@@ -1,0 +1,102 @@
+"use client";
+
+import { useGame } from "@/components/GameProvider";
+import { MetricCard } from "@/components/MetricCard";
+import { formatCurrency, formatPercent } from "@/lib/formatters";
+import clsx from "clsx";
+import { Medal, Trophy, UsersRound } from "lucide-react";
+
+export default function LeaderboardPage() {
+  const { leaderboard } = useGame();
+  const currentRank = leaderboard.findIndex((entry) => entry.isCurrentUser) + 1;
+  const leader = leaderboard[0];
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <p className="text-xs font-bold uppercase tracking-wide text-brass">Leaderboard</p>
+        <h1 className="mt-2 text-4xl font-black">Market standings</h1>
+      </div>
+
+      <section className="grid gap-3 md:grid-cols-3">
+        <MetricCard
+          label="Your rank"
+          value={`#${currentRank}`}
+          detail={`${leaderboard.length} traders`}
+          icon={<Trophy className="h-4 w-4" />}
+          tone="warm"
+        />
+        <MetricCard
+          label="Leader"
+          value={leader.username}
+          detail={formatCurrency(leader.portfolioValue)}
+          icon={<Medal className="h-4 w-4" />}
+          tone="good"
+        />
+        <MetricCard
+          label="Field"
+          value={`${leaderboard.length}`}
+          detail="Public rankings"
+          icon={<UsersRound className="h-4 w-4" />}
+          tone="cool"
+        />
+      </section>
+
+      <section className="rounded-md border border-line bg-panel/86 shadow-market">
+        <div className="overflow-x-auto scrollbar-thin">
+          <table className="w-full min-w-[720px] border-collapse">
+            <thead>
+              <tr className="border-b border-line text-left text-xs font-bold uppercase tracking-wide text-paper/42">
+                <th className="px-4 py-3">Rank</th>
+                <th className="px-4 py-3">Trader</th>
+                <th className="px-4 py-3 text-right">Portfolio value</th>
+                <th className="px-4 py-3 text-right">Cash</th>
+                <th className="px-4 py-3 text-right">Gain</th>
+              </tr>
+            </thead>
+            <tbody>
+              {leaderboard.map((entry, index) => (
+                <tr
+                  key={entry.id}
+                  className={clsx(
+                    "border-b border-line/70 last:border-0",
+                    entry.isCurrentUser ? "bg-brass/10" : "hover:bg-white/[0.035]"
+                  )}
+                >
+                  <td className="px-4 py-4">
+                    <span
+                      className={clsx(
+                        "grid h-9 w-9 place-items-center rounded-md font-black",
+                        index === 0 ? "bg-brass text-ink" : "border border-line bg-black/20 text-paper/68"
+                      )}
+                    >
+                      {index + 1}
+                    </span>
+                  </td>
+                  <td className="px-4 py-4">
+                    <div className="font-black">{entry.username}</div>
+                    {entry.isCurrentUser ? <div className="text-sm font-bold text-brass">Current user</div> : null}
+                  </td>
+                  <td className="px-4 py-4 text-right font-black number-tabular">
+                    {formatCurrency(entry.portfolioValue)}
+                  </td>
+                  <td className="px-4 py-4 text-right number-tabular text-paper/62">
+                    {formatCurrency(entry.cashBalance)}
+                  </td>
+                  <td
+                    className={clsx(
+                      "px-4 py-4 text-right font-black number-tabular",
+                      entry.gainPercent >= 0 ? "text-mint" : "text-ember"
+                    )}
+                  >
+                    {formatPercent(entry.gainPercent)}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+  );
+}
