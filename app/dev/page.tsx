@@ -1,5 +1,6 @@
 "use client";
 
+import { useAuth } from "@/components/AuthProvider";
 import { formatDate, formatPercent } from "@/lib/formatters";
 import {
   AlertTriangle,
@@ -7,7 +8,6 @@ import {
   CheckCircle2,
   Cloud,
   Database,
-  Eye,
   FileWarning,
   LockKeyhole,
   PlayCircle,
@@ -55,6 +55,19 @@ type PreviewState =
     }
   | {
       status: "error";
+      message: string;
+    };
+
+type AdminAccessState =
+  | {
+      status: "loading";
+    }
+  | {
+      status: "granted";
+      email: string | null;
+    }
+  | {
+      status: "denied";
       message: string;
     };
 
@@ -148,14 +161,88 @@ const signalCategories = [
 ];
 
 export default function DevPage() {
+  const { configured: authConfigured, loading: authLoading, session } = useAuth();
+  const [adminAccess, setAdminAccess] = useState<AdminAccessState>({ status: "loading" });
   const [cloudStatus, setCloudStatus] = useState<AsyncState<CloudStatus>>({ status: "loading" });
   const [marketHealth, setMarketHealth] = useState<AsyncState<MarketHealth>>({ status: "loading" });
   const [preview, setPreview] = useState<PreviewState>({ status: "idle" });
+  const adminHeaders = useMemo<Record<string, string>>(() => {
+    if (!session) {
+      return {} as Record<string, string>;
+    }
+
+    return {
+      authorization: `Bearer ${session.access_token}`
+    };
+  }, [session]);
 
   useEffect(() => {
+    if (authLoading) {
+      setAdminAccess({ status: "loading" });
+      return;
+    }
+
+    if (!authConfigured) {
+      setAdminAccess({
+        status: "denied",
+        message: "Supabase auth is not configured, so admin access cannot be verified."
+      });
+      return;
+    }
+
+    if (!session) {
+      setAdminAccess({
+        status: "denied",
+        message: "Sign in with an admin account to access market operations."
+      });
+      return;
+    }
+
+    let active = true;
+    setAdminAccess({ status: "loading" });
+
+    fetch("/api/admin/session", {
+      headers: adminHeaders
+    })
+      .then((response) => response.json().then((payload) => ({ ok: response.ok, payload })))
+      .then(({ ok, payload }) => {
+        if (!active) {
+          return;
+        }
+
+        if (!ok || !payload.ok) {
+          throw new Error(payload.error ?? "Admin access check failed.");
+        }
+
+        setAdminAccess({
+          status: "granted",
+          email: payload.email ?? null
+        });
+      })
+      .catch((error) => {
+        if (!active) {
+          return;
+        }
+
+        setAdminAccess({
+          status: "denied",
+          message: error instanceof Error ? error.message : "Admin access check failed."
+        });
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [adminHeaders, authConfigured, authLoading, session]);
+
+  useEffect(() => {
+    if (adminAccess.status !== "granted") {
+      return;
+    }
+
     void refreshCloudStatus();
     void refreshMarketHealth();
-  }, []);
+  }, [adminAccess.status]);
 
   const latestRunLabel = useMemo(() => {
     if (marketHealth.status !== "ready") {
@@ -203,7 +290,9 @@ export default function DevPage() {
     setMarketHealth({ status: "loading" });
 
     try {
-      const response = await fetch("/api/admin/market-health");
+      const response = await fetch("/api/admin/market-health", {
+        headers: adminHeaders
+      });
       const payload = await response.json();
 
       if (!response.ok || !payload.ok) {
@@ -229,7 +318,8 @@ export default function DevPage() {
       const response = await fetch("/api/admin/daily-market-update", {
         method: "POST",
         headers: {
-          "content-type": "application/json"
+          "content-type": "application/json",
+          ...adminHeaders
         },
         body: JSON.stringify({
           dryRun: true,
@@ -257,6 +347,10 @@ export default function DevPage() {
     }
   }
 
+  if (adminAccess.status !== "granted") {
+    return <AdminAccessGate state={adminAccess} />;
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
@@ -268,12 +362,12 @@ export default function DevPage() {
             and protected admin actions. Demo-only market reset controls do not belong here once Supabase is live.
           </p>
         </div>
-        <div className="rounded-md border border-ember/35 bg-ember/10 p-4 text-sm font-bold leading-6 text-ember">
+        <div className="rounded-md border border-mint/35 bg-mint/10 p-4 text-sm font-bold leading-6 text-mint">
           <div className="flex items-center gap-2">
-            <LockKeyhole className="h-4 w-4" />
-            Protect before launch
+            <ShieldCheck className="h-4 w-4" />
+            Admin-only access
           </div>
-          <p className="mt-1 text-ember/80">Add admin-only access before real users know this route exists.</p>
+          <p className="mt-1 text-mint/80">{adminAccess.email ?? "Verified admin session"}</p>
         </div>
       </div>
 
@@ -379,6 +473,28 @@ export default function DevPage() {
         </div>
       </section>
     </div>
+  );
+}
+
+function AdminAccessGate({ state }: { state: AdminAccessState }) {
+  const loading = state.status === "loading";
+  const message = state.status === "denied" ? state.message : "Checking your admin session...";
+
+  return (
+    <section className="mx-auto max-w-xl rounded-md border border-line bg-panel/88 p-6 shadow-market">
+      <div className="flex items-start gap-4">
+        <div className="grid h-11 w-11 shrink-0 place-items-center rounded-md bg-brass text-ink">
+          <LockKeyhole className="h-5 w-5" aria-hidden="true" />
+        </div>
+        <div>
+          <p className="text-xs font-bold uppercase tracking-wide text-paper/45">Operator console</p>
+          <h1 className="mt-2 text-3xl font-black">Admin access required</h1>
+          <p className="mt-3 text-sm leading-6 text-paper/58">
+            {loading ? "Checking your admin session..." : message}
+          </p>
+        </div>
+      </div>
+    </section>
   );
 }
 

@@ -42,6 +42,12 @@ export async function GET() {
       detail: config.marketUpdateSecretConfigured ? "Configured" : "Needed for protected admin updates"
     },
     {
+      id: "admin-emails",
+      label: "Admin emails",
+      ok: config.adminEmailsConfigured,
+      detail: config.adminEmailsConfigured ? "Configured" : "Needed to access the operator console"
+    },
+    {
       id: "cron-secret",
       label: "Cron secret",
       ok: true,

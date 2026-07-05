@@ -1,5 +1,6 @@
 import { clamp } from "@/lib/pricing";
 import type { MarketUpdateArtist } from "@/server/market/daily-update";
+import { buildDefaultGdeltQuery } from "@/server/market/artist-text-identifiers";
 import type {
   AdapterSignal,
   AdapterSignals,
@@ -282,7 +283,7 @@ function createObservation(
 }
 
 function getGdeltQuery(artist: MarketUpdateArtist, externalIds?: ArtistExternalIds) {
-  return externalIds?.gdeltQuery?.trim() || `"${artist.name}" rapper OR "${artist.name}" music`;
+  return externalIds?.gdeltQuery?.trim() || buildDefaultGdeltQuery(artist.name);
 }
 
 function buildGdeltArticleEvents({

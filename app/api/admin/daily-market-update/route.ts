@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServiceRoleClient, getSupabaseConfigStatus } from "@/lib/supabase/server";
 import type { HypeStats } from "@/lib/types";
+import { requireAdminRequest } from "@/server/admin-auth";
 import {
   calculateDailyMarketUpdates,
   mergeAdapterSignals,
@@ -20,6 +21,7 @@ import { collectLastfmMarketSignals } from "@/server/market/lastfm-source";
 import { collectMusicbrainzReleaseEvents } from "@/server/market/musicbrainz-releases";
 import { collectSpotifyMarketSignals } from "@/server/market/spotify-source";
 import { collectTradeFlowMarketSignals } from "@/server/market/trade-flow-source";
+import { collectWikimediaMarketSignals } from "@/server/market/wikimedia-source";
 import { collectYoutubeMarketSignals } from "@/server/market/youtube-source";
 import { collectYoutubeCommentMarketSignals } from "@/server/market/youtube-comments-source";
 import { getMockMarketArtists } from "@/server/market/mock-source";
@@ -62,7 +64,13 @@ type ArtistBatch = {
 const DEFAULT_LIVE_REAL_SOURCE_BATCH_SIZE = 50;
 const MAX_ARTIST_BATCH_SIZE = 100;
 
-export async function GET() {
+export async function GET(request: Request) {
+  const auth = await requireAdminRequest(request);
+
+  if (!auth.ok) {
+    return auth.response;
+  }
+
   return NextResponse.json({
     ok: true,
     config: getSupabaseConfigStatus(),
@@ -76,21 +84,22 @@ export async function POST(request: Request) {
   const source = normalizeSource(body.source);
   const runDate = body.runDate ?? getToday();
   const config = getSupabaseConfigStatus();
+  const auth = await requireAdminRequest(request);
+
+  if (!auth.ok) {
+    return auth.response;
+  }
 
   if (!dryRun) {
-    const secret = process.env.MARKET_UPDATE_SECRET;
-    const providedSecret = request.headers.get("x-market-update-secret");
-
-    if (!secret || providedSecret !== secret) {
+    if (auth.source !== "market-secret") {
       return NextResponse.json(
         {
           ok: false,
-          error: "Missing or invalid market update secret."
+          error: "Persisted market updates require the market update secret."
         },
         { status: 401 }
       );
     }
-
     if (!config.readyForAdminWrites) {
       return NextResponse.json(
         {
@@ -206,6 +215,7 @@ function normalizeSource(source: DailyUpdateBody["source"]): MarketUpdateSource 
     source === "lastfm" ||
     source === "spotify" ||
     source === "youtube" ||
+    source === "wikimedia" ||
     source === "core" ||
     source === "blended"
   ) {
@@ -334,6 +344,7 @@ function isRealExternalSource(source: MarketUpdateSource) {
     source === "lastfm" ||
     source === "spotify" ||
     source === "youtube" ||
+    source === "wikimedia" ||
     source === "core" ||
     source === "blended"
   );
@@ -394,10 +405,11 @@ async function collectRealSignals({
   const useLastfm = source === "lastfm" || source === "core" || source === "blended";
   const useSpotify = source === "spotify" || source === "core" || source === "blended";
   const useYoutube = source === "youtube" || source === "core" || source === "blended";
+  const useWikimedia = source === "wikimedia" || source === "core" || source === "blended";
   const useTradeFlow = Boolean(supabase) && isRealExternalSource(source);
   const warnings: string[] = [];
 
-  if (!useGdelt && !useLastfm && !useSpotify && !useYoutube) {
+  if (!useGdelt && !useLastfm && !useSpotify && !useYoutube && !useWikimedia) {
     return {
       adapterSignalSources: [],
       observations: [],
@@ -414,10 +426,19 @@ async function collectRealSignals({
   let spotifyBaselines: ObservationBaselines = {};
   let youtubeBaselines: ObservationBaselines = {};
   let youtubeCommentBaselines: ObservationBaselines = {};
+  let wikimediaBaselines: ObservationBaselines = {};
 
   if (supabase) {
     try {
-      [externalIds, gdeltBaselines, lastfmBaselines, spotifyBaselines, youtubeBaselines, youtubeCommentBaselines] = await Promise.all([
+      [
+        externalIds,
+        gdeltBaselines,
+        lastfmBaselines,
+        spotifyBaselines,
+        youtubeBaselines,
+        youtubeCommentBaselines,
+        wikimediaBaselines
+      ] = await Promise.all([
         loadArtistExternalIds(supabase, artistIds),
         useGdelt
           ? loadObservationBaselines({
@@ -474,6 +495,16 @@ async function collectRealSignals({
               beforeDate: runDate,
               lookbackDays: 30
             })
+          : Promise.resolve({}),
+        useWikimedia
+          ? loadObservationBaselines({
+              supabase,
+              artistIds,
+              source: "wikimedia",
+              metrics: ["pageviews_7d"],
+              beforeDate: runDate,
+              lookbackDays: 30
+            })
           : Promise.resolve({})
       ]);
     } catch (error) {
@@ -484,6 +515,7 @@ async function collectRealSignals({
       spotifyBaselines = {};
       youtubeBaselines = {};
       youtubeCommentBaselines = {};
+      wikimediaBaselines = {};
     }
   }
 
@@ -586,6 +618,22 @@ async function collectRealSignals({
       }
     } else {
       warnings.push("YouTube comment reaction signals skipped by quota guard.");
+    }
+  }
+
+  if (useWikimedia) {
+    const wikimedia = await collectExternalSource("public attention", warnings, () =>
+      collectWikimediaMarketSignals({
+        artists,
+        runDate,
+        baselines: wikimediaBaselines
+      })
+    );
+
+    if (wikimedia) {
+      sources.push(wikimedia.signals);
+      observations.push(...wikimedia.observations);
+      warnings.push(...wikimedia.warnings);
     }
   }
 

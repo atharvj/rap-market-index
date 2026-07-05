@@ -3,7 +3,16 @@ import type { AdapterSignal, AdapterSignals, MarketSignalModifier } from "@/serv
 import { getMarketModelVersion } from "@/server/market/model-version";
 import type { ArtistCategory, HypeStats } from "@/lib/types";
 
-export type MarketUpdateSource = "mock" | "manual" | "gdelt" | "lastfm" | "spotify" | "youtube" | "core" | "blended";
+export type MarketUpdateSource =
+  | "mock"
+  | "manual"
+  | "gdelt"
+  | "lastfm"
+  | "spotify"
+  | "youtube"
+  | "wikimedia"
+  | "core"
+  | "blended";
 
 type ResolvedMarketSignal = {
   stats: HypeStats;
@@ -249,6 +258,7 @@ function getSignalsForArtist(
     source === "lastfm" ||
     source === "spotify" ||
     source === "youtube" ||
+    source === "wikimedia" ||
     source === "core" ||
     source === "blended"
   ) {
@@ -452,6 +462,7 @@ function getDefaultSignalConfidence(sourceName: string) {
     youtube_comments: 0.68,
     spotify: 0.7,
     gdelt: 0.58,
+    wikimedia: 0.62,
     market_events: 0.78,
     trade_flow: 0.72,
     manual: 0.62,
@@ -488,6 +499,11 @@ function getStatSourceWeight(key: keyof HypeStats, sourceName: string) {
       searchGrowth: 0.75,
       socialGrowth: 0.4,
       newsScore: 0.7
+    },
+    wikimedia: {
+      searchGrowth: 0.72,
+      socialGrowth: 0.32,
+      newsScore: 0.52
     },
     market_events: {
       searchGrowth: 0.45,

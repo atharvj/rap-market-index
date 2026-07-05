@@ -27,7 +27,8 @@ This app still runs in development with unsaved demo data, but the backend found
    - `MARKET_CRON_MAX_BATCHES=4`
    - `MARKET_YOUTUBE_COMMENT_VIDEOS=0`
    - `MARKET_YOUTUBE_COMMENT_LIMIT=25`
-   - `MARKET_MODEL_VERSION=rmi-core-v2`
+   - `ADMIN_EMAILS=<comma-separated admin emails>`
+   - `MARKET_MODEL_VERSION=rmi-core-v3`
    - `LASTFM_API_KEY` for optional Last.fm listener/playcount signals
    - `SPOTIFY_CLIENT_ID` and `SPOTIFY_CLIENT_SECRET` for optional Spotify popularity/follower signals
    - `YOUTUBE_API_KEY` for optional YouTube channel view/subscriber/video-count and comment-reaction signals
@@ -95,7 +96,7 @@ with `x-market-update-secret` and a body like:
 }
 ```
 
-The resolver searches configured sources, ranks candidates by confidence, and returns proposed `artist_external_ids` records. It only persists proposed high-confidence records when `"dryRun": false`. Spotify candidate search requires `SPOTIFY_CLIENT_ID` and `SPOTIFY_CLIENT_SECRET`; YouTube candidate search requires `YOUTUBE_API_KEY`; MusicBrainz can run without a key but should be batched politely.
+The resolver fills safe text defaults for audience/news search fields, then searches configured exact-ID sources, ranks candidates by confidence, and returns proposed `artist_external_ids` records. It only persists proposed high-confidence exact IDs when `"dryRun": false`. Spotify candidate search requires `SPOTIFY_CLIENT_ID` and `SPOTIFY_CLIENT_SECRET`; YouTube candidate search requires `YOUTUBE_API_KEY`; MusicBrainz can run without a key but should be batched politely.
 
 ## Market health
 
@@ -137,7 +138,7 @@ After deployment, manually call `/api/cron/daily-market-update?dryRun=1` with `A
 
 `MARKET_MODEL_VERSION` is an internal audit label, not a prominent user-facing product label. It is saved on market runs, signal snapshots, and price-history rows so future algorithm changes can be traced without rewriting historical prices. Normal market pages should keep broad language such as audience momentum, market activity, release signals, and media movement. Admin/health/debug views can show the exact model version.
 
-`rmi-core-v2` adds signal-reliability scaling: broad, higher-confidence source coverage can move prices more than thin or single-source observations. This is intended to keep the market responsive while reducing overreaction to weak data.
+`rmi-core-v3` adds public-attention pageview momentum to the core model while keeping signal-reliability scaling. Broad, higher-confidence source coverage can move prices more than thin or single-source observations, which keeps the market responsive while reducing overreaction to weak data.
 
 ## Trading integrity controls
 
@@ -196,7 +197,7 @@ The combined source path is:
 }
 ```
 
-That combines GDELT coverage, Last.fm audience momentum, Spotify popularity/follower momentum, YouTube channel momentum, YouTube comment reaction, MusicBrainz release detection, and the market event/review layer. If optional source credentials are missing, the job returns a warning and skips that source instead of failing the whole dry run.
+That combines GDELT coverage, Last.fm audience momentum, public-attention pageview momentum, Spotify popularity/follower momentum, YouTube channel momentum, YouTube comment reaction, MusicBrainz release detection, and the market event/review layer. If optional source credentials are missing, the job returns a warning and skips that source instead of failing the whole dry run.
 
 The production daily source is:
 
@@ -209,7 +210,7 @@ The production daily source is:
 }
 ```
 
-`core` combines Last.fm, YouTube channel stats, MusicBrainz release detection, trade-flow demand, and Spotify when Spotify credentials are configured. YouTube comments are optional and disabled by default with `MARKET_YOUTUBE_COMMENT_VIDEOS=0`. `core` intentionally skips GDELT because the free news endpoint can be slow or rate-limited. Use `blended` when you intentionally want to include GDELT/news in a supervised run.
+`core` combines Last.fm, public attention, YouTube channel stats, MusicBrainz release detection, trade-flow demand, and Spotify when Spotify credentials are configured. YouTube comments are optional and disabled by default with `MARKET_YOUTUBE_COMMENT_VIDEOS=0`. `core` intentionally skips GDELT because the free news endpoint can be slow or rate-limited. Use `blended` when you intentionally want to include GDELT/news in a supervised run.
 
 When enabled, the YouTube comments path samples recent comments from each artist's official channel. It stores aggregate observations only:
 
@@ -293,7 +294,7 @@ The route skips duplicate same-day runs when a successful or running `core` run 
 
 The market event layer stores releases, reviews, news, controversies, awards, tour announcements, and viral moments. These events can adjust the final price movement after raw momentum is calculated, so a stream spike with weak reviews can still rise, but by less than a stream spike with strong reviews.
 
-Blended market runs use a confidence-weighted ensemble. Each adapter contributes most strongly to the stats it actually measures: Last.fm to streaming momentum, YouTube channel stats to video momentum, YouTube comments to fan/social reaction, GDELT to news/search, Spotify to streaming/search proxies, trade flow to trading demand, and market events to release/news/social modifiers. This keeps the result from depending on adapter order and makes weak or indirect inputs less dominant.
+Blended market runs use a confidence-weighted ensemble. Each adapter contributes most strongly to the stats it actually measures: Last.fm to streaming momentum, public-attention pageviews to search/media attention, YouTube channel stats to video momentum, YouTube comments to fan/social reaction, GDELT to news/search, Spotify to streaming/search proxies, trade flow to trading demand, and market events to release/news/social modifiers. This keeps the result from depending on adapter order and makes weak or indirect inputs less dominant.
 
 The admin event ingestion endpoint is:
 
@@ -404,6 +405,7 @@ Supported ranges are `1M`, `3M`, `6M`, `1Y`, and `ALL`. The artist detail page u
 Historical backfill depends on the source:
 
 - Last.fm `artist.getInfo` gives current listener/playcount totals, not reliable daily history. It is useful from the day we start tracking.
+- Public attention pageviews can be queried for recent daily windows, but price movement should still use collected baseline comparisons rather than raw popularity.
 - Spotify artist popularity and followers are mostly current snapshots unless we use a separate historical provider or have already been collecting them.
 - YouTube channel statistics are current snapshots. They become useful for charts and price movement once the app has collected daily observations for each artist's official channel.
 - GDELT can be queried historically by date window, so it is a realistic free candidate for backfilling news/article momentum.
@@ -416,6 +418,7 @@ For launch, the honest product behavior should be "since listing" until enough r
 - GDELT news coverage adapter.
 - GDELT article-to-event detector for reviews/news/controversies.
 - Last.fm listener/playcount momentum adapter.
+- Public-attention pageview momentum adapter.
 - Spotify artist popularity/follower momentum adapter.
 - YouTube channel view/subscriber/video-count momentum adapter.
 - YouTube comment-reaction adapter.

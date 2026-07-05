@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServiceRoleClient, getSupabaseConfigStatus } from "@/lib/supabase/server";
 import type { Database } from "@/lib/supabase/database.types";
+import { requireAdminRequest } from "@/server/admin-auth";
 import { getMarketModelVersion } from "@/server/market/model-version";
 import { loadActiveArtists, loadArtistExternalIds } from "@/server/market/supabase-repository";
 
@@ -21,6 +22,7 @@ type SourceCoverage = {
   configuredCount: number;
   missingCount: number;
   coveragePercent: number;
+  warningThreshold: number | null;
 };
 
 type ObservationHealth = {
@@ -37,11 +39,11 @@ type ObservationHealth = {
 };
 
 const SOURCE_ID_FIELDS = [
-  { key: "lastfmName", label: "Last.fm names" },
-  { key: "gdeltQuery", label: "GDELT queries" },
-  { key: "spotifyId", label: "Spotify artist IDs" },
-  { key: "youtubeChannelId", label: "YouTube channel IDs" },
-  { key: "musicbrainzId", label: "MusicBrainz IDs" }
+  { key: "lastfmName", label: "Audience search names", warningThreshold: 80 },
+  { key: "gdeltQuery", label: "News search queries", warningThreshold: 80 },
+  { key: "spotifyId", label: "Spotify exact IDs", warningThreshold: null },
+  { key: "youtubeChannelId", label: "YouTube exact IDs", warningThreshold: null },
+  { key: "musicbrainzId", label: "Release database IDs", warningThreshold: null }
 ] as const;
 
 const OBSERVATION_SERIES = [
@@ -53,6 +55,8 @@ const OBSERVATION_SERIES = [
   { source: "youtube", metric: "subscriber_count", label: "YouTube subscribers" },
   { source: "youtube_comments", metric: "comment_sentiment", label: "YouTube comment sentiment" },
   { source: "youtube_comments", metric: "comment_count", label: "YouTube comments sampled" },
+  { source: "wikimedia", metric: "pageviews_7d", label: "Public attention 7-day views" },
+  { source: "wikimedia", metric: "pageviews_1d", label: "Public attention 1-day views" },
   { source: "gdelt", metric: "article_count", label: "News article count" },
   { source: "trade_flow", metric: "net_order_value", label: "Trade-flow net order value" },
   { source: "trade_flow", metric: "trade_count", label: "Trade-flow trades" },
@@ -62,6 +66,12 @@ const OBSERVATION_SERIES = [
 const MAX_OBSERVATION_ROWS = 20000;
 
 export async function GET(request: Request) {
+  const auth = await requireAdminRequest(request);
+
+  if (!auth.ok) {
+    return auth.response;
+  }
+
   const config = getSupabaseConfigStatus();
 
   if (!config.readyForAdminWrites) {
@@ -249,7 +259,8 @@ function buildSourceCoverage({
       label: field.label,
       configuredCount,
       missingCount: Math.max(0, activeArtistCount - configuredCount),
-      coveragePercent: getPercent(configuredCount, activeArtistCount)
+      coveragePercent: getPercent(configuredCount, activeArtistCount),
+      warningThreshold: field.warningThreshold
     };
   });
 }
@@ -379,7 +390,7 @@ function buildWarnings({
   }
 
   for (const coverage of sourceCoverage) {
-    if (coverage.coveragePercent < 60) {
+    if (coverage.warningThreshold !== null && coverage.coveragePercent < coverage.warningThreshold) {
       warnings.push(`${coverage.label} coverage is ${coverage.coveragePercent.toFixed(1)}%.`);
     }
   }

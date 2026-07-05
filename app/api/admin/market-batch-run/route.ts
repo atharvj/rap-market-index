@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServiceRoleClient, getSupabaseConfigStatus } from "@/lib/supabase/server";
 import type { Json } from "@/lib/supabase/database.types";
+import { requireAdminRequest } from "@/server/admin-auth";
 import type { MarketUpdateSource } from "@/server/market/daily-update";
 import { getMarketModelVersion } from "@/server/market/model-version";
 
@@ -74,7 +75,13 @@ const DEFAULT_BATCH_SIZE = 50;
 const MAX_BATCH_SIZE = 100;
 const MAX_BATCHES_PER_REQUEST = 10;
 
-export async function GET() {
+export async function GET(request: Request) {
+  const auth = await requireAdminRequest(request);
+
+  if (!auth.ok) {
+    return auth.response;
+  }
+
   return NextResponse.json({
     ok: true,
     config: getSupabaseConfigStatus(),
@@ -208,6 +215,7 @@ function normalizeSource(source: MarketBatchRunBody["source"]): MarketUpdateSour
     source === "lastfm" ||
     source === "spotify" ||
     source === "youtube" ||
+    source === "wikimedia" ||
     source === "core" ||
     source === "blended"
   ) {

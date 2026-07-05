@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createServiceRoleClient, getSupabaseConfigStatus } from "@/lib/supabase/server";
+import { requireAdminRequest } from "@/server/admin-auth";
 import {
   flattenEvents,
   normalizeManualMarketEventList,
@@ -15,6 +16,12 @@ type MarketEventsBody = {
 };
 
 export async function GET(request: Request) {
+  const auth = await requireAdminRequest(request);
+
+  if (!auth.ok) {
+    return auth.response;
+  }
+
   const config = getSupabaseConfigStatus();
 
   if (!config.readyForAdminWrites) {

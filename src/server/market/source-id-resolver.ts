@@ -1,4 +1,5 @@
 import type { MarketUpdateArtist } from "@/server/market/daily-update";
+import { buildDefaultGdeltQuery, buildDefaultLastfmName } from "@/server/market/artist-text-identifiers";
 import type { ArtistExternalIds } from "@/server/market/market-data";
 import type { ArtistExternalIdUpsert } from "@/server/market/supabase-repository";
 
@@ -221,7 +222,8 @@ export async function resolveArtistSourceIds({
     }
 
     const proposedRecord = buildProposedRecord({
-      artistId: artist.id,
+      artist,
+      existing,
       candidates,
       minConfidence
     });
@@ -596,11 +598,13 @@ async function fetchJson({
 }
 
 function buildProposedRecord({
-  artistId,
+  artist,
+  existing,
   candidates,
   minConfidence
 }: {
-  artistId: string;
+  artist: MarketUpdateArtist;
+  existing?: ArtistExternalIds;
   candidates: Partial<Record<ResolverSource, SourceIdCandidate[]>>;
   minConfidence: number;
 }): ArtistExternalIdUpsert | null {
@@ -608,8 +612,16 @@ function buildProposedRecord({
   const youtube = candidates.youtube?.[0];
   const musicbrainz = candidates.musicbrainz?.[0];
   const record: ArtistExternalIdUpsert = {
-    artistId
+    artistId: artist.id
   };
+
+  if (!existing?.lastfmName) {
+    record.lastfmName = buildDefaultLastfmName(artist.name);
+  }
+
+  if (!existing?.gdeltQuery) {
+    record.gdeltQuery = buildDefaultGdeltQuery(artist.name);
+  }
 
   if (spotify && spotify.confidence >= minConfidence) {
     record.spotifyId = spotify.externalId;

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createServiceRoleClient, getSupabaseConfigStatus } from "@/lib/supabase/server";
+import { requireAdminRequest } from "@/server/admin-auth";
 import {
   loadActiveArtists,
   loadArtistExternalIds,
@@ -31,7 +32,13 @@ type SourceIdsBody = {
 
 const MAX_RECORDS_PER_REQUEST = 500;
 
-export async function GET() {
+export async function GET(request: Request) {
+  const auth = await requireAdminRequest(request);
+
+  if (!auth.ok) {
+    return auth.response;
+  }
+
   const config = getSupabaseConfigStatus();
 
   if (!config.readyForAdminWrites) {
@@ -82,16 +89,18 @@ export async function POST(request: Request) {
   const config = getSupabaseConfigStatus();
   const body = await parseBody(request);
   const dryRun = body.dryRun !== false;
+  const auth = await requireAdminRequest(request);
+
+  if (!auth.ok) {
+    return auth.response;
+  }
 
   if (!dryRun) {
-    const secret = process.env.MARKET_UPDATE_SECRET;
-    const providedSecret = request.headers.get("x-market-update-secret");
-
-    if (!secret || providedSecret !== secret) {
+    if (auth.source !== "market-secret") {
       return NextResponse.json(
         {
           ok: false,
-          error: "Missing or invalid market update secret."
+          error: "Persisted artist source ID updates require the market update secret."
         },
         { status: 401 }
       );

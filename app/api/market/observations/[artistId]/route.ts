@@ -80,6 +80,14 @@ const SERIES_DEFINITIONS: Record<string, { label: string; unit: string }> = {
     label: "News sources",
     unit: "sources"
   },
+  "wikimedia:pageviews_7d": {
+    label: "Public attention",
+    unit: "views"
+  },
+  "wikimedia:pageviews_1d": {
+    label: "Daily public attention",
+    unit: "views"
+  },
   "trade_flow:buy_value": {
     label: "Buy order value",
     unit: "cash"
