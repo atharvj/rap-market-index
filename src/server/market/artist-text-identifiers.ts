@@ -19,10 +19,19 @@ const WIKIPEDIA_SEARCH_OVERRIDES: Record<string, string> = {
   che: '"Che" rapper musician',
   future: '"Future" rapper musician',
   ian: '"ian" rapper musician',
-  jayz: '"Jay-Z" rapper musician',
+  "jay-z": '"Jay-Z" rapper musician',
   protect: '"Protect" rapper musician',
   tana: '"Tana" rapper BabySantana musician',
   ye: '"Ye" Kanye West rapper musician'
+};
+
+const WIKIPEDIA_TITLE_OVERRIDES: Record<string, string[]> = {
+  "asap-rocky": ["ASAP Rocky", "A$AP Rocky"],
+  autumn: ["Autumn!"],
+  future: ["Future (rapper)", "Future"],
+  "jay-z": ["Jay-Z"],
+  tana: ["Tana (rapper)", "BabySantana"],
+  ye: ["Kanye West", "Ye"]
 };
 
 export function buildDefaultLastfmName(artistName: string) {
@@ -50,7 +59,22 @@ export function buildWikipediaSearchQuery(artistName: string) {
     return override;
   }
 
-  return `"${artistName.trim()}" rapper musician hip hop`;
+  return `${artistName.trim()} rapper musician hip hop`;
+}
+
+export function buildWikipediaTitleCandidates(artistName: string) {
+  const key = getArtistTextKey(artistName);
+  const candidates = WIKIPEDIA_TITLE_OVERRIDES[key] ?? [];
+  const cleanName = artistName.trim();
+  const normalizedDollarName = cleanName.replace(/\$/g, "S");
+
+  return Array.from(
+    new Set([
+      ...candidates,
+      cleanName,
+      normalizedDollarName !== cleanName ? normalizedDollarName : null
+    ].filter((value): value is string => Boolean(value)))
+  );
 }
 
 export function getArtistTextKey(artistName: string) {

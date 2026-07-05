@@ -30,6 +30,7 @@ type ObservationHealth = {
   label: string;
   source: string;
   metric: string;
+  warningThreshold: number | null;
   latestDate: string | null;
   observedArtistCount: number;
   freshArtistCount: number;
@@ -47,20 +48,20 @@ const SOURCE_ID_FIELDS = [
 ] as const;
 
 const OBSERVATION_SERIES = [
-  { source: "lastfm", metric: "listeners", label: "Last.fm listeners" },
-  { source: "lastfm", metric: "playcount", label: "Last.fm plays" },
-  { source: "spotify", metric: "popularity", label: "Spotify popularity" },
-  { source: "spotify", metric: "followers_total", label: "Spotify followers" },
-  { source: "youtube", metric: "channel_views", label: "YouTube views" },
-  { source: "youtube", metric: "subscriber_count", label: "YouTube subscribers" },
-  { source: "youtube_comments", metric: "comment_sentiment", label: "YouTube comment sentiment" },
-  { source: "youtube_comments", metric: "comment_count", label: "YouTube comments sampled" },
-  { source: "wikimedia", metric: "pageviews_7d", label: "Public attention 7-day views" },
-  { source: "wikimedia", metric: "pageviews_1d", label: "Public attention 1-day views" },
-  { source: "gdelt", metric: "article_count", label: "News article count" },
-  { source: "trade_flow", metric: "net_order_value", label: "Trade-flow net order value" },
-  { source: "trade_flow", metric: "trade_count", label: "Trade-flow trades" },
-  { source: "trade_flow", metric: "unique_trader_count", label: "Trade-flow traders" }
+  { source: "lastfm", metric: "listeners", label: "Audience listeners", warningThreshold: 80 },
+  { source: "lastfm", metric: "playcount", label: "Audience plays", warningThreshold: 80 },
+  { source: "wikimedia", metric: "pageviews_7d", label: "Public attention 7-day views", warningThreshold: null },
+  { source: "wikimedia", metric: "pageviews_1d", label: "Public attention 1-day views", warningThreshold: null },
+  { source: "youtube", metric: "channel_views", label: "Video views", warningThreshold: null },
+  { source: "youtube", metric: "subscriber_count", label: "Video subscribers", warningThreshold: null },
+  { source: "spotify", metric: "popularity", label: "Spotify popularity", warningThreshold: null },
+  { source: "spotify", metric: "followers_total", label: "Spotify followers", warningThreshold: null },
+  { source: "youtube_comments", metric: "comment_sentiment", label: "Comment sentiment", warningThreshold: null },
+  { source: "youtube_comments", metric: "comment_count", label: "Comments sampled", warningThreshold: null },
+  { source: "gdelt", metric: "article_count", label: "News article count", warningThreshold: null },
+  { source: "trade_flow", metric: "net_order_value", label: "Trade-flow net order value", warningThreshold: null },
+  { source: "trade_flow", metric: "trade_count", label: "Trade-flow trades", warningThreshold: null },
+  { source: "trade_flow", metric: "unique_trader_count", label: "Trade-flow traders", warningThreshold: null }
 ] as const;
 
 const MAX_OBSERVATION_ROWS = 20000;
@@ -302,6 +303,7 @@ function buildObservationHealth({
       label: series.label,
       source: series.source,
       metric: series.metric,
+      warningThreshold: series.warningThreshold,
       latestDate: latestDates.sort().at(-1) ?? null,
       observedArtistCount,
       freshArtistCount,
@@ -381,14 +383,6 @@ function buildWarnings({
     warnings.push("CRON_SECRET is missing, so scheduled production market updates are not ready.");
   }
 
-  if (!config.spotifyCredentialsConfigured) {
-    warnings.push("Spotify credentials are missing, so Spotify signals are skipped.");
-  }
-
-  if (!config.youtubeApiKeyConfigured) {
-    warnings.push("YouTube API key is missing, so YouTube signals are skipped.");
-  }
-
   for (const coverage of sourceCoverage) {
     if (coverage.warningThreshold !== null && coverage.coveragePercent < coverage.warningThreshold) {
       warnings.push(`${coverage.label} coverage is ${coverage.coveragePercent.toFixed(1)}%.`);
@@ -396,7 +390,7 @@ function buildWarnings({
   }
 
   for (const health of observationHealth) {
-    if (health.freshCoveragePercent < 50 && health.observedArtistCount > 0) {
+    if (health.warningThreshold !== null && health.freshCoveragePercent < health.warningThreshold) {
       warnings.push(`${health.label} fresh coverage is ${health.freshCoveragePercent.toFixed(1)}%.`);
     }
   }

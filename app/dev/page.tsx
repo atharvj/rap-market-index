@@ -627,7 +627,7 @@ function MarketHealthPanel({ data }: { data: MarketHealth }) {
             Warnings
           </div>
           <ul className="mt-2 space-y-1 text-sm leading-6 text-paper/62">
-            {data.warnings.slice(0, 5).map((warning) => (
+            {data.warnings.map((warning) => (
               <li key={warning}>{warning}</li>
             ))}
           </ul>
@@ -641,7 +641,7 @@ function MarketHealthPanel({ data }: { data: MarketHealth }) {
         detail: `${item.configuredCount} mapped, ${item.missingCount} missing`
       }))} />
 
-      <CoverageGrid title="Observation freshness" items={data.observationHealth.slice(0, 8).map((item) => ({
+      <CoverageGrid title="Observation freshness" items={data.observationHealth.map((item) => ({
         key: item.key,
         label: item.label,
         value: formatPercent(item.freshCoveragePercent),

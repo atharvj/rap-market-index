@@ -1,6 +1,10 @@
 import { clamp } from "@/lib/pricing";
 import type { MarketUpdateArtist } from "@/server/market/daily-update";
-import { buildWikipediaSearchQuery, getArtistTextKey } from "@/server/market/artist-text-identifiers";
+import {
+  buildWikipediaSearchQuery,
+  buildWikipediaTitleCandidates,
+  getArtistTextKey
+} from "@/server/market/artist-text-identifiers";
 import type {
   AdapterSignal,
   AdapterSignals,
@@ -26,6 +30,23 @@ type WikipediaSearchResponse = {
       pageid?: number;
       wordcount?: number;
     }>;
+  };
+  error?: {
+    info?: string;
+  };
+};
+
+type WikipediaPageQueryResponse = {
+  query?: {
+    pages?: Record<
+      string,
+      {
+        pageid?: number;
+        title?: string;
+        missing?: string;
+        extract?: string;
+      }
+    >;
   };
   error?: {
     info?: string;
@@ -232,6 +253,16 @@ async function resolveWikipediaArticle({
   timeoutMs: number;
   fetchImpl: typeof fetch;
 }): Promise<{ ok: true; candidate: WikipediaCandidate } | { ok: false; error: string }> {
+  const titleCandidate = await resolveWikipediaTitleCandidate({
+    artist,
+    timeoutMs,
+    fetchImpl
+  });
+
+  if (titleCandidate.ok) {
+    return titleCandidate;
+  }
+
   const url = new URL("https://en.wikipedia.org/w/api.php");
 
   url.searchParams.set("action", "query");
@@ -293,6 +324,87 @@ async function resolveWikipediaArticle({
   return {
     ok: true,
     candidate: best
+  };
+}
+
+async function resolveWikipediaTitleCandidate({
+  artist,
+  timeoutMs,
+  fetchImpl
+}: {
+  artist: MarketUpdateArtist;
+  timeoutMs: number;
+  fetchImpl: typeof fetch;
+}): Promise<{ ok: true; candidate: WikipediaCandidate } | { ok: false; error: string }> {
+  const titleCandidates = buildWikipediaTitleCandidates(artist.name);
+  const errors: string[] = [];
+
+  for (const title of titleCandidates) {
+    const url = new URL("https://en.wikipedia.org/w/api.php");
+
+    url.searchParams.set("action", "query");
+    url.searchParams.set("titles", title);
+    url.searchParams.set("redirects", "1");
+    url.searchParams.set("prop", "extracts");
+    url.searchParams.set("exintro", "1");
+    url.searchParams.set("explaintext", "1");
+    url.searchParams.set("format", "json");
+    url.searchParams.set("origin", "*");
+
+    const result = await fetchJson({
+      url: url.toString(),
+      timeoutMs,
+      fetchImpl,
+      headers: {
+        "user-agent": "rap-market-index/0.1 market research"
+      }
+    });
+
+    if (!result.ok) {
+      errors.push(result.error);
+      continue;
+    }
+
+    const parsed = result.value as WikipediaPageQueryResponse;
+
+    if (parsed.error?.info) {
+      errors.push(parsed.error.info);
+      continue;
+    }
+
+    const page = Object.values(parsed.query?.pages ?? {}).find((candidate) => candidate && !candidate.missing);
+
+    if (!page?.title) {
+      errors.push(`No Wikipedia page found for ${title}.`);
+      continue;
+    }
+
+    const score = scoreWikipediaCandidate({
+      artistName: artist.name,
+      title: page.title,
+      snippet: page.extract ?? ""
+    });
+
+    if (score.confidence < 0.55) {
+      errors.push(`${page.title} did not have enough artist context.`);
+      continue;
+    }
+
+    return {
+      ok: true,
+      candidate: {
+        title: page.title,
+        confidence: score.confidence,
+        reason: `Exact title lookup: ${score.reason}`,
+        snippet: page.extract,
+        pageId: page.pageid
+      }
+    };
+  }
+
+  return {
+    ok: false,
+    error: errors[0] ?? "No exact-title Wikipedia article match was found."
   };
 }
 
