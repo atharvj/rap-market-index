@@ -17,6 +17,7 @@ Rap Market Index uses Supabase for cloud accounts, saved portfolios, trades, mar
    - `supabase/migrations/008_market_model_version.sql`
    - `supabase/migrations/009_trade_manipulation_controls.sql`
    - `supabase/migrations/010_trade_order_guardrails.sql`
+   - `supabase/migrations/011_curated_artist_roster.sql`
    - `supabase/seed.sql`
 
 ## Configure the app
@@ -32,6 +33,8 @@ CRON_SECRET=
 MARKET_CRON_SOURCE=core
 MARKET_CRON_ARTIST_LIMIT=25
 MARKET_CRON_MAX_BATCHES=4
+MARKET_YOUTUBE_COMMENT_VIDEOS=0
+MARKET_YOUTUBE_COMMENT_LIMIT=25
 MARKET_MODEL_VERSION=rmi-core-v2
 LASTFM_API_KEY=
 SPOTIFY_CLIENT_ID=
@@ -39,7 +42,7 @@ SPOTIFY_CLIENT_SECRET=
 YOUTUBE_API_KEY=
 ```
 
-Use long random values for `MARKET_UPDATE_SECRET` and `CRON_SECRET`. The service role key must stay server-only. `CRON_SECRET` is used by Vercel Cron to trigger the scheduled market update endpoint. `MARKET_CRON_SOURCE=core` runs the production daily market from Last.fm, YouTube channel stats, YouTube comments, MusicBrainz release detection, and Spotify if credentials are configured. `MARKET_MODEL_VERSION` is an internal audit label saved with market runs and price history; keep it at `rmi-core-v2` until the pricing algorithm materially changes. MusicBrainz release detection does not require an API key, but artists need `musicbrainz_id` set in `artist_external_ids`. `LASTFM_API_KEY` is optional, but it enables the free Last.fm listener/playcount market signal adapter. `SPOTIFY_CLIENT_ID` and `SPOTIFY_CLIENT_SECRET` are optional, but they enable Spotify artist popularity and follower signals. `YOUTUBE_API_KEY` is optional, but it enables YouTube channel view/subscriber/video-count and comment-reaction signals for artists with `youtube_channel_id` set in `artist_external_ids`.
+Use long random values for `MARKET_UPDATE_SECRET` and `CRON_SECRET`. The service role key must stay server-only. `CRON_SECRET` is used by Vercel Cron to trigger the scheduled market update endpoint. `MARKET_CRON_SOURCE=core` runs the production daily market from Last.fm, YouTube channel stats, MusicBrainz release detection, trade flow, and Spotify if credentials are configured. YouTube comment sentiment is off by default; set `MARKET_YOUTUBE_COMMENT_VIDEOS=1` only when you want to spend extra YouTube quota on comments. `MARKET_MODEL_VERSION` is an internal audit label saved with market runs and price history; keep it at `rmi-core-v2` until the pricing algorithm materially changes. MusicBrainz release detection does not require an API key, but artists need `musicbrainz_id` set in `artist_external_ids`. `LASTFM_API_KEY` is optional, but it enables the free Last.fm listener/playcount market signal adapter. `SPOTIFY_CLIENT_ID` and `SPOTIFY_CLIENT_SECRET` are optional, but they enable Spotify artist popularity and follower signals. `YOUTUBE_API_KEY` is optional, but it enables YouTube channel view/subscriber/video-count signals for artists with `youtube_channel_id` set in `artist_external_ids`.
 
 ## Verify
 
@@ -53,7 +56,7 @@ The Cloud setup panel should show:
 
 - Project URL configured.
 - Public anon key configured.
-- 10 active artists.
+- 55 active artists.
 - Watchlist storage configured.
 - Market engine storage configured.
 - Server service key configured.

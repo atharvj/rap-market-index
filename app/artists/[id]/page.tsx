@@ -49,7 +49,7 @@ export default function ArtistDetailPage() {
                 <span className="rounded-md bg-brass px-2.5 py-1 text-xs font-black text-ink">{artist.ticker}</span>
                 <WatchlistButton artistId={artist.id} label />
               </div>
-              <p className="mt-2 text-sm font-bold capitalize text-paper/50">{artist.category} market listing</p>
+              <p className="mt-2 text-sm font-bold text-paper/50">Market listing</p>
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-3 md:justify-end">

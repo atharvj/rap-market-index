@@ -8,24 +8,14 @@ import { TradeTicket } from "@/components/TradeTicket";
 import { WatchlistButton } from "@/components/WatchlistButton";
 import { formatCurrency, formatPercent } from "@/lib/formatters";
 import { STARTING_CASH } from "@/lib/market";
-import type { Artist, ArtistCategory } from "@/lib/types";
-import clsx from "clsx";
+import type { Artist } from "@/lib/types";
 import { Flame, Search, Sparkles, TrendingUp, WalletCards } from "lucide-react";
 import Link from "next/link";
 import { useMemo, useState } from "react";
 
-const categoryFilters: Array<"all" | ArtistCategory> = [
-  "all",
-  "superstar",
-  "mainstream",
-  "rising",
-  "underground"
-];
-
 export default function MarketPage() {
   const { state, portfolioValue, portfolioDayChange } = useGame();
   const [query, setQuery] = useState("");
-  const [category, setCategory] = useState<(typeof categoryFilters)[number]>("all");
   const [selectedArtistId, setSelectedArtistId] = useState(state.artists[0]?.id ?? "");
   const [ticketKey, setTicketKey] = useState(0);
   const [side, setSide] = useState<"buy" | "sell">("buy");
@@ -36,15 +26,14 @@ export default function MarketPage() {
     const normalizedQuery = query.trim().toLowerCase();
 
     return state.artists.filter((artist) => {
-      const matchesCategory = category === "all" || artist.category === category;
       const matchesQuery =
         !normalizedQuery ||
         artist.name.toLowerCase().includes(normalizedQuery) ||
         artist.ticker.toLowerCase().includes(normalizedQuery);
 
-      return matchesCategory && matchesQuery;
+      return matchesQuery;
     });
-  }, [category, query, state.artists]);
+  }, [query, state.artists]);
 
   const topMover = [...state.artists].sort((a, b) => b.dailyChangePercent - a.dailyChangePercent)[0];
   const topHype = [...state.artists].sort((a, b) => b.hypeScore - a.hypeScore)[0];
@@ -141,33 +130,14 @@ export default function MarketPage() {
             </div>
           </div>
 
-          <div className="flex gap-2 overflow-x-auto border-b border-line p-4 scrollbar-thin">
-            {categoryFilters.map((filter) => (
-              <button
-                key={filter}
-                type="button"
-                onClick={() => setCategory(filter)}
-                className={clsx(
-                  "min-h-9 shrink-0 rounded-md border px-3 text-sm font-bold capitalize transition",
-                  category === filter
-                    ? "border-brass bg-brass/90 text-ink"
-                    : "border-line bg-black/20 text-paper/60 hover:border-paper/25 hover:text-paper"
-                )}
-              >
-                {filter}
-              </button>
-            ))}
-          </div>
-
           <div className="overflow-x-auto scrollbar-thin">
-            <table className="w-full min-w-[780px] border-collapse">
+            <table className="w-full min-w-[680px] border-collapse">
               <thead>
                 <tr className="border-b border-line text-left text-xs font-bold uppercase tracking-wide text-paper/42">
                   <th className="px-4 py-3">Artist</th>
                   <th className="px-4 py-3 text-right">Price</th>
                   <th className="px-4 py-3 text-right">Daily</th>
                   <th className="px-4 py-3 text-right">Signal</th>
-                  <th className="px-4 py-3">Category</th>
                   <th className="px-4 py-3 text-right">Trade</th>
                 </tr>
               </thead>
@@ -193,11 +163,6 @@ export default function MarketPage() {
                       <ChangePill value={artist.dailyChangePercent} />
                     </td>
                     <td className="px-4 py-3 text-right font-black number-tabular">{artist.hypeScore}</td>
-                    <td className="px-4 py-3">
-                      <span className="rounded-md border border-line bg-black/20 px-2.5 py-1 text-xs font-bold capitalize text-paper/65">
-                        {artist.category}
-                      </span>
-                    </td>
                     <td className="px-4 py-3">
                       <div className="flex justify-end gap-2">
                         <button

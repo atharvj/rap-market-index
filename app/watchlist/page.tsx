@@ -59,14 +59,13 @@ export default function WatchlistPage() {
             <h2 className="text-xl font-black">Watchlist board</h2>
           </div>
           <div className="overflow-x-auto scrollbar-thin">
-            <table className="w-full min-w-[760px] border-collapse">
+            <table className="w-full min-w-[660px] border-collapse">
               <thead>
                 <tr className="border-b border-line text-left text-xs font-bold uppercase tracking-wide text-paper/42">
                   <th className="px-4 py-3">Artist</th>
                   <th className="px-4 py-3 text-right">Price</th>
                   <th className="px-4 py-3 text-right">Daily</th>
                   <th className="px-4 py-3 text-right">Signal</th>
-                  <th className="px-4 py-3">Category</th>
                   <th className="px-4 py-3 text-right">Trade</th>
                 </tr>
               </thead>
@@ -93,11 +92,6 @@ export default function WatchlistPage() {
                         <ChangePill value={artist.dailyChangePercent} />
                       </td>
                       <td className="px-4 py-3 text-right font-black number-tabular">{artist.hypeScore}</td>
-                      <td className="px-4 py-3">
-                        <span className="rounded-md border border-line bg-black/20 px-2.5 py-1 text-xs font-bold capitalize text-paper/65">
-                          {artist.category}
-                        </span>
-                      </td>
                       <td className="px-4 py-3 text-right">
                         <button
                           type="button"
@@ -112,7 +106,7 @@ export default function WatchlistPage() {
                   ))
                 ) : (
                   <tr>
-                    <td className="px-4 py-10 text-center text-paper/45" colSpan={6}>
+                    <td className="px-4 py-10 text-center text-paper/45" colSpan={5}>
                       No watched listings yet. Add artists from the market board.
                     </td>
                   </tr>

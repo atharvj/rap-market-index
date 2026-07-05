@@ -25,6 +25,8 @@ This app still runs in development with unsaved demo data, but the backend found
    - `MARKET_CRON_SOURCE=core`
    - `MARKET_CRON_ARTIST_LIMIT=25`
    - `MARKET_CRON_MAX_BATCHES=4`
+   - `MARKET_YOUTUBE_COMMENT_VIDEOS=0`
+   - `MARKET_YOUTUBE_COMMENT_LIMIT=25`
    - `MARKET_MODEL_VERSION=rmi-core-v2`
    - `LASTFM_API_KEY` for optional Last.fm listener/playcount signals
    - `SPOTIFY_CLIENT_ID` and `SPOTIFY_CLIENT_SECRET` for optional Spotify popularity/follower signals
@@ -207,9 +209,9 @@ The production daily source is:
 }
 ```
 
-`core` combines Last.fm, YouTube channel stats, YouTube comments, MusicBrainz release detection, trade-flow demand, and Spotify when Spotify credentials are configured. It intentionally skips GDELT because the free news endpoint can be slow or rate-limited. Use `blended` when you intentionally want to include GDELT/news in a supervised run.
+`core` combines Last.fm, YouTube channel stats, MusicBrainz release detection, trade-flow demand, and Spotify when Spotify credentials are configured. YouTube comments are optional and disabled by default with `MARKET_YOUTUBE_COMMENT_VIDEOS=0`. `core` intentionally skips GDELT because the free news endpoint can be slow or rate-limited. Use `blended` when you intentionally want to include GDELT/news in a supervised run.
 
-The YouTube path also samples recent comments from each artist's official channel. It stores aggregate observations only:
+When enabled, the YouTube comments path samples recent comments from each artist's official channel. It stores aggregate observations only:
 
 - `youtube_comments:comment_sentiment`
 - `youtube_comments:comment_count`
@@ -285,6 +287,7 @@ Vercel schedules cron in UTC, so this runs around 2 AM Pacific during daylight s
 - `source`: `MARKET_CRON_SOURCE`, default `core`
 - `artistLimit`: `MARKET_CRON_ARTIST_LIMIT`, default `25`
 - `maxBatches`: `MARKET_CRON_MAX_BATCHES`, default `4`
+- YouTube comments are quota-guarded separately. `MARKET_YOUTUBE_COMMENT_VIDEOS=0` keeps comment sentiment off; set it to `1` for limited comment sampling.
 
 The route skips duplicate same-day runs when a successful or running `core` run already exists. This matters because cron delivery is best-effort and can occasionally miss or duplicate invocations. For manual local testing, call the cron route with `x-market-update-secret: <MARKET_UPDATE_SECRET>`. Add `?dryRun=1` to exercise the full path without persisting another market run.
 
