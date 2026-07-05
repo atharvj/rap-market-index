@@ -303,9 +303,15 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       }
 
       const cost = shares * artist.currentPrice;
+      const holding = getHolding(artistId);
+      const remainingPositionValue = Math.max(0, portfolioValue * 0.25 - (holding?.currentValue ?? 0));
 
       if (cost > state.cashBalance) {
         return { ok: false, message: "Not enough cash for that order." };
+      }
+
+      if (cost > remainingPositionValue) {
+        return { ok: false, message: "Artist position limit is 25% of portfolio value." };
       }
 
       if (!session) {
@@ -329,7 +335,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
 
       return result;
     },
-    [getArtist, refreshServerState, session, state.cashBalance, syncMode]
+    [getArtist, getHolding, portfolioValue, refreshServerState, session, state.cashBalance, syncMode]
   );
 
   const sellShares = useCallback(

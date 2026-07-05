@@ -446,7 +446,7 @@ function formatMarketHealthError(error: unknown) {
     normalized.includes("model_version") ||
     normalized.includes("schema cache")
   ) {
-    return "Market engine storage needs setup. Run the Supabase migrations through 009_trade_manipulation_controls.sql.";
+    return "Market engine storage needs setup. Run the Supabase migrations through 010_trade_order_guardrails.sql.";
   }
 
   return message;

@@ -16,6 +16,7 @@ Rap Market Index uses Supabase for cloud accounts, saved portfolios, trades, mar
    - `supabase/migrations/007_market_events.sql`
    - `supabase/migrations/008_market_model_version.sql`
    - `supabase/migrations/009_trade_manipulation_controls.sql`
+   - `supabase/migrations/010_trade_order_guardrails.sql`
    - `supabase/seed.sql`
 
 ## Configure the app

@@ -14,7 +14,7 @@ export function TradeTicket({
   artist: Artist;
   defaultSide?: "buy" | "sell";
 }) {
-  const { buyShares, sellShares, getHolding, state, syncMode, serverRefreshing } = useGame();
+  const { buyShares, sellShares, getHolding, portfolioValue, state, syncMode, serverRefreshing } = useGame();
   const { loading: authLoading, session } = useAuth();
   const [side, setSide] = useState<"buy" | "sell">(defaultSide);
   const [shares, setShares] = useState("10");
@@ -23,8 +23,10 @@ export function TradeTicket({
   const parsedShares = Number(shares);
   const holding = getHolding(artist.id);
   const estimatedValue = Number.isFinite(parsedShares) ? parsedShares * artist.currentPrice : 0;
-  const maxBuy = Math.floor(state.cashBalance / artist.currentPrice);
   const maxSell = holding?.shares ?? 0;
+  const maxPositionValue = portfolioValue * 0.25;
+  const remainingPositionValue = Math.max(0, maxPositionValue - (holding?.currentValue ?? 0));
+  const maxBuy = Math.max(0, Math.min(state.cashBalance, remainingPositionValue) / artist.currentPrice);
   const tradeUnavailableReason = getTradeUnavailableReason({
     authLoading,
     hasSession: Boolean(session),
@@ -36,7 +38,7 @@ export function TradeTicket({
     !Number.isFinite(parsedShares) ||
     parsedShares <= 0 ||
     submitting ||
-    (side === "buy" ? estimatedValue > state.cashBalance : parsedShares > maxSell);
+    (side === "buy" ? estimatedValue > state.cashBalance || parsedShares > maxBuy : parsedShares > maxSell);
 
   const helper = useMemo(() => {
     if (tradeUnavailableReason) {

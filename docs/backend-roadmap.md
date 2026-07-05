@@ -14,8 +14,9 @@ This app still runs in development with unsaved demo data, but the backend found
 8. Run `supabase/migrations/007_market_events.sql`.
 9. Run `supabase/migrations/008_market_model_version.sql`.
 10. Run `supabase/migrations/009_trade_manipulation_controls.sql`.
-11. Run `supabase/seed.sql` for the starter artists.
-12. Copy `.env.example` to `.env.local` and fill in:
+11. Run `supabase/migrations/010_trade_order_guardrails.sql`.
+12. Run `supabase/seed.sql` for the starter artists.
+13. Copy `.env.example` to `.env.local` and fill in:
    - `NEXT_PUBLIC_SUPABASE_URL`
    - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
    - `SUPABASE_SERVICE_ROLE_KEY`
@@ -136,10 +137,11 @@ After deployment, manually call `/api/cron/daily-market-update?dryRun=1` with `A
 
 ## Trading integrity controls
 
-User trades should contribute to the market, but they should not overpower the real artist-momentum model. The current backend uses two controls:
+User trades should contribute to the market, but they should not overpower the real artist-momentum model. The current backend uses layered controls:
 
-- Immediate buy/sell impact is only a small quote nudge, with a per-order cap and a daily same-direction cap.
-- Daily trade-flow demand is discounted when activity comes from too few traders or when one trader accounts for too much of the order value.
+- Immediate buy/sell impact is only a small quote nudge with capped same-direction movement.
+- Daily trade-flow demand is discounted when activity lacks trader breadth or is heavily concentrated.
+- Trading RPCs enforce position sizing, rolling buy limits, and same-artist order cooldowns.
 
 This keeps the product closer to an HSX-style market where trading activity matters, while the durable price trend is still driven by audience growth, video activity, releases, news/reviews, and other external signals. If the market eventually adds public leaderboards or leagues, add account-level abuse checks before prizes, payouts, or season winners matter.
 
