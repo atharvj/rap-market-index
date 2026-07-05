@@ -97,6 +97,11 @@ const OBSERVATION_SERIES = [
   { source: "youtube_comments", metric: "comment_sentiment", label: "Comment sentiment", warningThreshold: null },
   { source: "youtube_comments", metric: "comment_count", label: "Comments sampled", warningThreshold: null },
   { source: "gdelt", metric: "article_count", label: "News article count", warningThreshold: null },
+  { source: "reddit", metric: "post_count", label: "Community post count", warningThreshold: null },
+  { source: "reddit", metric: "engagement_score", label: "Community engagement", warningThreshold: null },
+  { source: "reddit", metric: "hype_post_count", label: "Community hype posts", warningThreshold: null },
+  { source: "reddit", metric: "negative_post_count", label: "Community negative posts", warningThreshold: null },
+  { source: "reddit", metric: "catalyst_post_count", label: "Community catalyst posts", warningThreshold: null },
   { source: "trade_flow", metric: "net_order_value", label: "Trade-flow net order value", warningThreshold: null },
   { source: "trade_flow", metric: "trade_count", label: "Trade-flow trades", warningThreshold: null },
   { source: "trade_flow", metric: "unique_trader_count", label: "Trade-flow traders", warningThreshold: null }

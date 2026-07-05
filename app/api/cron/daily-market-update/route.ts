@@ -291,6 +291,7 @@ function normalizeSource(value: string | undefined): MarketUpdateSource {
     value === "spotify" ||
     value === "youtube" ||
     value === "wikimedia" ||
+    value === "reddit" ||
     value === "core" ||
     value === "blended"
   ) {

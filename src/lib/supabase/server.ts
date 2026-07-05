@@ -10,6 +10,7 @@ export type SupabaseConfigStatus = {
   lastfmApiKeyConfigured: boolean;
   spotifyCredentialsConfigured: boolean;
   youtubeApiKeyConfigured: boolean;
+  redditCredentialsConfigured: boolean;
   adminEmailsConfigured: boolean;
   readyForPublicReads: boolean;
   readyForAdminWrites: boolean;
@@ -24,6 +25,7 @@ export function getSupabaseConfigStatus(): SupabaseConfigStatus {
   const lastfmApiKeyConfigured = Boolean(process.env.LASTFM_API_KEY);
   const spotifyCredentialsConfigured = Boolean(process.env.SPOTIFY_CLIENT_ID && process.env.SPOTIFY_CLIENT_SECRET);
   const youtubeApiKeyConfigured = Boolean(process.env.YOUTUBE_API_KEY);
+  const redditCredentialsConfigured = Boolean(process.env.REDDIT_CLIENT_ID && process.env.REDDIT_CLIENT_SECRET);
   const adminEmailsConfigured = Boolean(process.env.ADMIN_EMAILS);
 
   return {
@@ -35,6 +37,7 @@ export function getSupabaseConfigStatus(): SupabaseConfigStatus {
     lastfmApiKeyConfigured,
     spotifyCredentialsConfigured,
     youtubeApiKeyConfigured,
+    redditCredentialsConfigured,
     adminEmailsConfigured,
     readyForPublicReads: urlConfigured && anonKeyConfigured,
     readyForAdminWrites: urlConfigured && serviceRoleConfigured && marketUpdateSecretConfigured

@@ -76,6 +76,14 @@ export async function GET() {
       detail: config.youtubeApiKeyConfigured
         ? "Configured"
         : "Optional; needed for YouTube channel and comment reaction signals"
+    },
+    {
+      id: "reddit-credentials",
+      label: "Reddit credentials",
+      ok: true,
+      detail: config.redditCredentialsConfigured
+        ? "Configured"
+        : "Optional; needed for community hype and snippet/performance signals"
     }
   ];
 

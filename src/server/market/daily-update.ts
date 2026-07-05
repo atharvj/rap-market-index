@@ -11,6 +11,7 @@ export type MarketUpdateSource =
   | "spotify"
   | "youtube"
   | "wikimedia"
+  | "reddit"
   | "core"
   | "blended";
 
@@ -345,6 +346,7 @@ function getSignalsForArtist(
     source === "spotify" ||
     source === "youtube" ||
     source === "wikimedia" ||
+    source === "reddit" ||
     source === "core" ||
     source === "blended"
   ) {
@@ -553,6 +555,7 @@ function getDefaultSignalConfidence(sourceName: string) {
     lastfm: 0.86,
     youtube: 0.84,
     youtube_comments: 0.68,
+    reddit: 0.64,
     spotify: 0.7,
     gdelt: 0.58,
     wikimedia: 0.62,
@@ -587,6 +590,11 @@ function getStatSourceWeight(key: keyof HypeStats, sourceName: string) {
       newsScore: 0.45,
       searchGrowth: 0.35,
       youtubeGrowth: 0.25
+    },
+    reddit: {
+      socialGrowth: 0.88,
+      searchGrowth: 0.55,
+      newsScore: 0.48
     },
     gdelt: {
       searchGrowth: 0.75,
@@ -771,6 +779,8 @@ function explainFlatMove(ticker: string, source: MarketUpdateSource) {
     source === "lastfm" ||
     source === "spotify" ||
     source === "youtube" ||
+    source === "wikimedia" ||
+    source === "reddit" ||
     source === "core" ||
     source === "blended"
   ) {

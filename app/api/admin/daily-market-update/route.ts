@@ -19,6 +19,7 @@ import {
 import { collectGdeltMarketSignals } from "@/server/market/gdelt-source";
 import { collectLastfmMarketSignals } from "@/server/market/lastfm-source";
 import { collectMusicbrainzReleaseEvents } from "@/server/market/musicbrainz-releases";
+import { collectRedditMarketSignals } from "@/server/market/reddit-source";
 import { collectSpotifyMarketSignals } from "@/server/market/spotify-source";
 import { collectTradeFlowMarketSignals } from "@/server/market/trade-flow-source";
 import { collectWikimediaMarketSignals } from "@/server/market/wikimedia-source";
@@ -227,6 +228,7 @@ function normalizeSource(source: DailyUpdateBody["source"]): MarketUpdateSource 
     source === "spotify" ||
     source === "youtube" ||
     source === "wikimedia" ||
+    source === "reddit" ||
     source === "core" ||
     source === "blended"
   ) {
@@ -356,6 +358,7 @@ function isRealExternalSource(source: MarketUpdateSource) {
     source === "spotify" ||
     source === "youtube" ||
     source === "wikimedia" ||
+    source === "reddit" ||
     source === "core" ||
     source === "blended"
   );
@@ -447,10 +450,11 @@ async function collectRealSignals({
   const useSpotify = source === "spotify" || source === "core" || source === "blended";
   const useYoutube = source === "youtube" || source === "core" || source === "blended";
   const useWikimedia = source === "wikimedia" || source === "core" || source === "blended";
+  const useReddit = source === "reddit" || source === "core" || source === "blended";
   const useTradeFlow = Boolean(supabase) && isRealExternalSource(source);
   const warnings: string[] = [];
 
-  if (!useGdelt && !useLastfm && !useSpotify && !useYoutube && !useWikimedia) {
+  if (!useGdelt && !useLastfm && !useSpotify && !useYoutube && !useWikimedia && !useReddit) {
     return {
       adapterSignalSources: [],
       observations: [],
@@ -468,6 +472,7 @@ async function collectRealSignals({
   let youtubeBaselines: ObservationBaselines = {};
   let youtubeCommentBaselines: ObservationBaselines = {};
   let wikimediaBaselines: ObservationBaselines = {};
+  let redditBaselines: ObservationBaselines = {};
 
   if (supabase) {
     try {
@@ -478,7 +483,8 @@ async function collectRealSignals({
         spotifyBaselines,
         youtubeBaselines,
         youtubeCommentBaselines,
-        wikimediaBaselines
+        wikimediaBaselines,
+        redditBaselines
       ] = await Promise.all([
         loadArtistExternalIds(supabase, artistIds),
         useGdelt
@@ -546,6 +552,16 @@ async function collectRealSignals({
               beforeDate: runDate,
               lookbackDays: 30
             })
+          : Promise.resolve({}),
+        useReddit
+          ? loadObservationBaselines({
+              supabase,
+              artistIds,
+              source: "reddit",
+              metrics: ["post_count", "engagement_score", "hype_post_count", "negative_post_count"],
+              beforeDate: runDate,
+              lookbackDays: 30
+            })
           : Promise.resolve({})
       ]);
     } catch (error) {
@@ -557,6 +573,7 @@ async function collectRealSignals({
       youtubeBaselines = {};
       youtubeCommentBaselines = {};
       wikimediaBaselines = {};
+      redditBaselines = {};
     }
   }
 
@@ -699,6 +716,32 @@ async function collectRealSignals({
     }
   }
 
+  if (useReddit) {
+    const reddit = await collectExternalSource("Reddit community hype", warnings, () =>
+      collectRedditMarketSignals({
+        artists,
+        runDate,
+        credentials: {
+          clientId: process.env.REDDIT_CLIENT_ID,
+          clientSecret: process.env.REDDIT_CLIENT_SECRET,
+          userAgent: process.env.REDDIT_USER_AGENT
+        },
+        externalIds,
+        baselines: redditBaselines,
+        subreddits: getEnvList("MARKET_REDDIT_SUBREDDITS"),
+        postsPerArtist: getEnvInteger("MARKET_REDDIT_POST_LIMIT", 25, 5, 100),
+        lookbackDays: getEnvInteger("MARKET_REDDIT_LOOKBACK_DAYS", 7, 1, 30)
+      })
+    );
+
+    if (reddit) {
+      sources.push(reddit.signals);
+      observations.push(...reddit.observations);
+      warnings.push(...reddit.warnings);
+      detectedEventsByArtist = mergeEvents(detectedEventsByArtist, reddit.eventsByArtist);
+    }
+  }
+
   if (useTradeFlow && supabase) {
     const tradeFlow = await collectExternalSource("trade flow", warnings, () =>
       collectTradeFlowMarketSignals({
@@ -746,6 +789,15 @@ function getEnvInteger(name: string, fallback: number, min: number, max: number)
   }
 
   return Math.min(max, Math.max(min, parsed));
+}
+
+function getEnvList(name: string) {
+  const values = (process.env[name] ?? "")
+    .split(",")
+    .map((value) => value.trim())
+    .filter(Boolean);
+
+  return values.length ? values : undefined;
 }
 
 function getErrorMessage(error: unknown) {

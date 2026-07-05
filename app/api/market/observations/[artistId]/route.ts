@@ -80,6 +80,26 @@ const SERIES_DEFINITIONS: Record<string, { label: string; unit: string }> = {
     label: "News sources",
     unit: "sources"
   },
+  "reddit:post_count": {
+    label: "Community posts",
+    unit: "posts"
+  },
+  "reddit:engagement_score": {
+    label: "Community engagement",
+    unit: "engagement"
+  },
+  "reddit:hype_post_count": {
+    label: "Community hype posts",
+    unit: "posts"
+  },
+  "reddit:negative_post_count": {
+    label: "Community negative posts",
+    unit: "posts"
+  },
+  "reddit:catalyst_post_count": {
+    label: "Community catalyst posts",
+    unit: "posts"
+  },
   "wikimedia:pageviews_7d": {
     label: "Public attention",
     unit: "views"
