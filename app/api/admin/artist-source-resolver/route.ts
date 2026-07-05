@@ -3,6 +3,7 @@ import { createServiceRoleClient, getSupabaseConfigStatus } from "@/lib/supabase
 import { requireAdminRequest } from "@/server/admin-auth";
 import {
   loadActiveArtistCount,
+  loadActiveArtists,
   loadActiveArtistsPage,
   loadArtistExternalIds,
   upsertArtistExternalIds
@@ -21,6 +22,7 @@ type SourceResolverBody = {
   artistOffset?: number;
   force?: boolean;
   minConfidence?: number;
+  prioritizeMissing?: boolean;
 };
 
 const DEFAULT_ARTIST_LIMIT = 5;
@@ -41,24 +43,18 @@ export async function GET(request: Request) {
       artistLimit: DEFAULT_ARTIST_LIMIT,
       maxArtistLimit: MAX_ARTIST_LIMIT,
       sources: ["spotify", "youtube", "musicbrainz"],
-      minConfidence: 0.88
+      minConfidence: 0.88,
+      prioritizeMissing: true
     }
   });
 }
 
 export async function POST(request: Request) {
   const config = getSupabaseConfigStatus();
-  const secret = process.env.MARKET_UPDATE_SECRET;
-  const providedSecret = request.headers.get("x-market-update-secret");
+  const auth = await requireAdminRequest(request);
 
-  if (!secret || providedSecret !== secret) {
-    return NextResponse.json(
-      {
-        ok: false,
-        error: "Missing or invalid market update secret."
-      },
-      { status: 401 }
-    );
+  if (!auth.ok) {
+    return auth.response;
   }
 
   if (!config.readyForAdminWrites) {
@@ -78,24 +74,30 @@ export async function POST(request: Request) {
   const artistOffset = getInteger(body.artistOffset, 0, 0, Number.MAX_SAFE_INTEGER);
   const sources = normalizeSources(body.sources);
   const minConfidence = getNumber(body.minConfidence, 0.88, 0.5, 0.99);
+  const prioritizeMissing = body.prioritizeMissing !== false;
+
+  if (!dryRun && auth.source !== "market-secret") {
+    return NextResponse.json(
+      {
+        ok: false,
+        error: "Persisted source ID resolver runs require the market update secret."
+      },
+      { status: 401 }
+    );
+  }
 
   try {
     const supabase = createServiceRoleClient();
-    const [totalArtists, artists] = await Promise.all([
-      loadActiveArtistCount(supabase),
-      loadActiveArtistsPage({
-        supabase,
-        offset: artistOffset,
-        limit: artistLimit
-      })
-    ]);
-    const externalIds = await loadArtistExternalIds(
+    const batch = await loadResolverArtistBatch({
       supabase,
-      artists.map((artist) => artist.id)
-    );
+      sources,
+      artistOffset,
+      artistLimit,
+      prioritizeMissing
+    });
     const result = await resolveArtistSourceIds({
-      artists,
-      externalIds,
+      artists: batch.artists,
+      externalIds: batch.externalIds,
       sources,
       credentials: {
         spotifyClientId: process.env.SPOTIFY_CLIENT_ID,
@@ -107,7 +109,7 @@ export async function POST(request: Request) {
       delayMs: sources.includes("musicbrainz") ? 1100 : 250
     });
     const saved = dryRun || !result.records.length ? {} : await upsertArtistExternalIds(supabase, result.records);
-    const nextOffset = artistOffset + artists.length;
+    const nextOffset = artistOffset + batch.artists.length;
 
     return NextResponse.json({
       ok: true,
@@ -116,13 +118,15 @@ export async function POST(request: Request) {
       config,
       sources,
       minConfidence,
+      prioritizeMissing,
       batch: {
         offset: artistOffset,
         limit: artistLimit,
-        artistCount: artists.length,
-        totalArtists,
-        nextOffset: nextOffset < totalArtists ? nextOffset : null,
-        hasMore: nextOffset < totalArtists
+        artistCount: batch.artists.length,
+        totalArtists: batch.totalArtists,
+        prioritizedCandidateCount: batch.prioritizedCandidateCount,
+        nextOffset: nextOffset < batch.totalArtists ? nextOffset : null,
+        hasMore: nextOffset < batch.totalArtists
       },
       warningCount: result.warnings.length,
       warnings: result.warnings,
@@ -142,6 +146,88 @@ export async function POST(request: Request) {
       { status: 500 }
     );
   }
+}
+
+async function loadResolverArtistBatch({
+  supabase,
+  sources,
+  artistOffset,
+  artistLimit,
+  prioritizeMissing
+}: {
+  supabase: ReturnType<typeof createServiceRoleClient>;
+  sources: ResolverSource[];
+  artistOffset: number;
+  artistLimit: number;
+  prioritizeMissing: boolean;
+}) {
+  if (!prioritizeMissing) {
+    const [totalArtists, artists] = await Promise.all([
+      loadActiveArtistCount(supabase),
+      loadActiveArtistsPage({
+        supabase,
+        offset: artistOffset,
+        limit: artistLimit
+      })
+    ]);
+    const externalIds = await loadArtistExternalIds(
+      supabase,
+      artists.map((artist) => artist.id)
+    );
+
+    return {
+      artists,
+      externalIds,
+      totalArtists,
+      prioritizedCandidateCount: totalArtists
+    };
+  }
+
+  const artists = await loadActiveArtists(supabase);
+  const externalIds = await loadArtistExternalIds(
+    supabase,
+    artists.map((artist) => artist.id)
+  );
+  const prioritizedArtists = [...artists].sort((first, second) => {
+    const missingDelta =
+      getMissingSourceCount(second.id, externalIds, sources) - getMissingSourceCount(first.id, externalIds, sources);
+
+    if (missingDelta !== 0) {
+      return missingDelta;
+    }
+
+    return first.ticker.localeCompare(second.ticker);
+  });
+  const selectedArtists = prioritizedArtists.slice(artistOffset, artistOffset + artistLimit);
+
+  return {
+    artists: selectedArtists,
+    externalIds: Object.fromEntries(selectedArtists.map((artist) => [artist.id, externalIds[artist.id]])),
+    totalArtists: artists.length,
+    prioritizedCandidateCount: prioritizedArtists.filter(
+      (artist) => getMissingSourceCount(artist.id, externalIds, sources) > 0
+    ).length
+  };
+}
+
+function getMissingSourceCount(
+  artistId: string,
+  externalIds: Awaited<ReturnType<typeof loadArtistExternalIds>>,
+  sources: ResolverSource[]
+) {
+  const ids = externalIds[artistId];
+
+  return sources.reduce((count, source) => {
+    if (source === "spotify") {
+      return count + (ids?.spotifyId ? 0 : 1);
+    }
+
+    if (source === "youtube") {
+      return count + (ids?.youtubeChannelId ? 0 : 1);
+    }
+
+    return count + (ids?.musicbrainzId ? 0 : 1);
+  }, 0);
 }
 
 async function parseBody(request: Request): Promise<SourceResolverBody> {

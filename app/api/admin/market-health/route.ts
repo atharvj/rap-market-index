@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { createServiceRoleClient, getSupabaseConfigStatus } from "@/lib/supabase/server";
 import type { Database } from "@/lib/supabase/database.types";
 import { requireAdminRequest } from "@/server/admin-auth";
-import { getMarketModelVersion } from "@/server/market/model-version";
+import { DEFAULT_MARKET_MODEL_VERSION, getMarketModelVersion } from "@/server/market/model-version";
 import { loadActiveArtists, loadArtistExternalIds } from "@/server/market/supabase-repository";
 
 export const dynamic = "force-dynamic";
@@ -168,6 +168,7 @@ export async function GET(request: Request) {
       priceHistoryHealth,
       eventHealth,
       configuredModelVersion,
+      defaultModelVersion: DEFAULT_MARKET_MODEL_VERSION,
       observationRowsTruncated: observations.length >= MAX_OBSERVATION_ROWS
     });
 
@@ -178,6 +179,7 @@ export async function GET(request: Request) {
       lookbackDays,
       freshnessDays,
       configuredModelVersion,
+      defaultModelVersion: DEFAULT_MARKET_MODEL_VERSION,
       latestModelVersion: recentRuns[0]?.model_version ?? null,
       activeArtistCount: artists.length,
       sourceCoverage,
@@ -474,6 +476,7 @@ function buildWarnings({
   priceHistoryHealth,
   eventHealth,
   configuredModelVersion,
+  defaultModelVersion,
   observationRowsTruncated
 }: {
   config: ReturnType<typeof getSupabaseConfigStatus>;
@@ -483,6 +486,7 @@ function buildWarnings({
   priceHistoryHealth: ReturnType<typeof buildPriceHistoryHealth>;
   eventHealth: EventHealth;
   configuredModelVersion: string;
+  defaultModelVersion: string;
   observationRowsTruncated: boolean;
 }) {
   const warnings: string[] = [];
@@ -500,6 +504,12 @@ function buildWarnings({
 
   if (!config.cronSecretConfigured) {
     warnings.push("CRON_SECRET is missing, so scheduled production market updates are not ready.");
+  }
+
+  if (configuredModelVersion !== defaultModelVersion) {
+    warnings.push(
+      `MARKET_MODEL_VERSION overrides the code default ${defaultModelVersion} with ${configuredModelVersion}.`
+    );
   }
 
   for (const coverage of sourceCoverage) {

@@ -95,18 +95,6 @@ export async function POST(request: Request) {
     return auth.response;
   }
 
-  if (!dryRun) {
-    if (auth.source !== "market-secret") {
-      return NextResponse.json(
-        {
-          ok: false,
-          error: "Persisted artist source ID updates require the market update secret."
-        },
-        { status: 401 }
-      );
-    }
-  }
-
   if (!config.readyForAdminWrites) {
     return NextResponse.json(
       {

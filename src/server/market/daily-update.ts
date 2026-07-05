@@ -344,11 +344,18 @@ function combinePartialStats(
 }
 
 function applySignalModifiers(signalDelta: number, modifiers: MarketSignalModifier[], reliabilityMultiplier = 1) {
+  const combinedMultiplier = modifiers.reduce(
+    (value, modifier) =>
+      typeof modifier.priceMultiplier === "number" ? value * modifier.priceMultiplier : value,
+    1
+  );
+  const combinedShock = modifiers.reduce(
+    (value, modifier) => value + (modifier.priceShock ?? 0) * reliabilityMultiplier,
+    0
+  );
+
   return clamp(
-    modifiers.reduce((value, modifier) => {
-      const multiplied = typeof modifier.priceMultiplier === "number" ? value * modifier.priceMultiplier : value;
-      return multiplied + (modifier.priceShock ?? 0) * reliabilityMultiplier;
-    }, signalDelta),
+    (signalDelta + combinedShock) * combinedMultiplier,
     -0.75,
     0.75
   );

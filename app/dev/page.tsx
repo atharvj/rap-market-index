@@ -58,6 +58,52 @@ type PreviewState =
       message: string;
     };
 
+type SourceResolverPreviewState =
+  | {
+      status: "idle";
+    }
+  | {
+      status: "loading";
+    }
+  | {
+      status: "success";
+      proposedRecordCount: number;
+      savedRecordCount?: number;
+      warnings: string[];
+      batch: {
+        artistCount: number;
+        totalArtists: number;
+        prioritizedCandidateCount?: number;
+        nextOffset: number | null;
+        hasMore: boolean;
+      };
+      suggestions: SourceResolverSuggestion[];
+      records: Record<string, unknown>[];
+      saveStatus?: "idle" | "saving" | "saved";
+    }
+  | {
+      status: "error";
+      message: string;
+    };
+
+type SourceResolverCandidate = {
+  source: string;
+  label: string;
+  externalId: string;
+  confidence: number;
+  reason: string;
+};
+
+type SourceResolverSuggestion = {
+  artistId: string;
+  ticker: string;
+  name: string;
+  candidates: Record<string, SourceResolverCandidate[] | undefined>;
+  proposedRecord: Record<string, unknown> | null;
+  skippedExisting: string[];
+  errors: string[];
+};
+
 type AdminAccessState =
   | {
       status: "loading";
@@ -178,6 +224,7 @@ export default function DevPage() {
   const [cloudStatus, setCloudStatus] = useState<AsyncState<CloudStatus>>({ status: "loading" });
   const [marketHealth, setMarketHealth] = useState<AsyncState<MarketHealth>>({ status: "loading" });
   const [preview, setPreview] = useState<PreviewState>({ status: "idle" });
+  const [resolverPreview, setResolverPreview] = useState<SourceResolverPreviewState>({ status: "idle" });
   const adminHeaders = useMemo<Record<string, string>>(() => {
     if (!session) {
       return {} as Record<string, string>;
@@ -359,6 +406,90 @@ export default function DevPage() {
     }
   }
 
+  async function runSourceResolverPreview() {
+    setResolverPreview({ status: "loading" });
+
+    try {
+      const response = await fetch("/api/admin/artist-source-resolver", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          ...adminHeaders
+        },
+        body: JSON.stringify({
+          dryRun: true,
+          artistLimit: 5,
+          artistOffset: 0,
+          sources: ["spotify", "youtube", "musicbrainz"],
+          minConfidence: 0.88,
+          prioritizeMissing: true
+        })
+      });
+      const payload = await response.json();
+
+      if (!response.ok || !payload.ok) {
+        throw new Error(payload.error ?? "Source resolver preview failed.");
+      }
+
+      setResolverPreview({
+        status: "success",
+        proposedRecordCount: payload.proposedRecordCount ?? 0,
+        warnings: payload.warnings ?? [],
+        batch: payload.batch,
+        suggestions: payload.suggestions ?? [],
+        records: payload.records ?? [],
+        saveStatus: "idle"
+      });
+    } catch (error) {
+      setResolverPreview({
+        status: "error",
+        message: error instanceof Error ? error.message : "Source resolver preview failed."
+      });
+    }
+  }
+
+  async function saveSourceResolverProposals() {
+    if (resolverPreview.status !== "success" || !resolverPreview.records.length) {
+      return;
+    }
+
+    setResolverPreview({
+      ...resolverPreview,
+      saveStatus: "saving"
+    });
+
+    try {
+      const response = await fetch("/api/admin/artist-source-ids", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          ...adminHeaders
+        },
+        body: JSON.stringify({
+          dryRun: false,
+          records: resolverPreview.records
+        })
+      });
+      const payload = await response.json();
+
+      if (!response.ok || !payload.ok) {
+        throw new Error(payload.error ?? "Source ID save failed.");
+      }
+
+      setResolverPreview({
+        ...resolverPreview,
+        savedRecordCount: payload.recordCount ?? resolverPreview.records.length,
+        saveStatus: "saved"
+      });
+      void refreshMarketHealth();
+    } catch (error) {
+      setResolverPreview({
+        status: "error",
+        message: error instanceof Error ? error.message : "Source ID save failed."
+      });
+    }
+  }
+
   if (adminAccess.status !== "granted") {
     return <AdminAccessGate state={adminAccess} />;
   }
@@ -449,6 +580,29 @@ export default function DevPage() {
           </button>
         </div>
         <PreviewResult preview={preview} />
+      </section>
+
+      <section className="rounded-md border border-line bg-panel/88 p-5 shadow-market">
+        <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-wide text-paper/45">Data quality</p>
+            <h2 className="mt-1 text-2xl font-black">Preview missing source IDs</h2>
+            <p className="mt-2 text-sm leading-6 text-paper/55">
+              Runs a dry resolver pass for missing Spotify, YouTube, and MusicBrainz IDs. It does not save candidate
+              IDs.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={runSourceResolverPreview}
+            disabled={resolverPreview.status === "loading"}
+            className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md border border-cyan/45 bg-cyan/10 px-4 text-sm font-black text-cyan disabled:cursor-wait disabled:opacity-55"
+          >
+            <PlayCircle className="h-4 w-4" />
+            Preview
+          </button>
+        </div>
+        <SourceResolverPreviewResult preview={resolverPreview} onSave={saveSourceResolverProposals} />
       </section>
 
       <section className="rounded-md border border-line bg-panel/88 p-5 shadow-market">
@@ -790,6 +944,128 @@ function PreviewResult({ preview }: { preview: PreviewState }) {
         <div className="rounded-md border border-brass/35 bg-brass/10 p-3 text-sm leading-6 text-paper/62">
           {preview.warnings.slice(0, 3).map((warning) => (
             <p key={warning}>{warning}</p>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function SourceResolverPreviewResult({
+  preview,
+  onSave
+}: {
+  preview: SourceResolverPreviewState;
+  onSave: () => void;
+}) {
+  if (preview.status === "idle") {
+    return (
+      <div className="mt-4 rounded-md border border-line bg-black/20 p-4 text-sm font-bold text-paper/45">
+        No source resolver preview has run in this session.
+      </div>
+    );
+  }
+
+  if (preview.status === "loading") {
+    return <LoadingText text="Resolving candidate source IDs..." />;
+  }
+
+  if (preview.status === "error") {
+    return <ErrorText text={preview.message} />;
+  }
+
+  return (
+    <div className="mt-4 space-y-3 rounded-md border border-line bg-black/20 p-4">
+      <div className="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
+        <div className="grid flex-1 gap-3 text-sm sm:grid-cols-4">
+          <PreviewMetric label="Artists" value={String(preview.batch.artistCount)} />
+          <PreviewMetric label="Missing pool" value={String(preview.batch.prioritizedCandidateCount ?? 0)} />
+          <PreviewMetric
+            label={preview.saveStatus === "saved" ? "Saved" : "Proposed"}
+            value={String(preview.savedRecordCount ?? preview.proposedRecordCount)}
+          />
+          <PreviewMetric label="More" value={preview.batch.hasMore ? String(preview.batch.nextOffset ?? "") : "No"} />
+        </div>
+        <button
+          type="button"
+          onClick={onSave}
+          disabled={!preview.records.length || preview.saveStatus === "saving" || preview.saveStatus === "saved"}
+          className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md border border-mint/45 bg-mint/10 px-4 text-sm font-black text-mint disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          <CheckCircle2 className="h-4 w-4" />
+          {preview.saveStatus === "saving"
+            ? "Saving"
+            : preview.saveStatus === "saved"
+              ? "Saved"
+              : `Save ${preview.proposedRecordCount}`}
+        </button>
+      </div>
+
+      {preview.warnings.length ? (
+        <div className="rounded-md border border-brass/35 bg-brass/10 p-3 text-sm leading-6 text-paper/62">
+          {preview.warnings.slice(0, 3).map((warning) => (
+            <p key={warning}>{warning}</p>
+          ))}
+        </div>
+      ) : null}
+
+      <div className="grid gap-2">
+        {preview.suggestions.slice(0, 5).map((suggestion) => (
+          <SourceResolverSuggestionRow key={suggestion.artistId} suggestion={suggestion} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function SourceResolverSuggestionRow({ suggestion }: { suggestion: SourceResolverSuggestion }) {
+  const topCandidates = ["spotify", "youtube", "musicbrainz"]
+    .map((source) => ({
+      source,
+      candidate: suggestion.candidates[source]?.[0]
+    }))
+    .filter((item): item is { source: string; candidate: SourceResolverCandidate } => Boolean(item.candidate));
+  const proposedKeys = suggestion.proposedRecord
+    ? Object.keys(suggestion.proposedRecord).filter((key) => key !== "artistId")
+    : [];
+
+  return (
+    <div className="rounded-md border border-line bg-black/25 p-3">
+      <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+        <div>
+          <p className="text-sm font-black">
+            {suggestion.ticker} <span className="text-paper/45">{suggestion.name}</span>
+          </p>
+          <p className="mt-1 text-xs font-bold text-paper/45">
+            {proposedKeys.length ? `Proposed ${proposedKeys.join(", ")}` : "No high-confidence proposal"}
+          </p>
+        </div>
+        {suggestion.skippedExisting.length ? (
+          <p className="text-xs font-bold uppercase tracking-wide text-mint/80">
+            Existing {suggestion.skippedExisting.join(", ")}
+          </p>
+        ) : null}
+      </div>
+
+      {topCandidates.length ? (
+        <div className="mt-3 grid gap-2 lg:grid-cols-3">
+          {topCandidates.map(({ source, candidate }) => (
+            <div key={source} className="rounded-md border border-line bg-black/20 p-2">
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-xs font-black uppercase tracking-wide text-paper/45">{source}</p>
+                <p className="text-xs font-black number-tabular">{formatPercent(candidate.confidence * 100)}</p>
+              </div>
+              <p className="mt-1 truncate text-sm font-bold">{candidate.label}</p>
+              <p className="mt-1 truncate text-xs font-bold text-paper/42">{candidate.reason}</p>
+            </div>
+          ))}
+        </div>
+      ) : null}
+
+      {suggestion.errors.length ? (
+        <div className="mt-3 rounded-md border border-ember/35 bg-ember/10 p-2 text-xs font-bold leading-5 text-ember">
+          {suggestion.errors.slice(0, 2).map((error) => (
+            <p key={error}>{error}</p>
           ))}
         </div>
       ) : null}

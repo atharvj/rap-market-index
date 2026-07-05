@@ -34,7 +34,7 @@ This app still runs in development with unsaved demo data, but the backend found
    - `MARKET_YOUTUBE_COMMENT_VIDEOS=0`
    - `MARKET_YOUTUBE_COMMENT_LIMIT=25`
    - `ADMIN_EMAILS=<comma-separated admin emails>`
-   - `MARKET_MODEL_VERSION=rmi-core-v3`
+   - `MARKET_MODEL_VERSION=rmi-core-v4`
    - `LASTFM_API_KEY` for optional Last.fm listener/playcount signals
    - `SPOTIFY_CLIENT_ID` and `SPOTIFY_CLIENT_SECRET` for optional Spotify popularity/follower signals
    - `YOUTUBE_API_KEY` for optional YouTube channel view/subscriber/video-count and comment-reaction signals
@@ -82,7 +82,7 @@ POST /api/admin/artist-source-ids
 }
 ```
 
-When the dry run is valid, send the same body with `"dryRun": false` and the `x-market-update-secret` header. The endpoint accepts either `artistId` or `ticker`, preserves existing fields you omit, and allows `null` or an empty string to clear a source ID.
+When the dry run is valid, send the same body with `"dryRun": false` using either a signed-in admin session or the `x-market-update-secret` header. The endpoint accepts either `artistId` or `ticker`, preserves existing fields you omit, and allows `null` or an empty string to clear a source ID.
 
 To generate candidate IDs instead of finding them manually, use the protected resolver endpoint:
 
@@ -98,11 +98,14 @@ with `x-market-update-secret` and a body like:
   "artistLimit": 5,
   "artistOffset": 0,
   "sources": ["spotify", "youtube", "musicbrainz"],
-  "minConfidence": 0.88
+  "minConfidence": 0.88,
+  "prioritizeMissing": true
 }
 ```
 
-The resolver fills safe text defaults for audience/news search fields, then searches configured exact-ID sources, ranks candidates by confidence, and returns proposed `artist_external_ids` records. It only persists proposed high-confidence exact IDs when `"dryRun": false`. Spotify candidate search requires `SPOTIFY_CLIENT_ID` and `SPOTIFY_CLIENT_SECRET`; YouTube candidate search requires `YOUTUBE_API_KEY`; MusicBrainz can run without a key but should be batched politely.
+The resolver fills safe text defaults for audience/news search fields, then searches configured exact-ID sources, ranks candidates by confidence, and returns proposed `artist_external_ids` records. It only persists proposed high-confidence exact IDs when `"dryRun": false`. `prioritizeMissing` defaults to `true`, so batches resolve artists missing requested IDs first instead of spending early batches on artists whose source coverage is already good. Set `prioritizeMissing=false` only when you need strict ticker-order pagination. Spotify candidate search requires `SPOTIFY_CLIENT_ID` and `SPOTIFY_CLIENT_SECRET`; YouTube candidate search requires `YOUTUBE_API_KEY`; MusicBrainz can run without a key but should be batched politely.
+
+The `/dev` console can run a dry source resolver preview with an admin session, then save reviewed proposed source-ID records through the source-ID update endpoint. Persisted resolver auto-runs still require the `x-market-update-secret` header, so the browser never needs to receive the market secret.
 
 ## Market health
 
@@ -144,7 +147,9 @@ After deployment, manually call `/api/cron/daily-market-update?dryRun=1` with `A
 
 `MARKET_MODEL_VERSION` is an internal audit label, not a prominent user-facing product label. It is saved on market runs, signal snapshots, and price-history rows so future algorithm changes can be traced without rewriting historical prices. Normal market pages should keep broad language such as audience momentum, market activity, release signals, and media movement. Admin/health/debug views can show the exact model version.
 
-`rmi-core-v3` adds public-attention pageview momentum to the core model while keeping signal-reliability scaling. Broad, higher-confidence source coverage can move prices more than thin or single-source observations, which keeps the market responsive while reducing overreaction to weak data.
+`rmi-core-v4` adds event ingestion from the scheduled GDELT scanner and official YouTube upload titles while keeping signal-reliability scaling. It can react to article-based news/reviews/releases and official-channel snippets, videos, singles, album trailers, and tour announcements before those moments fully show up in listener or view momentum. It also makes event modifiers order-independent, so negative reviews can dampen the full event-adjusted move from a release instead of only whichever modifier happens to be applied first.
+
+`rmi-core-v3` added public-attention pageview momentum to the core model while keeping signal-reliability scaling. Broad, higher-confidence source coverage can move prices more than thin or single-source observations, which keeps the market responsive while reducing overreaction to weak data.
 
 ## Trading integrity controls
 
