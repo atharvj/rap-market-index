@@ -24,6 +24,7 @@ import { collectTradeFlowMarketSignals } from "@/server/market/trade-flow-source
 import { collectWikimediaMarketSignals } from "@/server/market/wikimedia-source";
 import { collectYoutubeMarketSignals } from "@/server/market/youtube-source";
 import { collectYoutubeCommentMarketSignals } from "@/server/market/youtube-comments-source";
+import { collectYoutubeUploadEvents } from "@/server/market/youtube-upload-events-source";
 import { getMockMarketArtists } from "@/server/market/mock-source";
 import type {
   AdapterSignals,
@@ -594,6 +595,27 @@ async function collectRealSignals({
       sources.push(youtube.signals);
       observations.push(...youtube.observations);
       warnings.push(...youtube.warnings);
+    }
+
+    const maxUploadEventVideos = getEnvInteger("MARKET_YOUTUBE_UPLOAD_EVENT_VIDEOS", 2, 0, 5);
+
+    if (maxUploadEventVideos > 0) {
+      const youtubeUploadEvents = await collectExternalSource("YouTube upload events", warnings, () =>
+        collectYoutubeUploadEvents({
+          artists,
+          runDate,
+          apiKey: process.env.YOUTUBE_API_KEY,
+          externalIds,
+          maxVideosPerArtist: maxUploadEventVideos,
+          lookbackDays: getEnvInteger("MARKET_YOUTUBE_UPLOAD_EVENT_DAYS", 14, 1, 45)
+        })
+      );
+
+      if (youtubeUploadEvents) {
+        observations.push(...youtubeUploadEvents.observations);
+        warnings.push(...youtubeUploadEvents.warnings);
+        detectedEventsByArtist = mergeEvents(detectedEventsByArtist, youtubeUploadEvents.eventsByArtist);
+      }
     }
 
     const maxVideosPerArtist = getEnvInteger("MARKET_YOUTUBE_COMMENT_VIDEOS", 0, 0, 3);

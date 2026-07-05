@@ -22,6 +22,18 @@ type MarketBatchRunResponse = {
   hasMore?: boolean;
 };
 
+type MarketEventScanResponse = {
+  ok: boolean;
+  error?: string;
+  dryRun?: boolean;
+  persisted?: boolean;
+  runDate?: string;
+  scannedArtistCount?: number;
+  observationCount?: number;
+  eventCount?: number;
+  eventTypeCounts?: Record<string, number>;
+};
+
 type ExistingRun = {
   run_date: string;
   status: "running" | "succeeded" | "failed";
@@ -35,6 +47,8 @@ type ExistingRun = {
 const DEFAULT_SOURCE: MarketUpdateSource = "core";
 const DEFAULT_ARTIST_LIMIT = 25;
 const DEFAULT_MAX_BATCHES = 4;
+const DEFAULT_EVENT_SCAN_LIMIT = 6;
+const DEFAULT_EVENT_SCAN_MAX_RECORDS = 12;
 
 export async function GET(request: Request) {
   const auth = validateCronRequest(request);
@@ -69,6 +83,13 @@ export async function GET(request: Request) {
   const source = normalizeSource(process.env.MARKET_CRON_SOURCE);
   const artistLimit = getInteger(process.env.MARKET_CRON_ARTIST_LIMIT, DEFAULT_ARTIST_LIMIT, 1, 100);
   const maxBatches = getInteger(process.env.MARKET_CRON_MAX_BATCHES, DEFAULT_MAX_BATCHES, 1, 10);
+  const eventScanLimit = getInteger(process.env.MARKET_EVENT_SCAN_LIMIT, DEFAULT_EVENT_SCAN_LIMIT, 0, 20);
+  const eventScanMaxRecords = getInteger(
+    process.env.MARKET_EVENT_SCAN_MAX_RECORDS,
+    DEFAULT_EVENT_SCAN_MAX_RECORDS,
+    1,
+    50
+  );
   const existing = await loadExistingRun(runDate);
 
   if (!dryRun && !force && existing && shouldSkipExistingRun(existing, source)) {
@@ -93,6 +114,15 @@ export async function GET(request: Request) {
       { status: 500 }
     );
   }
+
+  const eventScan = await runEventScan({
+    request,
+    secret,
+    runDate,
+    dryRun,
+    artistLimit: eventScanLimit,
+    maxRecords: eventScanMaxRecords
+  });
 
   const response = await fetch(new URL("/api/admin/market-batch-run", request.url), {
     method: "POST",
@@ -119,6 +149,7 @@ export async function GET(request: Request) {
         source,
         artistLimit,
         maxBatches,
+        eventScan,
         error: payload.error ?? "Scheduled market update failed.",
         payload
       },
@@ -132,8 +163,73 @@ export async function GET(request: Request) {
     source,
     artistLimit,
     maxBatches,
+    eventScan,
     result: payload
   });
+}
+
+async function runEventScan({
+  request,
+  secret,
+  runDate,
+  dryRun,
+  artistLimit,
+  maxRecords
+}: {
+  request: Request;
+  secret: string;
+  runDate: string;
+  dryRun: boolean;
+  artistLimit: number;
+  maxRecords: number;
+}): Promise<
+  | {
+      ok: true;
+      disabled: true;
+      reason: string;
+    }
+  | {
+      ok: boolean;
+      disabled?: false;
+      error?: string;
+      payload?: MarketEventScanResponse;
+    }
+> {
+  if (artistLimit <= 0) {
+    return {
+      ok: true,
+      disabled: true,
+      reason: "MARKET_EVENT_SCAN_LIMIT is 0."
+    };
+  }
+
+  try {
+    const response = await fetch(new URL("/api/admin/market-event-scan", request.url), {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-market-update-secret": secret
+      },
+      body: JSON.stringify({
+        dryRun,
+        runDate,
+        artistLimit,
+        maxRecords
+      })
+    });
+    const payload = (await response.json()) as MarketEventScanResponse;
+
+    return {
+      ok: response.ok && payload.ok,
+      error: response.ok && payload.ok ? undefined : payload.error ?? "Market event scan failed.",
+      payload
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : "Market event scan failed."
+    };
+  }
 }
 
 function validateCronRequest(request: Request): { ok: true } | { ok: false; error: string } {

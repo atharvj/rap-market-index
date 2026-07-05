@@ -14,6 +14,11 @@ type ObservationRow = Pick<
 
 type PriceHistoryRow = Pick<Database["public"]["Tables"]["price_history"]["Row"], "artist_id" | "price_date">;
 
+type MarketEventRow = Pick<
+  Database["public"]["Tables"]["market_events"]["Row"],
+  "artist_id" | "event_date" | "event_type"
+>;
+
 type MarketRunRow = Database["public"]["Tables"]["market_update_runs"]["Row"];
 
 type SourceCoverage = {
@@ -39,6 +44,19 @@ type ObservationHealth = {
   freshCoveragePercent: number;
 };
 
+type EventHealth = {
+  latestDate: string | null;
+  eventCount: number;
+  freshEventCount: number;
+  observedArtistCount: number;
+  freshArtistCount: number;
+  missingArtistCount: number;
+  freshCoveragePercent: number;
+  eventFreshnessDays: number;
+  typeCounts: Record<string, number>;
+  freshTypeCounts: Record<string, number>;
+};
+
 const SOURCE_ID_FIELDS = [
   { key: "lastfmName", label: "Audience search names", warningThreshold: 80 },
   { key: "gdeltQuery", label: "News search queries", warningThreshold: 80 },
@@ -54,6 +72,8 @@ const OBSERVATION_SERIES = [
   { source: "wikimedia", metric: "pageviews_1d", label: "Public attention 1-day views", warningThreshold: null },
   { source: "youtube", metric: "channel_views", label: "Video views", warningThreshold: null },
   { source: "youtube", metric: "subscriber_count", label: "Video subscribers", warningThreshold: null },
+  { source: "youtube_uploads", metric: "recent_video_count", label: "Recent official uploads", warningThreshold: null },
+  { source: "youtube_uploads", metric: "event_video_count", label: "Upload event matches", warningThreshold: null },
   { source: "spotify", metric: "popularity", label: "Spotify popularity", warningThreshold: null },
   { source: "spotify", metric: "followers_total", label: "Spotify followers", warningThreshold: null },
   { source: "youtube_comments", metric: "comment_sentiment", label: "Comment sentiment", warningThreshold: null },
@@ -95,7 +115,8 @@ export async function GET(request: Request) {
     const supabase = createServiceRoleClient();
     const artists = await loadActiveArtists(supabase);
     const artistIds = artists.map((artist) => artist.id);
-    const [externalIds, recentRuns, observations, priceHistory] = await Promise.all([
+    const eventFreshnessDays = Math.max(7, freshnessDays);
+    const [externalIds, recentRuns, observations, priceHistory, recentEvents] = await Promise.all([
       loadArtistExternalIds(supabase, artistIds),
       loadRecentMarketRuns(supabase),
       loadRecentObservations({
@@ -105,6 +126,12 @@ export async function GET(request: Request) {
         lookbackDays
       }),
       loadRecentPriceHistory({
+        supabase,
+        artistIds,
+        runDate,
+        lookbackDays
+      }),
+      loadRecentEvents({
         supabase,
         artistIds,
         runDate,
@@ -127,12 +154,19 @@ export async function GET(request: Request) {
       runDate,
       freshnessDays
     });
+    const eventHealth = buildEventHealth({
+      activeArtistCount: artists.length,
+      events: recentEvents,
+      runDate,
+      eventFreshnessDays
+    });
     const warnings = buildWarnings({
       config,
       recentRuns,
       sourceCoverage,
       observationHealth,
       priceHistoryHealth,
+      eventHealth,
       configuredModelVersion,
       observationRowsTruncated: observations.length >= MAX_OBSERVATION_ROWS
     });
@@ -149,6 +183,7 @@ export async function GET(request: Request) {
       sourceCoverage,
       observationHealth,
       priceHistoryHealth,
+      eventHealth,
       latestRun: recentRuns[0] ?? null,
       recentRuns,
       warnings
@@ -243,6 +278,37 @@ async function loadRecentPriceHistory({
   }
 
   return (data ?? []) as PriceHistoryRow[];
+}
+
+async function loadRecentEvents({
+  supabase,
+  artistIds,
+  runDate,
+  lookbackDays
+}: {
+  supabase: ReturnType<typeof createServiceRoleClient>;
+  artistIds: string[];
+  runDate: string;
+  lookbackDays: number;
+}) {
+  if (!artistIds.length) {
+    return [];
+  }
+
+  const { data, error } = await supabase
+    .from("market_events")
+    .select("artist_id,event_date,event_type")
+    .in("artist_id", artistIds)
+    .gte("event_date", shiftDate(runDate, -lookbackDays))
+    .lte("event_date", runDate)
+    .order("event_date", { ascending: false })
+    .limit(MAX_OBSERVATION_ROWS);
+
+  if (error) {
+    throw new Error(`Could not load market event health: ${error.message}`);
+  }
+
+  return (data ?? []) as MarketEventRow[];
 }
 
 function buildSourceCoverage({
@@ -349,12 +415,64 @@ function buildPriceHistoryHealth({
   };
 }
 
+function buildEventHealth({
+  activeArtistCount,
+  events,
+  runDate,
+  eventFreshnessDays
+}: {
+  activeArtistCount: number;
+  events: MarketEventRow[];
+  runDate: string;
+  eventFreshnessDays: number;
+}): EventHealth {
+  const freshDate = shiftDate(runDate, -eventFreshnessDays);
+  const latestByArtist = new Map<string, string>();
+  const freshArtistIds = new Set<string>();
+  const typeCounts: Record<string, number> = {};
+  const freshTypeCounts: Record<string, number> = {};
+  let freshEventCount = 0;
+
+  for (const event of events) {
+    const current = latestByArtist.get(event.artist_id);
+    const isFresh = event.event_date >= freshDate;
+
+    if (!current || event.event_date > current) {
+      latestByArtist.set(event.artist_id, event.event_date);
+    }
+
+    if (isFresh) {
+      freshEventCount += 1;
+      freshArtistIds.add(event.artist_id);
+      freshTypeCounts[event.event_type] = (freshTypeCounts[event.event_type] ?? 0) + 1;
+    }
+
+    typeCounts[event.event_type] = (typeCounts[event.event_type] ?? 0) + 1;
+  }
+
+  const dates = Array.from(latestByArtist.values());
+
+  return {
+    latestDate: dates.sort().at(-1) ?? null,
+    eventCount: events.length,
+    freshEventCount,
+    observedArtistCount: latestByArtist.size,
+    freshArtistCount: freshArtistIds.size,
+    missingArtistCount: Math.max(0, activeArtistCount - latestByArtist.size),
+    freshCoveragePercent: getPercent(freshArtistIds.size, activeArtistCount),
+    eventFreshnessDays,
+    typeCounts,
+    freshTypeCounts
+  };
+}
+
 function buildWarnings({
   config,
   recentRuns,
   sourceCoverage,
   observationHealth,
   priceHistoryHealth,
+  eventHealth,
   configuredModelVersion,
   observationRowsTruncated
 }: {
@@ -363,6 +481,7 @@ function buildWarnings({
   sourceCoverage: SourceCoverage[];
   observationHealth: ObservationHealth[];
   priceHistoryHealth: ReturnType<typeof buildPriceHistoryHealth>;
+  eventHealth: EventHealth;
   configuredModelVersion: string;
   observationRowsTruncated: boolean;
 }) {
@@ -397,6 +516,10 @@ function buildWarnings({
 
   if (priceHistoryHealth.freshCoveragePercent < 80 && priceHistoryHealth.observedArtistCount > 0) {
     warnings.push(`Fresh price history coverage is ${priceHistoryHealth.freshCoveragePercent.toFixed(1)}%.`);
+  }
+
+  if (eventHealth.eventCount === 0) {
+    warnings.push("No recent market events are recorded, so release/news/review modifiers are idle.");
   }
 
   if (observationRowsTruncated) {
@@ -447,6 +570,7 @@ function formatMarketHealthError(error: unknown) {
     normalized.includes("market_observations") ||
     normalized.includes("artist_external_ids") ||
     normalized.includes("market_update_runs") ||
+    normalized.includes("market_events") ||
     normalized.includes("price_history") ||
     normalized.includes("model_version") ||
     normalized.includes("schema cache")

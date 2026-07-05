@@ -116,6 +116,18 @@ type MarketHealth = {
     missingArtistCount: number;
     freshCoveragePercent: number;
   };
+  eventHealth: {
+    latestDate: string | null;
+    eventCount: number;
+    freshEventCount: number;
+    observedArtistCount: number;
+    freshArtistCount: number;
+    missingArtistCount: number;
+    freshCoveragePercent: number;
+    eventFreshnessDays: number;
+    typeCounts: Record<string, number>;
+    freshTypeCounts: Record<string, number>;
+  };
   warnings: string[];
 };
 
@@ -596,7 +608,7 @@ function CloudStatusPanel({ data }: { data: CloudStatus }) {
 function MarketHealthPanel({ data }: { data: MarketHealth }) {
   return (
     <div className="space-y-4">
-      <div className="grid gap-3 sm:grid-cols-3">
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <ReadinessTile
           label="Price history"
           ready={data.priceHistoryHealth.freshCoveragePercent >= 80}
@@ -617,6 +629,13 @@ function MarketHealthPanel({ data }: { data: MarketHealth }) {
           readyText="Clear"
           pendingText={`${data.warnings.length} warning${data.warnings.length === 1 ? "" : "s"}`}
           icon={<AlertTriangle className="h-4 w-4" />}
+        />
+        <ReadinessTile
+          label="Market events"
+          ready={data.eventHealth.eventCount > 0}
+          readyText={`${data.eventHealth.freshEventCount} fresh`}
+          pendingText="Idle"
+          icon={<FileWarning className="h-4 w-4" />}
         />
       </div>
 
@@ -647,8 +666,48 @@ function MarketHealthPanel({ data }: { data: MarketHealth }) {
         value: formatPercent(item.freshCoveragePercent),
         detail: item.latestDate ? `Latest ${formatDate(item.latestDate)}` : "No observations"
       }))} />
+
+      <CoverageGrid title="Event layer" items={[
+        {
+          key: "event-count",
+          label: "Recent market events",
+          value: String(data.eventHealth.eventCount),
+          detail: data.eventHealth.latestDate ? `Latest ${formatDate(data.eventHealth.latestDate)}` : "No events"
+        },
+        {
+          key: "fresh-event-coverage",
+          label: "Fresh event artists",
+          value: formatPercent(data.eventHealth.freshCoveragePercent),
+          detail: `${data.eventHealth.freshArtistCount} active in ${data.eventHealth.eventFreshnessDays} days`
+        },
+        {
+          key: "fresh-event-types",
+          label: "Fresh event types",
+          value: String(Object.keys(data.eventHealth.freshTypeCounts).length),
+          detail: formatEventTypeCounts(data.eventHealth.freshTypeCounts)
+        },
+        {
+          key: "all-event-types",
+          label: "Recent event types",
+          value: String(Object.keys(data.eventHealth.typeCounts).length),
+          detail: formatEventTypeCounts(data.eventHealth.typeCounts)
+        }
+      ]} />
     </div>
   );
+}
+
+function formatEventTypeCounts(counts: Record<string, number>) {
+  const entries = Object.entries(counts).sort((a, b) => b[1] - a[1]);
+
+  if (!entries.length) {
+    return "No classified events";
+  }
+
+  return entries
+    .slice(0, 3)
+    .map(([type, count]) => `${type} ${count}`)
+    .join(", ");
 }
 
 function CoverageGrid({

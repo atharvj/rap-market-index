@@ -15,8 +15,10 @@ This app still runs in development with unsaved demo data, but the backend found
 9. Run `supabase/migrations/008_market_model_version.sql`.
 10. Run `supabase/migrations/009_trade_manipulation_controls.sql`.
 11. Run `supabase/migrations/010_trade_order_guardrails.sql`.
-12. Run `supabase/seed.sql` for the starter artists.
-13. Copy `.env.example` to `.env.local` and fill in:
+12. Run `supabase/migrations/011_curated_artist_roster.sql`.
+13. Run `supabase/migrations/012_artist_text_source_defaults.sql`.
+14. Run `supabase/seed.sql` for the starter artists.
+15. Create `.env.local` in the project root and fill in:
    - `NEXT_PUBLIC_SUPABASE_URL`
    - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
    - `SUPABASE_SERVICE_ROLE_KEY`
@@ -25,6 +27,10 @@ This app still runs in development with unsaved demo data, but the backend found
    - `MARKET_CRON_SOURCE=core`
    - `MARKET_CRON_ARTIST_LIMIT=25`
    - `MARKET_CRON_MAX_BATCHES=4`
+   - `MARKET_EVENT_SCAN_LIMIT=6`
+   - `MARKET_EVENT_SCAN_MAX_RECORDS=12`
+   - `MARKET_YOUTUBE_UPLOAD_EVENT_VIDEOS=2`
+   - `MARKET_YOUTUBE_UPLOAD_EVENT_DAYS=14`
    - `MARKET_YOUTUBE_COMMENT_VIDEOS=0`
    - `MARKET_YOUTUBE_COMMENT_LIMIT=25`
    - `ADMIN_EMAILS=<comma-separated admin emails>`
@@ -210,7 +216,7 @@ The production daily source is:
 }
 ```
 
-`core` combines Last.fm, public attention, YouTube channel stats, MusicBrainz release detection, trade-flow demand, and Spotify when Spotify credentials are configured. YouTube comments are optional and disabled by default with `MARKET_YOUTUBE_COMMENT_VIDEOS=0`. `core` intentionally skips GDELT because the free news endpoint can be slow or rate-limited. Use `blended` when you intentionally want to include GDELT/news in a supervised run.
+`core` combines Last.fm, public attention, YouTube channel stats, official YouTube upload events, MusicBrainz release detection, stored market events, trade-flow demand, and Spotify when Spotify credentials are configured. YouTube comments are optional and disabled by default with `MARKET_YOUTUBE_COMMENT_VIDEOS=0`. `core` intentionally skips direct GDELT pricing because the free news endpoint can be slow or rate-limited. Instead, the scheduler can pre-scan a small artist batch for article-based events and store those events for `core` to price through the normal event layer. Use `blended` when you intentionally want to include GDELT/news observations directly in a supervised run.
 
 When enabled, the YouTube comments path samples recent comments from each artist's official channel. It stores aggregate observations only:
 
@@ -221,6 +227,8 @@ When enabled, the YouTube comments path samples recent comments from each artist
 - `youtube_comments:negative_comment_share`
 
 Raw comment text is not saved. The first run is treated as a baseline; later runs move the social/news/search parts of the model from changes in sentiment, likes, and net positive-vs-negative share. This prevents every naturally positive fan comment section from pushing a stock up every day.
+
+The YouTube upload event path is separate from comment sentiment. It uses official channel upload playlists for artists with `youtube_channel_id`, classifies recent upload titles such as official videos, new singles, album trailers, snippets, teasers, and tour announcements, and stores those matches as `market_events`. It does not use YouTube search, so it is much cheaper and less ambiguous than searching all of YouTube for an artist name. Defaults are `MARKET_YOUTUBE_UPLOAD_EVENT_VIDEOS=2` and `MARKET_YOUTUBE_UPLOAD_EVENT_DAYS=14`.
 
 The `core` and `blended` paths also detect recent MusicBrainz release groups for artists with `musicbrainz_id` set. The detector stores confirmed releases as `market_events` with `eventType: "release"`, then lets the existing event/review layer apply decay, confidence, and price-shock caps. It only accepts full `YYYY-MM-DD` release dates and filters compilation/live/catalog-style records so vague metadata does not move the market.
 
@@ -288,7 +296,12 @@ Vercel schedules cron in UTC, so this runs around 2 AM Pacific during daylight s
 - `source`: `MARKET_CRON_SOURCE`, default `core`
 - `artistLimit`: `MARKET_CRON_ARTIST_LIMIT`, default `25`
 - `maxBatches`: `MARKET_CRON_MAX_BATCHES`, default `4`
+- `eventScanLimit`: `MARKET_EVENT_SCAN_LIMIT`, default `6`
+- `eventScanMaxRecords`: `MARKET_EVENT_SCAN_MAX_RECORDS`, default `12`
+- `youtubeUploadEventVideos`: `MARKET_YOUTUBE_UPLOAD_EVENT_VIDEOS`, default `2`
 - YouTube comments are quota-guarded separately. `MARKET_YOUTUBE_COMMENT_VIDEOS=0` keeps comment sentiment off; set it to `1` for limited comment sampling.
+
+Before pricing, the cron route calls `POST /api/admin/market-event-scan` unless `MARKET_EVENT_SCAN_LIMIT=0`. That scanner uses the free GDELT news endpoint on the least-recently-scanned artists, stores `gdelt:article_count` observations, and persists classified `market_events` for releases, reviews, controversies, awards, tours, viral moments, and major news. The pricing job then reads those saved events through the `market_events` adapter, so news can affect the normal daily move without turning the whole production job into a slow full-GDELT run.
 
 The route skips duplicate same-day runs when a successful or running `core` run already exists. This matters because cron delivery is best-effort and can occasionally miss or duplicate invocations. For manual local testing, call the cron route with `x-market-update-secret: <MARKET_UPDATE_SECRET>`. Add `?dryRun=1` to exercise the full path without persisting another market run.
 
@@ -328,6 +341,25 @@ and a body like:
 ```
 
 Those events are saved and then loaded by future market update runs. A non-dry-run `POST /api/admin/daily-market-update` can also include `manualEvents`; those submitted events are persisted and used in the same calculation.
+
+The protected event scanner endpoint is:
+
+```txt
+POST /api/admin/market-event-scan
+```
+
+It accepts a body such as:
+
+```json
+{
+  "dryRun": false,
+  "runDate": "2026-07-05",
+  "artistLimit": 6,
+  "maxRecords": 12
+}
+```
+
+It does not update prices. It only saves article-count observations and classified market events, which are then used by the next `core` market update.
 
 Example dry-run shape for testing that behavior:
 
