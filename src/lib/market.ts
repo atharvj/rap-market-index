@@ -6,6 +6,7 @@ import {
   getDailyChangePercent,
   roundPrice
 } from "@/lib/pricing";
+import { STARTING_CASH } from "@/lib/trading";
 import type {
   Artist,
   GameState,
@@ -16,7 +17,7 @@ import type {
   Transaction
 } from "@/lib/types";
 
-export const STARTING_CASH = 10000;
+export { STARTING_CASH };
 
 const BASE_DATE = "2026-07-03";
 

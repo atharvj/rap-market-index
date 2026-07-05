@@ -11,6 +11,7 @@ import {
   resetGame,
   simulateDailyUpdate
 } from "@/lib/market";
+import { estimateTradeTotal } from "@/lib/trading";
 import type { Artist, GameState, HoldingView, LeaderboardEntry, TradeResult } from "@/lib/types";
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 
@@ -303,10 +304,11 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       }
 
       const cost = shares * artist.currentPrice;
+      const totalCost = estimateTradeTotal(cost, shares);
       const holding = getHolding(artistId);
       const remainingPositionValue = Math.max(0, portfolioValue * 0.25 - (holding?.currentValue ?? 0));
 
-      if (cost > state.cashBalance) {
+      if (totalCost > state.cashBalance) {
         return { ok: false, message: "Not enough cash for that order." };
       }
 
@@ -521,8 +523,36 @@ async function submitServerTrade({
 
   return {
     ok: true,
-    message: `${side === "buy" ? "Bought" : "Sold"} ${shares} ${payload.trade?.ticker ?? "shares"}.`
+    message: formatTradeMessage({
+      side,
+      shares,
+      ticker: payload.trade?.ticker,
+      commission: payload.trade?.commission,
+      marketEligible: payload.trade?.market_eligible ?? payload.trade?.marketEligible
+    })
   };
+}
+
+function formatTradeMessage({
+  side,
+  shares,
+  ticker,
+  commission,
+  marketEligible
+}: {
+  side: "buy" | "sell";
+  shares: number;
+  ticker?: string;
+  commission?: number;
+  marketEligible?: boolean;
+}) {
+  const commissionText =
+    typeof commission === "number" && Number.isFinite(commission)
+      ? ` Commission ${new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(commission)}.`
+      : "";
+  const testingText = marketEligible === false ? " Test/admin trade: no market impact." : "";
+
+  return `${side === "buy" ? "Bought" : "Sold"} ${shares} ${ticker ?? "shares"}.${commissionText}${testingText}`;
 }
 
 function markCurrentLeaderboardUser(entries: LeaderboardEntry[], currentUserId?: string) {

@@ -62,10 +62,14 @@ export async function POST(request: Request) {
   }
 
   const supabase = createAnonServerClient(authorization);
+  const user = await supabase.auth.getUser();
+  const email = user.data.user?.email?.toLowerCase() ?? "";
+  const marketEligible = !isMarketImpactExemptEmail(email);
   const functionName = body.side === "sell" ? "sell_artist_shares" : "buy_artist_shares";
   const { data, error } = await supabase.rpc(functionName, {
     p_artist_id: artistId,
-    p_shares: shares
+    p_shares: shares,
+    p_market_eligible: marketEligible
   });
 
   if (error) {
@@ -82,6 +86,19 @@ export async function POST(request: Request) {
     ok: true,
     trade: data?.[0] ?? null
   });
+}
+
+function isMarketImpactExemptEmail(email: string) {
+  if (!email) {
+    return false;
+  }
+
+  const configured = `${process.env.MARKET_IMPACT_EXEMPT_EMAILS ?? ""},${process.env.ADMIN_EMAILS ?? ""}`
+    .split(",")
+    .map((value) => value.trim().toLowerCase())
+    .filter(Boolean);
+
+  return configured.includes(email);
 }
 
 async function parseBody(request: Request): Promise<TradeBody> {

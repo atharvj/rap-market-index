@@ -3,6 +3,7 @@
 import { useAuth } from "@/components/AuthProvider";
 import { useGame } from "@/components/GameProvider";
 import { formatCurrency, formatShares } from "@/lib/formatters";
+import { estimateTradeCommission, estimateTradeTotal } from "@/lib/trading";
 import type { Artist } from "@/lib/types";
 import { Minus, Plus } from "lucide-react";
 import { useMemo, useState } from "react";
@@ -23,10 +24,13 @@ export function TradeTicket({
   const parsedShares = Number(shares);
   const holding = getHolding(artist.id);
   const estimatedValue = Number.isFinite(parsedShares) ? parsedShares * artist.currentPrice : 0;
+  const estimatedCommission = estimateTradeCommission(estimatedValue, parsedShares);
+  const estimatedCashImpact = estimateTradeTotal(estimatedValue, parsedShares);
   const maxSell = holding?.shares ?? 0;
   const maxPositionValue = portfolioValue * 0.25;
   const remainingPositionValue = Math.max(0, maxPositionValue - (holding?.currentValue ?? 0));
-  const maxBuy = Math.max(0, Math.min(state.cashBalance, remainingPositionValue) / artist.currentPrice);
+  const effectiveCostPerShare = artist.currentPrice + Math.max(artist.currentPrice * 0.01, 0.02);
+  const maxBuy = Math.max(0, Math.min(state.cashBalance / effectiveCostPerShare, remainingPositionValue / artist.currentPrice));
   const tradeUnavailableReason = getTradeUnavailableReason({
     authLoading,
     hasSession: Boolean(session),
@@ -38,7 +42,7 @@ export function TradeTicket({
     !Number.isFinite(parsedShares) ||
     parsedShares <= 0 ||
     submitting ||
-    (side === "buy" ? estimatedValue > state.cashBalance || parsedShares > maxBuy : parsedShares > maxSell);
+    (side === "buy" ? estimatedCashImpact > state.cashBalance || parsedShares > maxBuy : parsedShares > maxSell);
 
   const helper = useMemo(() => {
     if (tradeUnavailableReason) {
@@ -124,6 +128,16 @@ export function TradeTicket({
       <div className="mt-3 flex items-center justify-between gap-3 text-sm">
         <span className="text-paper/55">{helper}</span>
         <span className="font-black number-tabular">{formatCurrency(estimatedValue || 0)}</span>
+      </div>
+      <div className="mt-2 flex items-center justify-between gap-3 text-xs font-bold text-paper/45">
+        <span>Commission</span>
+        <span className="number-tabular">{formatCurrency(estimatedCommission || 0)}</span>
+      </div>
+      <div className="mt-1 flex items-center justify-between gap-3 text-xs font-bold text-paper/45">
+        <span>{side === "buy" ? "Total cost" : "Estimated proceeds"}</span>
+        <span className="number-tabular">
+          {side === "buy" ? formatCurrency(estimatedCashImpact || 0) : formatCurrency(Math.max(0, estimatedValue - estimatedCommission))}
+        </span>
       </div>
 
       <button

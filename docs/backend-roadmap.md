@@ -18,8 +18,9 @@ This app still runs in development with unsaved demo data, but the backend found
 12. Run `supabase/migrations/011_curated_artist_roster.sql`.
 13. Run `supabase/migrations/012_artist_text_source_defaults.sql`.
 14. Run `supabase/migrations/013_price_ticks.sql`.
-15. Run `supabase/seed.sql` for the starter artists.
-16. Create `.env.local` in the project root and fill in:
+15. Run `supabase/migrations/014_market_economy_guardrails.sql`.
+16. Run `supabase/seed.sql` for the starter artists.
+17. Create `.env.local` in the project root and fill in:
    - `NEXT_PUBLIC_SUPABASE_URL`
    - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
    - `SUPABASE_SERVICE_ROLE_KEY`
@@ -128,6 +129,14 @@ It reports active artist count, source-ID coverage, observation freshness by sou
 - `runDate`: defaults to today
 
 This is the fastest way to see whether the market is ready for a real blended run or whether it is still missing IDs/baselines.
+
+Use the admin integrity endpoint to audit recent trade demand before trusting trade-flow price signals:
+
+```txt
+GET /api/admin/market-integrity
+```
+
+It reports total recent trades, market-eligible trades, excluded admin/test trades, commission totals, concentrated order flow, and rapid repeated trading. The `/dev` console displays the same audit in the Market integrity panel. Admin emails are excluded from market impact by default so test orders can verify the product without polluting public price history or daily trade-flow demand.
 
 ## Go-live checklist
 
@@ -253,7 +262,13 @@ The `core` and `blended` paths also detect recent MusicBrainz release groups for
 
 The `gdelt` and `blended` paths can also create article-based market events. This detector is intentionally conservative: it requires the title to mention the artist or a quoted alias from the artist's GDELT query, only treats reviews as reviews when the title has review/rating language, recognizes release, chart, tour/festival, award, viral, public-conflict, and controversy terms, weighs trusted music/business/news domains higher, and limits detected events to the strongest few articles per artist per run.
 
-Real-source market runs also include trade flow from saved buy/sell transactions. Individual trades already apply a small immediate market-maker impact; the daily trade-flow adapter summarizes the previous day's net buy-vs-sell order value, trade count, and trader breadth into the `traderDemand` model input. Trade-flow observations are included in the admin health endpoint so the operator can verify whether real trading demand is being measured.
+Real-source market runs also include trade flow from saved buy/sell transactions. Individual market-eligible trades already apply a small immediate market-maker impact; the daily trade-flow adapter summarizes the previous day's net buy-vs-sell gross order value, trade count, and trader breadth into the `traderDemand` model input. Admin/test trades can be marked `market_eligible=false`, which lets the order execute in the tester's portfolio without moving public prices or counting as trade-flow demand. Trade-flow observations are included in the admin health endpoint so the operator can verify whether real trading demand is being measured.
+
+## MVP product scope
+
+The first public version should stay focused on always-on ArtistStocks. That keeps the learning curve low: users sign up, get a starter bankroll, buy/sell artists, build a watchlist, and compete on lifetime/weekly/monthly leaderboards. HSX-style AlbumStocks, SongStocks, FeatureStocks, EventStocks, IPO calendars, and settlement/cash-out rules are good long-term expansion paths, but they should wait until the artist market, source coverage, trade execution, and anti-manipulation rules are stable.
+
+ArtistStock prices do not need a public one-line conversion like "H$1 equals $1M box office" yet. Internally, the price should represent expected near-term artist attention and demand. Later release/event securities should have clearer settlement math, such as first-30-day attention units for songs or first-4-week attention units for albums.
 
 The update endpoint is batch-aware for a larger artist universe:
 
@@ -370,7 +385,7 @@ The protected event scanner endpoint is:
 POST /api/admin/market-event-scan
 ```
 
-The `/dev` console exposes this as `Scan news and event signals`. Use `Preview` for a small dry scan, then `Save scan` to persist GDELT article-count observations and classified market events for a small least-recently-scanned artist batch.
+The normal market workflow runs this automatically through cron. The `/dev` console keeps the scanner under `Advanced testing`; use `Preview` for a small dry scan, then `Save scan` to persist GDELT article-count observations and classified market events for a small least-recently-scanned artist batch while debugging.
 
 It accepts a body such as:
 
@@ -471,8 +486,8 @@ The MusicBrainz release detector uses the public MusicBrainz web service and fol
 
 The real backend trading path is prepared through database functions:
 
-- `public.buy_artist_shares(artist_id, shares)`
-- `public.sell_artist_shares(artist_id, shares)`
+- `public.buy_artist_shares(artist_id, shares, market_eligible)`
+- `public.sell_artist_shares(artist_id, shares, market_eligible)`
 
 The app-facing API route is:
 
@@ -490,7 +505,7 @@ It expects a Supabase-authenticated `Authorization` header and a body like:
 }
 ```
 
-The database function handles the important atomic work: cash balance, holdings, average buy price, transaction record, trading demand, and small market-maker price impact.
+The database function handles the important atomic work: cash balance, holdings, average buy price, transaction record, commission, trading demand, and small market-maker price impact. Trades charge a 1% commission with a minimum of 2 cents per share. `market_eligible=false` is used for admin/test trades so the order still executes but does not move public prices or feed the trade-flow market signal.
 
 ## Frontend bridge
 

@@ -1,7 +1,7 @@
 "use client";
 
 import { useAuth } from "@/components/AuthProvider";
-import { formatDate, formatPercent } from "@/lib/formatters";
+import { formatCurrency, formatDate, formatPercent } from "@/lib/formatters";
 import {
   AlertTriangle,
   BarChart3,
@@ -18,7 +18,7 @@ import {
   Users,
   XCircle
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { Children, useEffect, useMemo, useState } from "react";
 
 type AsyncState<T> =
   | {
@@ -278,6 +278,23 @@ type ArtistRosterSaveState =
       message: string;
     };
 
+type AutoArtistAddState =
+  | {
+      status: "idle";
+    }
+  | {
+      status: "saving";
+    }
+  | {
+      status: "saved";
+      message: string;
+      warnings: string[];
+    }
+  | {
+      status: "error";
+      message: string;
+    };
+
 const sourceIdFieldBySource: Record<string, string> = {
   spotify: "spotifyId",
   youtube: "youtubeChannelId",
@@ -418,6 +435,68 @@ type MarketHealth = {
   warnings: string[];
 };
 
+type MarketIntegrity = {
+  generatedAt: string;
+  since: string;
+  lookbackHours: number;
+  summary: {
+    tradeCount: number;
+    marketEligibleTradeCount: number;
+    excludedTradeCount: number;
+    uniqueTraderCount: number;
+    marketEligibleUniqueTraderCount: number;
+    grossOrderValue: number;
+    marketEligibleGrossOrderValue: number;
+    excludedGrossOrderValue: number;
+    buyGrossOrderValue: number;
+    sellGrossOrderValue: number;
+    commissionTotal: number;
+  };
+  excludedTradeSummary: {
+    tradeCount: number;
+    grossOrderValue: number;
+    uniqueTraderCount: number;
+    artistCount: number;
+    latestTradeAt: string | null;
+  };
+  concentrationFlags: Array<{
+    artistId: string;
+    ticker: string;
+    name: string;
+    severity: "watch" | "high" | "critical";
+    reason: string;
+    tradeCount: number;
+    buyCount: number;
+    sellCount: number;
+    uniqueTraderCount: number;
+    grossOrderValue: number;
+    netOrderValue: number;
+    largestTrader: {
+      userId: string;
+      username: string | null;
+      tradeCount: number;
+      grossOrderValue: number;
+      sharePercent: number;
+    };
+    firstTradeAt: string;
+    lastTradeAt: string;
+  }>;
+  rapidTradeFlags: Array<{
+    userId: string;
+    username: string | null;
+    artistId: string;
+    ticker: string;
+    name: string;
+    tradeCount: number;
+    grossOrderValue: number;
+    windowMinutes: number;
+    severity: "watch" | "high";
+    firstTradeAt: string;
+    lastTradeAt: string;
+  }>;
+  warnings: string[];
+};
+
 const plannedPowers = [
   {
     title: "User management",
@@ -485,6 +564,7 @@ export default function DevPage() {
   const [adminAccess, setAdminAccess] = useState<AdminAccessState>({ status: "loading" });
   const [cloudStatus, setCloudStatus] = useState<AsyncState<CloudStatus>>({ status: "loading" });
   const [marketHealth, setMarketHealth] = useState<AsyncState<MarketHealth>>({ status: "loading" });
+  const [marketIntegrity, setMarketIntegrity] = useState<AsyncState<MarketIntegrity>>({ status: "loading" });
   const [preview, setPreview] = useState<PreviewState>({ status: "idle" });
   const [runNow, setRunNow] = useState<RunNowState>({ status: "idle" });
   const [eventScan, setEventScan] = useState<EventScanState>({ status: "idle" });
@@ -492,6 +572,8 @@ export default function DevPage() {
   const [artistRoster, setArtistRoster] = useState<AsyncState<ArtistRosterDirectory>>({ status: "loading" });
   const [artistRosterForm, setArtistRosterForm] = useState<ArtistRosterForm>(emptyArtistRosterForm);
   const [artistRosterSave, setArtistRosterSave] = useState<ArtistRosterSaveState>({ status: "idle" });
+  const [autoArtistName, setAutoArtistName] = useState("");
+  const [autoArtistAdd, setAutoArtistAdd] = useState<AutoArtistAddState>({ status: "idle" });
   const [sourceIds, setSourceIds] = useState<AsyncState<SourceIdDirectory>>({ status: "loading" });
   const [manualSourceForm, setManualSourceForm] = useState<ManualSourceIdForm>(emptyManualSourceIdForm);
   const [manualSourceSave, setManualSourceSave] = useState<ManualSourceIdSaveState>({ status: "idle" });
@@ -571,6 +653,7 @@ export default function DevPage() {
 
     void refreshCloudStatus();
     void refreshMarketHealth();
+    void refreshMarketIntegrity();
     void refreshArtistRoster();
     void refreshSourceIds();
   }, [adminAccess.status]);
@@ -654,6 +737,31 @@ export default function DevPage() {
       setMarketHealth({
         status: "error",
         message: error instanceof Error ? error.message : "Market health check failed."
+      });
+    }
+  }
+
+  async function refreshMarketIntegrity() {
+    setMarketIntegrity({ status: "loading" });
+
+    try {
+      const response = await fetch("/api/admin/market-integrity", {
+        headers: adminHeaders
+      });
+      const payload = await readJsonResponse(response);
+
+      if (!response.ok || !payload.ok) {
+        throw new Error(payload.error ?? "Market integrity check failed.");
+      }
+
+      setMarketIntegrity({
+        status: "ready",
+        data: payload as MarketIntegrity
+      });
+    } catch (error) {
+      setMarketIntegrity({
+        status: "error",
+        message: error instanceof Error ? error.message : "Market integrity check failed."
       });
     }
   }
@@ -832,6 +940,7 @@ export default function DevPage() {
       });
 
       await refreshMarketHealth();
+      await refreshMarketIntegrity();
     } catch (error) {
       setRunNow({
         status: "error",
@@ -982,6 +1091,78 @@ export default function DevPage() {
   function startNewRosterArtist() {
     setArtistRosterForm(emptyArtistRosterForm);
     setArtistRosterSave({ status: "idle" });
+  }
+
+  async function addArtistByName() {
+    const name = autoArtistName.trim();
+
+    if (!name) {
+      setAutoArtistAdd({
+        status: "error",
+        message: "Enter an artist name first."
+      });
+      return;
+    }
+
+    setAutoArtistAdd({ status: "saving" });
+
+    try {
+      const response = await fetch("/api/admin/artist-autofill", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          ...adminHeaders
+        },
+        body: JSON.stringify({
+          name
+        })
+      });
+      const payload = await readJsonResponse(response);
+
+      if (!response.ok || !payload.ok) {
+        throw new Error(payload.error ?? "Artist autofill failed.");
+      }
+
+      const record = payload.record as ArtistRosterRecord | undefined;
+      const sourceIds = payload.sourceIds as ArtistSourceIdRecord["externalIds"] | null | undefined;
+      const savedSourceLabels = sourceIds
+        ? manualSourceIdFields
+            .filter((field) => Boolean(sourceIds[field.key]))
+            .map((field) => field.label)
+        : [];
+      const starterPrice =
+        typeof payload.starter?.price === "number" ? `$${payload.starter.price.toFixed(2)}` : "starter price";
+
+      if (record) {
+        setArtistRosterForm(buildArtistRosterForm(record));
+        setManualSourceForm({
+          ...emptyManualSourceIdForm,
+          artistId: record.id,
+          spotifyId: sourceIds?.spotifyId ?? "",
+          youtubeChannelId: sourceIds?.youtubeChannelId ?? "",
+          musicbrainzId: sourceIds?.musicbrainzId ?? "",
+          lastfmName: sourceIds?.lastfmName ?? "",
+          gdeltQuery: sourceIds?.gdeltQuery ?? ""
+        });
+      }
+
+      setAutoArtistName("");
+      setAutoArtistAdd({
+        status: "saved",
+        message: `Added ${record?.ticker ?? name} at ${starterPrice}. ${
+          savedSourceLabels.length ? `Saved ${savedSourceLabels.join(", ")}.` : "No source IDs were saved."
+        }`,
+        warnings: payload.resolver?.warnings ?? []
+      });
+      await refreshArtistRoster();
+      await refreshSourceIds();
+      await refreshMarketHealth();
+    } catch (error) {
+      setAutoArtistAdd({
+        status: "error",
+        message: error instanceof Error ? error.message : "Artist autofill failed."
+      });
+    }
   }
 
   function updateRosterField(field: keyof Omit<ArtistRosterForm, "selectedId">, value: string | boolean) {
@@ -1224,80 +1405,53 @@ export default function DevPage() {
         </Panel>
       </section>
 
-      <section className="rounded-md border border-line bg-panel/88 p-5 shadow-market">
-        <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-          <div>
-            <p className="text-xs font-bold uppercase tracking-wide text-paper/45">Market operation</p>
-            <h2 className="mt-1 text-2xl font-black">Core market update</h2>
-            <p className="mt-2 text-sm leading-6 text-paper/55">
-              Preview runs a dry sample. Run now writes today's prices, observations, and history in short core batches,
-              even if today's market already ran.
-            </p>
-          </div>
-          <div className="flex flex-col gap-2 sm:flex-row">
-            <button
-              type="button"
-              onClick={runCorePreview}
-              disabled={preview.status === "loading" || runNow.status === "loading"}
-              className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md border border-cyan/45 bg-cyan/10 px-4 text-sm font-black text-cyan disabled:cursor-wait disabled:opacity-55"
-            >
-              <PlayCircle className="h-4 w-4" />
-              Preview
-            </button>
-            <button
-              type="button"
-              onClick={runCoreUpdateNow}
-              disabled={preview.status === "loading" || runNow.status === "loading"}
-              className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md border border-mint/45 bg-mint/10 px-4 text-sm font-black text-mint disabled:cursor-wait disabled:opacity-55"
-            >
-              <ServerCog className="h-4 w-4" />
-              Run now
-            </button>
-          </div>
-        </div>
-        <PreviewResult preview={preview} />
-        <RunNowResult run={runNow} />
-      </section>
+      <Panel
+        title="Market integrity"
+        eyebrow="Anti-manipulation"
+        actionLabel="Refresh"
+        onAction={refreshMarketIntegrity}
+      >
+        {marketIntegrity.status === "loading" ? <LoadingText text="Checking trade integrity..." /> : null}
+        {marketIntegrity.status === "error" ? <ErrorText text={marketIntegrity.message} /> : null}
+        {marketIntegrity.status === "ready" ? <MarketIntegrityPanel data={marketIntegrity.data} /> : null}
+      </Panel>
 
       <section className="rounded-md border border-line bg-panel/88 p-5 shadow-market">
         <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
           <div>
-            <p className="text-xs font-bold uppercase tracking-wide text-paper/45">Event layer</p>
-            <h2 className="mt-1 text-2xl font-black">Scan news and event signals</h2>
+            <p className="text-xs font-bold uppercase tracking-wide text-paper/45">Market operation</p>
+            <h2 className="mt-1 text-2xl font-black">Run market now</h2>
             <p className="mt-2 text-sm leading-6 text-paper/55">
-              The daily cron runs this automatically before pricing. These controls only preview or backfill a small
-              least-recently-scanned artist batch.
+              Writes today's prices, observations, and history in short core batches. The daily cron normally handles
+              this automatically, so use this only when you want an immediate production run.
             </p>
           </div>
-          <div className="flex flex-col gap-2 sm:flex-row">
-            <button
-              type="button"
-              onClick={() => runEventScan("preview")}
-              disabled={eventScan.status === "loading"}
-              className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md border border-cyan/45 bg-cyan/10 px-4 text-sm font-black text-cyan disabled:cursor-wait disabled:opacity-55"
-            >
-              <PlayCircle className="h-4 w-4" />
-              Preview
-            </button>
-            <button
-              type="button"
-              onClick={() => runEventScan("persist")}
-              disabled={eventScan.status === "loading"}
-              className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md border border-mint/45 bg-mint/10 px-4 text-sm font-black text-mint disabled:cursor-wait disabled:opacity-55"
-            >
-              <CheckCircle2 className="h-4 w-4" />
-              Backfill scan
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={runCoreUpdateNow}
+            disabled={runNow.status === "loading"}
+            className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md border border-mint/45 bg-mint/10 px-4 text-sm font-black text-mint disabled:cursor-wait disabled:opacity-55"
+          >
+            <ServerCog className="h-4 w-4" />
+            Run now
+          </button>
         </div>
-        <EventScanResult scan={eventScan} />
+        <RunNowResult run={runNow} />
       </section>
+
+      <AdvancedTestingPanel
+        preview={preview}
+        eventScan={eventScan}
+        runCorePreview={runCorePreview}
+        runEventScan={runEventScan}
+        controlsDisabled={runNow.status === "loading"}
+      />
 
       <section className="rounded-md border border-line bg-panel/88 p-5 shadow-market">
         <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
           <div>
             <p className="text-xs font-bold uppercase tracking-wide text-paper/45">Data quality</p>
-            <h2 className="mt-1 text-2xl font-black">Preview missing source IDs</h2>
+            <h2 className="mt-1 text-2xl font-black">Find missing source IDs</h2>
             <p className="mt-2 text-sm leading-6 text-paper/55">
               Runs a dry resolver pass for missing Spotify, YouTube, and MusicBrainz IDs. It does not save candidate
               IDs.
@@ -1310,7 +1464,7 @@ export default function DevPage() {
             className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md border border-cyan/45 bg-cyan/10 px-4 text-sm font-black text-cyan disabled:cursor-wait disabled:opacity-55"
           >
             <PlayCircle className="h-4 w-4" />
-            Preview
+            Scan candidates
           </button>
         </div>
         <SourceResolverPreviewResult preview={resolverPreview} onSave={saveSourceResolverProposals} />
@@ -1321,12 +1475,19 @@ export default function DevPage() {
         form={artistRosterForm}
         selectedRecord={selectedRosterRecord}
         saveState={artistRosterSave}
+        autoName={autoArtistName}
+        autoState={autoArtistAdd}
         onRefresh={refreshArtistRoster}
         onNew={startNewRosterArtist}
         onSelectArtist={selectRosterArtist}
         onChange={updateRosterField}
         onSave={saveRosterArtist}
         onSetActive={setRosterArtistActive}
+        onAutoNameChange={(value) => {
+          setAutoArtistName(value);
+          setAutoArtistAdd({ status: "idle" });
+        }}
+        onAutoAdd={addArtistByName}
       />
 
       <ManualSourceIdEditor
@@ -1626,6 +1787,181 @@ function MarketHealthPanel({ data }: { data: MarketHealth }) {
   );
 }
 
+function MarketIntegrityPanel({ data }: { data: MarketIntegrity }) {
+  const hasTrades = data.summary.tradeCount > 0;
+
+  return (
+    <div className="space-y-4">
+      <CoverageGrid title={`Trade audit, last ${data.lookbackHours}h`} items={[
+        {
+          key: "integrity:all-trades",
+          label: "All trades",
+          value: String(data.summary.tradeCount),
+          detail: `${data.summary.uniqueTraderCount} total traders`
+        },
+        {
+          key: "integrity:eligible-trades",
+          label: "Market-eligible trades",
+          value: String(data.summary.marketEligibleTradeCount),
+          detail: `${data.summary.marketEligibleUniqueTraderCount} real-demand traders`
+        },
+        {
+          key: "integrity:excluded-trades",
+          label: "Excluded test/admin trades",
+          value: String(data.summary.excludedTradeCount),
+          detail: `${formatCurrency(data.summary.excludedGrossOrderValue)} ignored by trade-flow`
+        },
+        {
+          key: "integrity:eligible-value",
+          label: "Eligible order value",
+          value: formatCurrency(data.summary.marketEligibleGrossOrderValue),
+          detail: `${formatCurrency(data.summary.buyGrossOrderValue)} buys, ${formatCurrency(data.summary.sellGrossOrderValue)} sells`
+        },
+        {
+          key: "integrity:commission",
+          label: "Commissions",
+          value: formatCurrency(data.summary.commissionTotal),
+          detail: "Collected across recent trades"
+        },
+        {
+          key: "integrity:generated",
+          label: "Checked",
+          value: formatDate(data.generatedAt),
+          detail: hasTrades ? `Since ${formatDate(data.since)}` : "No recent trades"
+        }
+      ]} />
+
+      {data.warnings.length ? (
+        <div className="rounded-md border border-brass/35 bg-brass/10 p-3">
+          <div className="flex items-center gap-2 text-sm font-black text-brass">
+            <AlertTriangle className="h-4 w-4" />
+            Integrity warnings
+          </div>
+          <ul className="mt-2 space-y-1 text-sm leading-6 text-paper/62">
+            {data.warnings.map((warning) => (
+              <li key={warning}>{warning}</li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+
+      <div className="grid gap-4 xl:grid-cols-2">
+        <IntegrityList
+          title="Concentrated order flow"
+          emptyText={hasTrades ? "No concentration flags in recent eligible trades." : "No recent trades to inspect."}
+        >
+          {data.concentrationFlags.map((flag) => (
+            <div key={flag.artistId} className="rounded-md border border-line bg-black/20 p-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <p className="text-sm font-black">{flag.ticker}</p>
+                  <p className="text-xs font-bold text-paper/45">{flag.name}</p>
+                </div>
+                <SeverityPill severity={flag.severity} />
+              </div>
+              <p className="mt-2 text-sm leading-5 text-paper/58">{flag.reason}</p>
+              <div className="mt-3 grid gap-2 text-xs font-bold text-paper/50 sm:grid-cols-3">
+                <span>{formatCurrency(flag.grossOrderValue)} gross</span>
+                <span>{formatSignedCurrency(flag.netOrderValue)} net</span>
+                <span>{flag.uniqueTraderCount} traders</span>
+              </div>
+              <p className="mt-2 text-xs font-bold text-paper/45">
+                Top trader {flag.largestTrader.username ?? shortId(flag.largestTrader.userId)} controls{" "}
+                {formatUnsignedPercent(flag.largestTrader.sharePercent)}.
+              </p>
+            </div>
+          ))}
+        </IntegrityList>
+
+        <IntegrityList
+          title="Rapid trading"
+          emptyText={hasTrades ? "No rapid-trading flags in the latest window." : "No recent trades to inspect."}
+        >
+          {data.rapidTradeFlags.map((flag) => (
+            <div key={`${flag.userId}:${flag.artistId}`} className="rounded-md border border-line bg-black/20 p-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <p className="text-sm font-black">{flag.username ?? shortId(flag.userId)}</p>
+                  <p className="text-xs font-bold text-paper/45">
+                    {flag.ticker} - {flag.name}
+                  </p>
+                </div>
+                <SeverityPill severity={flag.severity} />
+              </div>
+              <div className="mt-3 grid gap-2 text-xs font-bold text-paper/50 sm:grid-cols-3">
+                <span>{flag.tradeCount} trades</span>
+                <span>{formatCurrency(flag.grossOrderValue)} gross</span>
+                <span>{flag.windowMinutes} min window</span>
+              </div>
+            </div>
+          ))}
+        </IntegrityList>
+      </div>
+
+      {data.excludedTradeSummary.tradeCount > 0 ? (
+        <div className="rounded-md border border-mint/25 bg-mint/10 p-3 text-sm leading-6 text-paper/62">
+          <span className="font-black text-mint">{data.excludedTradeSummary.tradeCount} test/admin trades</span> were
+          excluded from market impact across {data.excludedTradeSummary.artistCount} artists.
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function IntegrityList({
+  title,
+  emptyText,
+  children
+}: {
+  title: string;
+  emptyText: string;
+  children: React.ReactNode;
+}) {
+  const childArray = Children.toArray(children);
+
+  return (
+    <div>
+      <h3 className="text-sm font-black uppercase tracking-wide text-paper/45">{title}</h3>
+      {childArray.length ? (
+        <div className="mt-2 space-y-2">{childArray}</div>
+      ) : (
+        <div className="mt-2 rounded-md border border-line bg-black/20 p-3 text-sm font-bold text-paper/45">
+          {emptyText}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function SeverityPill({ severity }: { severity: "watch" | "high" | "critical" }) {
+  const className =
+    severity === "critical"
+      ? "border-ember/45 bg-ember/10 text-ember"
+      : severity === "high"
+        ? "border-brass/45 bg-brass/10 text-brass"
+        : "border-cyan/45 bg-cyan/10 text-cyan";
+
+  return (
+    <span className={`rounded-md border px-2 py-1 text-xs font-black uppercase tracking-wide ${className}`}>
+      {severity}
+    </span>
+  );
+}
+
+function formatSignedCurrency(value: number) {
+  const sign = value > 0 ? "+" : "";
+
+  return `${sign}${formatCurrency(value)}`;
+}
+
+function formatUnsignedPercent(value: number) {
+  return `${value.toFixed(1)}%`;
+}
+
+function shortId(value: string) {
+  return value.length > 8 ? `${value.slice(0, 8)}...` : value;
+}
+
 function formatEventTypeCounts(counts: Record<string, number>) {
   const entries = Object.entries(counts).sort((a, b) => b[1] - a[1]);
 
@@ -1661,6 +1997,84 @@ function CoverageGrid({
         ))}
       </div>
     </div>
+  );
+}
+
+function AdvancedTestingPanel({
+  preview,
+  eventScan,
+  runCorePreview,
+  runEventScan,
+  controlsDisabled
+}: {
+  preview: PreviewState;
+  eventScan: EventScanState;
+  runCorePreview: () => void;
+  runEventScan: (mode: "preview" | "persist") => void;
+  controlsDisabled: boolean;
+}) {
+  return (
+    <details className="rounded-md border border-line bg-panel/75 p-5 shadow-market">
+      <summary className="cursor-pointer text-sm font-black uppercase tracking-wide text-paper/55">
+        Advanced testing
+      </summary>
+      <div className="mt-4 grid gap-4 xl:grid-cols-2">
+        <div className="rounded-md border border-line bg-black/20 p-4">
+          <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+            <div>
+              <p className="text-xs font-bold uppercase tracking-wide text-paper/45">Dry run</p>
+              <h3 className="mt-1 text-xl font-black">Market preview</h3>
+              <p className="mt-2 text-sm leading-6 text-paper/55">
+                Debug-only sample. It does not write prices, observations, or history.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={runCorePreview}
+              disabled={preview.status === "loading" || controlsDisabled}
+              className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md border border-cyan/45 bg-cyan/10 px-4 text-sm font-black text-cyan disabled:cursor-wait disabled:opacity-55"
+            >
+              <PlayCircle className="h-4 w-4" />
+              Preview
+            </button>
+          </div>
+          <PreviewResult preview={preview} />
+        </div>
+
+        <div className="rounded-md border border-line bg-black/20 p-4">
+          <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+            <div>
+              <p className="text-xs font-bold uppercase tracking-wide text-paper/45">Event layer</p>
+              <h3 className="mt-1 text-xl font-black">News/event scanner</h3>
+              <p className="mt-2 text-sm leading-6 text-paper/55">
+                The daily cron runs this automatically before pricing. These buttons are for debugging scanner output.
+              </p>
+            </div>
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <button
+                type="button"
+                onClick={() => runEventScan("preview")}
+                disabled={eventScan.status === "loading" || controlsDisabled}
+                className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md border border-cyan/45 bg-cyan/10 px-4 text-sm font-black text-cyan disabled:cursor-wait disabled:opacity-55"
+              >
+                <PlayCircle className="h-4 w-4" />
+                Preview
+              </button>
+              <button
+                type="button"
+                onClick={() => runEventScan("persist")}
+                disabled={eventScan.status === "loading" || controlsDisabled}
+                className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md border border-mint/45 bg-mint/10 px-4 text-sm font-black text-mint disabled:cursor-wait disabled:opacity-55"
+              >
+                <CheckCircle2 className="h-4 w-4" />
+                Save scan
+              </button>
+            </div>
+          </div>
+          <EventScanResult scan={eventScan} />
+        </div>
+      </div>
+    </details>
   );
 }
 
@@ -2064,26 +2478,34 @@ function ArtistRosterManager({
   form,
   selectedRecord,
   saveState,
+  autoName,
+  autoState,
   onRefresh,
   onNew,
   onSelectArtist,
   onChange,
   onSave,
-  onSetActive
+  onSetActive,
+  onAutoNameChange,
+  onAutoAdd
 }: {
   state: AsyncState<ArtistRosterDirectory>;
   form: ArtistRosterForm;
   selectedRecord: ArtistRosterRecord | null;
   saveState: ArtistRosterSaveState;
+  autoName: string;
+  autoState: AutoArtistAddState;
   onRefresh: () => void;
   onNew: () => void;
   onSelectArtist: (artistId: string) => void;
   onChange: (field: keyof Omit<ArtistRosterForm, "selectedId">, value: string | boolean) => void;
   onSave: () => void;
   onSetActive: (isActive: boolean) => void;
+  onAutoNameChange: (value: string) => void;
+  onAutoAdd: () => void;
 }) {
   const records = state.status === "ready" ? state.data.records : [];
-  const selectedDisabled = saveState.status === "saving";
+  const selectedDisabled = saveState.status === "saving" || autoState.status === "saving";
 
   return (
     <section className="rounded-md border border-line bg-panel/88 p-5 shadow-market">
@@ -2120,7 +2542,52 @@ function ArtistRosterManager({
       {state.status === "error" ? <ErrorText text={state.message} /> : null}
 
       {state.status === "ready" ? (
-        <div className="mt-4 grid gap-4 xl:grid-cols-[0.8fr_1.2fr]">
+        <div className="mt-4 space-y-4">
+          <div className="rounded-md border border-cyan/25 bg-cyan/5 p-4">
+            <div className="grid gap-3 lg:grid-cols-[1fr_auto] lg:items-end">
+              <label className="block">
+                <span className="text-xs font-black uppercase tracking-wide text-paper/45">Add by artist name</span>
+                <input
+                  value={autoName}
+                  onChange={(event) => onAutoNameChange(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") {
+                      event.preventDefault();
+                      onAutoAdd();
+                    }
+                  }}
+                  disabled={selectedDisabled}
+                  placeholder="Lil Tecca"
+                  className="mt-2 min-h-11 w-full rounded-md border border-line bg-ink px-3 text-sm font-bold text-paper outline-none placeholder:text-paper/24 focus:border-cyan disabled:cursor-not-allowed disabled:opacity-55"
+                />
+                <span className="mt-1 block text-xs font-bold leading-5 text-paper/42">
+                  Creates the listing, estimates neutral starting values, and saves safe source defaults plus confident IDs.
+                </span>
+              </label>
+              <button
+                type="button"
+                onClick={onAutoAdd}
+                disabled={!autoName.trim() || selectedDisabled}
+                className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-mint/45 bg-mint/10 px-4 text-sm font-black text-mint disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <CheckCircle2 className="h-4 w-4" />
+                {autoState.status === "saving" ? "Adding" : "Auto-add artist"}
+              </button>
+            </div>
+            {autoState.status === "saved" ? (
+              <div className="mt-3 rounded-md border border-mint/35 bg-mint/10 p-3 text-sm font-bold leading-6 text-paper/70">
+                <p className="text-mint">{autoState.message}</p>
+                {autoState.warnings.slice(0, 2).map((warning) => (
+                  <p key={warning} className="text-paper/55">
+                    {warning}
+                  </p>
+                ))}
+              </div>
+            ) : null}
+            {autoState.status === "error" ? <ErrorText text={autoState.message} /> : null}
+          </div>
+
+          <div className="grid gap-4 xl:grid-cols-[0.8fr_1.2fr]">
           <div className="rounded-md border border-line bg-black/20 p-4">
             <label className="block">
               <span className="text-xs font-black uppercase tracking-wide text-paper/45">Existing artist</span>
@@ -2280,6 +2747,7 @@ function ArtistRosterManager({
               </div>
             </div>
           </div>
+        </div>
         </div>
       ) : null}
     </section>

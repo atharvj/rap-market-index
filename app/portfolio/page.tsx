@@ -145,6 +145,14 @@ export default function PortfolioPage() {
                       <p className="mt-2 text-sm text-paper/58">
                         {formatShares(transaction.shares)} shares at {formatCurrency(transaction.price)}
                       </p>
+                      {typeof transaction.commission === "number" && transaction.commission > 0 ? (
+                        <p className="mt-1 text-xs font-bold text-paper/42">
+                          Commission {formatCurrency(transaction.commission)}
+                          {transaction.marketEligible === false ? " · no market impact" : ""}
+                        </p>
+                      ) : transaction.marketEligible === false ? (
+                        <p className="mt-1 text-xs font-bold text-paper/42">No market impact</p>
+                      ) : null}
                     </div>
                   );
                 })

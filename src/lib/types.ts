@@ -58,6 +58,9 @@ export type Transaction = {
   type: "buy" | "sell";
   shares: number;
   price: number;
+  grossValue?: number;
+  commission?: number;
+  marketEligible?: boolean;
   createdAt: string;
 };
 

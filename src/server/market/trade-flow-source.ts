@@ -16,7 +16,7 @@ type TradeFlowCollectOptions = {
 
 type TradeRow = Pick<
   Database["public"]["Tables"]["transactions"]["Row"],
-  "artist_id" | "user_id" | "type" | "shares" | "price" | "cash_delta" | "created_at"
+  "artist_id" | "user_id" | "type" | "shares" | "price" | "cash_delta" | "gross_value" | "market_eligible" | "created_at"
 >;
 
 type TradeBucket = {
@@ -67,8 +67,9 @@ export async function collectTradeFlowMarketSignals({
   const windowEnd = `${runDate}T00:00:00.000Z`;
   const { data, error } = await supabase
     .from("transactions")
-    .select("artist_id,user_id,type,shares,price,cash_delta,created_at")
+    .select("artist_id,user_id,type,shares,price,cash_delta,gross_value,market_eligible,created_at")
     .in("artist_id", artistIds)
+    .eq("market_eligible", true)
     .gte("created_at", windowStart)
     .lt("created_at", windowEnd)
     .order("created_at", { ascending: false })
@@ -126,7 +127,7 @@ function groupTrades(trades: TradeRow[]) {
         traders: new Set<string>(),
         traderValues: new Map<string, number>()
       };
-    const orderValue = Math.abs(Number(trade.cash_delta));
+    const orderValue = Number(trade.gross_value) || Math.abs(Number(trade.cash_delta));
     const shares = Number(trade.shares);
 
     if (trade.type === "buy") {

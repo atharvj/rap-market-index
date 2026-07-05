@@ -300,6 +300,9 @@ export type Database = {
           shares: number;
           price: number;
           cash_delta: number;
+          gross_value: number;
+          commission: number;
+          market_eligible: boolean;
           created_at: string;
         };
         Insert: {
@@ -310,6 +313,9 @@ export type Database = {
           shares: number;
           price: number;
           cash_delta: number;
+          gross_value?: number;
+          commission?: number;
+          market_eligible?: boolean;
           created_at?: string;
         };
         Update: Partial<Database["public"]["Tables"]["transactions"]["Insert"]>;
@@ -348,6 +354,7 @@ export type Database = {
         Args: {
           p_artist_id: string;
           p_shares: number;
+          p_market_eligible?: boolean;
         };
         Returns: Array<{
           transaction_id: string;
@@ -356,17 +363,21 @@ export type Database = {
           shares: number;
           execution_price: number;
           order_value: number;
+          gross_order_value: number;
+          commission: number;
           cash_balance: number;
           shares_owned: number;
           average_buy_price: number;
           updated_artist_price: number;
           price_impact_percent: number;
+          market_eligible: boolean;
         }>;
       };
       sell_artist_shares: {
         Args: {
           p_artist_id: string;
           p_shares: number;
+          p_market_eligible?: boolean;
         };
         Returns: Array<{
           transaction_id: string;
@@ -375,11 +386,14 @@ export type Database = {
           shares: number;
           execution_price: number;
           order_value: number;
+          gross_order_value: number;
+          commission: number;
           cash_balance: number;
           shares_owned: number;
           average_buy_price: number;
           updated_artist_price: number;
           price_impact_percent: number;
+          market_eligible: boolean;
         }>;
       };
     };
