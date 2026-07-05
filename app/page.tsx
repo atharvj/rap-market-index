@@ -62,7 +62,7 @@ export default function MarketPage() {
           <div className="border-b border-line p-5 sm:p-6 lg:border-b-0 lg:border-r">
             <div className="flex flex-wrap items-center gap-2">
               <span className="rounded-md border border-brass/35 bg-brass/10 px-2.5 py-1 text-xs font-black uppercase tracking-wide text-brass">
-                Market beta
+                Virtual market
               </span>
               <span className="rounded-md border border-line bg-black/20 px-2.5 py-1 text-xs font-black uppercase tracking-wide text-paper/52">
                 Continuous trading
@@ -72,8 +72,8 @@ export default function MarketPage() {
               Artist shares move on momentum, audience growth, media, and trading demand.
             </h1>
             <p className="mt-4 max-w-2xl text-base leading-7 text-paper/62">
-              Prices currently use modeled market signals: streaming momentum, video activity, discovery trends,
-              fan sentiment, release activity, media movement, and order flow.
+              Prices respond to audience momentum, video activity, discovery trends, fan sentiment, release activity,
+              media movement, and order flow.
             </p>
             <div className="mt-6 grid gap-3 sm:grid-cols-3">
               <MetricCard
@@ -117,16 +117,6 @@ export default function MarketPage() {
                 </div>
               </div>
             ) : null}
-            <div className="mt-6 rounded-md border border-line bg-black/20 p-4">
-              <p className="text-xs font-bold uppercase tracking-wide text-paper/50">Market model</p>
-              <div className="mt-3 grid grid-cols-5 gap-2 text-center text-xs font-black number-tabular">
-                <span className="rounded bg-mint/10 px-2 py-2 text-mint">35%</span>
-                <span className="rounded bg-cyan/10 px-2 py-2 text-cyan">25%</span>
-                <span className="rounded bg-brass/10 px-2 py-2 text-brass">15%</span>
-                <span className="rounded bg-ember/10 px-2 py-2 text-ember">15%</span>
-                <span className="rounded bg-paper/10 px-2 py-2 text-paper/70">10%</span>
-              </div>
-            </div>
           </aside>
         </div>
       </section>

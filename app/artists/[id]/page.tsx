@@ -75,8 +75,8 @@ export default function ArtistDetailPage() {
                 <p className="text-xs font-bold uppercase tracking-wide text-paper/45">Market summary</p>
                 <h2 className="mt-1 text-xl font-black">{artist.lastMoveExplanation}</h2>
                 <p className="mt-3 text-sm leading-6 text-paper/58">
-                  The market model weights audience momentum, media activity, and order flow, so faster-growing
-                  artists can move more sharply than stable large-cap listings.
+                  Prices reflect audience momentum, media activity, and order flow, so faster-growing artists can
+                  move more sharply than stable large-cap listings.
                 </p>
               </div>
             </div>

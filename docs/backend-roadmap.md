@@ -25,7 +25,7 @@ This app still runs in development with unsaved demo data, but the backend found
    - `MARKET_CRON_SOURCE=core`
    - `MARKET_CRON_ARTIST_LIMIT=25`
    - `MARKET_CRON_MAX_BATCHES=4`
-   - `MARKET_MODEL_VERSION=rmi-core-v1`
+   - `MARKET_MODEL_VERSION=rmi-core-v2`
    - `LASTFM_API_KEY` for optional Last.fm listener/playcount signals
    - `SPOTIFY_CLIENT_ID` and `SPOTIFY_CLIENT_SECRET` for optional Spotify popularity/follower signals
    - `YOUTUBE_API_KEY` for optional YouTube channel view/subscriber/video-count and comment-reaction signals
@@ -134,6 +134,8 @@ For production, add these environment variables to the deployment host before re
 After deployment, manually call `/api/cron/daily-market-update?dryRun=1` with `Authorization: Bearer <CRON_SECRET>` once. Then run one persisted `core` batch and recheck `/api/admin/market-health`. From that point forward, Vercel Cron can keep the graph history growing each day.
 
 `MARKET_MODEL_VERSION` is an internal audit label, not a prominent user-facing product label. It is saved on market runs, signal snapshots, and price-history rows so future algorithm changes can be traced without rewriting historical prices. Normal market pages should keep broad language such as audience momentum, market activity, release signals, and media movement. Admin/health/debug views can show the exact model version.
+
+`rmi-core-v2` adds signal-reliability scaling: broad, higher-confidence source coverage can move prices more than thin or single-source observations. This is intended to keep the market responsive while reducing overreaction to weak data.
 
 ## Trading integrity controls
 

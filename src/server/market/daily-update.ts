@@ -10,6 +10,8 @@ type ResolvedMarketSignal = {
   rawPayload: Record<string, unknown>;
   modifiers: MarketSignalModifier[];
   hasMomentumSignal: boolean;
+  reliability: number;
+  reliabilityDetails: Record<string, number>;
 };
 
 export type MarketUpdateArtist = {
@@ -58,6 +60,7 @@ export type MarketUpdateSummary = {
   momentumArtistCount: number;
   averageMovePercent: number;
   averageSignalDelta: number;
+  averageSignalReliability: number;
   signalSourceCoverage: Record<string, { artistCount: number; statCount: number }>;
   topGainer: Pick<ArtistMarketUpdate, "artistId" | "ticker" | "dailyChangePercent"> | null;
   topLoser: Pick<ArtistMarketUpdate, "artistId" | "ticker" | "dailyChangePercent"> | null;
@@ -89,6 +92,9 @@ export function calculateDailyMarketUpdates(input: MarketUpdateInput) {
     updates.reduce((total, update) => total + update.dailyChangePercent, 0) / Math.max(1, updates.length);
   const averageSignalDelta =
     updates.reduce((total, update) => total + update.signalDelta, 0) / Math.max(1, updates.length);
+  const averageSignalReliability =
+    updates.reduce((total, update) => total + getNumber(update.rawPayload.signalReliability, 0), 0) /
+    Math.max(1, updates.length);
   const sorted = [...updates].sort((a, b) => b.dailyChangePercent - a.dailyChangePercent);
 
   return {
@@ -101,6 +107,7 @@ export function calculateDailyMarketUpdates(input: MarketUpdateInput) {
       momentumArtistCount: updates.filter((update) => update.rawPayload.hasMomentumSignal === true).length,
       averageMovePercent,
       averageSignalDelta,
+      averageSignalReliability,
       signalSourceCoverage: buildSignalSourceCoverage(updates),
       topGainer: sorted[0]
         ? pickLeaderboardMove(sorted[0])
@@ -168,7 +175,11 @@ function calculateArtistUpdate({
   const signals = getSignalsForArtist(artist, index, runDate, source, manualSignals, adapterSignals);
   const stats = signals.hasMomentumSignal ? blendStats(artist.stats, signals.stats) : artist.stats;
   const rawSignalDelta = signals.hasMomentumSignal ? calculateSignalDelta(stats) * artist.volatility : 0;
-  const signalDelta = signals.hasMomentumSignal ? applySignalModifiers(rawSignalDelta, signals.modifiers) : 0;
+  const reliabilityMultiplier = signals.hasMomentumSignal ? getReliabilityPriceMultiplier(signals.reliability) : 0;
+  const reliabilityAdjustedDelta = rawSignalDelta * reliabilityMultiplier;
+  const signalDelta = signals.hasMomentumSignal
+    ? applySignalModifiers(reliabilityAdjustedDelta, signals.modifiers, reliabilityMultiplier)
+    : 0;
   const targetPrice = artist.currentPrice * (1 + signalDelta);
   const blendedPrice = artist.currentPrice * 0.8 + targetPrice * 0.2;
   const cappedPrice = clamp(
@@ -198,7 +209,11 @@ function calculateArtistUpdate({
       ...signals.rawPayload,
       modelVersion,
       hasMomentumSignal: signals.hasMomentumSignal,
+      signalReliability: signals.reliability,
+      reliabilityMultiplier,
+      reliabilityDetails: signals.reliabilityDetails,
       rawSignalDelta,
+      reliabilityAdjustedDelta,
       modifiers: signals.modifiers
     }
   };
@@ -318,11 +333,11 @@ function combinePartialStats(
   return stats;
 }
 
-function applySignalModifiers(signalDelta: number, modifiers: MarketSignalModifier[]) {
+function applySignalModifiers(signalDelta: number, modifiers: MarketSignalModifier[], reliabilityMultiplier = 1) {
   return clamp(
     modifiers.reduce((value, modifier) => {
       const multiplied = typeof modifier.priceMultiplier === "number" ? value * modifier.priceMultiplier : value;
-      return multiplied + (modifier.priceShock ?? 0);
+      return multiplied + (modifier.priceShock ?? 0) * reliabilityMultiplier;
     }, signalDelta),
     -0.75,
     0.75
@@ -427,6 +442,10 @@ function getSignalConfidence(signal: AdapterSignal, sourceName: string) {
     return clamp(signal.confidence, 0, 1);
   }
 
+  return getDefaultSignalConfidence(sourceName);
+}
+
+function getDefaultSignalConfidence(sourceName: string) {
   const defaults: Record<string, number> = {
     lastfm: 0.86,
     youtube: 0.84,
@@ -435,6 +454,9 @@ function getSignalConfidence(signal: AdapterSignal, sourceName: string) {
     gdelt: 0.58,
     market_events: 0.78,
     trade_flow: 0.72,
+    manual: 0.62,
+    core: 0.68,
+    blended: 0.68,
     adapter: 0.5
   };
 
@@ -496,6 +518,7 @@ function buildExplicitSignal(
   fallback: "existing" | "neutral" = "existing"
 ): ResolvedMarketSignal {
   const base = fallback === "neutral" ? getNeutralStats() : existing;
+  const reliability = calculateSignalReliability(incoming, rawPayload, modifiers);
 
   return {
     stats: {
@@ -508,8 +531,67 @@ function buildExplicitSignal(
     },
     rawPayload,
     modifiers,
-    hasMomentumSignal: hasPartialStats(incoming) || modifiers.length > 0
+    hasMomentumSignal: hasPartialStats(incoming) || modifiers.length > 0,
+    reliability: reliability.score,
+    reliabilityDetails: reliability.details
   };
+}
+
+function calculateSignalReliability(
+  incoming: Partial<HypeStats>,
+  rawPayload: Record<string, unknown>,
+  modifiers: MarketSignalModifier[]
+) {
+  const statCount = getHypeStatKeys().filter((key) => typeof incoming[key] === "number").length;
+  const sourceWeights = getSourceWeights(rawPayload);
+  const sourceNames = sourceWeights ? Object.keys(sourceWeights) : [getPayloadSourceName(rawPayload)].filter(Boolean);
+  const flattenedWeights = sourceWeights
+    ? Object.values(sourceWeights).flatMap((weights) => Object.values(weights).filter(isFiniteNumber))
+    : [];
+  const averageSourceWeight = flattenedWeights.length
+    ? flattenedWeights.reduce((total, value) => total + value, 0) / flattenedWeights.length
+    : getDefaultSignalConfidence(sourceNames[0] ?? "adapter");
+  const sourceBreadthScore = clamp(sourceNames.length / 4, 0.2, 1);
+  const statCoverageScore = clamp(statCount / 4, 0.2, 1);
+  const eventSupportScore = modifiers.length > 0 ? 0.16 : 0;
+  const score = clamp(
+    averageSourceWeight * 0.5 + sourceBreadthScore * 0.24 + statCoverageScore * 0.2 + eventSupportScore,
+    0.18,
+    1
+  );
+
+  return {
+    score,
+    details: {
+      sourceCount: sourceNames.length,
+      statCount,
+      averageSourceWeight,
+      sourceBreadthScore,
+      statCoverageScore,
+      eventSupportScore
+    }
+  };
+}
+
+function getPayloadSourceName(rawPayload: Record<string, unknown>) {
+  const source = rawPayload.source;
+
+  if (typeof source === "string" && source) {
+    return source;
+  }
+
+  const adapter = rawPayload.adapter;
+
+  if (adapter && typeof adapter === "object" && !Array.isArray(adapter)) {
+    const adapterSource = (adapter as Record<string, unknown>).source;
+    return typeof adapterSource === "string" ? adapterSource : "";
+  }
+
+  return "";
+}
+
+function getReliabilityPriceMultiplier(reliability: number) {
+  return clamp(0.25 + reliability * 0.75, 0.25, 1);
 }
 
 function getNeutralStats(): HypeStats {
@@ -617,4 +699,12 @@ function hashToUnit(input: string) {
   }
 
   return (hash >>> 0) / 4294967295;
+}
+
+function getNumber(value: unknown, fallback: number) {
+  return isFiniteNumber(value) ? value : fallback;
+}
+
+function isFiniteNumber(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value);
 }
