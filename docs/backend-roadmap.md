@@ -13,8 +13,9 @@ This app still runs in development with unsaved demo data, but the backend found
 7. Run `supabase/migrations/006_market_engine.sql`.
 8. Run `supabase/migrations/007_market_events.sql`.
 9. Run `supabase/migrations/008_market_model_version.sql`.
-10. Run `supabase/seed.sql` for the starter artists.
-11. Copy `.env.example` to `.env.local` and fill in:
+10. Run `supabase/migrations/009_trade_manipulation_controls.sql`.
+11. Run `supabase/seed.sql` for the starter artists.
+12. Copy `.env.example` to `.env.local` and fill in:
    - `NEXT_PUBLIC_SUPABASE_URL`
    - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
    - `SUPABASE_SERVICE_ROLE_KEY`
@@ -132,6 +133,15 @@ For production, add these environment variables to the deployment host before re
 After deployment, manually call `/api/cron/daily-market-update?dryRun=1` with `Authorization: Bearer <CRON_SECRET>` once. Then run one persisted `core` batch and recheck `/api/admin/market-health`. From that point forward, Vercel Cron can keep the graph history growing each day.
 
 `MARKET_MODEL_VERSION` is an internal audit label, not a prominent user-facing product label. It is saved on market runs, signal snapshots, and price-history rows so future algorithm changes can be traced without rewriting historical prices. Normal market pages should keep broad language such as audience momentum, market activity, release signals, and media movement. Admin/health/debug views can show the exact model version.
+
+## Trading integrity controls
+
+User trades should contribute to the market, but they should not overpower the real artist-momentum model. The current backend uses two controls:
+
+- Immediate buy/sell impact is only a small quote nudge, with a per-order cap and a daily same-direction cap.
+- Daily trade-flow demand is discounted when activity comes from too few traders or when one trader accounts for too much of the order value.
+
+This keeps the product closer to an HSX-style market where trading activity matters, while the durable price trend is still driven by audience growth, video activity, releases, news/reviews, and other external signals. If the market eventually adds public leaderboards or leagues, add account-level abuse checks before prizes, payouts, or season winners matter.
 
 ## Daily update flow
 

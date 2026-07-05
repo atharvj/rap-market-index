@@ -27,6 +27,7 @@ type TradeBucket = {
   sharesBought: number;
   sharesSold: number;
   traders: Set<string>;
+  traderValues: Map<string, number>;
 };
 
 export type TradeFlowMarketSignals = {
@@ -42,6 +43,9 @@ const NET_ORDER_VALUE = "net_order_value";
 const GROSS_ORDER_VALUE = "gross_order_value";
 const TRADE_COUNT = "trade_count";
 const UNIQUE_TRADER_COUNT = "unique_trader_count";
+const LARGEST_TRADER_SHARE = "largest_trader_share";
+const BREADTH_MULTIPLIER = "breadth_multiplier";
+const CONCENTRATION_PENALTY = "concentration_penalty";
 const MAX_TRADE_ROWS = 10000;
 
 export async function collectTradeFlowMarketSignals({
@@ -119,7 +123,8 @@ function groupTrades(trades: TradeRow[]) {
         sellCount: 0,
         sharesBought: 0,
         sharesSold: 0,
-        traders: new Set<string>()
+        traders: new Set<string>(),
+        traderValues: new Map<string, number>()
       };
     const orderValue = Math.abs(Number(trade.cash_delta));
     const shares = Number(trade.shares);
@@ -135,6 +140,7 @@ function groupTrades(trades: TradeRow[]) {
     }
 
     bucket.traders.add(trade.user_id);
+    bucket.traderValues.set(trade.user_id, (bucket.traderValues.get(trade.user_id) ?? 0) + orderValue);
     grouped.set(trade.artist_id, bucket);
     return grouped;
   }, new Map<string, TradeBucket>());
@@ -159,9 +165,15 @@ function buildTradeFlowSignal({
   const uniqueTraderCount = bucket.traders.size;
   const valueImbalance = grossOrderValue > 0 ? netOrderValue / grossOrderValue : 0;
   const countImbalance = tradeCount > 0 ? (bucket.buyCount - bucket.sellCount) / tradeCount : 0;
+  const largestTraderValue = getLargestTraderValue(bucket.traderValues);
+  const largestTraderShare = grossOrderValue > 0 ? largestTraderValue / grossOrderValue : 0;
   const activityScale = clamp(Math.log10(grossOrderValue + 1) / 4, 0.12, 1);
   const traderBreadth = clamp(uniqueTraderCount / 20, 0, 1);
-  const traderDemand = clamp((valueImbalance * 30 + countImbalance * 10) * (0.62 + activityScale * 0.28 + traderBreadth * 0.1), -40, 40);
+  const breadthMultiplier = getBreadthMultiplier(uniqueTraderCount);
+  const concentrationPenalty = getConcentrationPenalty(largestTraderShare);
+  const reliabilityMultiplier = breadthMultiplier * concentrationPenalty;
+  const rawTraderDemand = clamp((valueImbalance * 30 + countImbalance * 10) * (0.62 + activityScale * 0.28 + traderBreadth * 0.1), -40, 40);
+  const traderDemand = clamp(rawTraderDemand * reliabilityMultiplier, -28, 28);
   const stats: Partial<HypeStats> = {
     traderDemand
   };
@@ -179,19 +191,31 @@ function buildTradeFlowSignal({
     sellCount: bucket.sellCount,
     tradeCount,
     uniqueTraderCount,
+    largestTraderValue: round(largestTraderValue),
+    largestTraderShare,
     sharesBought: round(bucket.sharesBought),
     sharesSold: round(bucket.sharesSold),
     valueImbalance,
     countImbalance,
     activityScale,
     traderBreadth,
+    breadthMultiplier,
+    concentrationPenalty,
+    reliabilityMultiplier,
+    rawTraderDemand,
+    traderDemand,
     currentPrice: artist.currentPrice
   };
 
   return {
     signal: {
       stats,
-      confidence: getConfidence({ tradeCount, grossOrderValue, uniqueTraderCount }),
+      confidence: getConfidence({
+        tradeCount,
+        grossOrderValue,
+        uniqueTraderCount,
+        reliabilityMultiplier
+      }),
       rawPayload
     },
     observations: [
@@ -200,23 +224,67 @@ function buildTradeFlowSignal({
       createObservation(artist.id, runDate, NET_ORDER_VALUE, netOrderValue, "cash", rawPayload),
       createObservation(artist.id, runDate, GROSS_ORDER_VALUE, grossOrderValue, "cash", rawPayload),
       createObservation(artist.id, runDate, TRADE_COUNT, tradeCount, "trades", rawPayload),
-      createObservation(artist.id, runDate, UNIQUE_TRADER_COUNT, uniqueTraderCount, "traders", rawPayload)
+      createObservation(artist.id, runDate, UNIQUE_TRADER_COUNT, uniqueTraderCount, "traders", rawPayload),
+      createObservation(artist.id, runDate, LARGEST_TRADER_SHARE, largestTraderShare, "ratio", rawPayload),
+      createObservation(artist.id, runDate, BREADTH_MULTIPLIER, breadthMultiplier, "ratio", rawPayload),
+      createObservation(artist.id, runDate, CONCENTRATION_PENALTY, concentrationPenalty, "ratio", rawPayload)
     ]
   };
+}
+
+function getLargestTraderValue(traderValues: Map<string, number>) {
+  return Array.from(traderValues.values()).reduce((largest, value) => Math.max(largest, value), 0);
+}
+
+function getBreadthMultiplier(uniqueTraderCount: number) {
+  if (uniqueTraderCount <= 1) {
+    return 0.08;
+  }
+
+  if (uniqueTraderCount === 2) {
+    return 0.22;
+  }
+
+  if (uniqueTraderCount <= 4) {
+    return 0.45;
+  }
+
+  if (uniqueTraderCount <= 7) {
+    return 0.68;
+  }
+
+  if (uniqueTraderCount <= 12) {
+    return 0.84;
+  }
+
+  return 1;
+}
+
+function getConcentrationPenalty(largestTraderShare: number) {
+  if (largestTraderShare <= 0.35) {
+    return 1;
+  }
+
+  return clamp(1 - (largestTraderShare - 0.35) * 1.25, 0.12, 1);
 }
 
 function getConfidence({
   tradeCount,
   grossOrderValue,
-  uniqueTraderCount
+  uniqueTraderCount,
+  reliabilityMultiplier
 }: {
   tradeCount: number;
   grossOrderValue: number;
   uniqueTraderCount: number;
+  reliabilityMultiplier: number;
 }) {
+  const baseConfidence =
+    0.22 + Math.log10(tradeCount + 1) * 0.14 + Math.log10(grossOrderValue + 1) * 0.035 + Math.min(0.18, uniqueTraderCount * 0.02);
+
   return clamp(
-    0.28 + Math.log10(tradeCount + 1) * 0.14 + Math.log10(grossOrderValue + 1) * 0.035 + Math.min(0.16, uniqueTraderCount * 0.018),
-    0.32,
+    baseConfidence * (0.35 + reliabilityMultiplier * 0.65),
+    0.16,
     0.82
   );
 }

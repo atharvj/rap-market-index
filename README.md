@@ -20,7 +20,7 @@ The current production daily source is `core`, which combines:
 - MusicBrainz release-event detection
 - Optional Spotify artist popularity/follower signals
 - Stored and detected review/news/release events
-- Trading demand from buy/sell order flow
+- Manipulation-resistant trading demand from buy/sell order flow
 
 Real graph history starts from persisted Supabase market runs. The app intentionally avoids fake historical price movement unless it is explicitly labeled as estimated backfill.
 
