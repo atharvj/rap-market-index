@@ -28,6 +28,8 @@ Real graph history starts from persisted Supabase market runs. The app intention
 
 Local manual runs work when `.env.local` has Supabase admin credentials, `MARKET_UPDATE_SECRET`, `LASTFM_API_KEY`, and `YOUTUBE_API_KEY`. Production scheduled runs also need `CRON_SECRET` set in the deployment environment.
 
+Set `MARKET_MODEL_VERSION=rmi-core-v1` for internal audit tracking. The app stores that version with market runs and price history, but normal users do not see it on the main market screens.
+
 Use this endpoint to check readiness:
 
 ```txt

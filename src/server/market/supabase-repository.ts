@@ -354,6 +354,7 @@ export async function persistMarketUpdates({
         run_date: runDate,
         status: "running",
         source,
+        model_version: summary.modelVersion,
         started_at: new Date().toISOString(),
         completed_at: null,
         summary: {},
@@ -377,6 +378,7 @@ export async function persistMarketUpdates({
       .from("market_update_runs")
       .update({
         status: "succeeded",
+        model_version: summary.modelVersion,
         completed_at: new Date().toISOString(),
         summary: summary as unknown as Json
       })
@@ -391,6 +393,7 @@ export async function persistMarketUpdates({
       .from("market_update_runs")
       .update({
         status: "failed",
+        model_version: summary.modelVersion,
         completed_at: new Date().toISOString(),
         error_message: message
       })
@@ -442,6 +445,7 @@ async function persistOneUpdate(supabase: Supabase, runDate: string, update: Art
       social_growth: update.stats.socialGrowth,
       news_score: update.stats.newsScore,
       trader_demand: update.stats.traderDemand,
+      model_version: update.modelVersion,
       raw_payload: update.rawPayload as Json
     },
     { onConflict: "artist_id,source_date" }
@@ -457,6 +461,7 @@ async function persistOneUpdate(supabase: Supabase, runDate: string, update: Art
       price_date: runDate,
       price: update.currentPrice,
       hype_score: update.hypeScore,
+      model_version: update.modelVersion,
       explanation: update.explanation
     },
     { onConflict: "artist_id,price_date" }

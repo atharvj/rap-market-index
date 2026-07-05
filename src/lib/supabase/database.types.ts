@@ -94,6 +94,7 @@ export type Database = {
           price_date: string;
           price: number;
           hype_score: number;
+          model_version: string;
           explanation: string;
           created_at: string;
         };
@@ -103,6 +104,7 @@ export type Database = {
           price_date: string;
           price: number;
           hype_score: number;
+          model_version?: string;
           explanation: string;
           created_at?: string;
         };
@@ -180,6 +182,7 @@ export type Database = {
           social_growth: number;
           news_score: number;
           trader_demand: number;
+          model_version: string;
           raw_payload: Json;
           created_at: string;
         };
@@ -193,6 +196,7 @@ export type Database = {
           social_growth?: number;
           news_score?: number;
           trader_demand?: number;
+          model_version?: string;
           raw_payload?: Json;
           created_at?: string;
         };
@@ -205,6 +209,7 @@ export type Database = {
           run_date: string;
           status: "running" | "succeeded" | "failed";
           source: string;
+          model_version: string;
           started_at: string;
           completed_at: string | null;
           summary: Json;
@@ -215,6 +220,7 @@ export type Database = {
           run_date: string;
           status?: "running" | "succeeded" | "failed";
           source?: string;
+          model_version?: string;
           started_at?: string;
           completed_at?: string | null;
           summary?: Json;

@@ -12,8 +12,9 @@ This app still runs in development with unsaved demo data, but the backend found
 6. Run `supabase/migrations/005_watchlist.sql`.
 7. Run `supabase/migrations/006_market_engine.sql`.
 8. Run `supabase/migrations/007_market_events.sql`.
-9. Run `supabase/seed.sql` for the starter artists.
-10. Copy `.env.example` to `.env.local` and fill in:
+9. Run `supabase/migrations/008_market_model_version.sql`.
+10. Run `supabase/seed.sql` for the starter artists.
+11. Copy `.env.example` to `.env.local` and fill in:
    - `NEXT_PUBLIC_SUPABASE_URL`
    - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
    - `SUPABASE_SERVICE_ROLE_KEY`
@@ -22,6 +23,7 @@ This app still runs in development with unsaved demo data, but the backend found
    - `MARKET_CRON_SOURCE=core`
    - `MARKET_CRON_ARTIST_LIMIT=25`
    - `MARKET_CRON_MAX_BATCHES=4`
+   - `MARKET_MODEL_VERSION=rmi-core-v1`
    - `LASTFM_API_KEY` for optional Last.fm listener/playcount signals
    - `SPOTIFY_CLIENT_ID` and `SPOTIFY_CLIENT_SECRET` for optional Spotify popularity/follower signals
    - `YOUTUBE_API_KEY` for optional YouTube channel view/subscriber/video-count and comment-reaction signals
@@ -128,6 +130,8 @@ For production, add these environment variables to the deployment host before re
 - optional `SPOTIFY_CLIENT_ID` and `SPOTIFY_CLIENT_SECRET`
 
 After deployment, manually call `/api/cron/daily-market-update?dryRun=1` with `Authorization: Bearer <CRON_SECRET>` once. Then run one persisted `core` batch and recheck `/api/admin/market-health`. From that point forward, Vercel Cron can keep the graph history growing each day.
+
+`MARKET_MODEL_VERSION` is an internal audit label, not a prominent user-facing product label. It is saved on market runs, signal snapshots, and price-history rows so future algorithm changes can be traced without rewriting historical prices. Normal market pages should keep broad language such as audience momentum, market activity, release signals, and media movement. Admin/health/debug views can show the exact model version.
 
 ## Daily update flow
 

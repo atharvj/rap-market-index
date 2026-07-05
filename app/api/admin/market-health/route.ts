@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServiceRoleClient, getSupabaseConfigStatus } from "@/lib/supabase/server";
 import type { Database } from "@/lib/supabase/database.types";
+import { getMarketModelVersion } from "@/server/market/model-version";
 import { loadActiveArtists, loadArtistExternalIds } from "@/server/market/supabase-repository";
 
 export const dynamic = "force-dynamic";
@@ -79,6 +80,7 @@ export async function GET(request: Request) {
     const runDate = url.searchParams.get("runDate") ?? getToday();
     const lookbackDays = getInteger(url.searchParams.get("lookbackDays"), 30, 1, 180);
     const freshnessDays = getInteger(url.searchParams.get("freshnessDays"), 2, 0, 30);
+    const configuredModelVersion = getMarketModelVersion();
     const supabase = createServiceRoleClient();
     const artists = await loadActiveArtists(supabase);
     const artistIds = artists.map((artist) => artist.id);
@@ -120,6 +122,7 @@ export async function GET(request: Request) {
       sourceCoverage,
       observationHealth,
       priceHistoryHealth,
+      configuredModelVersion,
       observationRowsTruncated: observations.length >= MAX_OBSERVATION_ROWS
     });
 
@@ -129,6 +132,8 @@ export async function GET(request: Request) {
       runDate,
       lookbackDays,
       freshnessDays,
+      configuredModelVersion,
+      latestModelVersion: recentRuns[0]?.model_version ?? null,
       activeArtistCount: artists.length,
       sourceCoverage,
       observationHealth,
@@ -337,6 +342,7 @@ function buildWarnings({
   sourceCoverage,
   observationHealth,
   priceHistoryHealth,
+  configuredModelVersion,
   observationRowsTruncated
 }: {
   config: ReturnType<typeof getSupabaseConfigStatus>;
@@ -344,6 +350,7 @@ function buildWarnings({
   sourceCoverage: SourceCoverage[];
   observationHealth: ObservationHealth[];
   priceHistoryHealth: ReturnType<typeof buildPriceHistoryHealth>;
+  configuredModelVersion: string;
   observationRowsTruncated: boolean;
 }) {
   const warnings: string[] = [];
@@ -351,6 +358,12 @@ function buildWarnings({
 
   if (!latestSucceededRun) {
     warnings.push("No successful market update run is recorded yet.");
+  } else if (!latestSucceededRun.model_version) {
+    warnings.push("Latest successful market run has no model version metadata. Run migration 008_market_model_version.sql.");
+  } else if (latestSucceededRun.model_version !== configuredModelVersion) {
+    warnings.push(
+      `Latest successful market run used ${latestSucceededRun.model_version}; configured model is ${configuredModelVersion}.`
+    );
   }
 
   if (!config.cronSecretConfigured) {
@@ -430,9 +443,10 @@ function formatMarketHealthError(error: unknown) {
     normalized.includes("artist_external_ids") ||
     normalized.includes("market_update_runs") ||
     normalized.includes("price_history") ||
+    normalized.includes("model_version") ||
     normalized.includes("schema cache")
   ) {
-    return "Market engine storage needs setup. Run the Supabase migrations through 007_market_events.sql.";
+    return "Market engine storage needs setup. Run the Supabase migrations through 008_market_model_version.sql.";
   }
 
   return message;

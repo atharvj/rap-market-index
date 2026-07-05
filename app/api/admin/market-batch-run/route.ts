@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createServiceRoleClient, getSupabaseConfigStatus } from "@/lib/supabase/server";
 import type { Json } from "@/lib/supabase/database.types";
 import type { MarketUpdateSource } from "@/server/market/daily-update";
+import { getMarketModelVersion } from "@/server/market/model-version";
 
 export const dynamic = "force-dynamic";
 
@@ -35,6 +36,7 @@ type DailyUpdateResponse = {
   summary?: {
     runDate?: string;
     source?: MarketUpdateSource;
+    modelVersion?: string;
     artistCount: number;
     momentumArtistCount?: number;
     averageMovePercent: number;
@@ -50,6 +52,7 @@ type MarketMove = { artistId: string; ticker: string; dailyChangePercent: number
 type BatchRunSummary = {
   runDate: string;
   source: MarketUpdateSource;
+  modelVersion: string;
   artistCount: number;
   momentumArtistCount: number;
   averageMovePercent: number;
@@ -109,6 +112,7 @@ export async function POST(request: Request) {
   const source = normalizeSource(body.source);
   const dryRun = body.dryRun !== false;
   const runDate = body.runDate ?? getToday();
+  const modelVersion = getMarketModelVersion();
   const artistLimit = normalizePositiveInteger(body.artistLimit, DEFAULT_BATCH_SIZE, MAX_BATCH_SIZE);
   const maxBatches = normalizePositiveInteger(body.maxBatches, 1, MAX_BATCHES_PER_REQUEST);
   let artistOffset = normalizePositiveInteger(body.artistOffset, 0, Number.MAX_SAFE_INTEGER);
@@ -161,6 +165,7 @@ export async function POST(request: Request) {
     runs,
     runDate,
     source,
+    modelVersion,
     artistLimit,
     maxBatches
   });
@@ -224,12 +229,14 @@ function buildBatchRunSummary({
   runs,
   runDate,
   source,
+  modelVersion,
   artistLimit,
   maxBatches
 }: {
   runs: DailyUpdateResponse[];
   runDate: string;
   source: MarketUpdateSource;
+  modelVersion: string;
   artistLimit: number;
   maxBatches: number;
 }): BatchRunSummary {
@@ -250,6 +257,7 @@ function buildBatchRunSummary({
   return {
     runDate,
     source,
+    modelVersion,
     artistCount,
     momentumArtistCount,
     averageMovePercent,
@@ -313,6 +321,7 @@ async function persistBatchRunSummary(runDate: string, summary: BatchRunSummary)
     .from("market_update_runs")
     .update({
       status: "succeeded",
+      model_version: summary.modelVersion,
       completed_at: new Date().toISOString(),
       summary: summary as unknown as Json,
       error_message: null

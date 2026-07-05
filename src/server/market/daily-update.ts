@@ -1,5 +1,6 @@
 import { calculateHypeScore, calculateSignalDelta, clamp, getDailyChangePercent, roundPrice } from "@/lib/pricing";
 import type { AdapterSignal, AdapterSignals, MarketSignalModifier } from "@/server/market/market-data";
+import { getMarketModelVersion } from "@/server/market/model-version";
 import type { ArtistCategory, HypeStats } from "@/lib/types";
 
 export type MarketUpdateSource = "mock" | "manual" | "gdelt" | "lastfm" | "spotify" | "youtube" | "core" | "blended";
@@ -29,6 +30,7 @@ export type MarketUpdateInput = {
   artists: MarketUpdateArtist[];
   runDate: string;
   source: MarketUpdateSource;
+  modelVersion?: string;
   manualSignals?: ManualSignals;
   adapterSignals?: AdapterSignals;
 };
@@ -44,12 +46,14 @@ export type ArtistMarketUpdate = {
   stats: HypeStats;
   explanation: string;
   signalDelta: number;
+  modelVersion: string;
   rawPayload: Record<string, unknown>;
 };
 
 export type MarketUpdateSummary = {
   runDate: string;
   source: MarketUpdateSource;
+  modelVersion: string;
   artistCount: number;
   momentumArtistCount: number;
   averageMovePercent: number;
@@ -68,12 +72,14 @@ export type MarketUpdateSummary = {
 };
 
 export function calculateDailyMarketUpdates(input: MarketUpdateInput) {
+  const modelVersion = input.modelVersion ?? getMarketModelVersion();
   const updates = input.artists.map((artist, index) =>
     calculateArtistUpdate({
       artist,
       index,
       runDate: input.runDate,
       source: input.source,
+      modelVersion,
       manualSignals: input.manualSignals,
       adapterSignals: input.adapterSignals
     })
@@ -90,6 +96,7 @@ export function calculateDailyMarketUpdates(input: MarketUpdateInput) {
     summary: {
       runDate: input.runDate,
       source: input.source,
+      modelVersion,
       artistCount: updates.length,
       momentumArtistCount: updates.filter((update) => update.rawPayload.hasMomentumSignal === true).length,
       averageMovePercent,
@@ -146,6 +153,7 @@ function calculateArtistUpdate({
   index,
   runDate,
   source,
+  modelVersion,
   manualSignals,
   adapterSignals
 }: {
@@ -153,6 +161,7 @@ function calculateArtistUpdate({
   index: number;
   runDate: string;
   source: MarketUpdateSource;
+  modelVersion: string;
   manualSignals?: ManualSignals;
   adapterSignals?: AdapterSignals;
 }): ArtistMarketUpdate {
@@ -184,8 +193,10 @@ function calculateArtistUpdate({
       ? explainMove(artist.ticker, stats, dailyChangePercent, signals.modifiers)
       : explainFlatMove(artist.ticker, source),
     signalDelta,
+    modelVersion,
     rawPayload: {
       ...signals.rawPayload,
+      modelVersion,
       hasMomentumSignal: signals.hasMomentumSignal,
       rawSignalDelta,
       modifiers: signals.modifiers

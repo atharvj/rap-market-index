@@ -201,6 +201,12 @@ async function probeMarketEngineStorage() {
     return formatMarketEngineProbeError(externalIdsError.message);
   }
 
+  const modelVersionStorage = await probeModelVersionStorage(supabase);
+
+  if (!modelVersionStorage.ok) {
+    return modelVersionStorage;
+  }
+
   const { error: observationsError } = await supabase.from("market_observations").insert({
     artist_id: "__market_probe__",
     source: "system",
@@ -261,6 +267,24 @@ async function probeMarketEngineStorage() {
   return formatMarketEngineProbeError(eventsError.message);
 }
 
+async function probeModelVersionStorage(supabase: ReturnType<typeof createServiceRoleClient>) {
+  const checks = await Promise.all([
+    supabase.from("price_history").select("model_version", { count: "exact", head: true }),
+    supabase.from("market_signal_snapshots").select("model_version", { count: "exact", head: true }),
+    supabase.from("market_update_runs").select("model_version", { count: "exact", head: true })
+  ]);
+  const failed = checks.find((check) => check.error);
+
+  if (!failed?.error) {
+    return {
+      ok: true,
+      detail: "Configured"
+    };
+  }
+
+  return formatMarketEngineProbeError(failed.error.message);
+}
+
 function formatMarketEngineProbeError(message: string) {
   const normalized = message.toLowerCase();
 
@@ -268,11 +292,12 @@ function formatMarketEngineProbeError(message: string) {
     normalized.includes("schema cache") ||
     normalized.includes("market_observations") ||
     normalized.includes("artist_external_ids") ||
-    normalized.includes("market_events")
+    normalized.includes("market_events") ||
+    normalized.includes("model_version")
   ) {
     return {
       ok: false,
-      detail: "Run supabase/migrations/006_market_engine.sql and 007_market_events.sql"
+      detail: "Run Supabase migrations through 008_market_model_version.sql"
     };
   }
 
