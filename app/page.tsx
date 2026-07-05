@@ -69,11 +69,11 @@ export default function MarketPage() {
               </span>
             </div>
             <h1 className="mt-4 max-w-3xl text-4xl font-black leading-tight sm:text-5xl">
-              Artist shares move on momentum, audience growth, news, and trader demand.
+              Artist shares move on momentum, audience growth, media, and trading demand.
             </h1>
             <p className="mt-4 max-w-2xl text-base leading-7 text-paper/62">
-              Prices currently use modeled market signals: streaming growth, YouTube velocity, search and social
-              interest, release activity, press movement, and order flow.
+              Prices currently use modeled market signals: streaming momentum, video activity, discovery trends,
+              fan sentiment, release activity, media movement, and order flow.
             </p>
             <div className="mt-6 grid gap-3 sm:grid-cols-3">
               <MetricCard

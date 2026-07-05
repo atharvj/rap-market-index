@@ -79,6 +79,30 @@ const SERIES_DEFINITIONS: Record<string, { label: string; unit: string }> = {
   "gdelt:source_count": {
     label: "News sources",
     unit: "sources"
+  },
+  "trade_flow:buy_value": {
+    label: "Buy order value",
+    unit: "cash"
+  },
+  "trade_flow:sell_value": {
+    label: "Sell order value",
+    unit: "cash"
+  },
+  "trade_flow:net_order_value": {
+    label: "Net order value",
+    unit: "cash"
+  },
+  "trade_flow:gross_order_value": {
+    label: "Gross order value",
+    unit: "cash"
+  },
+  "trade_flow:trade_count": {
+    label: "Trade count",
+    unit: "trades"
+  },
+  "trade_flow:unique_trader_count": {
+    label: "Active traders",
+    unit: "traders"
   }
 };
 

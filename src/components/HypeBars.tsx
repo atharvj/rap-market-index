@@ -1,12 +1,12 @@
 import type { HypeStats } from "@/lib/types";
 
 const metrics: Array<{ key: keyof HypeStats; label: string; max: number }> = [
-  { key: "streamingGrowth", label: "Streaming", max: 60 },
-  { key: "youtubeGrowth", label: "YouTube", max: 60 },
-  { key: "searchGrowth", label: "Search", max: 70 },
-  { key: "socialGrowth", label: "Social", max: 90 },
-  { key: "newsScore", label: "News", max: 100 },
-  { key: "traderDemand", label: "Trader demand", max: 40 }
+  { key: "streamingGrowth", label: "Streaming momentum", max: 60 },
+  { key: "youtubeGrowth", label: "Video momentum", max: 60 },
+  { key: "searchGrowth", label: "Discovery trend", max: 70 },
+  { key: "socialGrowth", label: "Fan sentiment", max: 90 },
+  { key: "newsScore", label: "Media & reviews", max: 100 },
+  { key: "traderDemand", label: "Trading demand", max: 40 }
 ];
 
 export function HypeBars({ stats }: { stats: HypeStats }) {

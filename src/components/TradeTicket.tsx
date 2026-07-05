@@ -34,7 +34,7 @@ export function TradeTicket({
       return `Cash ${formatCurrency(state.cashBalance)} · Max ${formatShares(maxBuy)}`;
     }
 
-    return `Owned ${formatShares(maxSell)} · Value ${formatCurrency(maxSell * artist.currentPrice)}`;
+    return `Your shares ${formatShares(maxSell)} · Value ${formatCurrency(maxSell * artist.currentPrice)}`;
   }, [artist.currentPrice, maxBuy, maxSell, side, state.cashBalance]);
 
   async function submitTrade() {

@@ -4,12 +4,13 @@ import type {
   AdapterSignal,
   AdapterSignals,
   ArtistExternalIds,
+  MarketEvent,
   MarketObservation,
   ObservationBaselines
 } from "@/server/market/market-data";
 import type { HypeStats } from "@/lib/types";
 
-type GdeltArticle = {
+export type GdeltArticle = {
   title?: string;
   url?: string;
   domain?: string;
@@ -37,6 +38,7 @@ type GdeltCollectOptions = {
 export type GdeltMarketSignals = {
   signals: AdapterSignals;
   observations: MarketObservation[];
+  eventsByArtist: Record<string, MarketEvent[]>;
 };
 
 const SOURCE = "gdelt";
@@ -57,6 +59,7 @@ export async function collectGdeltMarketSignals({
 }: GdeltCollectOptions): Promise<GdeltMarketSignals> {
   const signals: AdapterSignals = {};
   const observations: MarketObservation[] = [];
+  const eventsByArtist: Record<string, MarketEvent[]> = {};
 
   for (const [index, artist] of artists.entries()) {
     if (index > 0 && delayMs > 0) {
@@ -107,11 +110,23 @@ export async function collectGdeltMarketSignals({
 
     signals[artist.id] = signal.signal;
     observations.push(...signal.observations);
+
+    const events = buildGdeltArticleEvents({
+      artist,
+      articles: result.articles,
+      runDate,
+      query
+    });
+
+    if (events.length) {
+      eventsByArtist[artist.id] = events;
+    }
   }
 
   return {
     signals,
-    observations
+    observations,
+    eventsByArtist
   };
 }
 
@@ -270,6 +285,251 @@ function getGdeltQuery(artist: MarketUpdateArtist, externalIds?: ArtistExternalI
   return externalIds?.gdeltQuery?.trim() || `"${artist.name}" rapper OR "${artist.name}" music`;
 }
 
+function buildGdeltArticleEvents({
+  artist,
+  articles,
+  runDate,
+  query
+}: {
+  artist: MarketUpdateArtist;
+  articles: GdeltArticle[];
+  runDate: string;
+  query: string;
+}) {
+  const events: MarketEvent[] = [];
+  const seen = new Set<string>();
+
+  for (const article of articles) {
+    const title = normalizeArticleTitle(article.title);
+    const url = article.url?.trim();
+    const domain = normalizeDomain(article.domain, url);
+    const eventDate = parseGdeltSeenDate(article.seendate) ?? runDate;
+
+    if (!title || !url || !domain || !mentionsArtist(title, artist.name)) {
+      continue;
+    }
+
+    const classification = classifyArticleEvent(title, domain, article.tone);
+
+    if (!classification) {
+      continue;
+    }
+
+    const key = `${classification.eventType}:${eventDate}:${normalizeEventKey(title)}`;
+
+    if (seen.has(key)) {
+      continue;
+    }
+
+    seen.add(key);
+    events.push({
+      artistId: artist.id,
+      eventDate,
+      eventType: classification.eventType,
+      title,
+      sourceName: domain,
+      sourceUrl: url,
+      sentimentScore: classification.sentimentScore,
+      impactScore: classification.impactScore,
+      confidence: classification.confidence,
+      rawPayload: {
+        source: "gdelt_article",
+        query,
+        domain,
+        seenDate: article.seendate ?? null,
+        tone: getNumber(article.tone),
+        classificationReason: classification.reason,
+        sourceTier: getSourceTier(domain)
+      }
+    });
+
+    if (events.length >= 3) {
+      break;
+    }
+  }
+
+  return events;
+}
+
+function classifyArticleEvent(title: string, domain: string, tone: unknown) {
+  const lowerTitle = title.toLowerCase();
+  const sourceTier = getSourceTier(domain);
+  const toneScore = clamp((getNumber(tone) ?? 0) * 8, -45, 45);
+
+  if (hasAny(lowerTitle, CONTROVERSY_TERMS)) {
+    return {
+      eventType: "controversy" as const,
+      sentimentScore: clamp(Math.min(-35, toneScore - 25), -100, 20),
+      impactScore: clamp(Math.min(-45, toneScore - 35), -100, 10),
+      confidence: getArticleConfidence(sourceTier, 0.76),
+      reason: "controversy_terms"
+    };
+  }
+
+  if (hasReviewSignal(lowerTitle)) {
+    const keywordSentiment = getTitleSentiment(lowerTitle);
+    const sentimentScore = clamp(keywordSentiment + toneScore * 0.75, -90, 90);
+
+    return {
+      eventType: "review" as const,
+      sentimentScore,
+      impactScore: clamp(sentimentScore * 0.95, -90, 90),
+      confidence: getArticleConfidence(sourceTier, REVIEW_DOMAINS.has(domain) ? 0.82 : 0.68),
+      reason: REVIEW_DOMAINS.has(domain) ? "review_domain" : "review_keyword"
+    };
+  }
+
+  if (hasAny(lowerTitle, TOUR_TERMS)) {
+    return {
+      eventType: "tour" as const,
+      sentimentScore: clamp(25 + Math.max(0, toneScore), -20, 70),
+      impactScore: clamp(30 + Math.max(0, toneScore), -20, 75),
+      confidence: getArticleConfidence(sourceTier, 0.68),
+      reason: "tour_terms"
+    };
+  }
+
+  if (hasAny(lowerTitle, AWARD_TERMS)) {
+    return {
+      eventType: "award" as const,
+      sentimentScore: clamp(35 + Math.max(0, toneScore), -20, 85),
+      impactScore: clamp(42 + Math.max(0, toneScore), -20, 90),
+      confidence: getArticleConfidence(sourceTier, 0.7),
+      reason: "award_terms"
+    };
+  }
+
+  if (hasAny(lowerTitle, VIRAL_TERMS)) {
+    return {
+      eventType: "viral" as const,
+      sentimentScore: clamp(24 + toneScore * 0.55, -45, 75),
+      impactScore: clamp(38 + Math.max(0, toneScore), -20, 85),
+      confidence: getArticleConfidence(sourceTier, 0.66),
+      reason: "viral_terms"
+    };
+  }
+
+  if (hasAny(lowerTitle, RELEASE_TERMS) && sourceTier >= 1) {
+    return {
+      eventType: "release" as const,
+      sentimentScore: clamp(28 + toneScore * 0.4, -35, 75),
+      impactScore: clamp(38 + Math.max(0, toneScore), -15, 85),
+      confidence: getArticleConfidence(sourceTier, 0.62),
+      reason: "release_terms"
+    };
+  }
+
+  if (sourceTier >= 2 && Math.abs(toneScore) >= 18 && hasAny(lowerTitle, NEWS_TERMS)) {
+    return {
+      eventType: "news" as const,
+      sentimentScore: clamp(toneScore, -65, 65),
+      impactScore: clamp(toneScore * 0.9, -60, 60),
+      confidence: getArticleConfidence(sourceTier, 0.58),
+      reason: "tiered_news_tone"
+    };
+  }
+
+  return null;
+}
+
+function hasReviewSignal(title: string) {
+  return /\breview\b/.test(title) || /\brated\b/.test(title) || hasAny(title, REVIEW_PHRASES);
+}
+
+function getTitleSentiment(title: string) {
+  const positive = countMatches(title, POSITIVE_REVIEW_TERMS);
+  const negative = countMatches(title, NEGATIVE_REVIEW_TERMS);
+
+  return clamp((positive - negative) * 22, -70, 70);
+}
+
+function countMatches(value: string, terms: string[]) {
+  return terms.reduce((count, term) => count + (value.includes(term) ? 1 : 0), 0);
+}
+
+function getArticleConfidence(sourceTier: number, base: number) {
+  return clamp(base + sourceTier * 0.055, 0.45, 0.9);
+}
+
+function getSourceTier(domain: string) {
+  if (TIER_THREE_DOMAINS.has(domain)) {
+    return 3;
+  }
+
+  if (TIER_TWO_DOMAINS.has(domain)) {
+    return 2;
+  }
+
+  if (TIER_ONE_DOMAINS.has(domain)) {
+    return 1;
+  }
+
+  return 0;
+}
+
+function hasAny(value: string, terms: string[]) {
+  return terms.some((term) => value.includes(term));
+}
+
+function mentionsArtist(title: string, artistName: string) {
+  const normalizedTitle = normalizeSearchText(title);
+  const normalizedArtist = normalizeSearchText(artistName);
+
+  if (normalizedTitle.includes(normalizedArtist)) {
+    return true;
+  }
+
+  const meaningfulParts = normalizedArtist.split(" ").filter((part) => part.length > 2);
+
+  return meaningfulParts.length > 1 && meaningfulParts.every((part) => normalizedTitle.includes(part));
+}
+
+function normalizeSearchText(value: string) {
+  return value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function normalizeArticleTitle(value: string | undefined) {
+  const title = value?.trim().replace(/\s+/g, " ");
+
+  return title ? title.slice(0, 160) : null;
+}
+
+function normalizeDomain(domain: string | undefined, url: string | undefined) {
+  const fromDomain = domain?.trim().toLowerCase();
+
+  if (fromDomain) {
+    return fromDomain.replace(/^www\./, "");
+  }
+
+  if (!url) {
+    return null;
+  }
+
+  try {
+    return new URL(url).hostname.toLowerCase().replace(/^www\./, "");
+  } catch {
+    return null;
+  }
+}
+
+function normalizeEventKey(value: string) {
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+}
+
+function parseGdeltSeenDate(value: string | undefined) {
+  if (!value) {
+    return null;
+  }
+
+  const match = value.match(/^(\d{4})(\d{2})(\d{2})/);
+
+  return match ? `${match[1]}-${match[2]}-${match[3]}` : null;
+}
+
 function calculateCoverageMomentum(articleCount: number, baseline?: number) {
   if (typeof baseline === "number" && baseline > 0) {
     return clamp(((articleCount - baseline) / baseline) * 100, -40, 120);
@@ -307,3 +567,105 @@ function sleep(ms: number) {
     setTimeout(resolve, ms);
   });
 }
+
+const REVIEW_DOMAINS = new Set([
+  "allmusic.com",
+  "complex.com",
+  "consequence.net",
+  "exclaim.ca",
+  "hiphopdx.com",
+  "musicomh.com",
+  "nme.com",
+  "pitchfork.com",
+  "rapreviews.com",
+  "rollingstone.com",
+  "slantmagazine.com",
+  "theguardian.com",
+  "thelineofbestfit.com"
+]);
+
+const TIER_THREE_DOMAINS = new Set([
+  "apnews.com",
+  "billboard.com",
+  "complex.com",
+  "forbes.com",
+  "latimes.com",
+  "nytimes.com",
+  "pitchfork.com",
+  "reuters.com",
+  "rollingstone.com",
+  "variety.com",
+  "washingtonpost.com"
+]);
+
+const TIER_TWO_DOMAINS = new Set([
+  "allmusic.com",
+  "consequence.net",
+  "exclaim.ca",
+  "hypebeast.com",
+  "musicbusinessworldwide.com",
+  "nme.com",
+  "stereogum.com",
+  "thefader.com",
+  "theguardian.com",
+  "uproxx.com",
+  "vibe.com"
+]);
+
+const TIER_ONE_DOMAINS = new Set([
+  "bet.com",
+  "clashmusic.com",
+  "genius.com",
+  "hiphopdx.com",
+  "hotnewhiphop.com",
+  "music-news.com",
+  "rap-up.com",
+  "rapreviews.com",
+  "thesource.com",
+  "xxlmag.com"
+]);
+
+const CONTROVERSY_TERMS = [
+  "arrest",
+  "arrested",
+  "charged",
+  "controversy",
+  "criticized",
+  "lawsuit",
+  "pleads guilty",
+  "sentenced",
+  "sued",
+  "trial"
+];
+
+const REVIEW_TERMS = ["review", "rated"];
+const REVIEW_PHRASES = ["album review", "best new music", "track review"];
+const RELEASE_TERMS = ["album", "drops", "new song", "new single", "release", "releases", "shares", "video"];
+const TOUR_TERMS = ["announces tour", "tour dates", "world tour"];
+const AWARD_TERMS = ["award", "grammy", "nomination", "nominated", "wins"];
+const VIRAL_TERMS = ["tiktok", "viral"];
+const NEWS_TERMS = [...REVIEW_TERMS, ...RELEASE_TERMS, ...TOUR_TERMS, ...AWARD_TERMS, ...VIRAL_TERMS, ...CONTROVERSY_TERMS];
+
+const POSITIVE_REVIEW_TERMS = [
+  "acclaimed",
+  "best",
+  "brilliant",
+  "classic",
+  "excellent",
+  "great",
+  "powerful",
+  "strong",
+  "triumph"
+];
+
+const NEGATIVE_REVIEW_TERMS = [
+  "bad",
+  "disappointing",
+  "fails",
+  "flat",
+  "mess",
+  "negative",
+  "poor",
+  "weak",
+  "worst"
+];

@@ -51,7 +51,10 @@ export type MarketUpdateSummary = {
   runDate: string;
   source: MarketUpdateSource;
   artistCount: number;
+  momentumArtistCount: number;
   averageMovePercent: number;
+  averageSignalDelta: number;
+  signalSourceCoverage: Record<string, { artistCount: number; statCount: number }>;
   topGainer: Pick<ArtistMarketUpdate, "artistId" | "ticker" | "dailyChangePercent"> | null;
   topLoser: Pick<ArtistMarketUpdate, "artistId" | "ticker" | "dailyChangePercent"> | null;
   batch?: {
@@ -78,6 +81,8 @@ export function calculateDailyMarketUpdates(input: MarketUpdateInput) {
 
   const averageMovePercent =
     updates.reduce((total, update) => total + update.dailyChangePercent, 0) / Math.max(1, updates.length);
+  const averageSignalDelta =
+    updates.reduce((total, update) => total + update.signalDelta, 0) / Math.max(1, updates.length);
   const sorted = [...updates].sort((a, b) => b.dailyChangePercent - a.dailyChangePercent);
 
   return {
@@ -86,7 +91,10 @@ export function calculateDailyMarketUpdates(input: MarketUpdateInput) {
       runDate: input.runDate,
       source: input.source,
       artistCount: updates.length,
+      momentumArtistCount: updates.filter((update) => update.rawPayload.hasMomentumSignal === true).length,
       averageMovePercent,
+      averageSignalDelta,
+      signalSourceCoverage: buildSignalSourceCoverage(updates),
       topGainer: sorted[0]
         ? pickLeaderboardMove(sorted[0])
         : null,
@@ -95,6 +103,42 @@ export function calculateDailyMarketUpdates(input: MarketUpdateInput) {
         : null
     } satisfies MarketUpdateSummary
   };
+}
+
+function buildSignalSourceCoverage(updates: ArtistMarketUpdate[]) {
+  const coverage: Record<string, { artistCount: number; statCount: number }> = {};
+
+  for (const update of updates) {
+    const sourceWeights = getSourceWeights(update.rawPayload);
+
+    if (!sourceWeights) {
+      continue;
+    }
+
+    for (const [source, weights] of Object.entries(sourceWeights)) {
+      const statCount = weights && typeof weights === "object" ? Object.keys(weights).length : 0;
+
+      if (statCount === 0) {
+        continue;
+      }
+
+      coverage[source] ??= { artistCount: 0, statCount: 0 };
+      coverage[source].artistCount += 1;
+      coverage[source].statCount += statCount;
+    }
+  }
+
+  return coverage;
+}
+
+function getSourceWeights(rawPayload: Record<string, unknown>) {
+  const sourceWeights = rawPayload.sourceWeights;
+
+  if (!sourceWeights || typeof sourceWeights !== "object" || Array.isArray(sourceWeights)) {
+    return null;
+  }
+
+  return sourceWeights as Record<string, Record<string, number>>;
 }
 
 function calculateArtistUpdate({
@@ -379,6 +423,7 @@ function getSignalConfidence(signal: AdapterSignal, sourceName: string) {
     spotify: 0.7,
     gdelt: 0.58,
     market_events: 0.78,
+    trade_flow: 0.72,
     adapter: 0.5
   };
 
@@ -415,6 +460,9 @@ function getStatSourceWeight(key: keyof HypeStats, sourceName: string) {
       searchGrowth: 0.45,
       socialGrowth: 0.5,
       newsScore: 0.85
+    },
+    trade_flow: {
+      traderDemand: 1
     },
     adapter: {
       streamingGrowth: 0.5,
@@ -494,11 +542,11 @@ function explainMove(
 ) {
   const signals = [
     ["streaming momentum", stats.streamingGrowth],
-    ["YouTube velocity", stats.youtubeGrowth],
-    ["search interest", stats.searchGrowth],
-    ["social trend growth", stats.socialGrowth],
-    ["release/news activity", stats.newsScore - 50],
-    ["trader demand", stats.traderDemand]
+    ["video momentum", stats.youtubeGrowth],
+    ["discovery trend", stats.searchGrowth],
+    ["fan sentiment", stats.socialGrowth],
+    ["media and reviews", stats.newsScore - 50],
+    ["trading demand", stats.traderDemand]
   ] as const;
   const [signalName] = signals.reduce((best, current) =>
     Math.abs(current[1]) > Math.abs(best[1]) ? current : best

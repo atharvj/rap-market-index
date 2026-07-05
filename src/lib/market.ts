@@ -239,11 +239,11 @@ function mutateStats(stats: HypeStats, index: number, volatility: number): HypeS
 function explainDailyMove(stats: HypeStats, dailyChangePercent: number, ticker: string) {
   const signals = [
     ["streaming momentum", stats.streamingGrowth],
-    ["YouTube velocity", stats.youtubeGrowth],
-    ["search interest", stats.searchGrowth],
-    ["social trend growth", stats.socialGrowth],
-    ["release/news activity", stats.newsScore - 50],
-    ["trader demand", stats.traderDemand]
+    ["video momentum", stats.youtubeGrowth],
+    ["discovery trend", stats.searchGrowth],
+    ["fan sentiment", stats.socialGrowth],
+    ["media and reviews", stats.newsScore - 50],
+    ["trading demand", stats.traderDemand]
   ] as const;
   const [signalName] = signals.reduce((best, current) =>
     Math.abs(current[1]) > Math.abs(best[1]) ? current : best

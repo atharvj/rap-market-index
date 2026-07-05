@@ -1,7 +1,6 @@
 "use client";
 
 import { ArtistAvatar } from "@/components/ArtistAvatar";
-import { ArtistMarketInputsPanel } from "@/components/ArtistMarketInputsPanel";
 import { ChangePill } from "@/components/ChangePill";
 import { ArtistPriceHistoryPanel } from "@/components/ArtistPriceHistoryPanel";
 import { useGame } from "@/components/GameProvider";
@@ -66,7 +65,6 @@ export default function ArtistDetailPage() {
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
         <div className="space-y-6">
           <ArtistPriceHistoryPanel artistId={artist.id} fallbackData={artist.priceHistory} />
-          <ArtistMarketInputsPanel artistId={artist.id} />
 
           <section className="rounded-md border border-line bg-panel/86 p-5 shadow-market">
             <div className="flex items-start gap-3">
@@ -74,7 +72,7 @@ export default function ArtistDetailPage() {
                 <Activity className="h-5 w-5" aria-hidden="true" />
               </div>
               <div>
-                <p className="text-xs font-bold uppercase tracking-wide text-paper/45">Price note</p>
+                <p className="text-xs font-bold uppercase tracking-wide text-paper/45">Market summary</p>
                 <h2 className="mt-1 text-xl font-black">{artist.lastMoveExplanation}</h2>
                 <p className="mt-3 text-sm leading-6 text-paper/58">
                   The market model weights audience momentum, media activity, and order flow, so faster-growing
@@ -86,21 +84,21 @@ export default function ArtistDetailPage() {
 
           <section className="grid gap-3 sm:grid-cols-3">
             <MetricCard
-              label="Signal score"
+              label="RMI score"
               value={`${artist.hypeScore}/100`}
-              detail="Weighted daily signal"
+              detail="Composite market rating"
               icon={<Flame className="h-4 w-4" />}
               tone="warm"
             />
             <MetricCard
               label="Volatility"
               value={`${artist.volatility.toFixed(2)}x`}
-              detail="Higher means bigger moves"
+              detail="Daily move sensitivity"
               icon={<Zap className="h-4 w-4" />}
               tone="cool"
             />
             <MetricCard
-              label="Owned"
+              label="Your shares"
               value={holding ? holding.shares.toFixed(2) : "0"}
               detail={holding ? `${formatCurrency(holding.currentValue)} value` : "No position"}
               icon={<BarChart3 className="h-4 w-4" />}
@@ -111,7 +109,7 @@ export default function ArtistDetailPage() {
           <section className="rounded-md border border-line bg-panel/86 p-5 shadow-market">
             <div className="mb-5 flex items-center gap-2">
               <Radio className="h-4 w-4 text-cyan" aria-hidden="true" />
-              <h2 className="text-xl font-black">Signal metrics</h2>
+              <h2 className="text-xl font-black">Price drivers</h2>
             </div>
             <HypeBars stats={artist.stats} />
           </section>

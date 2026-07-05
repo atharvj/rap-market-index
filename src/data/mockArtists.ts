@@ -75,7 +75,7 @@ const seeds: ArtistSeed[] = [
       newsScore: 62,
       traderDemand: 8.6
     },
-    explanation: "FUTR advanced with streaming growth and healthy trader demand.",
+    explanation: "FUTR advanced with streaming momentum and healthy trading demand.",
     historyBias: 1.9
   },
   {
@@ -115,7 +115,7 @@ const seeds: ArtistSeed[] = [
       newsScore: 61,
       traderDemand: 26.4
     },
-    explanation: "OSAMA rallied as online momentum and trader demand stacked together.",
+    explanation: "OSAMA rallied as online momentum and trading demand stacked together.",
     historyBias: 5.2
   },
   {
@@ -135,7 +135,7 @@ const seeds: ArtistSeed[] = [
       newsScore: 46,
       traderDemand: -6.2
     },
-    explanation: "FAZO dipped as trader demand cooled despite social discovery holding up.",
+    explanation: "FAZO dipped as trading demand cooled despite fan discovery holding up.",
     historyBias: 5.8
   },
   {
@@ -215,7 +215,7 @@ const seeds: ArtistSeed[] = [
       newsScore: 56,
       traderDemand: 3.1
     },
-    explanation: "EMNM edged higher on steady catalog strength and light trader demand.",
+    explanation: "EMNM edged higher on steady catalog strength and light trading demand.",
     historyBias: 0.8
   }
 ];

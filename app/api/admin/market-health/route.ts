@@ -52,7 +52,10 @@ const OBSERVATION_SERIES = [
   { source: "youtube", metric: "subscriber_count", label: "YouTube subscribers" },
   { source: "youtube_comments", metric: "comment_sentiment", label: "YouTube comment sentiment" },
   { source: "youtube_comments", metric: "comment_count", label: "YouTube comments sampled" },
-  { source: "gdelt", metric: "article_count", label: "News article count" }
+  { source: "gdelt", metric: "article_count", label: "News article count" },
+  { source: "trade_flow", metric: "net_order_value", label: "Trade-flow net order value" },
+  { source: "trade_flow", metric: "trade_count", label: "Trade-flow trades" },
+  { source: "trade_flow", metric: "unique_trader_count", label: "Trade-flow traders" }
 ] as const;
 
 const MAX_OBSERVATION_ROWS = 20000;
@@ -348,6 +351,10 @@ function buildWarnings({
 
   if (!latestSucceededRun) {
     warnings.push("No successful market update run is recorded yet.");
+  }
+
+  if (!config.cronSecretConfigured) {
+    warnings.push("CRON_SECRET is missing, so scheduled production market updates are not ready.");
   }
 
   if (!config.spotifyCredentialsConfigured) {

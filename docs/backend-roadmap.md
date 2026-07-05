@@ -107,6 +107,28 @@ It reports active artist count, source-ID coverage, observation freshness by sou
 
 This is the fastest way to see whether the market is ready for a real blended run or whether it is still missing IDs/baselines.
 
+## Go-live checklist
+
+For local testing, the market engine is up when `/api/admin/market-health` shows:
+
+- `readyForAdminWrites: true`
+- fresh price history coverage
+- fresh Last.fm and YouTube observations
+- a successful `core` market run
+
+For production, add these environment variables to the deployment host before relying on automatic daily updates:
+
+- `NEXT_PUBLIC_SUPABASE_URL`
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+- `SUPABASE_SERVICE_ROLE_KEY`
+- `MARKET_UPDATE_SECRET`
+- `CRON_SECRET`
+- `LASTFM_API_KEY`
+- `YOUTUBE_API_KEY`
+- optional `SPOTIFY_CLIENT_ID` and `SPOTIFY_CLIENT_SECRET`
+
+After deployment, manually call `/api/cron/daily-market-update?dryRun=1` with `Authorization: Bearer <CRON_SECRET>` once. Then run one persisted `core` batch and recheck `/api/admin/market-health`. From that point forward, Vercel Cron can keep the graph history growing each day.
+
 ## Daily update flow
 
 The backend update endpoint is:
@@ -127,7 +149,7 @@ The first real source path is:
 }
 ```
 
-That path queries GDELT news coverage, stores article-count/source/tone observations when persisted, and converts those observations into search, social, and news signals. `artistLimit` is dry-run only and is useful because GDELT asks high-traffic users to keep requests slow; the adapter also records request errors instead of crashing the market job.
+That path queries GDELT news coverage, stores article-count/source/tone observations when persisted, and converts those observations into search, social, and news signals. It also classifies high-confidence articles into market events such as reviews, controversies, tour announcements, awards, viral moments, and release news. `artistLimit` is dry-run only and is useful because GDELT asks high-traffic users to keep requests slow; the adapter also records request errors instead of crashing the market job.
 
 The first free audience-demand path is:
 
@@ -167,7 +189,7 @@ The production daily source is:
 }
 ```
 
-`core` combines Last.fm, YouTube channel stats, YouTube comments, MusicBrainz release detection, and Spotify when Spotify credentials are configured. It intentionally skips GDELT because the free news endpoint can be slow or rate-limited. Use `blended` when you intentionally want to include GDELT/news in a supervised run.
+`core` combines Last.fm, YouTube channel stats, YouTube comments, MusicBrainz release detection, trade-flow demand, and Spotify when Spotify credentials are configured. It intentionally skips GDELT because the free news endpoint can be slow or rate-limited. Use `blended` when you intentionally want to include GDELT/news in a supervised run.
 
 The YouTube path also samples recent comments from each artist's official channel. It stores aggregate observations only:
 
@@ -180,6 +202,10 @@ The YouTube path also samples recent comments from each artist's official channe
 Raw comment text is not saved. The first run is treated as a baseline; later runs move the social/news/search parts of the model from changes in sentiment, likes, and net positive-vs-negative share. This prevents every naturally positive fan comment section from pushing a stock up every day.
 
 The `core` and `blended` paths also detect recent MusicBrainz release groups for artists with `musicbrainz_id` set. The detector stores confirmed releases as `market_events` with `eventType: "release"`, then lets the existing event/review layer apply decay, confidence, and price-shock caps. It only accepts full `YYYY-MM-DD` release dates and filters compilation/live/catalog-style records so vague metadata does not move the market.
+
+The `gdelt` and `blended` paths can also create article-based market events. This detector is intentionally conservative: it requires the title to mention the artist, only treats reviews as reviews when the title has review/rating language, weighs trusted music/business/news domains higher, and limits detected events to the strongest few articles per artist per run.
+
+Real-source market runs also include trade flow from saved buy/sell transactions. Individual trades already apply a small immediate market-maker impact; the daily trade-flow adapter summarizes the previous day's net buy-vs-sell order value, trade count, and trader breadth into the `traderDemand` model input. Trade-flow observations are included in the admin health endpoint so the operator can verify whether real trading demand is being measured.
 
 The update endpoint is batch-aware for a larger artist universe:
 
@@ -217,7 +243,7 @@ with the same `x-market-update-secret` header and a body like:
 }
 ```
 
-The runner calls the daily update endpoint repeatedly, follows `batch.nextOffset`, and returns `hasMore`/`nextOffset` if more artists remain. `maxBatches` is capped at 10 per request so a scheduler cannot accidentally launch a huge free-API run.
+The runner calls the daily update endpoint repeatedly, follows `batch.nextOffset`, and returns `hasMore`/`nextOffset` if more artists remain. `maxBatches` is capped at 10 per request so a scheduler cannot accidentally launch a huge free-API run. After a persisted multi-batch run finishes, it rewrites the `market_update_runs.summary` row with an aggregate summary across all completed chunks: total artists processed, weighted average move, weighted signal delta, total source coverage, and top gainer/loser across the entire run. Daily run summaries include `momentumArtistCount`, `averageSignalDelta`, and `signalSourceCoverage` so an admin can see whether a run actually had confirmed signal inputs or only collected baselines.
 
 ## Scheduled market history
 
@@ -246,7 +272,7 @@ The route skips duplicate same-day runs when a successful or running `core` run 
 
 The market event layer stores releases, reviews, news, controversies, awards, tour announcements, and viral moments. These events can adjust the final price movement after raw momentum is calculated, so a stream spike with weak reviews can still rise, but by less than a stream spike with strong reviews.
 
-Blended market runs use a confidence-weighted ensemble. Each adapter contributes most strongly to the stats it actually measures: Last.fm to streaming momentum, YouTube channel stats to YouTube velocity, YouTube comments to fan/social reaction, GDELT to news/search, Spotify to streaming/search proxies, and market events to release/news/social modifiers. This keeps the result from depending on adapter order and makes weak or indirect inputs less dominant.
+Blended market runs use a confidence-weighted ensemble. Each adapter contributes most strongly to the stats it actually measures: Last.fm to streaming momentum, YouTube channel stats to video momentum, YouTube comments to fan/social reaction, GDELT to news/search, Spotify to streaming/search proxies, trade flow to trading demand, and market events to release/news/social modifiers. This keeps the result from depending on adapter order and makes weak or indirect inputs less dominant.
 
 The admin event ingestion endpoint is:
 
@@ -367,6 +393,7 @@ For launch, the honest product behavior should be "since listing" until enough r
 ## Signal adapters
 
 - GDELT news coverage adapter.
+- GDELT article-to-event detector for reviews/news/controversies.
 - Last.fm listener/playcount momentum adapter.
 - Spotify artist popularity/follower momentum adapter.
 - YouTube channel view/subscriber/video-count momentum adapter.
@@ -409,7 +436,7 @@ It expects a Supabase-authenticated `Authorization` header and a body like:
 }
 ```
 
-The database function handles the important atomic work: cash balance, holdings, average buy price, transaction record, trader demand, and small market-maker price impact.
+The database function handles the important atomic work: cash balance, holdings, average buy price, transaction record, trading demand, and small market-maker price impact.
 
 ## Frontend bridge
 

@@ -19,12 +19,14 @@ import { collectGdeltMarketSignals } from "@/server/market/gdelt-source";
 import { collectLastfmMarketSignals } from "@/server/market/lastfm-source";
 import { collectMusicbrainzReleaseEvents } from "@/server/market/musicbrainz-releases";
 import { collectSpotifyMarketSignals } from "@/server/market/spotify-source";
+import { collectTradeFlowMarketSignals } from "@/server/market/trade-flow-source";
 import { collectYoutubeMarketSignals } from "@/server/market/youtube-source";
 import { collectYoutubeCommentMarketSignals } from "@/server/market/youtube-comments-source";
 import { getMockMarketArtists } from "@/server/market/mock-source";
 import type {
   AdapterSignals,
   ArtistExternalIds,
+  MarketEvent,
   MarketObservation,
   ObservationBaselines
 } from "@/server/market/market-data";
@@ -124,6 +126,7 @@ export async function POST(request: Request) {
       supabase,
       dryRun,
       externalIds: realSignals.externalIds,
+      seedDetectedEventsByArtist: realSignals.detectedEventsByArtist,
       manualEvents: body.manualEvents
     });
     const adapterSignals = mergeAdapterSignals(...realSignals.adapterSignalSources, eventSignals.adapterSignals);
@@ -385,18 +388,21 @@ async function collectRealSignals({
   observations: MarketObservation[];
   warnings: string[];
   externalIds: Record<string, ArtistExternalIds>;
+  detectedEventsByArtist: Record<string, MarketEvent[]>;
 }> {
   const useGdelt = source === "gdelt" || source === "blended";
   const useLastfm = source === "lastfm" || source === "core" || source === "blended";
   const useSpotify = source === "spotify" || source === "core" || source === "blended";
   const useYoutube = source === "youtube" || source === "core" || source === "blended";
+  const useTradeFlow = Boolean(supabase) && isRealExternalSource(source);
 
   if (!useGdelt && !useLastfm && !useSpotify && !useYoutube) {
     return {
       adapterSignalSources: [],
       observations: [],
       warnings: [],
-      externalIds: {}
+      externalIds: {},
+      detectedEventsByArtist: {}
     };
   }
 
@@ -479,6 +485,7 @@ async function collectRealSignals({
   const sources: AdapterSignals[] = [];
   const observations: MarketObservation[] = [];
   const warnings: string[] = [];
+  let detectedEventsByArtist: Record<string, MarketEvent[]> = {};
 
   if (useGdelt) {
     const gdelt = await collectGdeltMarketSignals({
@@ -490,6 +497,7 @@ async function collectRealSignals({
 
     sources.push(gdelt.signals);
     observations.push(...gdelt.observations);
+    detectedEventsByArtist = mergeEvents(detectedEventsByArtist, gdelt.eventsByArtist);
   }
 
   if (useLastfm) {
@@ -549,12 +557,25 @@ async function collectRealSignals({
     warnings.push(...youtubeComments.warnings);
   }
 
+  if (useTradeFlow && supabase) {
+    const tradeFlow = await collectTradeFlowMarketSignals({
+      supabase,
+      artists,
+      runDate
+    });
+
+    sources.push(tradeFlow.signals);
+    observations.push(...tradeFlow.observations);
+    warnings.push(...tradeFlow.warnings);
+  }
+
   return {
     adapterSignals: mergeAdapterSignals(...sources),
     adapterSignalSources: sources,
     observations,
     warnings,
-    externalIds
+    externalIds,
+    detectedEventsByArtist
   };
 }
 
@@ -565,6 +586,7 @@ async function collectEventSignals({
   supabase,
   dryRun,
   externalIds,
+  seedDetectedEventsByArtist = {},
   manualEvents
 }: {
   source: MarketUpdateSource;
@@ -573,11 +595,12 @@ async function collectEventSignals({
   supabase: ReturnType<typeof createServiceRoleClient> | null;
   dryRun: boolean;
   externalIds: Record<string, ArtistExternalIds>;
+  seedDetectedEventsByArtist?: Record<string, MarketEvent[]>;
   manualEvents?: ManualMarketEvents;
 }) {
   const artistIds = artists.map((artist) => artist.id);
   let storedEvents = {};
-  let detectedEventsByArtist = {};
+  let detectedEventsByArtist = seedDetectedEventsByArtist;
   const warnings: string[] = [];
 
   if (supabase) {
@@ -602,7 +625,7 @@ async function collectEventSignals({
       externalIds
     });
 
-    detectedEventsByArtist = releaseEvents.eventsByArtist;
+    detectedEventsByArtist = mergeEvents(detectedEventsByArtist, releaseEvents.eventsByArtist);
     warnings.push(...releaseEvents.warnings);
   }
 
