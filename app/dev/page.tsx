@@ -58,6 +58,45 @@ type PreviewState =
       message: string;
     };
 
+type RunNowState =
+  | {
+      status: "idle";
+    }
+  | {
+      status: "loading";
+      completedBatchCount: number;
+      processedArtistCount: number;
+    }
+  | {
+      status: "success";
+      runDate: string | null;
+      source: string | null;
+      persisted: boolean;
+      forced: boolean;
+      completedBatchCount: number;
+      processedArtistCount: number;
+      observationCount: number;
+      eventCount: number;
+      detectedEventCount: number;
+      hasMore: boolean;
+      nextOffset: number | null;
+      summary: {
+        artistCount?: number;
+        momentumArtistCount?: number;
+        averageMovePercent?: number;
+        averageSignalDelta?: number;
+        modelVersion?: string;
+        topGainer?: { ticker: string; dailyChangePercent: number } | null;
+        topLoser?: { ticker: string; dailyChangePercent: number } | null;
+      } | null;
+      warnings: string[];
+      eventScanStatus: string;
+    }
+  | {
+      status: "error";
+      message: string;
+    };
+
 type EventScanState =
   | {
       status: "idle";
@@ -369,6 +408,7 @@ export default function DevPage() {
   const [cloudStatus, setCloudStatus] = useState<AsyncState<CloudStatus>>({ status: "loading" });
   const [marketHealth, setMarketHealth] = useState<AsyncState<MarketHealth>>({ status: "loading" });
   const [preview, setPreview] = useState<PreviewState>({ status: "idle" });
+  const [runNow, setRunNow] = useState<RunNowState>({ status: "idle" });
   const [eventScan, setEventScan] = useState<EventScanState>({ status: "idle" });
   const [resolverPreview, setResolverPreview] = useState<SourceResolverPreviewState>({ status: "idle" });
   const [sourceIds, setSourceIds] = useState<AsyncState<SourceIdDirectory>>({ status: "loading" });
@@ -588,6 +628,94 @@ export default function DevPage() {
       setPreview({
         status: "error",
         message: error instanceof Error ? error.message : "Market preview failed."
+      });
+    }
+  }
+
+  async function runCoreUpdateNow() {
+    setRunNow({ status: "loading", completedBatchCount: 0, processedArtistCount: 0 });
+
+    try {
+      const batchSize = 10;
+      const maxLoopCount = 20;
+      let nextOffset: number | null = 0;
+      let completedBatchCount = 0;
+      let processedArtistCount = 0;
+      let observationCount = 0;
+      let eventCount = 0;
+      let detectedEventCount = 0;
+      let latestPayload: Record<string, any> | null = null;
+      let hasMore = true;
+      const warnings = new Set<string>();
+
+      for (let loopIndex = 0; loopIndex < maxLoopCount && hasMore && nextOffset !== null; loopIndex += 1) {
+        const response = await fetch("/api/admin/market-run-now", {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            ...adminHeaders
+          },
+          body: JSON.stringify({
+            force: true,
+            artistLimit: batchSize,
+            artistOffset: nextOffset,
+            maxBatches: 1
+          })
+        });
+        const payload = await readJsonResponse(response);
+
+        if (!response.ok || !payload.ok) {
+          throw new Error(payload.error ?? "Market run failed.");
+        }
+
+        const result = payload.result ?? {};
+        latestPayload = payload;
+        completedBatchCount += result.completedBatchCount ?? 0;
+        processedArtistCount += result.processedArtistCount ?? 0;
+        observationCount += result.observationCount ?? 0;
+        eventCount += result.eventCount ?? 0;
+        detectedEventCount += result.detectedEventCount ?? 0;
+        (result.warnings ?? []).forEach((warning: string) => warnings.add(warning));
+        hasMore = Boolean(result.hasMore);
+        nextOffset = typeof result.nextOffset === "number" ? result.nextOffset : null;
+
+        setRunNow({
+          status: "loading",
+          completedBatchCount,
+          processedArtistCount
+        });
+      }
+
+      if (!latestPayload) {
+        throw new Error("Market run did not process any batches.");
+      }
+
+      const latestResult = latestPayload.result ?? {};
+      const summary = latestResult.summary ?? null;
+
+      setRunNow({
+        status: "success",
+        runDate: latestPayload.runDate ?? null,
+        source: latestPayload.source ?? null,
+        persisted: Boolean(latestPayload.persisted),
+        forced: Boolean(latestPayload.forced),
+        completedBatchCount,
+        processedArtistCount,
+        observationCount,
+        eventCount,
+        detectedEventCount,
+        hasMore,
+        nextOffset,
+        summary,
+        warnings: Array.from(warnings),
+        eventScanStatus: "Use event scan card"
+      });
+
+      await refreshMarketHealth();
+    } catch (error) {
+      setRunNow({
+        status: "error",
+        message: error instanceof Error ? error.message : "Market run failed."
       });
     }
   }
@@ -875,24 +1003,36 @@ export default function DevPage() {
       <section className="rounded-md border border-line bg-panel/88 p-5 shadow-market">
         <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
           <div>
-            <p className="text-xs font-bold uppercase tracking-wide text-paper/45">Safe action</p>
-            <h2 className="mt-1 text-2xl font-black">Preview core market update</h2>
+            <p className="text-xs font-bold uppercase tracking-wide text-paper/45">Market operation</p>
+            <h2 className="mt-1 text-2xl font-black">Core market update</h2>
             <p className="mt-2 text-sm leading-6 text-paper/55">
-              Runs a dry sample against the core market path. It does not write prices, trades, observations, or
-              history. Use this before a real persisted run.
+              Preview runs a dry sample. Run now writes today's prices, observations, and history in short core batches,
+              even if today's market already ran.
             </p>
           </div>
-          <button
-            type="button"
-            onClick={runCorePreview}
-            disabled={preview.status === "loading"}
-            className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md border border-cyan/45 bg-cyan/10 px-4 text-sm font-black text-cyan disabled:cursor-wait disabled:opacity-55"
-          >
-            <PlayCircle className="h-4 w-4" />
-            Preview
-          </button>
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <button
+              type="button"
+              onClick={runCorePreview}
+              disabled={preview.status === "loading" || runNow.status === "loading"}
+              className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md border border-cyan/45 bg-cyan/10 px-4 text-sm font-black text-cyan disabled:cursor-wait disabled:opacity-55"
+            >
+              <PlayCircle className="h-4 w-4" />
+              Preview
+            </button>
+            <button
+              type="button"
+              onClick={runCoreUpdateNow}
+              disabled={preview.status === "loading" || runNow.status === "loading"}
+              className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md border border-mint/45 bg-mint/10 px-4 text-sm font-black text-mint disabled:cursor-wait disabled:opacity-55"
+            >
+              <ServerCog className="h-4 w-4" />
+              Run now
+            </button>
+          </div>
         </div>
         <PreviewResult preview={preview} />
+        <RunNowResult run={runNow} />
       </section>
 
       <section className="rounded-md border border-line bg-panel/88 p-5 shadow-market">
@@ -1301,6 +1441,82 @@ function PreviewResult({ preview }: { preview: PreviewState }) {
       {preview.warnings.length ? (
         <div className="rounded-md border border-brass/35 bg-brass/10 p-3 text-sm leading-6 text-paper/62">
           {preview.warnings.slice(0, 3).map((warning) => (
+            <p key={warning}>{warning}</p>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function RunNowResult({ run }: { run: RunNowState }) {
+  if (run.status === "idle") {
+    return null;
+  }
+
+  if (run.status === "loading") {
+    return (
+      <div className="mt-4 rounded-md border border-cyan/35 bg-cyan/10 p-4">
+        <LoadingText text="Running persisted core market batches..." />
+        <div className="mt-3 grid gap-3 text-sm sm:grid-cols-2">
+          <PreviewMetric label="Completed batches" value={String(run.completedBatchCount)} />
+          <PreviewMetric label="Processed artists" value={String(run.processedArtistCount)} />
+        </div>
+      </div>
+    );
+  }
+
+  if (run.status === "error") {
+    return <ErrorText text={run.message} />;
+  }
+
+  return (
+    <div className="mt-4 space-y-3 rounded-md border border-mint/30 bg-mint/10 p-4">
+      <div className="grid gap-3 text-sm sm:grid-cols-5">
+        <PreviewMetric label="Run date" value={run.runDate ?? "N/A"} />
+        <PreviewMetric label="Artists" value={String(run.processedArtistCount || (run.summary?.artistCount ?? 0))} />
+        <PreviewMetric
+          label="Avg move"
+          value={
+            typeof run.summary?.averageMovePercent === "number"
+              ? formatPercent(run.summary.averageMovePercent)
+              : "N/A"
+          }
+        />
+        <PreviewMetric label="Batches" value={String(run.completedBatchCount)} />
+        <PreviewMetric label="Model" value={run.summary?.modelVersion ?? "N/A"} />
+      </div>
+      <div className="grid gap-3 text-sm sm:grid-cols-4">
+        <PreviewMetric label="Observations" value={String(run.observationCount)} />
+        <PreviewMetric label="Events loaded" value={String(run.eventCount)} />
+        <PreviewMetric label="Detected events" value={String(run.detectedEventCount)} />
+        <PreviewMetric label="Event scan" value={run.eventScanStatus} />
+      </div>
+      <div className="grid gap-3 text-sm sm:grid-cols-2">
+        <PreviewMetric
+          label="Top gainer"
+          value={
+            run.summary?.topGainer
+              ? `${run.summary.topGainer.ticker} ${formatPercent(run.summary.topGainer.dailyChangePercent)}`
+              : "N/A"
+          }
+        />
+        <PreviewMetric
+          label="Top loser"
+          value={
+            run.summary?.topLoser
+              ? `${run.summary.topLoser.ticker} ${formatPercent(run.summary.topLoser.dailyChangePercent)}`
+              : "N/A"
+          }
+        />
+      </div>
+      <div className="rounded-md border border-mint/25 bg-black/20 p-3 text-sm font-bold text-paper/62">
+        Persisted {run.persisted ? "yes" : "no"}{run.forced ? " · forced same-day run" : ""}
+        {run.hasMore ? ` · more remains at offset ${run.nextOffset ?? "unknown"}` : ""}
+      </div>
+      {run.warnings.length ? (
+        <div className="rounded-md border border-brass/35 bg-brass/10 p-3 text-sm leading-6 text-paper/62">
+          {run.warnings.slice(0, 4).map((warning) => (
             <p key={warning}>{warning}</p>
           ))}
         </div>
@@ -1737,6 +1953,57 @@ function buildManualSourceIdUpsert(
   }
 
   return upsert;
+}
+
+function getEventScanStatus(value: unknown) {
+  if (!value || typeof value !== "object") {
+    return "Not reported";
+  }
+
+  const scan = value as {
+    ok?: boolean;
+    disabled?: boolean;
+    reason?: string;
+    error?: string;
+    payload?: {
+      scannedArtistCount?: number;
+      eventCount?: number;
+      observationCount?: number;
+    };
+  };
+
+  if (scan.disabled) {
+    return scan.reason ?? "Disabled";
+  }
+
+  if (!scan.ok) {
+    return scan.error ?? "Failed";
+  }
+
+  const scanned = scan.payload?.scannedArtistCount ?? 0;
+  const events = scan.payload?.eventCount ?? 0;
+
+  return `${scanned} artists, ${events} events`;
+}
+
+async function readJsonResponse(response: Response) {
+  const text = await response.text();
+
+  if (!text.trim()) {
+    return {
+      ok: false,
+      error: `Server returned an empty response with HTTP ${response.status}.`
+    };
+  }
+
+  try {
+    return JSON.parse(text);
+  } catch {
+    return {
+      ok: false,
+      error: text.slice(0, 240) || `Server returned non-JSON with HTTP ${response.status}.`
+    };
+  }
 }
 
 function PreviewMetric({ label, value }: { label: string; value: string }) {
