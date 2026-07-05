@@ -88,11 +88,47 @@ async function mapArtistRowsWithStats(supabase: Supabase, artistRows: ArtistRow[
     ticker: row.ticker,
     currentPrice: Number(row.current_price),
     previousClose: Number(row.previous_close),
+    previousCloseSource: "artist" as const,
     hypeScore: row.hype_score,
     volatility: Number(row.volatility),
     category: row.category as ArtistCategory,
     stats: mapStats(statsByArtist[row.id] ?? null)
   }));
+}
+
+export async function loadPreviousClosePrices({
+  supabase,
+  artistIds,
+  runDate
+}: {
+  supabase: Supabase;
+  artistIds: string[];
+  runDate: string;
+}) {
+  if (!artistIds.length) {
+    return {};
+  }
+
+  const { data, error } = await supabase
+    .from("price_history")
+    .select("artist_id,price,price_date")
+    .in("artist_id", artistIds)
+    .lt("price_date", runDate)
+    .order("price_date", { ascending: false });
+
+  if (error) {
+    throw new Error(`Could not load previous closes: ${error.message}`);
+  }
+
+  return ((data ?? []) as Pick<Database["public"]["Tables"]["price_history"]["Row"], "artist_id" | "price">[]).reduce<
+    Record<string, number>
+  >((previousCloses, row) => {
+    if (previousCloses[row.artist_id] === undefined) {
+      previousCloses[row.artist_id] = Number(row.price);
+    }
+
+    return previousCloses;
+  }, {});
 }
 
 async function loadStatsByArtist(supabase: Supabase, artistIds: string[]) {
@@ -515,6 +551,60 @@ async function persistOneUpdate(supabase: Supabase, runDate: string, update: Art
   if (historyUpsert.error) {
     throw new Error(`Could not save price history for ${update.ticker}: ${historyUpsert.error.message}`);
   }
+
+  await persistPriceTickIfAvailable({
+    supabase,
+    artistId: update.artistId,
+    price: update.currentPrice,
+    source: "market_run",
+    modelVersion: update.modelVersion,
+    rawPayload: {
+      source: "market_run",
+      runDate,
+      ticker: update.ticker,
+      dailyChangePercent: update.dailyChangePercent
+    }
+  });
+}
+
+async function persistPriceTickIfAvailable({
+  supabase,
+  artistId,
+  price,
+  source,
+  modelVersion,
+  rawPayload
+}: {
+  supabase: Supabase;
+  artistId: string;
+  price: number;
+  source: "market_run" | "trade" | "migration" | "manual";
+  modelVersion?: string | null;
+  rawPayload: Record<string, unknown>;
+}) {
+  const { error } = await supabase.from("price_ticks").insert({
+    artist_id: artistId,
+    price,
+    source,
+    model_version: modelVersion ?? null,
+    raw_payload: rawPayload as Json
+  });
+
+  if (!error) {
+    return;
+  }
+
+  if (isMissingPriceTicksError(error.message)) {
+    return;
+  }
+
+  throw new Error(`Could not save price tick for ${artistId}: ${error.message}`);
+}
+
+function isMissingPriceTicksError(message: string) {
+  const normalized = message.toLowerCase();
+
+  return normalized.includes("price_ticks") || normalized.includes("schema cache");
 }
 
 function mapStats(stats: ArtistStatsRow | null): HypeStats {

@@ -29,6 +29,7 @@ export type MarketUpdateArtist = {
   ticker: string;
   currentPrice: number;
   previousClose: number;
+  previousCloseSource?: "artist" | "price_history";
   hypeScore: number;
   volatility: number;
   category: ArtistCategory;
@@ -85,7 +86,7 @@ export type MarketUpdateSummary = {
 
 export function calculateDailyMarketUpdates(input: MarketUpdateInput) {
   const modelVersion = input.modelVersion ?? getMarketModelVersion();
-  const updates = input.artists.map((artist, index) =>
+  const standaloneUpdates = input.artists.map((artist, index) =>
     calculateArtistUpdate({
       artist,
       index,
@@ -96,6 +97,7 @@ export function calculateDailyMarketUpdates(input: MarketUpdateInput) {
       adapterSignals: input.adapterSignals
     })
   );
+  const updates = applyMarketRelativePricing(standaloneUpdates);
 
   const averageMovePercent =
     updates.reduce((total, update) => total + update.dailyChangePercent, 0) / Math.max(1, updates.length);
@@ -125,6 +127,84 @@ export function calculateDailyMarketUpdates(input: MarketUpdateInput) {
         ? pickLeaderboardMove(sorted[sorted.length - 1])
         : null
     } satisfies MarketUpdateSummary
+  };
+}
+
+function applyMarketRelativePricing(updates: ArtistMarketUpdate[]): ArtistMarketUpdate[] {
+  if (updates.length < 2 || !updates.some((update) => update.rawPayload.hasMomentumSignal === true)) {
+    return updates;
+  }
+
+  const marketAverageSignalDelta =
+    updates.reduce((total, update) => total + update.signalDelta, 0) / Math.max(1, updates.length);
+  const marketSignalBreadth =
+    updates.filter((update) => update.signalDelta > 0).length / Math.max(1, updates.length);
+
+  if (Math.abs(marketAverageSignalDelta) < 0.0001) {
+    return updates;
+  }
+
+  return updates.map((update) =>
+    applyRelativePressure({
+      update,
+      marketAverageSignalDelta,
+      marketSignalBreadth
+    })
+  );
+}
+
+function applyRelativePressure({
+  update,
+  marketAverageSignalDelta,
+  marketSignalBreadth
+}: {
+  update: ArtistMarketUpdate;
+  marketAverageSignalDelta: number;
+  marketSignalBreadth: number;
+}): ArtistMarketUpdate {
+  const relativeSignalDelta = update.signalDelta - marketAverageSignalDelta;
+  const marketRelativeAdjustment = clamp(relativeSignalDelta * 0.35, -0.012, 0.012);
+  const noSignalLiquidityDrift =
+    update.rawPayload.hasMomentumSignal === true || marketAverageSignalDelta <= 0
+      ? 0
+      : -clamp(marketAverageSignalDelta * 0.18, 0, 0.004);
+  const adjustedSignalDelta = update.signalDelta + marketRelativeAdjustment + noSignalLiquidityDrift;
+  const repriced = priceFromSignalDelta(update, adjustedSignalDelta);
+  const shouldExplainRelativeMove =
+    repriced.dailyChangePercent < 0 ||
+    (update.rawPayload.hasMomentumSignal !== true && Math.abs(repriced.dailyChangePercent) >= 0.01);
+
+  return {
+    ...update,
+    currentPrice: repriced.currentPrice,
+    dailyChangePercent: repriced.dailyChangePercent,
+    signalDelta: adjustedSignalDelta,
+    explanation: shouldExplainRelativeMove
+      ? explainRelativeMove(update.ticker, repriced.dailyChangePercent, update.rawPayload.hasMomentumSignal === true)
+      : update.explanation,
+    rawPayload: {
+      ...(update.rawPayload as Record<string, unknown>),
+      standaloneSignalDelta: update.signalDelta,
+      marketAverageSignalDelta,
+      marketSignalBreadth,
+      marketRelativeAdjustment,
+      noSignalLiquidityDrift,
+      adjustedSignalDelta
+    }
+  } satisfies ArtistMarketUpdate;
+}
+
+function priceFromSignalDelta(update: ArtistMarketUpdate, signalDelta: number) {
+  const previousClose = getValidPrice(update.previousClose, update.oldPrice);
+  const dailyCap = getNumber(update.rawPayload.dailyCap, 0.18);
+  const targetPrice = update.oldPrice * (1 + signalDelta);
+  const blendedPrice = update.oldPrice * 0.8 + targetPrice * 0.2;
+  const cappedPrice = clamp(blendedPrice, previousClose * (1 - dailyCap), previousClose * (1 + dailyCap));
+  const currentPrice = roundPrice(cappedPrice);
+
+  return {
+    currentPrice,
+    dailyChangePercent: getDailyChangePercent(currentPrice, previousClose)
   };
 }
 
@@ -189,21 +269,23 @@ function calculateArtistUpdate({
   const signalDelta = signals.hasMomentumSignal
     ? applySignalModifiers(reliabilityAdjustedDelta, signals.modifiers, reliabilityMultiplier)
     : 0;
+  const previousClose = getValidPrice(artist.previousClose, artist.currentPrice);
+  const dailyCap = getCategoryDailyCap(artist.category);
   const targetPrice = artist.currentPrice * (1 + signalDelta);
   const blendedPrice = artist.currentPrice * 0.8 + targetPrice * 0.2;
   const cappedPrice = clamp(
     blendedPrice,
-    artist.currentPrice * (1 - getCategoryDailyCap(artist.category)),
-    artist.currentPrice * (1 + getCategoryDailyCap(artist.category))
+    previousClose * (1 - dailyCap),
+    previousClose * (1 + dailyCap)
   );
   const currentPrice = roundPrice(cappedPrice);
-  const dailyChangePercent = getDailyChangePercent(currentPrice, artist.currentPrice);
+  const dailyChangePercent = getDailyChangePercent(currentPrice, previousClose);
   const hypeScore = calculateHypeScore(stats);
 
   return {
     artistId: artist.id,
     ticker: artist.ticker,
-    previousClose: artist.currentPrice,
+    previousClose,
     oldPrice: artist.currentPrice,
     currentPrice,
     dailyChangePercent,
@@ -223,6 +305,10 @@ function calculateArtistUpdate({
       reliabilityDetails: signals.reliabilityDetails,
       rawSignalDelta,
       reliabilityAdjustedDelta,
+      previousClose,
+      previousCloseSource: artist.previousCloseSource ?? "artist",
+      oldPrice: artist.currentPrice,
+      dailyCap,
       modifiers: signals.modifiers
     }
   };
@@ -694,6 +780,18 @@ function explainFlatMove(ticker: string, source: MarketUpdateSource) {
   return `${ticker} held flat with no confirmed daily momentum signal.`;
 }
 
+function explainRelativeMove(ticker: string, dailyChangePercent: number, hasMomentumSignal: boolean) {
+  if (dailyChangePercent < 0 && hasMomentumSignal) {
+    return `${ticker} pulled back as its signals lagged the day's market momentum.`;
+  }
+
+  if (dailyChangePercent < 0) {
+    return `${ticker} drifted lower as stronger momentum elsewhere created relative market pressure.`;
+  }
+
+  return `${ticker} moved as the market repriced relative momentum across active artists.`;
+}
+
 function getCategoryDailyCap(category: ArtistCategory) {
   const caps: Record<ArtistCategory, number> = {
     superstar: 0.12,
@@ -726,6 +824,10 @@ function hashToUnit(input: string) {
 
 function getNumber(value: unknown, fallback: number) {
   return isFiniteNumber(value) ? value : fallback;
+}
+
+function getValidPrice(value: number, fallback: number) {
+  return isFiniteNumber(value) && value > 0 ? value : fallback;
 }
 
 function isFiniteNumber(value: unknown): value is number {

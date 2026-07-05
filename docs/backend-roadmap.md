@@ -17,8 +17,9 @@ This app still runs in development with unsaved demo data, but the backend found
 11. Run `supabase/migrations/010_trade_order_guardrails.sql`.
 12. Run `supabase/migrations/011_curated_artist_roster.sql`.
 13. Run `supabase/migrations/012_artist_text_source_defaults.sql`.
-14. Run `supabase/seed.sql` for the starter artists.
-15. Create `.env.local` in the project root and fill in:
+14. Run `supabase/migrations/013_price_ticks.sql`.
+15. Run `supabase/seed.sql` for the starter artists.
+16. Create `.env.local` in the project root and fill in:
    - `NEXT_PUBLIC_SUPABASE_URL`
    - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
    - `SUPABASE_SERVICE_ROLE_KEY`
@@ -34,7 +35,7 @@ This app still runs in development with unsaved demo data, but the backend found
    - `MARKET_YOUTUBE_COMMENT_VIDEOS=0`
    - `MARKET_YOUTUBE_COMMENT_LIMIT=25`
    - `ADMIN_EMAILS=<comma-separated admin emails>`
-   - `MARKET_MODEL_VERSION=rmi-core-v4`
+   - `MARKET_MODEL_VERSION=rmi-core-v5`
    - `LASTFM_API_KEY` for optional Last.fm listener/playcount signals
    - `SPOTIFY_CLIENT_ID` and `SPOTIFY_CLIENT_SECRET` for optional Spotify popularity/follower signals
    - `YOUTUBE_API_KEY` for optional YouTube channel view/subscriber/video-count and comment-reaction signals
@@ -54,6 +55,8 @@ The Dev console shows these checks at:
 ## Artist source IDs
 
 Real adapters are only as accurate as their artist matching. Store official external IDs in `artist_external_ids` before relying on Spotify or YouTube signals at scale.
+
+Artist roster changes should be done through `/dev` -> `Artist roster`, not by creating a new migration for every artist. The admin roster tool can add/update an artist and toggle an unreliable listing inactive while preserving historical rows.
 
 The preferred admin workflow is `/dev` -> `Manual source IDs`, where one artist can be reviewed and updated without touching raw JSON. YouTube manual entries accept a `UC...` channel ID, a `youtube.com/channel/UC...` URL, an `@handle`, or a `youtube.com/@handle` URL. Handle inputs are resolved to a channel ID through the YouTube Data API before saving.
 
@@ -117,7 +120,7 @@ Use the admin health endpoint to check whether the engine has enough mapped arti
 GET /api/admin/market-health
 ```
 
-It reports active artist count, source-ID coverage, observation freshness by source/metric, fresh price-history coverage, recent market update runs, and warnings such as missing Spotify/YouTube credentials. Query params:
+It reports active artist count, source-ID coverage, observation freshness by source/metric, fresh daily price-history coverage, quote tick coverage, recent market update runs, and warnings such as missing Spotify/YouTube credentials. Query params:
 
 - `lookbackDays`: defaults to `30`
 - `freshnessDays`: defaults to `2`
@@ -131,6 +134,7 @@ For local testing, the market engine is up when `/api/admin/market-health` shows
 
 - `readyForAdminWrites: true`
 - fresh price history coverage
+- fresh quote tick coverage
 - fresh Last.fm and YouTube observations
 - a successful `core` market run
 
@@ -148,6 +152,8 @@ For production, add these environment variables to the deployment host before re
 After deployment, manually call `/api/cron/daily-market-update?dryRun=1` with `Authorization: Bearer <CRON_SECRET>` once. Then run one persisted `core` batch and recheck `/api/admin/market-health`. From that point forward, Vercel Cron can keep the graph history growing each day.
 
 `MARKET_MODEL_VERSION` is an internal audit label, not a prominent user-facing product label. It is saved on market runs, signal snapshots, and price-history rows so future algorithm changes can be traced without rewriting historical prices. Normal market pages should keep broad language such as audience momentum, market activity, release signals, and media movement. Admin/health/debug views can show the exact model version.
+
+`rmi-core-v5` adds stock-like quote baselines and relative repricing: daily percentage change and daily movement caps use a fixed previous close, persisted runs prefer the latest saved close before the run date, timestamped `price_ticks` record trade and market-run quote movement for intraday charts, and weak/no-signal artists can drift lower when stronger names are attracting the day's momentum.
 
 `rmi-core-v4` adds event ingestion from the scheduled GDELT scanner and official YouTube upload titles while keeping signal-reliability scaling. It can react to article-based news/reviews/releases and official-channel snippets, videos, singles, album trailers, and tour announcements before those moments fully show up in listener or view momentum. Review events apply signed price shocks instead of simple multipliers, so negative reviews can pull against a streaming/release spike and positive reviews can support it without accidentally softening an already-negative move.
 
@@ -402,12 +408,16 @@ The job:
 1. Loads active artists.
 2. Collects market signals.
 3. Calculates the new hype score and price.
-4. Applies category volatility and daily movement caps.
-5. Saves artist prices, stats, signal snapshots, price history, and a market update run record.
+4. Applies category volatility and daily movement caps against the fixed previous close.
+5. Saves artist prices, stats, signal snapshots, daily price history, intraday price ticks, and a market update run record.
 
 ## Market history
 
-Real price history starts when the backend begins persisting `price_history` rows. The general market snapshot only carries a short recent history for each artist so the homepage stays fast with a large artist universe. Full chart ranges are loaded on demand from:
+Real price history starts when the backend begins persisting `price_history` rows. Those rows are daily closes/opening snapshots, so an artist with only one saved date will otherwise render as a single point. `price_ticks` stores timestamped quote movement from trades and persisted market runs; short chart ranges use those ticks when available, while longer ranges keep using the lighter daily history.
+
+Daily percentage change should be measured against one fixed previous close for the whole market day. Persisted market runs prefer the latest saved `price_history` close before the run date as that baseline, then write timestamped `price_ticks` as the current quote changes during the day.
+
+The general market snapshot only carries a short recent history for each artist so the homepage stays fast with a large artist universe. Full chart ranges are loaded on demand from:
 
 ```txt
 GET /api/market/history/:artistId?range=1M
@@ -424,7 +434,7 @@ Historical backfill depends on the source:
 - GDELT can be queried historically by date window, so it is a realistic free candidate for backfilling news/article momentum.
 - Billboard, airplay, chart, and SoundCloud historical data depend on access terms and available APIs/scrapers.
 
-For launch, the honest product behavior should be "since listing" until enough real observations have accumulated. If we generate pre-launch history, it should be labeled as backfilled/model-estimated rather than pretending it was live market data.
+For launch, the honest product behavior should be "since listing" until enough real observations have accumulated. Intraday movement should come from real trades, persisted market runs, or clearly labeled synthetic liquidity/tick jobs. If we generate pre-launch history, it should be labeled as backfilled/model-estimated rather than pretending it was live market data.
 
 ## Signal adapters
 

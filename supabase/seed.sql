@@ -73,7 +73,6 @@ values
   (46, 'feng', 'Feng', 'FENG', 5.95, 5.50, 2.200, 'underground', 'from-blue-300 via-stone-100 to-emerald-300'),
   (47, 'bleood', 'Bleood', 'BLEOD', 7.85, 6.40, 2.050, 'underground', 'from-amber-200 via-fuchsia-200 to-cyan-300'),
   (48, 'slayr', 'Slayr', 'SLAYR', 8.60, 8.25, 2.060, 'underground', 'from-fuchsia-300 via-lime-200 to-cyan-300'),
-  (49, 'boolymon', 'Boolymon', 'BOOLY', 9.25, 8.80, 2.000, 'underground', 'from-sky-300 via-pink-200 to-yellow-200'),
   (50, 'lazerdim700', 'Lazer Dim 700', 'LZR700', 19.75, 17.90, 1.980, 'underground', 'from-lime-300 via-cyan-200 to-zinc-100'),
   (51, 'protect', 'Protect', 'PRTCT', 6.70, 6.45, 2.120, 'underground', 'from-rose-300 via-emerald-200 to-stone-100'),
   (52, 'xaviersobased', 'xaviersobased', 'XAVIER', 12.95, 12.20, 1.960, 'underground', 'from-violet-300 via-zinc-100 to-emerald-300'),

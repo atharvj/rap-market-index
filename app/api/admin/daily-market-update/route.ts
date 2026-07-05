@@ -39,6 +39,7 @@ import {
   loadActiveArtistsPage,
   loadArtistExternalIds,
   loadObservationBaselines,
+  loadPreviousClosePrices,
   loadRecentMarketEvents,
   persistMarketEvents,
   persistMarketObservations,
@@ -115,13 +116,22 @@ export async function POST(request: Request) {
 
   try {
     const supabase = config.readyForAdminWrites ? createServiceRoleClient() : null;
-    const { artists, batch } = await loadArtistBatch({
+    let { artists, batch } = await loadArtistBatch({
       source,
       supabase,
       dryRun,
       artistLimit: body.artistLimit,
       artistOffset: body.artistOffset
     });
+
+    if (!dryRun && supabase) {
+      artists = await applyPreviousCloseBaselines({
+        supabase,
+        artists,
+        runDate
+      });
+    }
+
     const realSignals = await collectRealSignals({
       source,
       artists,
@@ -380,6 +390,36 @@ function buildBatchSummary({
     nextOffset: nextOffset < totalArtists ? nextOffset : null,
     hasMore: nextOffset < totalArtists
   };
+}
+
+async function applyPreviousCloseBaselines({
+  supabase,
+  artists,
+  runDate
+}: {
+  supabase: ReturnType<typeof createServiceRoleClient>;
+  artists: ReturnType<typeof getMockMarketArtists>;
+  runDate: string;
+}) {
+  const previousCloses = await loadPreviousClosePrices({
+    supabase,
+    artistIds: artists.map((artist) => artist.id),
+    runDate
+  });
+
+  return artists.map((artist) => {
+    const previousClose = previousCloses[artist.id];
+
+    if (previousClose === undefined || !Number.isFinite(previousClose) || previousClose <= 0) {
+      return artist;
+    }
+
+    return {
+      ...artist,
+      previousClose,
+      previousCloseSource: "price_history" as const
+    };
+  });
 }
 
 async function collectRealSignals({

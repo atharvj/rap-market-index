@@ -254,23 +254,43 @@ async function probeMarketEngineStorage() {
       .eq("artist_id", "__market_probe__")
       .eq("event_date", "1970-01-01")
       .eq("title", "Storage probe");
-
-    return {
-      ok: true,
-      detail: "Configured"
-    };
   }
 
-  const eventsMessage = eventsError.message.toLowerCase();
+  if (eventsError) {
+    const eventsMessage = eventsError.message.toLowerCase();
 
-  if (eventsMessage.includes("foreign key")) {
-    return {
-      ok: true,
-      detail: "Configured"
-    };
+    if (!eventsMessage.includes("foreign key")) {
+      return formatMarketEngineProbeError(eventsError.message);
+    }
   }
 
-  return formatMarketEngineProbeError(eventsError.message);
+  const { error: ticksError } = await supabase.from("price_ticks").insert({
+    artist_id: "__market_probe__",
+    price: 1,
+    source: "manual"
+  });
+
+  if (!ticksError) {
+    await supabase
+      .from("price_ticks")
+      .delete()
+      .eq("artist_id", "__market_probe__")
+      .eq("price", 1)
+      .eq("source", "manual");
+  }
+
+  if (ticksError) {
+    const ticksMessage = ticksError.message.toLowerCase();
+
+    if (!ticksMessage.includes("foreign key")) {
+      return formatMarketEngineProbeError(ticksError.message);
+    }
+  }
+
+  return {
+    ok: true,
+    detail: "Configured"
+  };
 }
 
 async function probeModelVersionStorage(supabase: ReturnType<typeof createServiceRoleClient>) {
@@ -299,11 +319,12 @@ function formatMarketEngineProbeError(message: string) {
     normalized.includes("market_observations") ||
     normalized.includes("artist_external_ids") ||
     normalized.includes("market_events") ||
+    normalized.includes("price_ticks") ||
     normalized.includes("model_version")
   ) {
     return {
       ok: false,
-      detail: "Run Supabase migrations through 008_market_model_version.sql"
+      detail: "Run Supabase migrations through 013_price_ticks.sql"
     };
   }
 

@@ -111,6 +111,32 @@ export type Database = {
         Update: Partial<Database["public"]["Tables"]["price_history"]["Insert"]>;
         Relationships: [];
       };
+      price_ticks: {
+        Row: {
+          id: string;
+          artist_id: string;
+          observed_at: string;
+          price: number;
+          source: "market_run" | "trade" | "migration" | "manual";
+          reference_id: string | null;
+          model_version: string | null;
+          raw_payload: Json;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          artist_id: string;
+          observed_at?: string;
+          price: number;
+          source?: "market_run" | "trade" | "migration" | "manual";
+          reference_id?: string | null;
+          model_version?: string | null;
+          raw_payload?: Json;
+          created_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["price_ticks"]["Insert"]>;
+        Relationships: [];
+      };
       market_observations: {
         Row: {
           id: string;

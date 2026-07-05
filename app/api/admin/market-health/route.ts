@@ -13,6 +13,10 @@ type ObservationRow = Pick<
 >;
 
 type PriceHistoryRow = Pick<Database["public"]["Tables"]["price_history"]["Row"], "artist_id" | "price_date">;
+type PriceTickRow = Pick<
+  Database["public"]["Tables"]["price_ticks"]["Row"],
+  "artist_id" | "observed_at" | "source"
+>;
 
 type MarketEventRow = Pick<
   Database["public"]["Tables"]["market_events"]["Row"],
@@ -55,6 +59,20 @@ type EventHealth = {
   eventFreshnessDays: number;
   typeCounts: Record<string, number>;
   freshTypeCounts: Record<string, number>;
+};
+
+type PriceTickHealth = {
+  latestAt: string | null;
+  tickCount: number;
+  marketRunTickCount: number;
+  tradeTickCount: number;
+  migrationTickCount: number;
+  manualTickCount: number;
+  observedArtistCount: number;
+  freshArtistCount: number;
+  staleArtistCount: number;
+  missingArtistCount: number;
+  freshCoveragePercent: number;
 };
 
 const SOURCE_ID_FIELDS = [
@@ -116,7 +134,7 @@ export async function GET(request: Request) {
     const artists = await loadActiveArtists(supabase);
     const artistIds = artists.map((artist) => artist.id);
     const eventFreshnessDays = Math.max(7, freshnessDays);
-    const [externalIds, recentRuns, observations, priceHistory, recentEvents] = await Promise.all([
+    const [externalIds, recentRuns, observations, priceHistory, priceTicks, recentEvents] = await Promise.all([
       loadArtistExternalIds(supabase, artistIds),
       loadRecentMarketRuns(supabase),
       loadRecentObservations({
@@ -126,6 +144,12 @@ export async function GET(request: Request) {
         lookbackDays
       }),
       loadRecentPriceHistory({
+        supabase,
+        artistIds,
+        runDate,
+        lookbackDays
+      }),
+      loadRecentPriceTicks({
         supabase,
         artistIds,
         runDate,
@@ -154,6 +178,12 @@ export async function GET(request: Request) {
       runDate,
       freshnessDays
     });
+    const priceTickHealth = buildPriceTickHealth({
+      activeArtistCount: artists.length,
+      priceTicks,
+      runDate,
+      freshnessDays
+    });
     const eventHealth = buildEventHealth({
       activeArtistCount: artists.length,
       events: recentEvents,
@@ -166,6 +196,7 @@ export async function GET(request: Request) {
       sourceCoverage,
       observationHealth,
       priceHistoryHealth,
+      priceTickHealth,
       eventHealth,
       configuredModelVersion,
       defaultModelVersion: DEFAULT_MARKET_MODEL_VERSION,
@@ -185,6 +216,7 @@ export async function GET(request: Request) {
       sourceCoverage,
       observationHealth,
       priceHistoryHealth,
+      priceTickHealth,
       eventHealth,
       latestRun: recentRuns[0] ?? null,
       recentRuns,
@@ -280,6 +312,39 @@ async function loadRecentPriceHistory({
   }
 
   return (data ?? []) as PriceHistoryRow[];
+}
+
+async function loadRecentPriceTicks({
+  supabase,
+  artistIds,
+  runDate,
+  lookbackDays
+}: {
+  supabase: ReturnType<typeof createServiceRoleClient>;
+  artistIds: string[];
+  runDate: string;
+  lookbackDays: number;
+}) {
+  if (!artistIds.length) {
+    return [];
+  }
+
+  const startDate = shiftDate(runDate, -lookbackDays);
+  const endDate = shiftDate(runDate, 1);
+  const { data, error } = await supabase
+    .from("price_ticks")
+    .select("artist_id, observed_at, source")
+    .in("artist_id", artistIds)
+    .gte("observed_at", `${startDate}T00:00:00.000Z`)
+    .lt("observed_at", `${endDate}T00:00:00.000Z`)
+    .order("observed_at", { ascending: false })
+    .limit(MAX_OBSERVATION_ROWS);
+
+  if (error) {
+    throw new Error(`Could not load price tick health: ${error.message}`);
+  }
+
+  return (data ?? []) as PriceTickRow[];
 }
 
 async function loadRecentEvents({
@@ -417,6 +482,46 @@ function buildPriceHistoryHealth({
   };
 }
 
+function buildPriceTickHealth({
+  activeArtistCount,
+  priceTicks,
+  runDate,
+  freshnessDays
+}: {
+  activeArtistCount: number;
+  priceTicks: PriceTickRow[];
+  runDate: string;
+  freshnessDays: number;
+}): PriceTickHealth {
+  const freshAt = `${shiftDate(runDate, -freshnessDays)}T00:00:00.000Z`;
+  const latestByArtist = new Map<string, string>();
+
+  for (const tick of priceTicks) {
+    const current = latestByArtist.get(tick.artist_id);
+
+    if (!current || tick.observed_at > current) {
+      latestByArtist.set(tick.artist_id, tick.observed_at);
+    }
+  }
+
+  const timestamps = Array.from(latestByArtist.values());
+  const freshArtistCount = timestamps.filter((observedAt) => observedAt >= freshAt).length;
+
+  return {
+    latestAt: priceTicks.map((tick) => tick.observed_at).sort().at(-1) ?? null,
+    tickCount: priceTicks.length,
+    marketRunTickCount: priceTicks.filter((tick) => tick.source === "market_run").length,
+    tradeTickCount: priceTicks.filter((tick) => tick.source === "trade").length,
+    migrationTickCount: priceTicks.filter((tick) => tick.source === "migration").length,
+    manualTickCount: priceTicks.filter((tick) => tick.source === "manual").length,
+    observedArtistCount: latestByArtist.size,
+    freshArtistCount,
+    staleArtistCount: Math.max(0, latestByArtist.size - freshArtistCount),
+    missingArtistCount: Math.max(0, activeArtistCount - latestByArtist.size),
+    freshCoveragePercent: getPercent(freshArtistCount, activeArtistCount)
+  };
+}
+
 function buildEventHealth({
   activeArtistCount,
   events,
@@ -474,6 +579,7 @@ function buildWarnings({
   sourceCoverage,
   observationHealth,
   priceHistoryHealth,
+  priceTickHealth,
   eventHealth,
   configuredModelVersion,
   defaultModelVersion,
@@ -484,6 +590,7 @@ function buildWarnings({
   sourceCoverage: SourceCoverage[];
   observationHealth: ObservationHealth[];
   priceHistoryHealth: ReturnType<typeof buildPriceHistoryHealth>;
+  priceTickHealth: PriceTickHealth;
   eventHealth: EventHealth;
   configuredModelVersion: string;
   defaultModelVersion: string;
@@ -526,6 +633,14 @@ function buildWarnings({
 
   if (priceHistoryHealth.freshCoveragePercent < 80 && priceHistoryHealth.observedArtistCount > 0) {
     warnings.push(`Fresh price history coverage is ${priceHistoryHealth.freshCoveragePercent.toFixed(1)}%.`);
+  }
+
+  if (priceTickHealth.tickCount === 0) {
+    warnings.push("No price ticks are recorded yet, so intraday artist charts will fall back to daily history.");
+  } else if (priceTickHealth.marketRunTickCount === 0 && priceTickHealth.tradeTickCount === 0) {
+    warnings.push("Price ticks currently only contain seed/manual rows; run the market engine or record trades to start live quote ticks.");
+  } else if (priceTickHealth.freshCoveragePercent < 80) {
+    warnings.push(`Fresh quote tick coverage is ${priceTickHealth.freshCoveragePercent.toFixed(1)}%.`);
   }
 
   if (eventHealth.eventCount === 0) {
@@ -582,10 +697,11 @@ function formatMarketHealthError(error: unknown) {
     normalized.includes("market_update_runs") ||
     normalized.includes("market_events") ||
     normalized.includes("price_history") ||
+    normalized.includes("price_ticks") ||
     normalized.includes("model_version") ||
     normalized.includes("schema cache")
   ) {
-    return "Market engine storage needs setup. Run the Supabase migrations through 010_trade_order_guardrails.sql.";
+    return "Market engine storage needs setup. Run the Supabase migrations through 013_price_ticks.sql.";
   }
 
   return message;

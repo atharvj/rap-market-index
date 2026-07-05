@@ -75,7 +75,6 @@ const roster: RosterSeed[] = [
   { id: "feng", name: "Feng", ticker: "FENG", price: 5.95, previousClose: 5.5, volatility: 2.2, category: "underground", historyBias: 7.1 },
   { id: "bleood", name: "Bleood", ticker: "BLEOD", price: 7.85, previousClose: 6.4, volatility: 2.05, category: "underground", historyBias: 6.4 },
   { id: "slayr", name: "Slayr", ticker: "SLAYR", price: 8.6, previousClose: 8.25, volatility: 2.06, category: "underground", historyBias: 6.2 },
-  { id: "boolymon", name: "Boolymon", ticker: "BOOLY", price: 9.25, previousClose: 8.8, volatility: 2, category: "underground", historyBias: 5.9 },
   { id: "lazerdim700", name: "Lazer Dim 700", ticker: "LZR700", price: 19.75, previousClose: 17.9, volatility: 1.98, category: "underground", historyBias: 6 },
   { id: "protect", name: "Protect", ticker: "PRTCT", price: 6.7, previousClose: 6.45, volatility: 2.12, category: "underground", historyBias: 6.6 },
   { id: "xaviersobased", name: "xaviersobased", ticker: "XAVIER", price: 12.95, previousClose: 12.2, volatility: 1.96, category: "underground", historyBias: 5.6 },

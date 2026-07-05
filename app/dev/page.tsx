@@ -227,6 +227,57 @@ type ManualSourceIdSaveState =
       message: string;
     };
 
+type ArtistCategory = "superstar" | "mainstream" | "rising" | "underground";
+
+type ArtistRosterRecord = {
+  id: string;
+  name: string;
+  ticker: string;
+  currentPrice: number;
+  previousClose: number;
+  dailyChangePercent: number;
+  hypeScore: number;
+  volatility: number;
+  category: ArtistCategory;
+  accent: string;
+  isActive: boolean;
+};
+
+type ArtistRosterDirectory = {
+  artistCount: number;
+  activeCount: number;
+  inactiveCount: number;
+  records: ArtistRosterRecord[];
+};
+
+type ArtistRosterForm = {
+  selectedId: string;
+  id: string;
+  name: string;
+  ticker: string;
+  currentPrice: string;
+  previousClose: string;
+  volatility: string;
+  category: ArtistCategory;
+  isActive: boolean;
+};
+
+type ArtistRosterSaveState =
+  | {
+      status: "idle";
+    }
+  | {
+      status: "saving";
+    }
+  | {
+      status: "saved";
+      message: string;
+    }
+  | {
+      status: "error";
+      message: string;
+    };
+
 const sourceIdFieldBySource: Record<string, string> = {
   spotify: "spotifyId",
   youtube: "youtubeChannelId",
@@ -278,6 +329,8 @@ const manualSourceIdFields: Array<{
     helper: "Optional override for news/review/event matching."
   }
 ];
+
+const artistCategoryOptions: ArtistCategory[] = ["underground", "rising", "mainstream", "superstar"];
 
 type AdminAccessState =
   | {
@@ -334,6 +387,19 @@ type MarketHealth = {
   priceHistoryHealth: {
     latestDate: string | null;
     freshArtistCount: number;
+    missingArtistCount: number;
+    freshCoveragePercent: number;
+  };
+  priceTickHealth: {
+    latestAt: string | null;
+    tickCount: number;
+    marketRunTickCount: number;
+    tradeTickCount: number;
+    migrationTickCount: number;
+    manualTickCount: number;
+    observedArtistCount: number;
+    freshArtistCount: number;
+    staleArtistCount: number;
     missingArtistCount: number;
     freshCoveragePercent: number;
   };
@@ -402,6 +468,18 @@ const emptyManualSourceIdForm: ManualSourceIdForm = {
   gdeltQuery: ""
 };
 
+const emptyArtistRosterForm: ArtistRosterForm = {
+  selectedId: "",
+  id: "",
+  name: "",
+  ticker: "",
+  currentPrice: "",
+  previousClose: "",
+  volatility: "1.4",
+  category: "underground",
+  isActive: true
+};
+
 export default function DevPage() {
   const { configured: authConfigured, loading: authLoading, session } = useAuth();
   const [adminAccess, setAdminAccess] = useState<AdminAccessState>({ status: "loading" });
@@ -411,6 +489,9 @@ export default function DevPage() {
   const [runNow, setRunNow] = useState<RunNowState>({ status: "idle" });
   const [eventScan, setEventScan] = useState<EventScanState>({ status: "idle" });
   const [resolverPreview, setResolverPreview] = useState<SourceResolverPreviewState>({ status: "idle" });
+  const [artistRoster, setArtistRoster] = useState<AsyncState<ArtistRosterDirectory>>({ status: "loading" });
+  const [artistRosterForm, setArtistRosterForm] = useState<ArtistRosterForm>(emptyArtistRosterForm);
+  const [artistRosterSave, setArtistRosterSave] = useState<ArtistRosterSaveState>({ status: "idle" });
   const [sourceIds, setSourceIds] = useState<AsyncState<SourceIdDirectory>>({ status: "loading" });
   const [manualSourceForm, setManualSourceForm] = useState<ManualSourceIdForm>(emptyManualSourceIdForm);
   const [manualSourceSave, setManualSourceSave] = useState<ManualSourceIdSaveState>({ status: "idle" });
@@ -490,6 +571,7 @@ export default function DevPage() {
 
     void refreshCloudStatus();
     void refreshMarketHealth();
+    void refreshArtistRoster();
     void refreshSourceIds();
   }, [adminAccess.status]);
 
@@ -514,6 +596,14 @@ export default function DevPage() {
 
     return sourceIds.data.records.find((record) => record.artistId === manualSourceForm.artistId) ?? null;
   }, [manualSourceForm.artistId, sourceIds]);
+
+  const selectedRosterRecord = useMemo(() => {
+    if (artistRoster.status !== "ready" || !artistRosterForm.selectedId) {
+      return null;
+    }
+
+    return artistRoster.data.records.find((record) => record.id === artistRosterForm.selectedId) ?? null;
+  }, [artistRoster, artistRosterForm.selectedId]);
 
   async function refreshCloudStatus() {
     setCloudStatus({ status: "loading" });
@@ -564,6 +654,36 @@ export default function DevPage() {
       setMarketHealth({
         status: "error",
         message: error instanceof Error ? error.message : "Market health check failed."
+      });
+    }
+  }
+
+  async function refreshArtistRoster() {
+    setArtistRoster({ status: "loading" });
+
+    try {
+      const response = await fetch("/api/admin/artist-roster", {
+        headers: adminHeaders
+      });
+      const payload = await response.json();
+
+      if (!response.ok || !payload.ok) {
+        throw new Error(payload.error ?? "Artist roster load failed.");
+      }
+
+      setArtistRoster({
+        status: "ready",
+        data: {
+          artistCount: payload.artistCount ?? 0,
+          activeCount: payload.activeCount ?? 0,
+          inactiveCount: payload.inactiveCount ?? 0,
+          records: payload.records ?? []
+        }
+      });
+    } catch (error) {
+      setArtistRoster({
+        status: "error",
+        message: error instanceof Error ? error.message : "Artist roster load failed."
       });
     }
   }
@@ -851,6 +971,110 @@ export default function DevPage() {
     }
   }
 
+  function selectRosterArtist(artistId: string) {
+    const record =
+      artistRoster.status === "ready" ? artistRoster.data.records.find((item) => item.id === artistId) : undefined;
+
+    setArtistRosterForm(record ? buildArtistRosterForm(record) : { ...emptyArtistRosterForm, selectedId: artistId });
+    setArtistRosterSave({ status: "idle" });
+  }
+
+  function startNewRosterArtist() {
+    setArtistRosterForm(emptyArtistRosterForm);
+    setArtistRosterSave({ status: "idle" });
+  }
+
+  function updateRosterField(field: keyof Omit<ArtistRosterForm, "selectedId">, value: string | boolean) {
+    setArtistRosterForm((current) => ({
+      ...current,
+      [field]: value
+    }));
+    setArtistRosterSave({ status: "idle" });
+  }
+
+  async function saveRosterArtist() {
+    setArtistRosterSave({ status: "saving" });
+
+    try {
+      const response = await fetch("/api/admin/artist-roster", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          ...adminHeaders
+        },
+        body: JSON.stringify({
+          artist: buildArtistRosterPayload(artistRosterForm)
+        })
+      });
+      const payload = await response.json();
+
+      if (!response.ok || !payload.ok) {
+        throw new Error(payload.error ?? "Artist roster save failed.");
+      }
+
+      setArtistRosterSave({
+        status: "saved",
+        message: `Saved ${payload.record?.ticker ?? (artistRosterForm.ticker || "artist")}.`
+      });
+      setArtistRosterForm(payload.record ? buildArtistRosterForm(payload.record) : artistRosterForm);
+      await refreshArtistRoster();
+      await refreshSourceIds();
+      await refreshMarketHealth();
+    } catch (error) {
+      setArtistRosterSave({
+        status: "error",
+        message: error instanceof Error ? error.message : "Artist roster save failed."
+      });
+    }
+  }
+
+  async function setRosterArtistActive(isActive: boolean) {
+    const artistId = selectedRosterRecord?.id ?? artistRosterForm.id;
+
+    if (!artistId) {
+      setArtistRosterSave({
+        status: "error",
+        message: "Choose an artist before changing active status."
+      });
+      return;
+    }
+
+    setArtistRosterSave({ status: "saving" });
+
+    try {
+      const response = await fetch("/api/admin/artist-roster", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          ...adminHeaders
+        },
+        body: JSON.stringify({
+          artistId,
+          isActive
+        })
+      });
+      const payload = await response.json();
+
+      if (!response.ok || !payload.ok) {
+        throw new Error(payload.error ?? "Artist active status update failed.");
+      }
+
+      setArtistRosterSave({
+        status: "saved",
+        message: `${payload.record?.ticker ?? artistId} is now ${isActive ? "active" : "inactive"}.`
+      });
+      setArtistRosterForm(payload.record ? buildArtistRosterForm(payload.record) : artistRosterForm);
+      await refreshArtistRoster();
+      await refreshSourceIds();
+      await refreshMarketHealth();
+    } catch (error) {
+      setArtistRosterSave({
+        status: "error",
+        message: error instanceof Error ? error.message : "Artist active status update failed."
+      });
+    }
+  }
+
   function selectManualSourceArtist(artistId: string) {
     const record =
       sourceIds.status === "ready" ? sourceIds.data.records.find((item) => item.artistId === artistId) : undefined;
@@ -1092,6 +1316,19 @@ export default function DevPage() {
         <SourceResolverPreviewResult preview={resolverPreview} onSave={saveSourceResolverProposals} />
       </section>
 
+      <ArtistRosterManager
+        state={artistRoster}
+        form={artistRosterForm}
+        selectedRecord={selectedRosterRecord}
+        saveState={artistRosterSave}
+        onRefresh={refreshArtistRoster}
+        onNew={startNewRosterArtist}
+        onSelectArtist={selectRosterArtist}
+        onChange={updateRosterField}
+        onSave={saveRosterArtist}
+        onSetActive={setRosterArtistActive}
+      />
+
       <ManualSourceIdEditor
         state={sourceIds}
         form={manualSourceForm}
@@ -1260,13 +1497,20 @@ function CloudStatusPanel({ data }: { data: CloudStatus }) {
 function MarketHealthPanel({ data }: { data: MarketHealth }) {
   return (
     <div className="space-y-4">
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
         <ReadinessTile
           label="Price history"
           ready={data.priceHistoryHealth.freshCoveragePercent >= 80}
           readyText={`${formatPercent(data.priceHistoryHealth.freshCoveragePercent)} fresh`}
           pendingText={`${formatPercent(data.priceHistoryHealth.freshCoveragePercent)} fresh`}
           icon={<BarChart3 className="h-4 w-4" />}
+        />
+        <ReadinessTile
+          label="Quote ticks"
+          ready={data.priceTickHealth.freshCoveragePercent >= 80}
+          readyText={`${formatPercent(data.priceTickHealth.freshCoveragePercent)} fresh`}
+          pendingText={`${data.priceTickHealth.tickCount} ticks`}
+          icon={<RefreshCcw className="h-4 w-4" />}
         />
         <ReadinessTile
           label="Latest model"
@@ -1318,6 +1562,39 @@ function MarketHealthPanel({ data }: { data: MarketHealth }) {
         value: formatPercent(item.freshCoveragePercent),
         detail: item.latestDate ? `Latest ${formatDate(item.latestDate)}` : "No observations"
       }))} />
+
+      <CoverageGrid title="Quote tick health" items={[
+        {
+          key: "quote-ticks:fresh",
+          label: "Fresh tick coverage",
+          value: formatPercent(data.priceTickHealth.freshCoveragePercent),
+          detail: data.priceTickHealth.latestAt ? `Latest ${formatDate(data.priceTickHealth.latestAt)}` : "No ticks"
+        },
+        {
+          key: "quote-ticks:total",
+          label: "Total ticks",
+          value: String(data.priceTickHealth.tickCount),
+          detail: `${data.priceTickHealth.observedArtistCount} artists observed`
+        },
+        {
+          key: "quote-ticks:market",
+          label: "Market-run ticks",
+          value: String(data.priceTickHealth.marketRunTickCount),
+          detail: "Written by market engine runs"
+        },
+        {
+          key: "quote-ticks:trade",
+          label: "Trade ticks",
+          value: String(data.priceTickHealth.tradeTickCount),
+          detail: "Written by buy/sell impact"
+        },
+        {
+          key: "quote-ticks:seed",
+          label: "Seed ticks",
+          value: String(data.priceTickHealth.migrationTickCount + data.priceTickHealth.manualTickCount),
+          detail: "Initial/manual quote records"
+        }
+      ]} />
 
       <CoverageGrid title="Event layer" items={[
         {
@@ -1782,6 +2059,233 @@ function SourceResolverSuggestionRow({
   );
 }
 
+function ArtistRosterManager({
+  state,
+  form,
+  selectedRecord,
+  saveState,
+  onRefresh,
+  onNew,
+  onSelectArtist,
+  onChange,
+  onSave,
+  onSetActive
+}: {
+  state: AsyncState<ArtistRosterDirectory>;
+  form: ArtistRosterForm;
+  selectedRecord: ArtistRosterRecord | null;
+  saveState: ArtistRosterSaveState;
+  onRefresh: () => void;
+  onNew: () => void;
+  onSelectArtist: (artistId: string) => void;
+  onChange: (field: keyof Omit<ArtistRosterForm, "selectedId">, value: string | boolean) => void;
+  onSave: () => void;
+  onSetActive: (isActive: boolean) => void;
+}) {
+  const records = state.status === "ready" ? state.data.records : [];
+  const selectedDisabled = saveState.status === "saving";
+
+  return (
+    <section className="rounded-md border border-line bg-panel/88 p-5 shadow-market">
+      <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+        <div>
+          <p className="text-xs font-bold uppercase tracking-wide text-paper/45">Roster control</p>
+          <h2 className="mt-1 text-2xl font-black">Artist roster</h2>
+          <p className="mt-2 text-sm leading-6 text-paper/55">
+            Add artists or move unreliable listings inactive without creating one-off SQL migrations.
+          </p>
+        </div>
+        <div className="flex flex-col gap-2 sm:flex-row">
+          <button
+            type="button"
+            onClick={onNew}
+            disabled={selectedDisabled}
+            className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md border border-line bg-black/20 px-4 text-sm font-black text-paper/70 disabled:cursor-wait disabled:opacity-55"
+          >
+            New artist
+          </button>
+          <button
+            type="button"
+            onClick={onRefresh}
+            disabled={state.status === "loading"}
+            className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md border border-cyan/45 bg-cyan/10 px-4 text-sm font-black text-cyan disabled:cursor-wait disabled:opacity-55"
+          >
+            <RefreshCcw className="h-4 w-4" />
+            Refresh
+          </button>
+        </div>
+      </div>
+
+      {state.status === "loading" ? <LoadingText text="Loading artist roster..." /> : null}
+      {state.status === "error" ? <ErrorText text={state.message} /> : null}
+
+      {state.status === "ready" ? (
+        <div className="mt-4 grid gap-4 xl:grid-cols-[0.8fr_1.2fr]">
+          <div className="rounded-md border border-line bg-black/20 p-4">
+            <label className="block">
+              <span className="text-xs font-black uppercase tracking-wide text-paper/45">Existing artist</span>
+              <select
+                value={form.selectedId}
+                onChange={(event) => onSelectArtist(event.target.value)}
+                className="mt-2 min-h-11 w-full rounded-md border border-line bg-ink px-3 text-sm font-bold text-paper outline-none focus:border-cyan"
+              >
+                <option value="">New artist</option>
+                {records.map((record) => (
+                  <option key={record.id} value={record.id}>
+                    {record.ticker} - {record.name} {record.isActive ? "" : "(inactive)"}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <div className="mt-4 grid gap-2">
+              <PreviewMetric label="Total listings" value={String(state.data.artistCount)} />
+              <PreviewMetric label="Active" value={String(state.data.activeCount)} />
+              <PreviewMetric label="Inactive" value={String(state.data.inactiveCount)} />
+            </div>
+
+            {selectedRecord ? (
+              <div className="mt-4 rounded-md border border-line bg-black/25 p-3">
+                <p className="text-xs font-black uppercase tracking-wide text-paper/45">Selected listing</p>
+                <div className="mt-2 grid gap-2">
+                  <PreviewMetric label="Status" value={selectedRecord.isActive ? "Active" : "Inactive"} />
+                  <PreviewMetric label="Price" value={`$${selectedRecord.currentPrice.toFixed(2)}`} />
+                  <PreviewMetric label="Hype score" value={String(selectedRecord.hypeScore)} />
+                </div>
+              </div>
+            ) : null}
+          </div>
+
+          <div className="rounded-md border border-line bg-black/20 p-4">
+            <div className="grid gap-3 md:grid-cols-2">
+              <label className="block">
+                <span className="text-xs font-black uppercase tracking-wide text-paper/45">Artist ID</span>
+                <input
+                  value={form.id}
+                  onChange={(event) => onChange("id", event.target.value)}
+                  disabled={Boolean(selectedRecord) || selectedDisabled}
+                  placeholder="auto-from-name"
+                  className="mt-2 min-h-11 w-full rounded-md border border-line bg-ink px-3 text-sm font-bold text-paper outline-none placeholder:text-paper/24 focus:border-cyan disabled:cursor-not-allowed disabled:opacity-55"
+                />
+              </label>
+              <label className="block">
+                <span className="text-xs font-black uppercase tracking-wide text-paper/45">Ticker</span>
+                <input
+                  value={form.ticker}
+                  onChange={(event) => onChange("ticker", event.target.value)}
+                  disabled={selectedDisabled}
+                  placeholder="ARTIST"
+                  className="mt-2 min-h-11 w-full rounded-md border border-line bg-ink px-3 text-sm font-bold text-paper outline-none placeholder:text-paper/24 focus:border-cyan disabled:cursor-not-allowed disabled:opacity-55"
+                />
+              </label>
+              <label className="block md:col-span-2">
+                <span className="text-xs font-black uppercase tracking-wide text-paper/45">Name</span>
+                <input
+                  value={form.name}
+                  onChange={(event) => onChange("name", event.target.value)}
+                  disabled={selectedDisabled}
+                  placeholder="Artist name"
+                  className="mt-2 min-h-11 w-full rounded-md border border-line bg-ink px-3 text-sm font-bold text-paper outline-none placeholder:text-paper/24 focus:border-cyan disabled:cursor-not-allowed disabled:opacity-55"
+                />
+              </label>
+              <label className="block">
+                <span className="text-xs font-black uppercase tracking-wide text-paper/45">Current price</span>
+                <input
+                  type="number"
+                  min="1"
+                  step="0.01"
+                  value={form.currentPrice}
+                  onChange={(event) => onChange("currentPrice", event.target.value)}
+                  disabled={selectedDisabled}
+                  className="mt-2 min-h-11 w-full rounded-md border border-line bg-ink px-3 text-sm font-bold text-paper outline-none focus:border-cyan disabled:cursor-not-allowed disabled:opacity-55"
+                />
+              </label>
+              <label className="block">
+                <span className="text-xs font-black uppercase tracking-wide text-paper/45">Previous close</span>
+                <input
+                  type="number"
+                  min="1"
+                  step="0.01"
+                  value={form.previousClose}
+                  onChange={(event) => onChange("previousClose", event.target.value)}
+                  disabled={selectedDisabled}
+                  className="mt-2 min-h-11 w-full rounded-md border border-line bg-ink px-3 text-sm font-bold text-paper outline-none focus:border-cyan disabled:cursor-not-allowed disabled:opacity-55"
+                />
+              </label>
+              <label className="block">
+                <span className="text-xs font-black uppercase tracking-wide text-paper/45">Volatility</span>
+                <input
+                  type="number"
+                  min="0.4"
+                  max="3"
+                  step="0.01"
+                  value={form.volatility}
+                  onChange={(event) => onChange("volatility", event.target.value)}
+                  disabled={selectedDisabled}
+                  className="mt-2 min-h-11 w-full rounded-md border border-line bg-ink px-3 text-sm font-bold text-paper outline-none focus:border-cyan disabled:cursor-not-allowed disabled:opacity-55"
+                />
+              </label>
+              <label className="block">
+                <span className="text-xs font-black uppercase tracking-wide text-paper/45">Category</span>
+                <select
+                  value={form.category}
+                  onChange={(event) => onChange("category", event.target.value as ArtistCategory)}
+                  disabled={selectedDisabled}
+                  className="mt-2 min-h-11 w-full rounded-md border border-line bg-ink px-3 text-sm font-bold text-paper outline-none focus:border-cyan disabled:cursor-not-allowed disabled:opacity-55"
+                >
+                  {artistCategoryOptions.map((category) => (
+                    <option key={category} value={category}>
+                      {category}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="flex min-h-11 items-center gap-3 rounded-md border border-line bg-ink px-3 text-sm font-bold text-paper md:col-span-2">
+                <input
+                  type="checkbox"
+                  checked={form.isActive}
+                  onChange={(event) => onChange("isActive", event.target.checked)}
+                  disabled={selectedDisabled}
+                  className="h-4 w-4 accent-cyan"
+                />
+                Active listing
+              </label>
+            </div>
+
+            <div className="mt-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+              <div className="min-h-6 text-sm font-bold">
+                {saveState.status === "saved" ? <span className="text-mint">{saveState.message}</span> : null}
+                {saveState.status === "error" ? <span className="text-ember">{saveState.message}</span> : null}
+              </div>
+              <div className="flex flex-col gap-2 sm:flex-row">
+                {selectedRecord ? (
+                  <button
+                    type="button"
+                    onClick={() => onSetActive(!selectedRecord.isActive)}
+                    disabled={saveState.status === "saving"}
+                    className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md border border-brass/45 bg-brass/10 px-4 text-sm font-black text-brass disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {selectedRecord.isActive ? "Deactivate" : "Reactivate"}
+                  </button>
+                ) : null}
+                <button
+                  type="button"
+                  onClick={onSave}
+                  disabled={saveState.status === "saving"}
+                  className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md border border-mint/45 bg-mint/10 px-4 text-sm font-black text-mint disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <CheckCircle2 className="h-4 w-4" />
+                  {saveState.status === "saving" ? "Saving" : "Save artist"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
 function ManualSourceIdEditor({
   state,
   form,
@@ -1920,6 +2424,49 @@ type ManualSourceIdUpsert = {
   lastfmName?: string | null;
   gdeltQuery?: string | null;
 };
+
+function buildArtistRosterForm(record: ArtistRosterRecord): ArtistRosterForm {
+  return {
+    selectedId: record.id,
+    id: record.id,
+    name: record.name,
+    ticker: record.ticker,
+    currentPrice: String(record.currentPrice),
+    previousClose: String(record.previousClose),
+    volatility: String(record.volatility),
+    category: record.category,
+    isActive: record.isActive
+  };
+}
+
+function buildArtistRosterPayload(form: ArtistRosterForm) {
+  const name = form.name.trim();
+  const id = form.id.trim() || slugifyArtistName(name);
+  const ticker = form.ticker.trim().toUpperCase().replace(/[^A-Z0-9]/g, "");
+  const currentPrice = Number(form.currentPrice);
+  const previousClose = Number(form.previousClose || form.currentPrice);
+  const volatility = Number(form.volatility);
+
+  return {
+    id,
+    name,
+    ticker,
+    currentPrice,
+    previousClose,
+    volatility,
+    category: form.category,
+    isActive: form.isActive
+  };
+}
+
+function slugifyArtistName(value: string) {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/&/g, "and")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
 
 function buildManualSourceForm(record: ArtistSourceIdRecord): ManualSourceIdForm {
   return {

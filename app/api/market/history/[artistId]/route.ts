@@ -10,6 +10,7 @@ type HistoryRange = "1M" | "3M" | "6M" | "1Y" | "ALL";
 
 type ArtistRow = Pick<Database["public"]["Tables"]["artists"]["Row"], "id" | "current_price">;
 type PriceHistoryRow = Pick<Database["public"]["Tables"]["price_history"]["Row"], "price_date" | "price">;
+type PriceTickRow = Pick<Database["public"]["Tables"]["price_ticks"]["Row"], "observed_at" | "price">;
 
 const RANGE_DAYS: Record<Exclude<HistoryRange, "ALL">, number> = {
   "1M": 31,
@@ -57,14 +58,16 @@ export async function GET(request: Request, context: { params: Promise<{ artistI
       artistId,
       range
     });
-    const points = history.length
-      ? history
-      : [
-          {
-            date: getToday(),
-            price: Number((artist as ArtistRow).current_price)
-          }
-        ];
+    const ticks = await loadArtistTicksIfAvailable({
+      supabase,
+      artistId,
+      range
+    });
+    const points = buildHistoryPoints({
+      dailyHistory: history,
+      ticks,
+      currentPrice: Number((artist as ArtistRow).current_price)
+    });
 
     return NextResponse.json({
       ok: true,
@@ -72,7 +75,7 @@ export async function GET(request: Request, context: { params: Promise<{ artistI
       artistId,
       range,
       points,
-      hasRealHistory: history.length > 0,
+      hasRealHistory: history.length > 0 || ticks.length > 0,
       historyStart: points[0]?.date ?? null,
       historyEnd: points[points.length - 1]?.date ?? null
     });
@@ -117,6 +120,72 @@ async function loadArtistHistory({
     date: point.price_date,
     price: Number(point.price)
   }));
+}
+
+async function loadArtistTicksIfAvailable({
+  supabase,
+  artistId,
+  range
+}: {
+  supabase: ReturnType<typeof createAnonServerClient>;
+  artistId: string;
+  range: HistoryRange;
+}): Promise<PricePoint[]> {
+  if (range !== "1M" && range !== "3M") {
+    return [];
+  }
+
+  const minDate = shiftDate(getToday(), -RANGE_DAYS[range]);
+  const { data, error } = await supabase
+    .from("price_ticks")
+    .select("observed_at, price")
+    .eq("artist_id", artistId)
+    .gte("observed_at", `${minDate}T00:00:00.000Z`)
+    .order("observed_at", { ascending: false })
+    .limit(900);
+
+  if (error) {
+    if (isMissingPriceTicksError(error.message)) {
+      return [];
+    }
+
+    throw new Error(`Could not load price ticks: ${error.message}`);
+  }
+
+  return ((data ?? []) as PriceTickRow[])
+    .map((point) => ({
+      date: point.observed_at,
+      price: Number(point.price)
+    }))
+    .reverse();
+}
+
+function buildHistoryPoints({
+  dailyHistory,
+  ticks,
+  currentPrice
+}: {
+  dailyHistory: PricePoint[];
+  ticks: PricePoint[];
+  currentPrice: number;
+}) {
+  const base = ticks.length ? ticks : dailyHistory;
+  const livePoint = {
+    date: new Date().toISOString(),
+    price: currentPrice
+  };
+
+  if (!base.length) {
+    return [livePoint];
+  }
+
+  return [...base, livePoint];
+}
+
+function isMissingPriceTicksError(message: string) {
+  const normalized = message.toLowerCase();
+
+  return normalized.includes("price_ticks") || normalized.includes("schema cache");
 }
 
 function getMockHistoryResponse(artistId: string, range: HistoryRange) {

@@ -25,8 +25,10 @@ export function formatShares(value: number) {
 }
 
 export function formatDate(value: string) {
+  const date = value.includes("T") ? new Date(value) : new Date(`${value}T00:00:00`);
+
   return new Intl.DateTimeFormat("en-US", {
     month: "short",
     day: "numeric"
-  }).format(new Date(`${value}T00:00:00`));
+  }).format(date);
 }
