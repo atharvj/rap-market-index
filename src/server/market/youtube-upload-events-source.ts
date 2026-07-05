@@ -266,11 +266,24 @@ function buildYoutubeUploadEvents({
 function classifyYoutubeUploadTitle(title: string): YoutubeUploadClassification | null {
   const normalized = normalizeTitle(title);
 
-  if (!normalized || hasAny(normalized, LOW_SIGNAL_TERMS)) {
+  if (!normalized) {
     return null;
   }
 
-  if (hasAny(normalized, TOUR_TERMS)) {
+  const hasAlbumSignal = hasAny(normalized, ALBUM_ANNOUNCEMENT_TERMS);
+  const hasSingleSignal = hasAny(normalized, SINGLE_RELEASE_TERMS);
+  const hasOfficialVideoSignal = hasAny(normalized, OFFICIAL_VIDEO_TERMS);
+  const hasSnippetSignal = hasAny(normalized, SNIPPET_TERMS);
+  const hasTourSignal = hasAny(normalized, TOUR_TERMS);
+  const hasPerformanceSignal = hasAny(normalized, PERFORMANCE_TERMS);
+  const hasStrongMusicSignal =
+    hasAlbumSignal || hasSingleSignal || hasOfficialVideoSignal || hasSnippetSignal || hasPerformanceSignal;
+
+  if (hasAny(normalized, LOW_SIGNAL_TERMS) && !hasStrongMusicSignal) {
+    return null;
+  }
+
+  if (hasTourSignal) {
     return {
       eventType: "tour",
       sentimentScore: 25,
@@ -280,7 +293,7 @@ function classifyYoutubeUploadTitle(title: string): YoutubeUploadClassification 
     };
   }
 
-  if (hasAny(normalized, ALBUM_ANNOUNCEMENT_TERMS)) {
+  if (hasAlbumSignal) {
     return {
       eventType: "release",
       sentimentScore: 32,
@@ -290,23 +303,33 @@ function classifyYoutubeUploadTitle(title: string): YoutubeUploadClassification 
     };
   }
 
-  if (hasAny(normalized, SINGLE_RELEASE_TERMS) || hasAny(normalized, OFFICIAL_VIDEO_TERMS)) {
+  if (hasSingleSignal || hasOfficialVideoSignal) {
     return {
       eventType: "release",
       sentimentScore: 26,
-      impactScore: hasAny(normalized, OFFICIAL_VIDEO_TERMS) ? 44 : 38,
+      impactScore: hasOfficialVideoSignal ? 44 : 38,
       confidence: 0.74,
-      reason: hasAny(normalized, OFFICIAL_VIDEO_TERMS) ? "official_video_upload_title" : "single_upload_title"
+      reason: hasOfficialVideoSignal ? "official_video_upload_title" : "single_upload_title"
     };
   }
 
-  if (hasAny(normalized, SNIPPET_TERMS)) {
+  if (hasSnippetSignal) {
     return {
       eventType: "viral",
       sentimentScore: 18,
       impactScore: 28,
       confidence: 0.6,
       reason: "snippet_upload_title"
+    };
+  }
+
+  if (hasPerformanceSignal) {
+    return {
+      eventType: "viral",
+      sentimentScore: 16,
+      impactScore: 24,
+      confidence: 0.58,
+      reason: "performance_upload_title"
     };
   }
 
@@ -589,11 +612,17 @@ function sleep(ms: number) {
 const LOW_SIGNAL_TERMS = [
   "#shorts",
   "behind the scenes",
+  "day in the life",
+  "documentary",
+  "episode",
+  "full interview",
+  "gaming",
   "interview",
-  "live performance",
   "podcast",
   "reaction",
   "recap",
+  "stream highlights",
+  "tour vlog",
   "shorts",
   "vlog"
 ];
@@ -602,18 +631,35 @@ const ALBUM_ANNOUNCEMENT_TERMS = [
   "album announcement",
   "album trailer",
   "album out now",
+  "announces album",
+  "announces mixtape",
+  "cover art",
+  "deluxe",
+  "deluxe edition",
+  "ep out now",
+  "mixtape",
   "new album",
   "new ep",
+  "new project",
+  "pre-save",
+  "pre save",
+  "release date",
   "tracklist"
 ];
 
 const SINGLE_RELEASE_TERMS = [
+  "available now",
+  "drops",
+  "dropped",
+  "full song",
+  "listen now",
   "new single",
   "new song",
   "out now",
   "premiere",
+  "released",
   "single",
-  "visualizer"
+  "stream now"
 ];
 
 const OFFICIAL_VIDEO_TERMS = [
@@ -621,18 +667,40 @@ const OFFICIAL_VIDEO_TERMS = [
   "lyric video",
   "music video",
   "official audio",
+  "official lyric video",
   "official video",
-  "video"
+  "visualizer"
 ];
 
 const SNIPPET_TERMS = [
+  "coming soon",
+  "demo",
+  "first listen",
+  "in the studio",
+  "leak",
+  "leaked",
+  "new music",
   "preview",
+  "song preview",
   "snippet",
-  "teaser"
+  "teaser",
+  "unreleased"
 ];
 
 const TOUR_TERMS = [
   "announces tour",
+  "presale",
+  "tickets",
+  "tour announcement",
   "tour dates",
   "world tour"
+];
+
+const PERFORMANCE_TERMS = [
+  "acoustic",
+  "freestyle",
+  "live performance",
+  "official live",
+  "performance",
+  "studio session"
 ];

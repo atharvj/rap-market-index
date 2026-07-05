@@ -306,7 +306,7 @@ function buildGdeltArticleEvents({
     const domain = normalizeDomain(article.domain, url);
     const eventDate = parseGdeltSeenDate(article.seendate) ?? runDate;
 
-    if (!title || !url || !domain || !mentionsArtist(title, artist.name)) {
+    if (!title || !url || !domain || !mentionsArtist(title, artist.name, query)) {
       continue;
     }
 
@@ -400,6 +400,26 @@ function classifyArticleEvent(title: string, domain: string, tone: unknown) {
     };
   }
 
+  if (hasAny(lowerTitle, CHART_TERMS)) {
+    return {
+      eventType: "viral" as const,
+      sentimentScore: clamp(30 + Math.max(0, toneScore), -20, 80),
+      impactScore: clamp(46 + Math.max(0, toneScore), -20, 90),
+      confidence: getArticleConfidence(sourceTier, 0.74),
+      reason: "chart_terms"
+    };
+  }
+
+  if (hasAny(lowerTitle, PUBLIC_CONFLICT_TERMS)) {
+    return {
+      eventType: "viral" as const,
+      sentimentScore: clamp(14 + toneScore * 0.55, -45, 70),
+      impactScore: clamp(34 + Math.max(0, toneScore), -20, 80),
+      confidence: getArticleConfidence(sourceTier, 0.64),
+      reason: "public_conflict_terms"
+    };
+  }
+
   if (hasAny(lowerTitle, VIRAL_TERMS)) {
     return {
       eventType: "viral" as const,
@@ -434,7 +454,7 @@ function classifyArticleEvent(title: string, domain: string, tone: unknown) {
 }
 
 function hasReviewSignal(title: string) {
-  return /\breview\b/.test(title) || /\brated\b/.test(title) || hasAny(title, REVIEW_PHRASES);
+  return /\breview(s|ed)?\b/.test(title) || /\brated\b/.test(title) || hasAny(title, REVIEW_PHRASES);
 }
 
 function getTitleSentiment(title: string) {
@@ -472,25 +492,52 @@ function hasAny(value: string, terms: string[]) {
   return terms.some((term) => value.includes(term));
 }
 
-function mentionsArtist(title: string, artistName: string) {
+function mentionsArtist(title: string, artistName: string, query?: string) {
   const normalizedTitle = normalizeSearchText(title);
-  const normalizedArtist = normalizeSearchText(artistName);
+  const compactTitle = normalizedTitle.replace(/\s+/g, "");
+  const candidateNames = [artistName, ...extractQuotedSearchPhrases(query)].filter(Boolean);
 
-  if (normalizedTitle.includes(normalizedArtist)) {
-    return true;
+  for (const candidate of candidateNames) {
+    const normalizedArtist = normalizeSearchText(candidate);
+
+    if (normalizedArtist && normalizedTitle.includes(normalizedArtist)) {
+      return true;
+    }
+
+    const compactArtist = normalizedArtist.replace(/\s+/g, "");
+
+    if (compactArtist.length > 2 && compactTitle.includes(compactArtist)) {
+      return true;
+    }
+
+    const meaningfulParts = normalizedArtist.split(" ").filter((part) => part.length > 2);
+
+    if (meaningfulParts.length > 1 && meaningfulParts.every((part) => normalizedTitle.includes(part))) {
+      return true;
+    }
   }
 
-  const meaningfulParts = normalizedArtist.split(" ").filter((part) => part.length > 2);
-
-  return meaningfulParts.length > 1 && meaningfulParts.every((part) => normalizedTitle.includes(part));
+  return false;
 }
 
 function normalizeSearchText(value: string) {
   return value
     .toLowerCase()
+    .replace(/&/g, " and ")
+    .replace(/\$/g, "s")
     .replace(/[^a-z0-9]+/g, " ")
     .replace(/\s+/g, " ")
     .trim();
+}
+
+function extractQuotedSearchPhrases(query: string | undefined) {
+  if (!query) {
+    return [];
+  }
+
+  return Array.from(query.matchAll(/"([^"]+)"/g), (match) => match[1]?.trim()).filter((value): value is string =>
+    Boolean(value)
+  );
 }
 
 function normalizeArticleTitle(value: string | undefined) {
@@ -581,6 +628,7 @@ const REVIEW_DOMAINS = new Set([
   "rapreviews.com",
   "rollingstone.com",
   "slantmagazine.com",
+  "spectrumculture.com",
   "theguardian.com",
   "thelineofbestfit.com"
 ]);
@@ -590,6 +638,7 @@ const TIER_THREE_DOMAINS = new Set([
   "billboard.com",
   "complex.com",
   "forbes.com",
+  "hollywoodreporter.com",
   "latimes.com",
   "nytimes.com",
   "pitchfork.com",
@@ -622,51 +671,149 @@ const TIER_ONE_DOMAINS = new Set([
   "music-news.com",
   "rap-up.com",
   "rapreviews.com",
+  "revolt.tv",
   "thesource.com",
   "xxlmag.com"
 ]);
 
 const CONTROVERSY_TERMS = [
+  "accused",
   "arrest",
   "arrested",
+  "backlash",
   "charged",
   "controversy",
   "criticized",
+  "death",
+  "dies",
+  "died",
+  "hospitalized",
+  "injured",
   "lawsuit",
+  "pleads",
   "pleads guilty",
   "sentenced",
   "sued",
   "trial"
 ];
 
-const REVIEW_TERMS = ["review", "rated"];
-const REVIEW_PHRASES = ["album review", "best new music", "track review"];
-const RELEASE_TERMS = ["album", "drops", "new song", "new single", "release", "releases", "shares", "video"];
-const TOUR_TERMS = ["announces tour", "tour dates", "world tour"];
-const AWARD_TERMS = ["award", "grammy", "nomination", "nominated", "wins"];
-const VIRAL_TERMS = ["tiktok", "viral"];
-const NEWS_TERMS = [...REVIEW_TERMS, ...RELEASE_TERMS, ...TOUR_TERMS, ...AWARD_TERMS, ...VIRAL_TERMS, ...CONTROVERSY_TERMS];
+const REVIEW_TERMS = ["review", "reviewed", "reviews", "rated"];
+const REVIEW_PHRASES = [
+  "album of the week",
+  "album review",
+  "best new music",
+  "best new track",
+  "song review",
+  "track review"
+];
+const RELEASE_TERMS = [
+  "album",
+  "announces album",
+  "announces ep",
+  "announces mixtape",
+  "deluxe",
+  "drops",
+  "ep out now",
+  "hear new",
+  "mixtape",
+  "music video",
+  "new album",
+  "new ep",
+  "new project",
+  "new song",
+  "new single",
+  "out now",
+  "release",
+  "release date",
+  "released",
+  "releases",
+  "shares",
+  "single",
+  "tracklist",
+  "unveils",
+  "visualizer"
+];
+const TOUR_TERMS = [
+  "announces tour",
+  "festival lineup",
+  "headlines festival",
+  "tour dates",
+  "world tour"
+];
+const AWARD_TERMS = [
+  "award",
+  "bet awards",
+  "billboard music awards",
+  "grammy",
+  "honored",
+  "nomination",
+  "nominated",
+  "vmas",
+  "wins"
+];
+const CHART_TERMS = [
+  "billboard 200",
+  "chart",
+  "charts",
+  "debuts at no",
+  "hot 100",
+  "no. 1",
+  "number 1",
+  "spotify chart",
+  "tops chart"
+];
+const PUBLIC_CONFLICT_TERMS = ["beef", "diss", "feud"];
+const VIRAL_TERMS = [
+  "breakout",
+  "challenge",
+  "goes viral",
+  "meme",
+  "streaming record",
+  "tiktok",
+  "trending",
+  "viral"
+];
+const NEWS_TERMS = [
+  ...REVIEW_TERMS,
+  ...RELEASE_TERMS,
+  ...TOUR_TERMS,
+  ...AWARD_TERMS,
+  ...CHART_TERMS,
+  ...PUBLIC_CONFLICT_TERMS,
+  ...VIRAL_TERMS,
+  ...CONTROVERSY_TERMS
+];
 
 const POSITIVE_REVIEW_TERMS = [
   "acclaimed",
   "best",
   "brilliant",
   "classic",
+  "essential",
   "excellent",
   "great",
+  "inventive",
+  "must-hear",
+  "must hear",
   "powerful",
+  "revelatory",
   "strong",
   "triumph"
 ];
 
 const NEGATIVE_REVIEW_TERMS = [
   "bad",
+  "bloated",
+  "boring",
   "disappointing",
   "fails",
   "flat",
+  "forgettable",
   "mess",
+  "misfire",
   "negative",
   "poor",
+  "sloppy",
   "weak",
   "worst"
 ];

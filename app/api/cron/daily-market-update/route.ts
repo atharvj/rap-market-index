@@ -47,7 +47,7 @@ type ExistingRun = {
 const DEFAULT_SOURCE: MarketUpdateSource = "core";
 const DEFAULT_ARTIST_LIMIT = 25;
 const DEFAULT_MAX_BATCHES = 4;
-const DEFAULT_EVENT_SCAN_LIMIT = 6;
+const DEFAULT_EVENT_SCAN_LIMIT = 10;
 const DEFAULT_EVENT_SCAN_MAX_RECORDS = 12;
 
 export async function GET(request: Request) {

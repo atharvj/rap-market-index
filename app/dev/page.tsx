@@ -58,6 +58,45 @@ type PreviewState =
       message: string;
     };
 
+type EventScanState =
+  | {
+      status: "idle";
+    }
+  | {
+      status: "loading";
+      mode: "preview" | "persist";
+    }
+  | {
+      status: "success";
+      mode: "preview" | "persist";
+      runDate: string;
+      scannedArtistCount: number;
+      totalArtistCount: number;
+      observationCount: number;
+      eventCount: number;
+      eventTypeCounts: Record<string, number>;
+      artists: Array<{
+        id: string;
+        ticker: string;
+        name: string;
+        latestNewsScanDate: string | null;
+      }>;
+      topEvents: Array<{
+        artistId: string;
+        eventDate: string;
+        eventType: string;
+        title: string;
+        sourceName: string | null;
+        confidence: number;
+        impactScore: number;
+        sentimentScore: number | null;
+      }>;
+    }
+  | {
+      status: "error";
+      message: string;
+    };
+
 type SourceResolverPreviewState =
   | {
       status: "idle";
@@ -69,6 +108,7 @@ type SourceResolverPreviewState =
       status: "success";
       proposedRecordCount: number;
       savedRecordCount?: number;
+      minConfidence: number;
       warnings: string[];
       batch: {
         artistCount: number;
@@ -103,6 +143,102 @@ type SourceResolverSuggestion = {
   skippedExisting: string[];
   errors: string[];
 };
+
+type ArtistSourceIdRecord = {
+  artistId: string;
+  ticker: string;
+  name: string;
+  externalIds: {
+    artistId: string;
+    spotifyId?: string;
+    youtubeChannelId?: string;
+    musicbrainzId?: string;
+    lastfmName?: string;
+    gdeltQuery?: string;
+  };
+};
+
+type SourceIdDirectory = {
+  artistCount: number;
+  records: ArtistSourceIdRecord[];
+};
+
+type ManualSourceIdForm = {
+  artistId: string;
+  spotifyId: string;
+  youtubeChannelId: string;
+  musicbrainzId: string;
+  lastfmName: string;
+  gdeltQuery: string;
+};
+
+type ManualSourceIdSaveState =
+  | {
+      status: "idle";
+    }
+  | {
+      status: "saving";
+    }
+  | {
+      status: "saved";
+      message: string;
+    }
+  | {
+      status: "error";
+      message: string;
+    };
+
+const sourceIdFieldBySource: Record<string, string> = {
+  spotify: "spotifyId",
+  youtube: "youtubeChannelId",
+  musicbrainz: "musicbrainzId"
+};
+
+const sourceIdLabelByField: Record<string, string> = {
+  spotifyId: "Spotify ID",
+  youtubeChannelId: "YouTube channel",
+  musicbrainzId: "MusicBrainz ID",
+  lastfmName: "audience search name",
+  gdeltQuery: "news search query"
+};
+
+const manualSourceIdFields: Array<{
+  key: keyof Omit<ManualSourceIdForm, "artistId">;
+  label: string;
+  placeholder: string;
+  helper: string;
+}> = [
+  {
+    key: "youtubeChannelId",
+    label: "YouTube channel",
+    placeholder: "UC..., @handle, or YouTube channel URL",
+    helper: "Use a UC... ID, youtube.com/channel/UC... URL, @handle, or youtube.com/@handle URL."
+  },
+  {
+    key: "spotifyId",
+    label: "Spotify artist",
+    placeholder: "Spotify artist ID or URL",
+    helper: "Optional. Paste a Spotify artist ID, artist URL, or spotify:artist URI."
+  },
+  {
+    key: "musicbrainzId",
+    label: "MusicBrainz",
+    placeholder: "UUID",
+    helper: "Optional. Paste the MusicBrainz artist UUID."
+  },
+  {
+    key: "lastfmName",
+    label: "Audience search name",
+    placeholder: "Artist name",
+    helper: "Optional override for listener/play lookup when the artist name needs special spelling."
+  },
+  {
+    key: "gdeltQuery",
+    label: "News search query",
+    placeholder: "\"Artist Name\"",
+    helper: "Optional override for news/review/event matching."
+  }
+];
 
 type AdminAccessState =
   | {
@@ -218,13 +354,26 @@ const signalCategories = [
   ["Market", "Order-flow activity"]
 ];
 
+const emptyManualSourceIdForm: ManualSourceIdForm = {
+  artistId: "",
+  spotifyId: "",
+  youtubeChannelId: "",
+  musicbrainzId: "",
+  lastfmName: "",
+  gdeltQuery: ""
+};
+
 export default function DevPage() {
   const { configured: authConfigured, loading: authLoading, session } = useAuth();
   const [adminAccess, setAdminAccess] = useState<AdminAccessState>({ status: "loading" });
   const [cloudStatus, setCloudStatus] = useState<AsyncState<CloudStatus>>({ status: "loading" });
   const [marketHealth, setMarketHealth] = useState<AsyncState<MarketHealth>>({ status: "loading" });
   const [preview, setPreview] = useState<PreviewState>({ status: "idle" });
+  const [eventScan, setEventScan] = useState<EventScanState>({ status: "idle" });
   const [resolverPreview, setResolverPreview] = useState<SourceResolverPreviewState>({ status: "idle" });
+  const [sourceIds, setSourceIds] = useState<AsyncState<SourceIdDirectory>>({ status: "loading" });
+  const [manualSourceForm, setManualSourceForm] = useState<ManualSourceIdForm>(emptyManualSourceIdForm);
+  const [manualSourceSave, setManualSourceSave] = useState<ManualSourceIdSaveState>({ status: "idle" });
   const adminHeaders = useMemo<Record<string, string>>(() => {
     if (!session) {
       return {} as Record<string, string>;
@@ -301,6 +450,7 @@ export default function DevPage() {
 
     void refreshCloudStatus();
     void refreshMarketHealth();
+    void refreshSourceIds();
   }, [adminAccess.status]);
 
   const latestRunLabel = useMemo(() => {
@@ -316,6 +466,14 @@ export default function DevPage() {
 
     return `${latestRun.status} ${latestRun.source}`;
   }, [marketHealth]);
+
+  const selectedManualSourceRecord = useMemo(() => {
+    if (sourceIds.status !== "ready" || !manualSourceForm.artistId) {
+      return null;
+    }
+
+    return sourceIds.data.records.find((record) => record.artistId === manualSourceForm.artistId) ?? null;
+  }, [manualSourceForm.artistId, sourceIds]);
 
   async function refreshCloudStatus() {
     setCloudStatus({ status: "loading" });
@@ -370,6 +528,34 @@ export default function DevPage() {
     }
   }
 
+  async function refreshSourceIds() {
+    setSourceIds({ status: "loading" });
+
+    try {
+      const response = await fetch("/api/admin/artist-source-ids", {
+        headers: adminHeaders
+      });
+      const payload = await response.json();
+
+      if (!response.ok || !payload.ok) {
+        throw new Error(payload.error ?? "Source ID list failed.");
+      }
+
+      setSourceIds({
+        status: "ready",
+        data: {
+          artistCount: payload.artistCount ?? 0,
+          records: payload.records ?? []
+        }
+      });
+    } catch (error) {
+      setSourceIds({
+        status: "error",
+        message: error instanceof Error ? error.message : "Source ID list failed."
+      });
+    }
+  }
+
   async function runCorePreview() {
     setPreview({ status: "loading" });
 
@@ -406,6 +592,52 @@ export default function DevPage() {
     }
   }
 
+  async function runEventScan(mode: "preview" | "persist") {
+    setEventScan({ status: "loading", mode });
+
+    try {
+      const response = await fetch("/api/admin/market-event-scan", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          ...adminHeaders
+        },
+        body: JSON.stringify({
+          dryRun: mode === "preview",
+          artistLimit: 3,
+          maxRecords: 8
+        })
+      });
+      const payload = await response.json();
+
+      if (!response.ok || !payload.ok) {
+        throw new Error(payload.error ?? "Market event scan failed.");
+      }
+
+      setEventScan({
+        status: "success",
+        mode,
+        runDate: payload.runDate,
+        scannedArtistCount: payload.scannedArtistCount ?? 0,
+        totalArtistCount: payload.totalArtistCount ?? 0,
+        observationCount: payload.observationCount ?? 0,
+        eventCount: payload.eventCount ?? 0,
+        eventTypeCounts: payload.eventTypeCounts ?? {},
+        artists: payload.artists ?? [],
+        topEvents: payload.topEvents ?? []
+      });
+
+      if (mode === "persist") {
+        void refreshMarketHealth();
+      }
+    } catch (error) {
+      setEventScan({
+        status: "error",
+        message: error instanceof Error ? error.message : "Market event scan failed."
+      });
+    }
+  }
+
   async function runSourceResolverPreview() {
     setResolverPreview({ status: "loading" });
 
@@ -434,6 +666,7 @@ export default function DevPage() {
       setResolverPreview({
         status: "success",
         proposedRecordCount: payload.proposedRecordCount ?? 0,
+        minConfidence: payload.minConfidence ?? 0.88,
         warnings: payload.warnings ?? [],
         batch: payload.batch,
         suggestions: payload.suggestions ?? [],
@@ -486,6 +719,86 @@ export default function DevPage() {
       setResolverPreview({
         status: "error",
         message: error instanceof Error ? error.message : "Source ID save failed."
+      });
+    }
+  }
+
+  function selectManualSourceArtist(artistId: string) {
+    const record =
+      sourceIds.status === "ready" ? sourceIds.data.records.find((item) => item.artistId === artistId) : undefined;
+
+    setManualSourceForm(record ? buildManualSourceForm(record) : { ...emptyManualSourceIdForm, artistId });
+    setManualSourceSave({ status: "idle" });
+  }
+
+  function updateManualSourceField(field: keyof Omit<ManualSourceIdForm, "artistId">, value: string) {
+    setManualSourceForm((current) => ({
+      ...current,
+      [field]: value
+    }));
+    setManualSourceSave({ status: "idle" });
+  }
+
+  async function saveManualSourceIds() {
+    if (!selectedManualSourceRecord) {
+      setManualSourceSave({
+        status: "error",
+        message: "Choose an artist before saving source IDs."
+      });
+      return;
+    }
+
+    const record = buildManualSourceIdUpsert(manualSourceForm, selectedManualSourceRecord);
+
+    if (Object.keys(record).length === 1) {
+      setManualSourceSave({
+        status: "error",
+        message: "No source ID changes to save for this artist."
+      });
+      return;
+    }
+
+    setManualSourceSave({ status: "saving" });
+
+    try {
+      const response = await fetch("/api/admin/artist-source-ids", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          ...adminHeaders
+        },
+        body: JSON.stringify({
+          dryRun: false,
+          records: [record]
+        })
+      });
+      const payload = await response.json();
+
+      if (!response.ok || !payload.ok) {
+        throw new Error(payload.error ?? payload.errors?.[0] ?? "Manual source ID save failed.");
+      }
+
+      setManualSourceSave({
+        status: "saved",
+        message: `Saved source IDs for ${selectedManualSourceRecord.ticker}.`
+      });
+      const savedExternalIds = payload.saved?.[selectedManualSourceRecord.artistId];
+
+      if (savedExternalIds) {
+        setManualSourceForm(
+          buildManualSourceForm({
+            ...selectedManualSourceRecord,
+            externalIds: savedExternalIds
+          })
+        );
+      }
+
+      await refreshSourceIds();
+      await refreshMarketHealth();
+    } catch (error) {
+      setManualSourceSave({
+        status: "error",
+        message: error instanceof Error ? error.message : "Manual source ID save failed."
       });
     }
   }
@@ -585,6 +898,40 @@ export default function DevPage() {
       <section className="rounded-md border border-line bg-panel/88 p-5 shadow-market">
         <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
           <div>
+            <p className="text-xs font-bold uppercase tracking-wide text-paper/45">Event layer</p>
+            <h2 className="mt-1 text-2xl font-black">Scan news and event signals</h2>
+            <p className="mt-2 text-sm leading-6 text-paper/55">
+              The daily cron runs this automatically before pricing. These controls only preview or backfill a small
+              least-recently-scanned artist batch.
+            </p>
+          </div>
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <button
+              type="button"
+              onClick={() => runEventScan("preview")}
+              disabled={eventScan.status === "loading"}
+              className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md border border-cyan/45 bg-cyan/10 px-4 text-sm font-black text-cyan disabled:cursor-wait disabled:opacity-55"
+            >
+              <PlayCircle className="h-4 w-4" />
+              Preview
+            </button>
+            <button
+              type="button"
+              onClick={() => runEventScan("persist")}
+              disabled={eventScan.status === "loading"}
+              className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md border border-mint/45 bg-mint/10 px-4 text-sm font-black text-mint disabled:cursor-wait disabled:opacity-55"
+            >
+              <CheckCircle2 className="h-4 w-4" />
+              Backfill scan
+            </button>
+          </div>
+        </div>
+        <EventScanResult scan={eventScan} />
+      </section>
+
+      <section className="rounded-md border border-line bg-panel/88 p-5 shadow-market">
+        <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+          <div>
             <p className="text-xs font-bold uppercase tracking-wide text-paper/45">Data quality</p>
             <h2 className="mt-1 text-2xl font-black">Preview missing source IDs</h2>
             <p className="mt-2 text-sm leading-6 text-paper/55">
@@ -604,6 +951,17 @@ export default function DevPage() {
         </div>
         <SourceResolverPreviewResult preview={resolverPreview} onSave={saveSourceResolverProposals} />
       </section>
+
+      <ManualSourceIdEditor
+        state={sourceIds}
+        form={manualSourceForm}
+        selectedRecord={selectedManualSourceRecord}
+        saveState={manualSourceSave}
+        onRefresh={refreshSourceIds}
+        onSelectArtist={selectManualSourceArtist}
+        onChange={updateManualSourceField}
+        onSave={saveManualSourceIds}
+      />
 
       <section className="rounded-md border border-line bg-panel/88 p-5 shadow-market">
         <div>
@@ -951,6 +1309,96 @@ function PreviewResult({ preview }: { preview: PreviewState }) {
   );
 }
 
+function EventScanResult({ scan }: { scan: EventScanState }) {
+  if (scan.status === "idle") {
+    return (
+      <div className="mt-4 rounded-md border border-line bg-black/20 p-4 text-sm font-bold text-paper/45">
+        No event scan has run in this session.
+      </div>
+    );
+  }
+
+  if (scan.status === "loading") {
+    return (
+      <LoadingText
+        text={scan.mode === "persist" ? "Saving a small market event scan..." : "Previewing a small market event scan..."}
+      />
+    );
+  }
+
+  if (scan.status === "error") {
+    return <ErrorText text={scan.message} />;
+  }
+
+  return (
+    <div className="mt-4 space-y-3 rounded-md border border-line bg-black/20 p-4">
+      <div className="grid gap-3 text-sm sm:grid-cols-5">
+        <PreviewMetric label="Mode" value={scan.mode === "persist" ? "Saved" : "Preview"} />
+        <PreviewMetric label="Artists" value={`${scan.scannedArtistCount}/${scan.totalArtistCount}`} />
+        <PreviewMetric label="Observations" value={String(scan.observationCount)} />
+        <PreviewMetric label="Events" value={String(scan.eventCount)} />
+        <PreviewMetric label="Run date" value={formatDate(scan.runDate)} />
+      </div>
+
+      <div className="grid gap-3 lg:grid-cols-2">
+        <div className="rounded-md border border-line bg-black/20 p-3">
+          <p className="text-xs font-black uppercase tracking-wide text-paper/45">Scanned artists</p>
+          <div className="mt-2 grid gap-2">
+            {scan.artists.length ? (
+              scan.artists.map((artist) => (
+                <div key={artist.id} className="flex items-center justify-between gap-3 text-sm">
+                  <span className="min-w-0 truncate font-black">
+                    {artist.ticker} <span className="font-bold text-paper/45">{artist.name}</span>
+                  </span>
+                  <span className="shrink-0 text-xs font-bold text-paper/42">
+                    {artist.latestNewsScanDate ? `Last ${formatDate(artist.latestNewsScanDate)}` : "New scan"}
+                  </span>
+                </div>
+              ))
+            ) : (
+              <p className="text-sm font-bold text-paper/45">No artists scanned.</p>
+            )}
+          </div>
+        </div>
+
+        <div className="rounded-md border border-line bg-black/20 p-3">
+          <p className="text-xs font-black uppercase tracking-wide text-paper/45">Event types</p>
+          <p className="mt-2 text-sm font-bold leading-6 text-paper/62">
+            {formatEventTypeCounts(scan.eventTypeCounts)}
+          </p>
+        </div>
+      </div>
+
+      {scan.topEvents.length ? (
+        <div className="grid gap-2">
+          {scan.topEvents.map((event, index) => (
+            <div key={`${event.artistId}-${event.eventDate}-${event.title}-${index}`} className="rounded-md border border-line bg-black/20 p-3">
+              <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-black">{event.title}</p>
+                  <p className="mt-1 text-xs font-bold text-paper/42">
+                    {event.eventType} - {formatDate(event.eventDate)}
+                    {event.sourceName ? ` - ${event.sourceName}` : ""}
+                  </p>
+                </div>
+                <div className="grid shrink-0 grid-cols-3 gap-2 text-right text-xs font-black number-tabular">
+                  <span>{formatPercent(event.confidence * 100)}</span>
+                  <span>{formatPercent(event.impactScore * 100)}</span>
+                  <span>{event.sentimentScore === null ? "N/A" : formatPercent(event.sentimentScore * 100)}</span>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="rounded-md border border-brass/35 bg-brass/10 p-3 text-sm font-bold leading-6 text-paper/62">
+          No classified events were found in this small scan. Saved scans still persist article-count observations.
+        </div>
+      )}
+    </div>
+  );
+}
+
 function SourceResolverPreviewResult({
   preview,
   onSave
@@ -997,7 +1445,7 @@ function SourceResolverPreviewResult({
             ? "Saving"
             : preview.saveStatus === "saved"
               ? "Saved"
-              : `Save ${preview.proposedRecordCount}`}
+              : `Save proposed ${preview.proposedRecordCount}`}
         </button>
       </div>
 
@@ -1011,14 +1459,24 @@ function SourceResolverPreviewResult({
 
       <div className="grid gap-2">
         {preview.suggestions.slice(0, 5).map((suggestion) => (
-          <SourceResolverSuggestionRow key={suggestion.artistId} suggestion={suggestion} />
+          <SourceResolverSuggestionRow
+            key={suggestion.artistId}
+            suggestion={suggestion}
+            minConfidence={preview.minConfidence}
+          />
         ))}
       </div>
     </div>
   );
 }
 
-function SourceResolverSuggestionRow({ suggestion }: { suggestion: SourceResolverSuggestion }) {
+function SourceResolverSuggestionRow({
+  suggestion,
+  minConfidence
+}: {
+  suggestion: SourceResolverSuggestion;
+  minConfidence: number;
+}) {
   const topCandidates = ["spotify", "youtube", "musicbrainz"]
     .map((source) => ({
       source,
@@ -1028,6 +1486,7 @@ function SourceResolverSuggestionRow({ suggestion }: { suggestion: SourceResolve
   const proposedKeys = suggestion.proposedRecord
     ? Object.keys(suggestion.proposedRecord).filter((key) => key !== "artistId")
     : [];
+  const proposedLabels = proposedKeys.map((key) => sourceIdLabelByField[key] ?? key);
 
   return (
     <div className="rounded-md border border-line bg-black/25 p-3">
@@ -1037,7 +1496,7 @@ function SourceResolverSuggestionRow({ suggestion }: { suggestion: SourceResolve
             {suggestion.ticker} <span className="text-paper/45">{suggestion.name}</span>
           </p>
           <p className="mt-1 text-xs font-bold text-paper/45">
-            {proposedKeys.length ? `Proposed ${proposedKeys.join(", ")}` : "No high-confidence proposal"}
+            {proposedLabels.length ? `Will save ${proposedLabels.join(", ")}` : "No high-confidence source IDs"}
           </p>
         </div>
         {suggestion.skippedExisting.length ? (
@@ -1049,16 +1508,50 @@ function SourceResolverSuggestionRow({ suggestion }: { suggestion: SourceResolve
 
       {topCandidates.length ? (
         <div className="mt-3 grid gap-2 lg:grid-cols-3">
-          {topCandidates.map(({ source, candidate }) => (
-            <div key={source} className="rounded-md border border-line bg-black/20 p-2">
-              <div className="flex items-center justify-between gap-2">
-                <p className="text-xs font-black uppercase tracking-wide text-paper/45">{source}</p>
-                <p className="text-xs font-black number-tabular">{formatPercent(candidate.confidence * 100)}</p>
+          {topCandidates.map(({ source, candidate }) => {
+            const proposedField = sourceIdFieldBySource[source];
+            const willSave = Boolean(
+              proposedField &&
+                suggestion.proposedRecord &&
+                Object.prototype.hasOwnProperty.call(suggestion.proposedRecord, proposedField)
+            );
+            const alreadySaved = suggestion.skippedExisting.includes(source);
+            const statusLabel = willSave ? "Will save" : alreadySaved ? "Already saved" : "Not saving";
+            const statusClassName = willSave
+              ? "border-mint/40 bg-mint/10 text-mint"
+              : alreadySaved
+                ? "border-cyan/35 bg-cyan/10 text-cyan"
+                : "border-brass/35 bg-brass/10 text-brass";
+            const cardClassName = willSave
+              ? "border-mint/35 bg-mint/5"
+              : alreadySaved
+                ? "border-cyan/25 bg-cyan/5"
+                : "border-line bg-black/20";
+
+            return (
+              <div key={source} className={`rounded-md border p-2 ${cardClassName}`}>
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <p className="text-xs font-black uppercase tracking-wide text-paper/45">{source}</p>
+                    <p className="mt-1 text-xs font-black number-tabular">{formatPercent(candidate.confidence * 100)}</p>
+                  </div>
+                  <span
+                    className={`shrink-0 rounded border px-2 py-1 text-[10px] font-black uppercase tracking-wide ${statusClassName}`}
+                  >
+                    {statusLabel}
+                  </span>
+                </div>
+                <p className="mt-2 truncate text-sm font-bold">{candidate.label}</p>
+                <p className="mt-1 truncate text-xs font-bold text-paper/42">
+                  {willSave
+                    ? candidate.reason
+                    : alreadySaved
+                      ? "Existing ID is already stored."
+                      : `Below ${formatPercent(minConfidence * 100)} save threshold.`}
+                </p>
               </div>
-              <p className="mt-1 truncate text-sm font-bold">{candidate.label}</p>
-              <p className="mt-1 truncate text-xs font-bold text-paper/42">{candidate.reason}</p>
-            </div>
-          ))}
+            );
+          })}
         </div>
       ) : null}
 
@@ -1071,6 +1564,179 @@ function SourceResolverSuggestionRow({ suggestion }: { suggestion: SourceResolve
       ) : null}
     </div>
   );
+}
+
+function ManualSourceIdEditor({
+  state,
+  form,
+  selectedRecord,
+  saveState,
+  onRefresh,
+  onSelectArtist,
+  onChange,
+  onSave
+}: {
+  state: AsyncState<SourceIdDirectory>;
+  form: ManualSourceIdForm;
+  selectedRecord: ArtistSourceIdRecord | null;
+  saveState: ManualSourceIdSaveState;
+  onRefresh: () => void;
+  onSelectArtist: (artistId: string) => void;
+  onChange: (field: keyof Omit<ManualSourceIdForm, "artistId">, value: string) => void;
+  onSave: () => void;
+}) {
+  const records = state.status === "ready" ? state.data.records : [];
+  const selectedDisabled = state.status !== "ready" || !selectedRecord || saveState.status === "saving";
+
+  return (
+    <section className="rounded-md border border-line bg-panel/88 p-5 shadow-market">
+      <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+        <div>
+          <p className="text-xs font-bold uppercase tracking-wide text-paper/45">Data quality</p>
+          <h2 className="mt-1 text-2xl font-black">Manual source IDs</h2>
+          <p className="mt-2 text-sm leading-6 text-paper/55">
+            Review one artist at a time and save exact source IDs when automatic matching is uncertain.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={onRefresh}
+          disabled={state.status === "loading"}
+          className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md border border-cyan/45 bg-cyan/10 px-4 text-sm font-black text-cyan disabled:cursor-wait disabled:opacity-55"
+        >
+          <RefreshCcw className="h-4 w-4" />
+          Refresh
+        </button>
+      </div>
+
+      {state.status === "loading" ? <LoadingText text="Loading stored source IDs..." /> : null}
+      {state.status === "error" ? <ErrorText text={state.message} /> : null}
+
+      {state.status === "ready" ? (
+        <div className="mt-4 grid gap-4 xl:grid-cols-[0.8fr_1.2fr]">
+          <div className="rounded-md border border-line bg-black/20 p-4">
+            <label className="block">
+              <span className="text-xs font-black uppercase tracking-wide text-paper/45">Artist</span>
+              <select
+                value={form.artistId}
+                onChange={(event) => onSelectArtist(event.target.value)}
+                className="mt-2 min-h-11 w-full rounded-md border border-line bg-ink px-3 text-sm font-bold text-paper outline-none focus:border-cyan"
+              >
+                <option value="">Select artist</option>
+                {records.map((record) => (
+                  <option key={record.artistId} value={record.artistId}>
+                    {record.ticker} - {record.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <div className="mt-4 grid gap-2">
+              <PreviewMetric label="Loaded artists" value={String(state.data.artistCount)} />
+              <PreviewMetric label="Selected" value={selectedRecord ? selectedRecord.ticker : "None"} />
+            </div>
+
+            {selectedRecord ? (
+              <div className="mt-4 rounded-md border border-line bg-black/25 p-3">
+                <p className="text-xs font-black uppercase tracking-wide text-paper/45">Current stored data</p>
+                <div className="mt-2 grid gap-2">
+                  {manualSourceIdFields.map((field) => {
+                    const value = selectedRecord.externalIds[field.key];
+
+                    return (
+                      <div key={field.key} className="min-w-0">
+                        <p className="text-xs font-bold text-paper/42">{field.label}</p>
+                        <p className={`mt-1 truncate text-xs font-black ${value ? "text-paper/70" : "text-brass"}`}>
+                          {value ?? "Missing"}
+                        </p>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            ) : null}
+          </div>
+
+          <div className="rounded-md border border-line bg-black/20 p-4">
+            <div className="grid gap-3 md:grid-cols-2">
+              {manualSourceIdFields.map((field) => (
+                <label key={field.key} className={field.key === "gdeltQuery" ? "block md:col-span-2" : "block"}>
+                  <span className="text-xs font-black uppercase tracking-wide text-paper/45">{field.label}</span>
+                  <input
+                    value={form[field.key]}
+                    onChange={(event) => onChange(field.key, event.target.value)}
+                    disabled={selectedDisabled}
+                    placeholder={field.placeholder}
+                    className="mt-2 min-h-11 w-full rounded-md border border-line bg-ink px-3 text-sm font-bold text-paper outline-none placeholder:text-paper/24 focus:border-cyan disabled:cursor-not-allowed disabled:opacity-55"
+                  />
+                  <span className="mt-1 block text-xs font-bold leading-5 text-paper/42">{field.helper}</span>
+                </label>
+              ))}
+            </div>
+
+            <div className="mt-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+              <div className="min-h-6 text-sm font-bold">
+                {saveState.status === "saved" ? <span className="text-mint">{saveState.message}</span> : null}
+                {saveState.status === "error" ? <span className="text-ember">{saveState.message}</span> : null}
+              </div>
+              <button
+                type="button"
+                onClick={onSave}
+                disabled={!selectedRecord || saveState.status === "saving"}
+                className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md border border-mint/45 bg-mint/10 px-4 text-sm font-black text-mint disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <CheckCircle2 className="h-4 w-4" />
+                {saveState.status === "saving" ? "Saving" : "Save manual IDs"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
+type ManualSourceIdUpsert = {
+  artistId: string;
+  spotifyId?: string | null;
+  youtubeChannelId?: string | null;
+  musicbrainzId?: string | null;
+  lastfmName?: string | null;
+  gdeltQuery?: string | null;
+};
+
+function buildManualSourceForm(record: ArtistSourceIdRecord): ManualSourceIdForm {
+  return {
+    artistId: record.artistId,
+    spotifyId: record.externalIds.spotifyId ?? "",
+    youtubeChannelId: record.externalIds.youtubeChannelId ?? "",
+    musicbrainzId: record.externalIds.musicbrainzId ?? "",
+    lastfmName: record.externalIds.lastfmName ?? "",
+    gdeltQuery: record.externalIds.gdeltQuery ?? ""
+  };
+}
+
+function buildManualSourceIdUpsert(
+  form: ManualSourceIdForm,
+  selectedRecord: ArtistSourceIdRecord
+): ManualSourceIdUpsert {
+  const upsert: ManualSourceIdUpsert = {
+    artistId: selectedRecord.artistId
+  };
+
+  for (const field of manualSourceIdFields) {
+    const key = field.key;
+    const currentValue = selectedRecord.externalIds[key] ?? "";
+    const nextValue = form[key].trim();
+
+    if (nextValue && nextValue !== currentValue) {
+      upsert[key] = nextValue;
+    } else if (!nextValue && currentValue) {
+      upsert[key] = null;
+    }
+  }
+
+  return upsert;
 }
 
 function PreviewMetric({ label, value }: { label: string; value: string }) {

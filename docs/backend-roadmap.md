@@ -27,7 +27,7 @@ This app still runs in development with unsaved demo data, but the backend found
    - `MARKET_CRON_SOURCE=core`
    - `MARKET_CRON_ARTIST_LIMIT=25`
    - `MARKET_CRON_MAX_BATCHES=4`
-   - `MARKET_EVENT_SCAN_LIMIT=6`
+   - `MARKET_EVENT_SCAN_LIMIT=10`
    - `MARKET_EVENT_SCAN_MAX_RECORDS=12`
    - `MARKET_YOUTUBE_UPLOAD_EVENT_VIDEOS=2`
    - `MARKET_YOUTUBE_UPLOAD_EVENT_DAYS=14`
@@ -54,6 +54,8 @@ The Dev console shows these checks at:
 ## Artist source IDs
 
 Real adapters are only as accurate as their artist matching. Store official external IDs in `artist_external_ids` before relying on Spotify or YouTube signals at scale.
+
+The preferred admin workflow is `/dev` -> `Manual source IDs`, where one artist can be reviewed and updated without touching raw JSON. YouTube manual entries accept a `UC...` channel ID, a `youtube.com/channel/UC...` URL, an `@handle`, or a `youtube.com/@handle` URL. Handle inputs are resolved to a channel ID through the YouTube Data API before saving.
 
 Use the admin source-ID endpoint to inspect existing mappings:
 
@@ -147,7 +149,7 @@ After deployment, manually call `/api/cron/daily-market-update?dryRun=1` with `A
 
 `MARKET_MODEL_VERSION` is an internal audit label, not a prominent user-facing product label. It is saved on market runs, signal snapshots, and price-history rows so future algorithm changes can be traced without rewriting historical prices. Normal market pages should keep broad language such as audience momentum, market activity, release signals, and media movement. Admin/health/debug views can show the exact model version.
 
-`rmi-core-v4` adds event ingestion from the scheduled GDELT scanner and official YouTube upload titles while keeping signal-reliability scaling. It can react to article-based news/reviews/releases and official-channel snippets, videos, singles, album trailers, and tour announcements before those moments fully show up in listener or view momentum. It also makes event modifiers order-independent, so negative reviews can dampen the full event-adjusted move from a release instead of only whichever modifier happens to be applied first.
+`rmi-core-v4` adds event ingestion from the scheduled GDELT scanner and official YouTube upload titles while keeping signal-reliability scaling. It can react to article-based news/reviews/releases and official-channel snippets, videos, singles, album trailers, and tour announcements before those moments fully show up in listener or view momentum. Review events apply signed price shocks instead of simple multipliers, so negative reviews can pull against a streaming/release spike and positive reviews can support it without accidentally softening an already-negative move.
 
 `rmi-core-v3` added public-attention pageview momentum to the core model while keeping signal-reliability scaling. Broad, higher-confidence source coverage can move prices more than thin or single-source observations, which keeps the market responsive while reducing overreaction to weak data.
 
@@ -233,11 +235,11 @@ When enabled, the YouTube comments path samples recent comments from each artist
 
 Raw comment text is not saved. The first run is treated as a baseline; later runs move the social/news/search parts of the model from changes in sentiment, likes, and net positive-vs-negative share. This prevents every naturally positive fan comment section from pushing a stock up every day.
 
-The YouTube upload event path is separate from comment sentiment. It uses official channel upload playlists for artists with `youtube_channel_id`, classifies recent upload titles such as official videos, new singles, album trailers, snippets, teasers, and tour announcements, and stores those matches as `market_events`. It does not use YouTube search, so it is much cheaper and less ambiguous than searching all of YouTube for an artist name. Defaults are `MARKET_YOUTUBE_UPLOAD_EVENT_VIDEOS=2` and `MARKET_YOUTUBE_UPLOAD_EVENT_DAYS=14`.
+The YouTube upload event path is separate from comment sentiment. It uses official channel upload playlists for artists with `youtube_channel_id`, classifies recent upload titles such as official videos, new singles, album trailers, deluxe/tracklist announcements, snippets, teasers, freestyles, performances, and tour announcements, and stores those matches as `market_events`. It does not use YouTube search, so it is much cheaper and less ambiguous than searching all of YouTube for an artist name. Defaults are `MARKET_YOUTUBE_UPLOAD_EVENT_VIDEOS=2` and `MARKET_YOUTUBE_UPLOAD_EVENT_DAYS=14`.
 
-The `core` and `blended` paths also detect recent MusicBrainz release groups for artists with `musicbrainz_id` set. The detector stores confirmed releases as `market_events` with `eventType: "release"`, then lets the existing event/review layer apply decay, confidence, and price-shock caps. It only accepts full `YYYY-MM-DD` release dates and filters compilation/live/catalog-style records so vague metadata does not move the market.
+The `core` and `blended` paths also detect recent MusicBrainz release groups for artists with `musicbrainz_id` set. The detector reads up to 100 release groups per artist so major artists with large catalogs do not hide recent releases behind older metadata. It stores confirmed releases as `market_events` with `eventType: "release"`, then lets the existing event/review layer apply decay, confidence, and price-shock caps. It only accepts full `YYYY-MM-DD` release dates and filters compilation/live/catalog-style records so vague metadata does not move the market.
 
-The `gdelt` and `blended` paths can also create article-based market events. This detector is intentionally conservative: it requires the title to mention the artist, only treats reviews as reviews when the title has review/rating language, weighs trusted music/business/news domains higher, and limits detected events to the strongest few articles per artist per run.
+The `gdelt` and `blended` paths can also create article-based market events. This detector is intentionally conservative: it requires the title to mention the artist or a quoted alias from the artist's GDELT query, only treats reviews as reviews when the title has review/rating language, recognizes release, chart, tour/festival, award, viral, public-conflict, and controversy terms, weighs trusted music/business/news domains higher, and limits detected events to the strongest few articles per artist per run.
 
 Real-source market runs also include trade flow from saved buy/sell transactions. Individual trades already apply a small immediate market-maker impact; the daily trade-flow adapter summarizes the previous day's net buy-vs-sell order value, trade count, and trader breadth into the `traderDemand` model input. Trade-flow observations are included in the admin health endpoint so the operator can verify whether real trading demand is being measured.
 
@@ -301,12 +303,14 @@ Vercel schedules cron in UTC, so this runs around 2 AM Pacific during daylight s
 - `source`: `MARKET_CRON_SOURCE`, default `core`
 - `artistLimit`: `MARKET_CRON_ARTIST_LIMIT`, default `25`
 - `maxBatches`: `MARKET_CRON_MAX_BATCHES`, default `4`
-- `eventScanLimit`: `MARKET_EVENT_SCAN_LIMIT`, default `6`
+- `eventScanLimit`: `MARKET_EVENT_SCAN_LIMIT`, default `10`
 - `eventScanMaxRecords`: `MARKET_EVENT_SCAN_MAX_RECORDS`, default `12`
 - `youtubeUploadEventVideos`: `MARKET_YOUTUBE_UPLOAD_EVENT_VIDEOS`, default `2`
 - YouTube comments are quota-guarded separately. `MARKET_YOUTUBE_COMMENT_VIDEOS=0` keeps comment sentiment off; set it to `1` for limited comment sampling.
 
 Before pricing, the cron route calls `POST /api/admin/market-event-scan` unless `MARKET_EVENT_SCAN_LIMIT=0`. That scanner uses the free GDELT news endpoint on the least-recently-scanned artists, stores `gdelt:article_count` observations, and persists classified `market_events` for releases, reviews, controversies, awards, tours, viral moments, and major news. The pricing job then reads those saved events through the `market_events` adapter, so news can affect the normal daily move without turning the whole production job into a slow full-GDELT run.
+
+Event ingestion should be automatic in normal operation. The free automatic event sources are rotating GDELT news scans, official YouTube upload detection, and MusicBrainz release detection.
 
 The route skips duplicate same-day runs when a successful or running `core` run already exists. This matters because cron delivery is best-effort and can occasionally miss or duplicate invocations. For manual local testing, call the cron route with `x-market-update-secret: <MARKET_UPDATE_SECRET>`. Add `?dryRun=1` to exercise the full path without persisting another market run.
 
@@ -320,7 +324,7 @@ The admin event ingestion endpoint is:
 POST /api/admin/market-events
 ```
 
-with the header:
+Use the server-only header:
 
 ```txt
 x-market-update-secret: <MARKET_UPDATE_SECRET>
@@ -345,7 +349,7 @@ and a body like:
 }
 ```
 
-Those events are saved and then loaded by future market update runs. A non-dry-run `POST /api/admin/daily-market-update` can also include `manualEvents`; those submitted events are persisted and used in the same calculation.
+Those events are saved and then loaded by future market update runs. This endpoint is kept for server-side automation and emergency operator tooling, not for the normal market workflow. The normal event workflow should stay automatic through cron, GDELT news scans, YouTube official-upload detection, and MusicBrainz release detection.
 
 The protected event scanner endpoint is:
 
@@ -353,56 +357,28 @@ The protected event scanner endpoint is:
 POST /api/admin/market-event-scan
 ```
 
+The `/dev` console exposes this as `Scan news and event signals`. Use `Preview` for a small dry scan, then `Save scan` to persist GDELT article-count observations and classified market events for a small least-recently-scanned artist batch.
+
 It accepts a body such as:
 
 ```json
 {
   "dryRun": false,
   "runDate": "2026-07-05",
-  "artistLimit": 6,
+  "artistLimit": 10,
   "maxRecords": 12
 }
 ```
 
 It does not update prices. It only saves article-count observations and classified market events, which are then used by the next `core` market update.
 
-Example dry-run shape for testing that behavior:
+Example dry-run shape for testing the automatic core path:
 
 ```json
 {
   "dryRun": true,
-  "source": "manual",
-  "artistLimit": 1,
-  "manualSignals": {
-    "playboi-carti": {
-      "streamingGrowth": 70,
-      "youtubeGrowth": 55,
-      "searchGrowth": 80,
-      "socialGrowth": 90,
-      "newsScore": 72,
-      "traderDemand": 20
-    }
-  },
-  "manualEvents": {
-    "playboi-carti": [
-      {
-        "eventType": "release",
-        "eventDate": "2026-07-04",
-        "title": "Album release spike",
-        "sentimentScore": 20,
-        "impactScore": 60,
-        "confidence": 0.95
-      },
-      {
-        "eventType": "review",
-        "eventDate": "2026-07-04",
-        "title": "Poor critical reception",
-        "sentimentScore": -85,
-        "impactScore": -75,
-        "confidence": 0.95
-      }
-    ]
-  }
+  "source": "core",
+  "artistLimit": 5
 }
 ```
 
@@ -411,7 +387,7 @@ For a persisted update, send:
 ```json
 {
   "dryRun": false,
-  "source": "mock"
+  "source": "core"
 }
 ```
 

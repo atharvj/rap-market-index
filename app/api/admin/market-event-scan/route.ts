@@ -26,7 +26,7 @@ type MarketEventScanBody = {
   timeoutMs?: number;
 };
 
-const DEFAULT_ARTIST_LIMIT = 6;
+const DEFAULT_ARTIST_LIMIT = 10;
 const MAX_ARTIST_LIMIT = 20;
 const DEFAULT_MAX_RECORDS = 12;
 const MAX_GDELT_RECORDS = 50;

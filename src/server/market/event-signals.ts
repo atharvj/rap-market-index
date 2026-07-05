@@ -213,18 +213,17 @@ function buildPriceModifiers(scoredEvents: Array<ReturnType<typeof scoreEvent>>)
     const score = event.weightedImpact;
     const isReview = event.event.eventType === "review";
     const isRelease = event.event.eventType === "release";
-    const reviewMultiplier = isReview ? clamp(1 + score / 135, 0.45, 1.35) : undefined;
+    const reviewShock = isReview ? clamp(score / 1800, -0.04, 0.04) : undefined;
     const releaseShock = isRelease ? clamp(score / 1800, -0.025, 0.04) : undefined;
     const generalShock = !isRelease && !isReview ? clamp(score / 2400, -0.025, 0.03) : undefined;
-    const priceShock = releaseShock ?? generalShock;
+    const priceShock = reviewShock ?? releaseShock ?? generalShock;
 
-    if (reviewMultiplier === undefined && priceShock === undefined) {
+    if (priceShock === undefined) {
       continue;
     }
 
     modifiers.push({
       reason: `${event.event.eventType}: ${event.event.title}`,
-      priceMultiplier: reviewMultiplier,
       priceShock,
       score
     });
