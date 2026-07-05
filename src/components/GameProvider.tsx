@@ -3,8 +3,6 @@
 import { useAuth } from "@/components/AuthProvider";
 import {
   STARTING_CASH,
-  applyBuy,
-  applySell,
   createInitialGameState,
   getHoldingViews,
   getMockLeaderboard,
@@ -107,7 +105,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
           holdings: current.holdings,
           transactions: current.transactions
         }));
-        setSyncStatus(session ? "Server market loaded" : "Server market loaded; demo guest profile");
+        setSyncStatus(session ? "Server market loaded" : "Server market loaded");
       })
       .catch(() => {
         if (active) {
@@ -310,23 +308,26 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
         return { ok: false, message: "Not enough cash for that order." };
       }
 
-      if (syncMode === "supabase" && session) {
-        const result = await submitServerTrade({
-          side: "buy",
-          artistId,
-          shares,
-          accessToken: session.access_token
-        });
-
-        if (result.ok) {
-          await refreshServerState();
-        }
-
-        return result;
+      if (!session) {
+        return { ok: false, message: "Sign in to trade." };
       }
 
-      setState((current) => applyBuy(current, artistId, shares));
-      return { ok: true, message: `Bought ${shares} ${artist.ticker} shares.` };
+      if (syncMode !== "supabase") {
+        return { ok: false, message: "Wait for your cloud profile to sync before trading." };
+      }
+
+      const result = await submitServerTrade({
+        side: "buy",
+        artistId,
+        shares,
+        accessToken: session.access_token
+      });
+
+      if (result.ok) {
+        await refreshServerState();
+      }
+
+      return result;
     },
     [getArtist, refreshServerState, session, state.cashBalance, syncMode]
   );
@@ -348,23 +349,26 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
         return { ok: false, message: "You cannot sell more shares than you own." };
       }
 
-      if (syncMode === "supabase" && session) {
-        const result = await submitServerTrade({
-          side: "sell",
-          artistId,
-          shares,
-          accessToken: session.access_token
-        });
-
-        if (result.ok) {
-          await refreshServerState();
-        }
-
-        return result;
+      if (!session) {
+        return { ok: false, message: "Sign in to trade." };
       }
 
-      setState((current) => applySell(current, artistId, shares));
-      return { ok: true, message: `Sold ${shares} ${artist.ticker} shares.` };
+      if (syncMode !== "supabase") {
+        return { ok: false, message: "Wait for your cloud profile to sync before trading." };
+      }
+
+      const result = await submitServerTrade({
+        side: "sell",
+        artistId,
+        shares,
+        accessToken: session.access_token
+      });
+
+      if (result.ok) {
+        await refreshServerState();
+      }
+
+      return result;
     },
     [getArtist, getHolding, refreshServerState, session, syncMode]
   );

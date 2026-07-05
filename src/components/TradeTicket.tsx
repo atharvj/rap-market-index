@@ -1,5 +1,6 @@
 "use client";
 
+import { useAuth } from "@/components/AuthProvider";
 import { useGame } from "@/components/GameProvider";
 import { formatCurrency, formatShares } from "@/lib/formatters";
 import type { Artist } from "@/lib/types";
@@ -13,7 +14,8 @@ export function TradeTicket({
   artist: Artist;
   defaultSide?: "buy" | "sell";
 }) {
-  const { buyShares, sellShares, getHolding, state } = useGame();
+  const { buyShares, sellShares, getHolding, state, syncMode, serverRefreshing } = useGame();
+  const { loading: authLoading, session } = useAuth();
   const [side, setSide] = useState<"buy" | "sell">(defaultSide);
   const [shares, setShares] = useState("10");
   const [message, setMessage] = useState("");
@@ -23,19 +25,30 @@ export function TradeTicket({
   const estimatedValue = Number.isFinite(parsedShares) ? parsedShares * artist.currentPrice : 0;
   const maxBuy = Math.floor(state.cashBalance / artist.currentPrice);
   const maxSell = holding?.shares ?? 0;
+  const tradeUnavailableReason = getTradeUnavailableReason({
+    authLoading,
+    hasSession: Boolean(session),
+    serverRefreshing,
+    syncMode
+  });
   const disabled =
+    Boolean(tradeUnavailableReason) ||
     !Number.isFinite(parsedShares) ||
     parsedShares <= 0 ||
     submitting ||
     (side === "buy" ? estimatedValue > state.cashBalance : parsedShares > maxSell);
 
   const helper = useMemo(() => {
+    if (tradeUnavailableReason) {
+      return tradeUnavailableReason;
+    }
+
     if (side === "buy") {
       return `Cash ${formatCurrency(state.cashBalance)} · Max ${formatShares(maxBuy)}`;
     }
 
     return `Your shares ${formatShares(maxSell)} · Value ${formatCurrency(maxSell * artist.currentPrice)}`;
-  }, [artist.currentPrice, maxBuy, maxSell, side, state.cashBalance]);
+  }, [artist.currentPrice, maxBuy, maxSell, side, state.cashBalance, tradeUnavailableReason]);
 
   async function submitTrade() {
     setSubmitting(true);
@@ -121,10 +134,42 @@ export function TradeTicket({
             : "bg-ember/90 text-white hover:bg-ember"
         } disabled:cursor-not-allowed disabled:bg-paper/12 disabled:text-paper/35`}
       >
-        {submitting ? "Sending order" : side === "buy" ? "Submit buy order" : "Submit sell order"}
+        {submitting
+          ? "Sending order"
+          : tradeUnavailableReason
+            ? tradeUnavailableReason
+            : side === "buy"
+              ? "Submit buy order"
+              : "Submit sell order"}
       </button>
 
       {message ? <p className="mt-3 min-h-5 text-sm text-paper/60">{message}</p> : <p className="mt-3 min-h-5" />}
     </section>
   );
+}
+
+function getTradeUnavailableReason({
+  authLoading,
+  hasSession,
+  serverRefreshing,
+  syncMode
+}: {
+  authLoading: boolean;
+  hasSession: boolean;
+  serverRefreshing: boolean;
+  syncMode: "demo" | "supabase";
+}) {
+  if (authLoading) {
+    return "Checking session";
+  }
+
+  if (!hasSession) {
+    return "Sign in to trade";
+  }
+
+  if (serverRefreshing || syncMode !== "supabase") {
+    return "Syncing profile";
+  }
+
+  return "";
 }

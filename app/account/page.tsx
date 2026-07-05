@@ -39,13 +39,15 @@ export default function AccountPage() {
       <section className="grid gap-4 md:grid-cols-2">
         <div className="rounded-md border border-line bg-panel/86 p-4 shadow-market">
           <p className="text-xs font-bold uppercase tracking-wide text-paper/45">Player</p>
-          <p className="mt-2 text-2xl font-black">{state.username}</p>
-          <p className="mt-1 text-sm text-paper/50">{user?.email ?? "Demo guest"}</p>
+          <p className="mt-2 text-2xl font-black">{session ? state.username : "Not signed in"}</p>
+          <p className="mt-1 text-sm text-paper/50">
+            {user?.email ?? "Create an account or sign in to trade."}
+          </p>
         </div>
         <div className="rounded-md border border-line bg-panel/86 p-4 shadow-market">
           <p className="text-xs font-bold uppercase tracking-wide text-paper/45">Cash</p>
           <p className="mt-2 text-2xl font-black number-tabular">{formatCurrency(state.cashBalance)}</p>
-          <p className="mt-1 text-sm text-paper/50">{session ? "Cloud profile" : "Not saved"}</p>
+          <p className="mt-1 text-sm text-paper/50">{session ? "Cloud profile" : "Sign in required"}</p>
         </div>
       </section>
 
