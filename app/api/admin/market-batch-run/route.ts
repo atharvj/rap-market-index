@@ -41,7 +41,21 @@ type DailyUpdateResponse = {
     artistCount: number;
     momentumArtistCount?: number;
     averageMovePercent: number;
+    averageAbsMovePercent?: number;
     averageSignalDelta?: number;
+    upMoveCount?: number;
+    downMoveCount?: number;
+    flatMoveCount?: number;
+    lowReliabilityCount?: number;
+    mediumReliabilityCount?: number;
+    highReliabilityCount?: number;
+    sourceQualityAnomalyCount?: number;
+    sourceQualityStaleCount?: number;
+    averageSourceQualityMultiplier?: number;
+    signalCoverageScore?: number;
+    reliabilityScore?: number;
+    movementBalanceScore?: number;
+    marketQualityScore?: number;
     signalSourceCoverage?: Record<string, { artistCount: number; statCount: number }>;
     topGainer: { artistId: string; ticker: string; dailyChangePercent: number } | null;
     topLoser: { artistId: string; ticker: string; dailyChangePercent: number } | null;
@@ -57,7 +71,21 @@ type BatchRunSummary = {
   artistCount: number;
   momentumArtistCount: number;
   averageMovePercent: number;
+  averageAbsMovePercent: number;
   averageSignalDelta: number;
+  upMoveCount: number;
+  downMoveCount: number;
+  flatMoveCount: number;
+  lowReliabilityCount: number;
+  mediumReliabilityCount: number;
+  highReliabilityCount: number;
+  sourceQualityAnomalyCount: number;
+  sourceQualityStaleCount: number;
+  averageSourceQualityMultiplier: number;
+  signalCoverageScore: number;
+  reliabilityScore: number;
+  movementBalanceScore: number;
+  marketQualityScore: number;
   signalSourceCoverage: Record<string, { artistCount: number; statCount: number }>;
   topGainer: MarketMove | null;
   topLoser: MarketMove | null;
@@ -252,7 +280,27 @@ function buildBatchRunSummary({
   const artistCount = runs.reduce((total, run) => total + getRunArtistCount(run), 0);
   const momentumArtistCount = runs.reduce((total, run) => total + (run.summary?.momentumArtistCount ?? 0), 0);
   const averageMovePercent = getWeightedAverage(runs, "averageMovePercent", artistCount);
+  const averageAbsMovePercent = getWeightedAverage(runs, "averageAbsMovePercent", artistCount);
   const averageSignalDelta = getWeightedAverage(runs, "averageSignalDelta", artistCount);
+  const upMoveCount = runs.reduce((total, run) => total + (run.summary?.upMoveCount ?? 0), 0);
+  const downMoveCount = runs.reduce((total, run) => total + (run.summary?.downMoveCount ?? 0), 0);
+  const flatMoveCount = runs.reduce((total, run) => total + (run.summary?.flatMoveCount ?? 0), 0);
+  const lowReliabilityCount = runs.reduce((total, run) => total + (run.summary?.lowReliabilityCount ?? 0), 0);
+  const mediumReliabilityCount = runs.reduce((total, run) => total + (run.summary?.mediumReliabilityCount ?? 0), 0);
+  const highReliabilityCount = runs.reduce((total, run) => total + (run.summary?.highReliabilityCount ?? 0), 0);
+  const sourceQualityAnomalyCount = runs.reduce(
+    (total, run) => total + (run.summary?.sourceQualityAnomalyCount ?? 0),
+    0
+  );
+  const sourceQualityStaleCount = runs.reduce(
+    (total, run) => total + (run.summary?.sourceQualityStaleCount ?? 0),
+    0
+  );
+  const averageSourceQualityMultiplier = getWeightedAverage(runs, "averageSourceQualityMultiplier", artistCount);
+  const signalCoverageScore = getWeightedAverage(runs, "signalCoverageScore", artistCount);
+  const reliabilityScore = getWeightedAverage(runs, "reliabilityScore", artistCount);
+  const movementBalanceScore = getWeightedAverage(runs, "movementBalanceScore", artistCount);
+  const marketQualityScore = getWeightedAverage(runs, "marketQualityScore", artistCount);
   const topGainer = runs
     .map((run) => run.summary?.topGainer)
     .filter(isMarketMove)
@@ -270,7 +318,21 @@ function buildBatchRunSummary({
     artistCount,
     momentumArtistCount,
     averageMovePercent,
+    averageAbsMovePercent,
     averageSignalDelta,
+    upMoveCount,
+    downMoveCount,
+    flatMoveCount,
+    lowReliabilityCount,
+    mediumReliabilityCount,
+    highReliabilityCount,
+    sourceQualityAnomalyCount,
+    sourceQualityStaleCount,
+    averageSourceQualityMultiplier,
+    signalCoverageScore,
+    reliabilityScore,
+    movementBalanceScore,
+    marketQualityScore,
     signalSourceCoverage: mergeSignalSourceCoverage(runs),
     topGainer,
     topLoser,
@@ -295,7 +357,15 @@ function getRunArtistCount(run: DailyUpdateResponse) {
 
 function getWeightedAverage(
   runs: DailyUpdateResponse[],
-  key: "averageMovePercent" | "averageSignalDelta",
+  key:
+    | "averageMovePercent"
+    | "averageAbsMovePercent"
+    | "averageSignalDelta"
+    | "averageSourceQualityMultiplier"
+    | "signalCoverageScore"
+    | "reliabilityScore"
+    | "movementBalanceScore"
+    | "marketQualityScore",
   artistCount: number
 ) {
   if (artistCount <= 0) {

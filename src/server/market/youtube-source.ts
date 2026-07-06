@@ -7,6 +7,13 @@ import type {
   MarketObservation,
   ObservationBaselines
 } from "@/server/market/market-data";
+import {
+  buildMomentumQualityPayload,
+  calculatePointDeltaMomentum,
+  calculateSnapshotMomentum,
+  getBaselineAgeDays,
+  getCombinedConfidenceMultiplier
+} from "@/server/market/source-quality";
 import type { HypeStats } from "@/lib/types";
 
 type YoutubeCollectOptions = {
@@ -212,24 +219,51 @@ function buildYoutubeSignal({
   signal: AdapterSignal;
   observations: MarketObservation[];
 } {
-  const viewMomentum = calculateCumulativeMomentum(info.viewCount, baseline[CHANNEL_VIEWS], 5.25, -25, 70);
-  const subscriberMomentum = calculateCumulativeMomentum(info.subscriberCount, baseline[SUBSCRIBERS], 4.5, -20, 65);
-  const uploadMomentum = calculateUploadMomentum(info.videoCount, baseline[VIDEO_COUNT]);
+  const viewBaselineAgeDays = getBaselineAgeDays(baseline, CHANNEL_VIEWS);
+  const subscriberBaselineAgeDays = getBaselineAgeDays(baseline, SUBSCRIBERS);
+  const videoBaselineAgeDays = getBaselineAgeDays(baseline, VIDEO_COUNT);
+  const viewMomentum = calculateSnapshotMomentum({
+    current: info.viewCount,
+    baseline: baseline[CHANNEL_VIEWS],
+    baselineAgeDays: viewBaselineAgeDays,
+    multiplier: 5.25,
+    min: -25,
+    max: 70,
+    monotonic: true
+  });
+  const subscriberMomentum = calculateSnapshotMomentum({
+    current: info.subscriberCount,
+    baseline: baseline[SUBSCRIBERS],
+    baselineAgeDays: subscriberBaselineAgeDays,
+    multiplier: 4.5,
+    min: -20,
+    max: 65,
+    monotonic: true
+  });
+  const uploadMomentum = calculatePointDeltaMomentum({
+    current: info.videoCount,
+    baseline: baseline[VIDEO_COUNT],
+    baselineAgeDays: videoBaselineAgeDays,
+    multiplier: 18,
+    min: 0,
+    max: 45,
+    extremeJumpPoints: 6
+  });
   const stats: Partial<HypeStats> = {};
 
   if (
-    typeof viewMomentum === "number" ||
-    typeof subscriberMomentum === "number" ||
-    typeof uploadMomentum === "number"
+    typeof viewMomentum.value === "number" ||
+    typeof subscriberMomentum.value === "number" ||
+    typeof uploadMomentum.value === "number"
   ) {
     const youtubeGrowth = weightedAverage([
-      { value: viewMomentum, weight: 0.72 },
-      { value: subscriberMomentum, weight: 0.18 },
-      { value: uploadMomentum, weight: 0.1 }
+      { value: viewMomentum.value, weight: 0.72 },
+      { value: subscriberMomentum.value, weight: 0.18 },
+      { value: uploadMomentum.value, weight: 0.1 }
     ]);
     const socialGrowth = weightedAverage([
-      { value: subscriberMomentum, weight: 0.75 },
-      { value: viewMomentum, weight: 0.2 }
+      { value: subscriberMomentum.value, weight: 0.75 },
+      { value: viewMomentum.value, weight: 0.2 }
     ]);
 
     if (typeof youtubeGrowth === "number") {
@@ -241,7 +275,10 @@ function buildYoutubeSignal({
     }
 
     stats.newsScore = clamp(
-      50 + (viewMomentum ?? 0) * 0.06 + (subscriberMomentum ?? 0) * 0.04 + Math.max(0, uploadMomentum ?? 0) * 0.35,
+      50 +
+        (viewMomentum.value ?? 0) * 0.06 +
+        (subscriberMomentum.value ?? 0) * 0.04 +
+        Math.max(0, uploadMomentum.value ?? 0) * 0.35,
       0,
       100
     );
@@ -261,9 +298,15 @@ function buildYoutubeSignal({
     baselineViewCount: baseline[CHANNEL_VIEWS] ?? null,
     baselineSubscriberCount: baseline[SUBSCRIBERS] ?? null,
     baselineVideoCount: baseline[VIDEO_COUNT] ?? null,
-    viewMomentum,
-    subscriberMomentum,
-    uploadMomentum,
+    viewBaselineAgeDays,
+    subscriberBaselineAgeDays,
+    videoBaselineAgeDays,
+    viewMomentum: viewMomentum.value,
+    subscriberMomentum: subscriberMomentum.value,
+    uploadMomentum: uploadMomentum.value,
+    viewMomentumQuality: buildMomentumQualityPayload(viewMomentum),
+    subscriberMomentumQuality: buildMomentumQualityPayload(subscriberMomentum),
+    uploadMomentumQuality: buildMomentumQualityPayload(uploadMomentum),
     status: Object.keys(stats).length ? "ok" : "baseline_only"
   };
   const observations: MarketObservation[] = [];
@@ -283,7 +326,7 @@ function buildYoutubeSignal({
   return {
     signal: {
       stats,
-      confidence: 0.84,
+      confidence: clamp(0.84 * getCombinedConfidenceMultiplier([viewMomentum, subscriberMomentum, uploadMomentum]), 0.3, 0.84),
       rawPayload
     },
     observations
@@ -403,28 +446,6 @@ function normalizeYoutubeChannelId(value: string | undefined) {
   }
 
   return undefined;
-}
-
-function calculateCumulativeMomentum(
-  current: number | undefined,
-  baseline: number | undefined,
-  multiplier: number,
-  min: number,
-  max: number
-) {
-  if (typeof current !== "number" || typeof baseline !== "number" || baseline <= 0) {
-    return undefined;
-  }
-
-  return clamp(((current - baseline) / baseline) * 100 * multiplier, min, max);
-}
-
-function calculateUploadMomentum(current: number | undefined, baseline: number | undefined) {
-  if (typeof current !== "number" || typeof baseline !== "number") {
-    return undefined;
-  }
-
-  return clamp(Math.max(0, current - baseline) * 18, 0, 45);
 }
 
 function weightedAverage(values: Array<{ value?: number; weight: number }>) {

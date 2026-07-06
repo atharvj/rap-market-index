@@ -7,6 +7,13 @@ import type {
   MarketObservation,
   ObservationBaselines
 } from "@/server/market/market-data";
+import {
+  buildMomentumQualityPayload,
+  calculatePointDeltaMomentum,
+  calculateSnapshotMomentum,
+  getBaselineAgeDays,
+  getCombinedConfidenceMultiplier
+} from "@/server/market/source-quality";
 import type { HypeStats } from "@/lib/types";
 
 type SpotifyCredentials = {
@@ -183,18 +190,36 @@ function buildSpotifySignal({
   signal: AdapterSignal;
   observations: MarketObservation[];
 } {
-  const popularityMomentum = calculatePopularityMomentum(info.popularity, baseline[POPULARITY]);
-  const followerMomentum = calculateFollowerMomentum(info.followers, baseline[FOLLOWERS]);
+  const popularityBaselineAgeDays = getBaselineAgeDays(baseline, POPULARITY);
+  const followerBaselineAgeDays = getBaselineAgeDays(baseline, FOLLOWERS);
+  const popularityMomentum = calculatePointDeltaMomentum({
+    current: info.popularity,
+    baseline: baseline[POPULARITY],
+    baselineAgeDays: popularityBaselineAgeDays,
+    multiplier: 8,
+    min: -25,
+    max: 75,
+    extremeJumpPoints: 18
+  });
+  const followerMomentum = calculateSnapshotMomentum({
+    current: info.followers,
+    baseline: baseline[FOLLOWERS],
+    baselineAgeDays: followerBaselineAgeDays,
+    multiplier: 6,
+    min: -25,
+    max: 75,
+    monotonic: true
+  });
   const stats: Partial<HypeStats> = {};
 
-  if (typeof popularityMomentum === "number" || typeof followerMomentum === "number") {
+  if (typeof popularityMomentum.value === "number" || typeof followerMomentum.value === "number") {
     const streamingGrowth = weightedAverage([
-      { value: popularityMomentum, weight: 0.75 },
-      { value: followerMomentum, weight: 0.25 }
+      { value: popularityMomentum.value, weight: 0.75 },
+      { value: followerMomentum.value, weight: 0.25 }
     ]);
     const searchGrowth = weightedAverage([
-      { value: popularityMomentum, weight: 0.45 },
-      { value: followerMomentum, weight: 0.35 }
+      { value: popularityMomentum.value, weight: 0.45 },
+      { value: followerMomentum.value, weight: 0.35 }
     ]);
 
     if (typeof streamingGrowth === "number") {
@@ -217,8 +242,12 @@ function buildSpotifySignal({
     popularity: info.popularity ?? null,
     baselineFollowers: baseline[FOLLOWERS] ?? null,
     baselinePopularity: baseline[POPULARITY] ?? null,
-    followerMomentum,
-    popularityMomentum,
+    followerBaselineAgeDays,
+    popularityBaselineAgeDays,
+    followerMomentum: followerMomentum.value,
+    popularityMomentum: popularityMomentum.value,
+    followerMomentumQuality: buildMomentumQualityPayload(followerMomentum),
+    popularityMomentumQuality: buildMomentumQualityPayload(popularityMomentum),
     matchedBy: info.matchedBy,
     status: Object.keys(stats).length ? "ok" : "baseline_only"
   };
@@ -235,7 +264,7 @@ function buildSpotifySignal({
   return {
     signal: {
       stats,
-      confidence: 0.7,
+      confidence: clamp(0.7 * getCombinedConfidenceMultiplier([popularityMomentum, followerMomentum]), 0.28, 0.7),
       rawPayload
     },
     observations
@@ -499,22 +528,6 @@ function createObservation(
     unit,
     rawPayload
   };
-}
-
-function calculatePopularityMomentum(current: number | undefined, baseline: number | undefined) {
-  if (typeof current !== "number" || typeof baseline !== "number") {
-    return undefined;
-  }
-
-  return clamp((current - baseline) * 8, -25, 75);
-}
-
-function calculateFollowerMomentum(current: number | undefined, baseline: number | undefined) {
-  if (typeof current !== "number" || typeof baseline !== "number" || baseline <= 0) {
-    return undefined;
-  }
-
-  return clamp(((current - baseline) / baseline) * 100 * 6, -25, 75);
 }
 
 function weightedAverage(values: Array<{ value?: number; weight: number }>) {

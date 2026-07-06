@@ -157,7 +157,8 @@ export async function POST(request: Request) {
       runDate,
       source,
       manualSignals: sanitizeManualSignals(body.manualSignals),
-      adapterSignals
+      adapterSignals,
+      marketCoverageRatio: getMarketCoverageRatio(batch)
     });
     const summary = {
       ...result.summary,
@@ -395,6 +396,14 @@ function buildBatchSummary({
   };
 }
 
+function getMarketCoverageRatio(batch: NonNullable<MarketUpdateSummary["batch"]>) {
+  if (batch.totalArtists <= 0) {
+    return 1;
+  }
+
+  return Math.min(1, Math.max(0, batch.artistCount / batch.totalArtists));
+}
+
 async function applyPreviousCloseBaselines({
   supabase,
   artists,
@@ -504,7 +513,8 @@ async function collectRealSignals({
               source: "lastfm",
               metrics: ["listeners", "playcount"],
               beforeDate: runDate,
-              lookbackDays: 30
+              lookbackDays: 30,
+              strategy: "latest"
             })
           : Promise.resolve({}),
         useSpotify
@@ -514,7 +524,8 @@ async function collectRealSignals({
               source: "spotify",
               metrics: ["popularity", "followers_total"],
               beforeDate: runDate,
-              lookbackDays: 30
+              lookbackDays: 30,
+              strategy: "latest"
             })
           : Promise.resolve({}),
         useYoutube
@@ -524,7 +535,8 @@ async function collectRealSignals({
               source: "youtube",
               metrics: ["channel_views", "subscriber_count", "video_count"],
               beforeDate: runDate,
-              lookbackDays: 30
+              lookbackDays: 30,
+              strategy: "latest"
             })
           : Promise.resolve({}),
         useYoutube

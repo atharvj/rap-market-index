@@ -7,6 +7,12 @@ import type {
   MarketObservation,
   ObservationBaselines
 } from "@/server/market/market-data";
+import {
+  buildMomentumQualityPayload,
+  calculateSnapshotMomentum,
+  getBaselineAgeDays,
+  getCombinedConfidenceMultiplier
+} from "@/server/market/source-quality";
 import type { HypeStats } from "@/lib/types";
 
 type LastfmArtistStats = {
@@ -137,18 +143,36 @@ function buildLastfmSignal({
   signal: AdapterSignal;
   observations: MarketObservation[];
 } {
-  const listenerMomentum = calculateCumulativeMomentum(info.listeners, baseline[LISTENERS], 5.5, -25, 70);
-  const playcountMomentum = calculateCumulativeMomentum(info.playcount, baseline[PLAYCOUNT], 4.5, -25, 75);
+  const listenerBaselineAgeDays = getBaselineAgeDays(baseline, LISTENERS);
+  const playcountBaselineAgeDays = getBaselineAgeDays(baseline, PLAYCOUNT);
+  const listenerMomentum = calculateSnapshotMomentum({
+    current: info.listeners,
+    baseline: baseline[LISTENERS],
+    baselineAgeDays: listenerBaselineAgeDays,
+    multiplier: 5.5,
+    min: -25,
+    max: 70,
+    monotonic: true
+  });
+  const playcountMomentum = calculateSnapshotMomentum({
+    current: info.playcount,
+    baseline: baseline[PLAYCOUNT],
+    baselineAgeDays: playcountBaselineAgeDays,
+    multiplier: 4.5,
+    min: -25,
+    max: 75,
+    monotonic: true
+  });
   const stats: Partial<HypeStats> = {};
 
-  if (typeof playcountMomentum === "number" || typeof listenerMomentum === "number") {
+  if (typeof playcountMomentum.value === "number" || typeof listenerMomentum.value === "number") {
     const streamingGrowth = weightedAverage([
-      { value: playcountMomentum, weight: 0.7 },
-      { value: listenerMomentum, weight: 0.3 }
+      { value: playcountMomentum.value, weight: 0.7 },
+      { value: listenerMomentum.value, weight: 0.3 }
     ]);
     const socialGrowth = weightedAverage([
-      { value: listenerMomentum, weight: 0.65 },
-      { value: playcountMomentum, weight: 0.15 }
+      { value: listenerMomentum.value, weight: 0.65 },
+      { value: playcountMomentum.value, weight: 0.15 }
     ]);
 
     if (typeof streamingGrowth === "number") {
@@ -170,8 +194,12 @@ function buildLastfmSignal({
     playcount: info.playcount ?? null,
     baselineListeners: baseline[LISTENERS] ?? null,
     baselinePlaycount: baseline[PLAYCOUNT] ?? null,
-    listenerMomentum,
-    playcountMomentum,
+    listenerBaselineAgeDays,
+    playcountBaselineAgeDays,
+    listenerMomentum: listenerMomentum.value,
+    playcountMomentum: playcountMomentum.value,
+    listenerMomentumQuality: buildMomentumQualityPayload(listenerMomentum),
+    playcountMomentumQuality: buildMomentumQualityPayload(playcountMomentum),
     status: Object.keys(stats).length ? "ok" : "baseline_only"
   };
   const observations: MarketObservation[] = [];
@@ -187,7 +215,7 @@ function buildLastfmSignal({
   return {
     signal: {
       stats,
-      confidence: 0.86,
+      confidence: clamp(0.86 * getCombinedConfidenceMultiplier([listenerMomentum, playcountMomentum]), 0.3, 0.86),
       rawPayload
     },
     observations
@@ -306,20 +334,6 @@ function createObservation(
     unit,
     rawPayload
   };
-}
-
-function calculateCumulativeMomentum(
-  current: number | undefined,
-  baseline: number | undefined,
-  multiplier: number,
-  min: number,
-  max: number
-) {
-  if (typeof current !== "number" || typeof baseline !== "number" || baseline <= 0) {
-    return undefined;
-  }
-
-  return clamp(((current - baseline) / baseline) * 100 * multiplier, min, max);
 }
 
 function weightedAverage(values: Array<{ value?: number; weight: number }>) {

@@ -614,6 +614,39 @@ function buildWarnings({
     );
   }
 
+  if (latestSucceededRun) {
+    const movementSummary = getMovementSummary(latestSucceededRun.summary);
+
+    if (movementSummary.artistCount >= 10 && movementSummary.downMoveCount === 0) {
+      warnings.push("Latest market run had no decliners; review signal balance before trusting broad green movement.");
+    }
+
+    if (
+      movementSummary.artistCount >= 10 &&
+      movementSummary.lowReliabilityCount > movementSummary.highReliabilityCount + movementSummary.mediumReliabilityCount
+    ) {
+      warnings.push("Latest market run was mostly low-reliability; source coverage or confirmation may still be thin.");
+    }
+
+    if (
+      movementSummary.artistCount >= 10 &&
+      movementSummary.marketQualityScore > 0 &&
+      movementSummary.marketQualityScore < 45
+    ) {
+      warnings.push("Latest market run quality score is low; review source confirmation, direction balance, and move size.");
+    }
+
+    if (movementSummary.sourceQualityAnomalyCount > 0) {
+      warnings.push(
+        `Latest market run saw ${movementSummary.sourceQualityAnomalyCount} source data anomal${movementSummary.sourceQualityAnomalyCount === 1 ? "y" : "ies"}; review raw source quality before trusting sharp moves.`
+      );
+    }
+
+    if (movementSummary.artistCount >= 10 && movementSummary.averageSourceQualityMultiplier < 0.75) {
+      warnings.push("Latest market run source quality was weak; several signals may be stale, missing baselines, or anomaly-dampened.");
+    }
+  }
+
   if (!config.cronSecretConfigured) {
     warnings.push("CRON_SECRET is missing, so scheduled production market updates are not ready.");
   }
@@ -657,6 +690,40 @@ function buildWarnings({
   }
 
   return warnings;
+}
+
+function getMovementSummary(summary: MarketRunRow["summary"]) {
+  if (!summary || typeof summary !== "object" || Array.isArray(summary)) {
+    return {
+      artistCount: 0,
+      downMoveCount: 0,
+      lowReliabilityCount: 0,
+      mediumReliabilityCount: 0,
+      highReliabilityCount: 0,
+      marketQualityScore: 0,
+      sourceQualityAnomalyCount: 0,
+      sourceQualityStaleCount: 0,
+      averageSourceQualityMultiplier: 1
+    };
+  }
+
+  const value = summary as Record<string, unknown>;
+
+  return {
+    artistCount: getSummaryNumber(value.artistCount),
+    downMoveCount: getSummaryNumber(value.downMoveCount),
+    lowReliabilityCount: getSummaryNumber(value.lowReliabilityCount),
+    mediumReliabilityCount: getSummaryNumber(value.mediumReliabilityCount),
+    highReliabilityCount: getSummaryNumber(value.highReliabilityCount),
+    marketQualityScore: getSummaryNumber(value.marketQualityScore),
+    sourceQualityAnomalyCount: getSummaryNumber(value.sourceQualityAnomalyCount),
+    sourceQualityStaleCount: getSummaryNumber(value.sourceQualityStaleCount),
+    averageSourceQualityMultiplier: getSummaryNumber(value.averageSourceQualityMultiplier, 1)
+  };
+}
+
+function getSummaryNumber(value: unknown, fallback = 0) {
+  return typeof value === "number" && Number.isFinite(value) ? value : fallback;
 }
 
 function getInteger(value: string | null, fallback: number, min: number, max: number) {

@@ -385,6 +385,25 @@ type MarketHealth = {
     status: string;
     model_version: string;
     completed_at: string | null;
+    summary?: {
+      artistCount?: number;
+      momentumArtistCount?: number;
+      averageMovePercent?: number;
+      averageAbsMovePercent?: number;
+      upMoveCount?: number;
+      downMoveCount?: number;
+      flatMoveCount?: number;
+      lowReliabilityCount?: number;
+      mediumReliabilityCount?: number;
+      highReliabilityCount?: number;
+      sourceQualityAnomalyCount?: number;
+      sourceQualityStaleCount?: number;
+      averageSourceQualityMultiplier?: number;
+      signalCoverageScore?: number;
+      reliabilityScore?: number;
+      movementBalanceScore?: number;
+      marketQualityScore?: number;
+    };
   } | null;
   sourceCoverage: Array<{
     key: string;
@@ -1756,6 +1775,47 @@ function MarketHealthPanel({ data }: { data: MarketHealth }) {
           detail: "Initial/manual quote records"
         }
       ]} />
+
+      {data.latestRun?.summary ? (
+        <CoverageGrid title="Latest run movement" items={[
+          {
+            key: "latest-run:up-down",
+            label: "Up / down / flat",
+            value: `${data.latestRun.summary.upMoveCount ?? 0}/${data.latestRun.summary.downMoveCount ?? 0}/${data.latestRun.summary.flatMoveCount ?? 0}`,
+            detail: `${data.latestRun.summary.artistCount ?? 0} artists in latest summary`
+          },
+          {
+            key: "latest-run:avg-move",
+            label: "Average move",
+            value: formatPercent(data.latestRun.summary.averageMovePercent ?? 0),
+            detail: `${formatPercent(data.latestRun.summary.averageAbsMovePercent ?? 0)} average absolute move`
+          },
+          {
+            key: "latest-run:momentum",
+            label: "Momentum artists",
+            value: String(data.latestRun.summary.momentumArtistCount ?? 0),
+            detail: "Artists with confirmed fresh signal"
+          },
+          {
+            key: "latest-run:reliability",
+            label: "Reliability bands",
+            value: `${data.latestRun.summary.highReliabilityCount ?? 0}/${data.latestRun.summary.mediumReliabilityCount ?? 0}/${data.latestRun.summary.lowReliabilityCount ?? 0}`,
+            detail: "High / medium / low"
+          },
+          {
+            key: "latest-run:quality",
+            label: "Market quality",
+            value: `${Math.round(data.latestRun.summary.marketQualityScore ?? 0)}/100`,
+            detail: `Signal ${Math.round(data.latestRun.summary.signalCoverageScore ?? 0)}/100, reliability ${Math.round(data.latestRun.summary.reliabilityScore ?? 0)}/100, balance ${Math.round(data.latestRun.summary.movementBalanceScore ?? 0)}/100`
+          },
+          {
+            key: "latest-run:source-quality",
+            label: "Source quality",
+            value: `${Math.round((data.latestRun.summary.averageSourceQualityMultiplier ?? 1) * 100)}/100`,
+            detail: `${data.latestRun.summary.sourceQualityAnomalyCount ?? 0} anomalies, ${data.latestRun.summary.sourceQualityStaleCount ?? 0} stale inputs`
+          }
+        ]} />
+      ) : null}
 
       <CoverageGrid title="Event layer" items={[
         {

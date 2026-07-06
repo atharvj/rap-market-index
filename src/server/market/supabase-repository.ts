@@ -226,7 +226,8 @@ export async function loadObservationBaselines({
   source,
   metrics,
   beforeDate,
-  lookbackDays
+  lookbackDays,
+  strategy = "average"
 }: {
   supabase: Supabase;
   artistIds: string[];
@@ -234,6 +235,7 @@ export async function loadObservationBaselines({
   metrics: string[];
   beforeDate: string;
   lookbackDays: number;
+  strategy?: "average" | "latest";
 }): Promise<ObservationBaselines> {
   if (!artistIds.length || !metrics.length) {
     return {};
@@ -242,18 +244,34 @@ export async function loadObservationBaselines({
   const startDate = shiftDate(beforeDate, -lookbackDays);
   const { data, error } = await supabase
     .from("market_observations")
-    .select("artist_id,metric,value")
+    .select("artist_id,metric,value,observed_date")
     .in("artist_id", artistIds)
     .eq("source", source)
     .in("metric", metrics)
     .gte("observed_date", startDate)
-    .lt("observed_date", beforeDate);
+    .lt("observed_date", beforeDate)
+    .order("observed_date", { ascending: false });
 
   if (error) {
     throw new Error(`Could not load observation baselines: ${error.message}`);
   }
 
-  const grouped = ((data ?? []) as Pick<MarketObservationRow, "artist_id" | "metric" | "value">[]).reduce<
+  const rows = (data ?? []) as Pick<MarketObservationRow, "artist_id" | "metric" | "value" | "observed_date">[];
+
+  if (strategy === "latest") {
+    return rows.reduce<ObservationBaselines>((memo, row) => {
+      memo[row.artist_id] ??= {};
+
+      if (typeof memo[row.artist_id][row.metric] !== "number") {
+        memo[row.artist_id][row.metric] = Number(row.value);
+        memo[row.artist_id][getBaselineAgeMetric(row.metric)] = getDateDistanceDays(beforeDate, row.observed_date);
+      }
+
+      return memo;
+    }, {});
+  }
+
+  const grouped = rows.reduce<
     Record<string, Record<string, { total: number; count: number }>>
   >((memo, row) => {
     memo[row.artist_id] ??= {};
@@ -316,6 +334,21 @@ export async function loadLatestObservationDates({
 
     return latest;
   }, {});
+}
+
+function getBaselineAgeMetric(metric: string) {
+  return `${metric}__age_days`;
+}
+
+function getDateDistanceDays(laterDate: string, earlierDate: string) {
+  const later = new Date(`${laterDate}T00:00:00.000Z`).getTime();
+  const earlier = new Date(`${earlierDate}T00:00:00.000Z`).getTime();
+
+  if (!Number.isFinite(later) || !Number.isFinite(earlier)) {
+    return 1;
+  }
+
+  return Math.max(1, Math.round((later - earlier) / 86_400_000));
 }
 
 export async function persistMarketObservations(supabase: Supabase, observations: MarketObservation[]) {
