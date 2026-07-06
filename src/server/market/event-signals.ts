@@ -546,6 +546,11 @@ function getYoutubeUploadEventQuality(event: MarketEvent) {
     "tour_upload_title"
   ].includes(reason);
   const hasExplicitRelease = hasExplicitYoutubeReleaseLanguage(normalizedTitle);
+  const releaseKind = getRawString(event.rawPayload.releaseKind) ?? "";
+  const majorReleaseCatalyst =
+    reason === "album_announcement_upload_title" ||
+    reason === "major_feature_upload_title" ||
+    ["album", "ep", "mixtape", "project"].includes(releaseKind);
 
   if ((hasLowSignalTitle || isPromoTitle) && !hasExplicitRelease) {
     return {
@@ -567,6 +572,14 @@ function getYoutubeUploadEventQuality(event: MarketEvent) {
     return {
       accepted: false,
       label: "short-form-without-release-language",
+      multiplier: 0
+    };
+  }
+
+  if (lowReach && !majorReleaseCatalyst) {
+    return {
+      accepted: false,
+      label: "low-reach-minor-upload",
       multiplier: 0
     };
   }

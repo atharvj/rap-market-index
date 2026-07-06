@@ -568,6 +568,12 @@ function getUploadQuality(
     classification.reason === "performance_upload_title" ||
     classification.reason === "track_audio_upload_title" ||
     classification.reason === "tour_upload_title";
+  const majorReleaseCatalyst =
+    classification.reason === "album_announcement_upload_title" ||
+    classification.reason === "major_feature_upload_title" ||
+    classification.releaseKind === "album" ||
+    classification.releaseKind === "ep" ||
+    classification.releaseKind === "mixtape";
 
   if ((isShortForm || lowReach) && weakCatalyst) {
     return {
@@ -581,6 +587,14 @@ function getUploadQuality(
     return {
       accepted: false,
       label: "short_form_without_release_language",
+      multiplier: 0
+    };
+  }
+
+  if (lowReach && !majorReleaseCatalyst) {
+    return {
+      accepted: false,
+      label: "low_reach_minor_upload",
       multiplier: 0
     };
   }
@@ -1111,7 +1125,6 @@ const SINGLE_RELEASE_TERMS = [
 ];
 
 const OFFICIAL_VIDEO_TERMS = [
-  "audio",
   "lyric video",
   "music video",
   "official audio",

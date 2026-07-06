@@ -5,21 +5,16 @@ import { ChangePill } from "@/components/ChangePill";
 import { useGame } from "@/components/GameProvider";
 import { MarketNewsFeed } from "@/components/MarketNewsFeed";
 import { MiniSparkline } from "@/components/MiniSparkline";
-import { TradeTicket } from "@/components/TradeTicket";
 import { WatchlistButton } from "@/components/WatchlistButton";
 import { formatCurrency, formatPercent } from "@/lib/formatters";
 import type { Artist } from "@/lib/types";
-import { BarChart3, Newspaper, Search, Star, Trophy, WalletCards } from "lucide-react";
+import { BarChart3, Info, Newspaper, Search, Star, Trophy, WalletCards } from "lucide-react";
 import Link from "next/link";
 import { useMemo, useState } from "react";
 
 export default function MarketPage() {
   const { state, portfolioValue, portfolioDayChange, leaderboard, watchlistArtists } = useGame();
   const [query, setQuery] = useState("");
-  const [selectedArtistId, setSelectedArtistId] = useState(state.artists[0]?.id ?? "");
-  const [ticketKey, setTicketKey] = useState(0);
-  const [side, setSide] = useState<"buy" | "sell">("buy");
-  const selectedArtist = state.artists.find((artist) => artist.id === selectedArtistId) ?? state.artists[0];
   const filteredArtists = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
 
@@ -44,65 +39,60 @@ export default function MarketPage() {
   );
   const marketMover = topGainers[0];
 
-  function openTicket(artist: Artist, nextSide: "buy" | "sell") {
-    setSelectedArtistId(artist.id);
-    setSide(nextSide);
-    setTicketKey((value) => value + 1);
-  }
-
   return (
-    <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_340px]">
+    <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
       <div className="min-w-0 space-y-5">
-        <section className="grid gap-5 lg:grid-cols-[minmax(0,0.9fr)_minmax(340px,1.1fr)]">
-          <div className="rounded border border-line bg-panel shadow-market">
-            <div className="grid gap-0 md:grid-cols-[240px_minmax(0,1fr)]">
-              <div className="border-b border-line bg-panelSoft p-5 md:border-b-0 md:border-r">
-                <p className="text-xs font-black uppercase tracking-wide text-brass">Market leader</p>
+        <section className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_320px]">
+          <section className="rounded border border-line bg-panel shadow-market">
+            <SectionHeader title="Market News" action="Latest" icon={<Newspaper className="h-4 w-4" />} />
+            <div className="px-4">
+              <MarketNewsFeed limit={7} compact />
+            </div>
+          </section>
+
+          <section className="rounded border border-line bg-panel shadow-market">
+            <div className="border-b border-line bg-panelSoft p-5">
+              <p className="text-xs font-black uppercase tracking-wide text-brass">Market pulse</p>
+              <h1 className="mt-2 text-2xl font-black leading-tight">Rap Market Index</h1>
+              <p className="mt-2 text-sm font-bold leading-6 text-paper/55">
+                Prices, catalysts, artist momentum, and portfolio tracking.
+              </p>
+            </div>
+            <div className="p-5">
+              <div>
+                <p className="text-xs font-black uppercase tracking-wide text-paper/45">Market leader</p>
                 {marketMover ? (
-                  <Link href={`/artists/${marketMover.id}`} className="mt-4 flex items-center gap-4">
+                  <Link href={`/artists/${marketMover.id}`} className="mt-3 flex min-w-0 items-center gap-4">
                     <ArtistAvatar artist={marketMover} size="lg" />
-                    <span>
-                      <span className="block text-2xl font-black">{marketMover.name}</span>
+                    <span className="min-w-0">
+                      <span className="block truncate text-2xl font-black">{marketMover.name}</span>
                       <span className="mt-1 block text-sm font-bold text-paper/50">{marketMover.ticker}</span>
                     </span>
                   </Link>
                 ) : null}
-              </div>
-
-              <div className="p-5">
-                <div className="flex flex-wrap items-start justify-between gap-4">
-                  <div>
-                    <p className="text-sm font-bold text-paper/50">Today&apos;s market pulse</p>
-                    <h1 className="mt-1 max-w-xl text-3xl font-black leading-tight sm:text-4xl">
-                      Prices, catalysts, and momentum across rap.
-                    </h1>
+                {marketMover ? (
+                  <div className="mt-4">
+                    <ChangePill value={marketMover.dailyChangePercent} />
                   </div>
-                  {marketMover ? <ChangePill value={marketMover.dailyChangePercent} /> : null}
-                </div>
-                <div className="mt-5 grid gap-3 sm:grid-cols-3">
-                  <SnapshotMetric label="Cash" value={formatCurrency(state.cashBalance)} icon={<WalletCards className="h-4 w-4" />} />
-                  <SnapshotMetric
-                    label="Portfolio"
-                    value={formatCurrency(portfolioValue)}
-                    detail={`${portfolioDayChange >= 0 ? "+" : ""}${formatCurrency(portfolioDayChange)} today`}
-                    positive={portfolioDayChange >= 0}
-                    icon={<BarChart3 className="h-4 w-4" />}
-                  />
-                  <SnapshotMetric
-                    label="Watchlist"
-                    value={String(watchlistArtists.length)}
-                    detail="Tracked artists"
-                    icon={<Star className="h-4 w-4" />}
-                  />
-                </div>
+                ) : null}
               </div>
-            </div>
-          </div>
 
-          <section className="rounded border border-line bg-panel shadow-market">
-            <SectionHeader title="Market News" action="Latest" icon={<Newspaper className="h-4 w-4" />} />
-            <div className="px-4">
-              <MarketNewsFeed limit={5} compact />
+              <div className="mt-5 grid gap-3">
+                <SnapshotMetric label="Cash" value={formatCurrency(state.cashBalance)} icon={<WalletCards className="h-4 w-4" />} />
+                <SnapshotMetric
+                  label="Portfolio"
+                  value={formatCurrency(portfolioValue)}
+                  detail={`${portfolioDayChange >= 0 ? "+" : ""}${formatCurrency(portfolioDayChange)} today`}
+                  positive={portfolioDayChange >= 0}
+                  icon={<BarChart3 className="h-4 w-4" />}
+                />
+                <SnapshotMetric
+                  label="Watchlist"
+                  value={String(watchlistArtists.length)}
+                  detail="Tracked artists"
+                  icon={<Star className="h-4 w-4" />}
+                />
+              </div>
             </div>
           </section>
         </section>
@@ -133,7 +123,7 @@ export default function MarketPage() {
                   <th className="px-4 py-3 text-right">Change</th>
                   <th className="px-4 py-3 text-right">Score</th>
                   <th className="px-4 py-3 text-center">Trend</th>
-                  <th className="px-4 py-3 text-right">Trade</th>
+                  <th className="px-4 py-3 text-right">Open</th>
                 </tr>
               </thead>
               <tbody>
@@ -162,22 +152,12 @@ export default function MarketPage() {
                       <MiniSparkline data={artist.priceHistory} positive={artist.dailyChangePercent >= 0} />
                     </td>
                     <td className="px-4 py-3">
-                      <div className="flex justify-end gap-2">
-                        <button
-                          type="button"
-                          onClick={() => openTicket(artist, "buy")}
-                          className="min-h-8 rounded bg-mint px-3 text-xs font-black text-white hover:bg-mint/90"
-                        >
-                          Buy
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => openTicket(artist, "sell")}
-                          className="min-h-8 rounded border border-line bg-panel px-3 text-xs font-black text-paper/70 hover:border-ember hover:text-ember"
-                        >
-                          Sell
-                        </button>
-                      </div>
+                      <Link
+                        href={`/artists/${artist.id}`}
+                        className="ml-auto flex min-h-8 w-fit items-center rounded border border-line bg-panel px-3 text-xs font-black text-paper/70 hover:border-cyan hover:text-cyan"
+                      >
+                        View
+                      </Link>
                     </td>
                   </tr>
                 ))}
@@ -186,16 +166,11 @@ export default function MarketPage() {
           </div>
         </section>
 
-        <section className="grid gap-5 lg:grid-cols-2">
-          <MarketList title="Top Gainers" artists={topGainers} />
-          <MarketList title="Top Losers" artists={topLosers} />
-        </section>
       </div>
 
-      <aside className="space-y-5 xl:sticky xl:top-40 xl:self-start">
-        {selectedArtist ? (
-          <TradeTicket key={`${selectedArtist.id}-${side}-${ticketKey}`} artist={selectedArtist} defaultSide={side} />
-        ) : null}
+      <aside className="space-y-5">
+        <MarketList title="Top Gainers" artists={topGainers} />
+        <MarketList title="Top Losers" artists={topLosers} />
 
         <section className="rounded border border-line bg-panel shadow-market">
           <SectionHeader title="Hot Artists" action="Score" />
@@ -204,6 +179,17 @@ export default function MarketPage() {
               <CompactArtistRow key={artist.id} artist={artist} detail={`${artist.hypeScore}/100`} />
             ))}
           </div>
+        </section>
+
+        <section className="rounded border border-line bg-panel p-4 shadow-market">
+          <div className="flex items-center gap-2">
+            <Info className="h-4 w-4 text-brass" aria-hidden="true" />
+            <h2 className="text-sm font-black uppercase tracking-wide">RMI Score</h2>
+          </div>
+          <p className="mt-3 text-sm font-bold leading-6 text-paper/55">
+            A 1-99 artist market signal built from audience momentum, video activity, public attention, releases,
+            reviews, and trading demand.
+          </p>
         </section>
 
         <section className="rounded border border-line bg-panel shadow-market">

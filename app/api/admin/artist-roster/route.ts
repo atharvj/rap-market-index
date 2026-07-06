@@ -26,6 +26,7 @@ type ArtistRosterBody = {
   artistId?: string;
   ticker?: string;
   isActive?: boolean;
+  confirmDelete?: string;
 };
 
 const DEFAULT_ACCENT = "from-fuchsia-300 via-lime-200 to-cyan-300";
@@ -200,6 +201,87 @@ export async function POST(request: Request) {
   }
 }
 
+export async function DELETE(request: Request) {
+  const auth = await requireAdminRequest(request);
+
+  if (!auth.ok) {
+    return auth.response;
+  }
+
+  const config = getSupabaseConfigStatus();
+
+  if (!config.readyForAdminWrites) {
+    return NextResponse.json(
+      {
+        ok: false,
+        error: "Supabase admin credentials are not fully configured.",
+        config
+      },
+      { status: 400 }
+    );
+  }
+
+  try {
+    const body = await parseBody(request);
+    const artistId = normalizeLookupId(body.artistId);
+    const ticker = normalizeOptionalTicker(body.ticker);
+
+    if (!artistId && !ticker) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: "Provide artistId or ticker."
+        },
+        { status: 400 }
+      );
+    }
+
+    const supabase = createServiceRoleClient();
+    const artist = await loadExistingArtistByLookup(supabase, { artistId, ticker });
+
+    if (!artist) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: "Artist not found."
+        },
+        { status: 404 }
+      );
+    }
+
+    const confirmation = body.confirmDelete?.trim();
+
+    if (confirmation !== artist.ticker && confirmation !== artist.id) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: `Type ${artist.ticker} or ${artist.id} to confirm permanent deletion.`
+        },
+        { status: 400 }
+      );
+    }
+
+    const deleted = await deleteArtistEverywhere(supabase, artist.id);
+
+    return NextResponse.json({
+      ok: true,
+      persisted: true,
+      config,
+      deletedArtist: mapArtistRow(artist),
+      deleted
+    });
+  } catch (error) {
+    return NextResponse.json(
+      {
+        ok: false,
+        error: error instanceof Error ? error.message : "Artist delete failed.",
+        config
+      },
+      { status: 500 }
+    );
+  }
+}
+
 async function parseBody(request: Request): Promise<ArtistRosterBody> {
   try {
     return (await request.json()) as ArtistRosterBody;
@@ -219,6 +301,66 @@ async function loadExistingArtist(
   }
 
   return (data ?? null) as ArtistRow | null;
+}
+
+async function loadExistingArtistByLookup(
+  supabase: ReturnType<typeof createServiceRoleClient>,
+  { artistId, ticker }: { artistId: string; ticker: string | null }
+): Promise<ArtistRow | null> {
+  let query = supabase.from("artists").select("*");
+  const result = artistId ? await query.eq("id", artistId).maybeSingle() : await query.eq("ticker", ticker ?? "").maybeSingle();
+
+  if (result.error) {
+    throw new Error(result.error.message);
+  }
+
+  return (result.data ?? null) as ArtistRow | null;
+}
+
+async function deleteArtistEverywhere(supabase: ReturnType<typeof createServiceRoleClient>, artistId: string) {
+  const tables: Array<keyof Database["public"]["Tables"]> = [
+    "short_transactions",
+    "transactions",
+    "short_positions",
+    "holdings",
+    "watchlist",
+    "artist_trading_halts",
+    "artist_external_ids",
+    "artist_stats",
+    "price_ticks",
+    "price_history",
+    "market_events",
+    "market_observations",
+    "market_signal_snapshots"
+  ];
+  const deleted: Record<string, number> = {};
+  const dynamicClient = supabase as unknown as {
+    from: (table: string) => {
+      delete: (options?: { count?: "exact" }) => {
+        eq: (column: string, value: string) => Promise<{ count: number | null; error: { message: string } | null }>;
+      };
+    };
+  };
+
+  for (const table of tables) {
+    const { count, error } = await dynamicClient.from(table).delete({ count: "exact" }).eq("artist_id", artistId);
+
+    if (error) {
+      throw new Error(`Could not delete ${table}: ${error.message}`);
+    }
+
+    deleted[table] = count ?? 0;
+  }
+
+  const artistResult = await supabase.from("artists").delete({ count: "exact" }).eq("id", artistId);
+
+  if (artistResult.error) {
+    throw new Error(`Could not delete artist: ${artistResult.error.message}`);
+  }
+
+  deleted.artists = artistResult.count ?? 0;
+
+  return deleted;
 }
 
 function getArtistInputId(input: ArtistRosterInput) {

@@ -8,9 +8,10 @@ import { MarketNewsFeed } from "@/components/MarketNewsFeed";
 import { MiniSparkline } from "@/components/MiniSparkline";
 import { TradeTicket } from "@/components/TradeTicket";
 import { WatchlistButton } from "@/components/WatchlistButton";
+import { MARKET_SCORE_EXPLANATION, sanitizeMoveExplanation } from "@/lib/artist-explanations";
 import { formatCurrency, formatPercent, formatShares } from "@/lib/formatters";
 import type { Artist } from "@/lib/types";
-import { ArrowLeft, BarChart3, Newspaper, Star } from "lucide-react";
+import { ArrowLeft, BarChart3, Info, Newspaper, Star } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useMemo } from "react";
@@ -47,6 +48,7 @@ export default function ArtistDetailPage() {
   const recentPrices = artist.priceHistory.slice(-30).map((point) => point.price);
   const periodLow = Math.min(...recentPrices, artist.currentPrice);
   const periodHigh = Math.max(...recentPrices, artist.currentPrice);
+  const moveExplanation = sanitizeMoveExplanation(artist.ticker, artist.lastMoveExplanation);
 
   return (
     <div className="grid gap-5 xl:grid-cols-[136px_minmax(0,1fr)_340px]">
@@ -106,14 +108,14 @@ export default function ArtistDetailPage() {
             <QuoteStat label="Previous Close" value={formatCurrency(artist.previousClose)} />
             <QuoteStat label="30-Day Range" value={`${formatCurrency(periodLow)} - ${formatCurrency(periodHigh)}`} />
             <QuoteStat label="Volatility" value={`${artist.volatility.toFixed(2)}x`} />
-            <QuoteStat label="Market Score" value={`${artist.hypeScore}/100`} />
+            <QuoteStat label="Market Score" value={`${artist.hypeScore}/100`} description={MARKET_SCORE_EXPLANATION} />
           </div>
         </section>
 
         <section className="rounded border border-line bg-panel shadow-market">
           <SectionHeader title={`What's happening with ${artist.ticker}`} icon={<BarChart3 className="h-4 w-4" />} />
           <div className="p-5">
-            <p className="text-base font-black leading-snug">{artist.lastMoveExplanation}</p>
+            <p className="text-base font-black leading-snug">{moveExplanation}</p>
           </div>
         </section>
 
@@ -183,10 +185,13 @@ function SectionHeader({ title, icon }: { title: string; icon?: React.ReactNode 
   );
 }
 
-function QuoteStat({ label, value }: { label: string; value: string }) {
+function QuoteStat({ label, value, description }: { label: string; value: string; description?: string }) {
   return (
-    <div className="border-b border-line px-4 py-3 md:border-b-0 md:border-r md:last:border-r-0">
-      <p className="text-xs font-black uppercase tracking-wide text-paper/40">{label}</p>
+    <div className="border-b border-line px-4 py-3 md:border-b-0 md:border-r md:last:border-r-0" title={description}>
+      <p className="flex items-center gap-1.5 text-xs font-black uppercase tracking-wide text-paper/40">
+        {label}
+        {description ? <Info className="h-3.5 w-3.5 text-paper/35" aria-hidden="true" /> : null}
+      </p>
       <p className="mt-1 text-sm font-black number-tabular">{value}</p>
     </div>
   );

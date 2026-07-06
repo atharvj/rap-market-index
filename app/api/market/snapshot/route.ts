@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createInitialGameState } from "@/lib/market";
+import { sanitizeMoveExplanation } from "@/lib/artist-explanations";
 import { createAnonServerClient, getSupabaseConfigStatus } from "@/lib/supabase/server";
 import type { Database } from "@/lib/supabase/database.types";
 import type { Artist, GameState, HypeStats, PricePoint } from "@/lib/types";
@@ -151,7 +152,7 @@ function mapArtist(row: ArtistRow, stats: ArtistStatsRow | null, history: PriceP
     accent: row.accent,
     stats: mapStats(stats),
     priceHistory: history.length ? history.slice(-PRICE_HISTORY_LOOKBACK_DAYS) : fallbackHistory,
-    lastMoveExplanation: row.last_move_explanation
+    lastMoveExplanation: sanitizeMoveExplanation(row.ticker, row.last_move_explanation)
   };
 }
 

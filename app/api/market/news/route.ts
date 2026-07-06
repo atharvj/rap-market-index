@@ -40,6 +40,18 @@ export async function GET(request: Request) {
     const artists = await loadArtists(supabase);
     const artistById = new Map(artists.map((artist) => [artist.id, artist]));
     const selectedArtistId = artistId ?? (ticker ? artists.find((artist) => artist.ticker === ticker)?.id ?? null : null);
+
+    if (ticker && !selectedArtistId) {
+      return NextResponse.json({
+        ok: true,
+        source: "supabase",
+        runDate,
+        lookbackDays,
+        eventCount: 0,
+        news: []
+      });
+    }
+
     const candidateLimit = Math.min(500, limit * 6);
     let query = supabase
       .from("market_events")
@@ -64,7 +76,10 @@ export async function GET(request: Request) {
       throw new Error(`Could not load market news: ${error.message}`);
     }
 
-    const events = ((data ?? []) as MarketEventRow[]).filter(isPublicMarketNewsEvent).slice(0, limit).map((event) => {
+    const events = ((data ?? []) as MarketEventRow[])
+      .filter((event) => artistById.has(event.artist_id) && isPublicMarketNewsEvent(event))
+      .slice(0, limit)
+      .map((event) => {
       const artist = artistById.get(event.artist_id) ?? null;
       const rawPayload = event.raw_payload as Record<string, unknown>;
 
@@ -78,6 +93,7 @@ export async function GET(request: Request) {
         title: event.title,
         sourceName: event.source_name,
         sourceUrl: event.source_url,
+        thumbnailUrl: getEventThumbnailUrl(rawPayload),
         sentimentScore: Number(event.sentiment_score),
         impactScore: Number(event.impact_score),
         confidence: Number(event.confidence),
@@ -253,8 +269,49 @@ function getRawString(value: unknown) {
   return typeof value === "string" ? value.toLowerCase() : "";
 }
 
+function getRawText(value: unknown) {
+  return typeof value === "string" ? value.trim() : "";
+}
+
 function getRawNumber(value: unknown) {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+function getEventThumbnailUrl(rawPayload: Record<string, unknown>) {
+  const directImageUrl = [
+    rawPayload.thumbnailUrl,
+    rawPayload.thumbnail_url,
+    rawPayload.imageUrl,
+    rawPayload.image_url,
+    rawPayload.urlToImage
+  ]
+    .map(getRawText)
+    .find(isSafeHttpUrl);
+
+  if (directImageUrl) {
+    return directImageUrl;
+  }
+
+  const videoId = getRawText(rawPayload.videoId);
+
+  if (/^[A-Za-z0-9_-]{6,}$/.test(videoId)) {
+    return `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`;
+  }
+
+  return null;
+}
+
+function isSafeHttpUrl(value: string | undefined) {
+  if (!value) {
+    return false;
+  }
+
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" || url.protocol === "http:";
+  } catch {
+    return false;
+  }
 }
 
 function isLowSignalSocialTitle(title: string) {

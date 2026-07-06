@@ -1448,6 +1448,66 @@ export default function DevPage() {
     }
   }
 
+  async function deleteRosterArtist() {
+    const artist = selectedRosterRecord;
+
+    if (!artist) {
+      setArtistRosterSave({
+        status: "error",
+        message: "Choose an artist before deleting."
+      });
+      return;
+    }
+
+    const confirmation = window.prompt(
+      `Type ${artist.ticker} to permanently delete ${artist.name} and all related market data.`
+    );
+
+    if (confirmation !== artist.ticker) {
+      setArtistRosterSave({
+        status: "error",
+        message: "Permanent delete cancelled."
+      });
+      return;
+    }
+
+    setArtistRosterSave({ status: "saving" });
+
+    try {
+      const response = await fetch("/api/admin/artist-roster", {
+        method: "DELETE",
+        headers: {
+          "content-type": "application/json",
+          ...adminHeaders
+        },
+        body: JSON.stringify({
+          artistId: artist.id,
+          confirmDelete: confirmation
+        })
+      });
+      const payload = await response.json();
+
+      if (!response.ok || !payload.ok) {
+        throw new Error(payload.error ?? "Artist delete failed.");
+      }
+
+      setArtistRosterSave({
+        status: "saved",
+        message: `Deleted ${artist.ticker} from the market roster and related market data.`
+      });
+      setArtistRosterForm(emptyArtistRosterForm);
+      setManualSourceForm(emptyManualSourceIdForm);
+      await refreshArtistRoster();
+      await refreshSourceIds();
+      await refreshMarketHealth();
+    } catch (error) {
+      setArtistRosterSave({
+        status: "error",
+        message: error instanceof Error ? error.message : "Artist delete failed."
+      });
+    }
+  }
+
   function selectManualSourceArtist(artistId: string) {
     const record =
       sourceIds.status === "ready" ? sourceIds.data.records.find((item) => item.artistId === artistId) : undefined;
@@ -1724,6 +1784,7 @@ export default function DevPage() {
         onChange={updateRosterField}
         onSave={saveRosterArtist}
         onSetActive={setRosterArtistActive}
+        onDelete={deleteRosterArtist}
         onAutoNameChange={(value) => {
           setAutoArtistName(value);
           setAutoArtistAdd({ status: "idle" });
@@ -3022,6 +3083,7 @@ function ArtistRosterManager({
   onChange,
   onSave,
   onSetActive,
+  onDelete,
   onAutoNameChange,
   onAutoAdd
 }: {
@@ -3037,6 +3099,7 @@ function ArtistRosterManager({
   onChange: (field: keyof Omit<ArtistRosterForm, "selectedId">, value: string | boolean) => void;
   onSave: () => void;
   onSetActive: (isActive: boolean) => void;
+  onDelete: () => void;
   onAutoNameChange: (value: string) => void;
   onAutoAdd: () => void;
 }) {
@@ -3262,14 +3325,24 @@ function ArtistRosterManager({
               </div>
               <div className="flex flex-col gap-2 sm:flex-row">
                 {selectedRecord ? (
-                  <button
-                    type="button"
-                    onClick={() => onSetActive(!selectedRecord.isActive)}
-                    disabled={saveState.status === "saving"}
-                    className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md border border-brass/45 bg-brass/10 px-4 text-sm font-black text-brass disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    {selectedRecord.isActive ? "Deactivate" : "Reactivate"}
-                  </button>
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => onSetActive(!selectedRecord.isActive)}
+                      disabled={saveState.status === "saving"}
+                      className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md border border-brass/45 bg-brass/10 px-4 text-sm font-black text-brass disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      {selectedRecord.isActive ? "Deactivate" : "Reactivate"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={onDelete}
+                      disabled={saveState.status === "saving"}
+                      className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md border border-ember/45 bg-ember/10 px-4 text-sm font-black text-ember disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      Delete completely
+                    </button>
+                  </>
                 ) : null}
                 <button
                   type="button"

@@ -3,7 +3,6 @@
 import { ArtistAvatar } from "@/components/ArtistAvatar";
 import { ChangePill } from "@/components/ChangePill";
 import { useGame } from "@/components/GameProvider";
-import { MiniSparkline } from "@/components/MiniSparkline";
 import { TradeTicket } from "@/components/TradeTicket";
 import { formatCurrency, formatPercent, formatShares } from "@/lib/formatters";
 import { STARTING_CASH } from "@/lib/market";
@@ -76,9 +75,9 @@ export default function PortfolioPage() {
         <div className="border-b border-brass/35 bg-brass/10 px-4 py-3">
           <h2 className="text-sm font-black uppercase tracking-wide">Popular artists to watch</h2>
         </div>
-        <div className="grid gap-4 p-4 md:grid-cols-2 xl:grid-cols-4">
+        <div className="grid gap-3 p-4 md:grid-cols-2 xl:grid-cols-4">
           {suggestedArtists.map((artist) => (
-            <Link key={artist.id} href={`/artists/${artist.id}`} className="min-w-0">
+            <Link key={artist.id} href={`/artists/${artist.id}`} className="min-w-0 rounded border border-line bg-white p-3 hover:border-cyan">
               <div className="flex items-center gap-3">
                 <ArtistAvatar artist={artist} />
                 <div className="min-w-0">
@@ -88,9 +87,8 @@ export default function PortfolioPage() {
                   </p>
                 </div>
               </div>
-              <div className="mt-3 grid grid-cols-[1fr_110px] items-center gap-3">
+              <div className="mt-3">
                 <ChangePill value={artist.dailyChangePercent} />
-                <MiniSparkline data={artist.priceHistory} positive={artist.dailyChangePercent >= 0} />
               </div>
             </Link>
           ))}

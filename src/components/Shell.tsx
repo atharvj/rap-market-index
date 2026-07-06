@@ -7,11 +7,12 @@ import clsx from "clsx";
 import {
   BarChart3,
   Newspaper,
-  Landmark,
+  LogIn,
   LogOut,
   Search,
   Star,
   UserCircle,
+  UserPlus,
   Trophy,
   WalletCards
 } from "lucide-react";
@@ -33,6 +34,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
   const { portfolioValue, state, gainPercent } = useGame();
   const { session, user, signOut } = useAuth();
   const [search, setSearch] = useState("");
+  const [searchFocused, setSearchFocused] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
   const tapeArtists = useMemo(
     () =>
@@ -41,6 +43,21 @@ export function Shell({ children }: { children: React.ReactNode }) {
         .slice(0, 12),
     [state.artists]
   );
+  const searchSuggestions = useMemo(() => {
+    const normalized = search.trim().toLowerCase();
+
+    if (!normalized) {
+      return tapeArtists.slice(0, 6);
+    }
+
+    return state.artists
+      .filter(
+        (artist) =>
+          artist.name.toLowerCase().includes(normalized) ||
+          artist.ticker.toLowerCase().includes(normalized)
+      )
+      .slice(0, 6);
+  }, [search, state.artists, tapeArtists]);
 
   function submitSearch(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -58,6 +75,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
     );
 
     if (match) {
+      setSearchFocused(false);
       router.push(`/artists/${match.id}`);
     }
   }
@@ -69,7 +87,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
   }
 
   const accountLabel =
-    session && state.username && state.username !== "Demo Guest" ? state.username : user?.email?.split("@")[0] ?? "Account";
+    session && state.username && state.username !== "Demo Guest" ? state.username : user?.email?.split("@")[0] ?? "Guest";
   const accountInitial = (accountLabel.trim()[0] ?? "A").toUpperCase();
 
   return (
@@ -96,7 +114,44 @@ export function Shell({ children }: { children: React.ReactNode }) {
                 placeholder="Search artists or tickers"
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
+                onFocus={() => setSearchFocused(true)}
+                onBlur={() => {
+                  window.setTimeout(() => setSearchFocused(false), 140);
+                }}
               />
+              {searchFocused ? (
+                <div className="absolute left-0 right-0 top-12 z-40 rounded-2xl border border-line bg-panel p-4 shadow-2xl">
+                  <div className="mb-3 flex items-center justify-between gap-3">
+                    <h2 className="text-sm font-black">Trending Artists</h2>
+                    {search.trim() ? (
+                      <span className="text-xs font-bold text-paper/45">{searchSuggestions.length} matches</span>
+                    ) : null}
+                  </div>
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    {searchSuggestions.map((artist) => (
+                      <Link
+                        key={artist.id}
+                        href={`/artists/${artist.id}`}
+                        onClick={() => setSearchFocused(false)}
+                        className="flex min-w-0 items-center justify-between gap-3 rounded-full bg-panelSoft px-3 py-2 hover:bg-brass/10"
+                      >
+                        <span className="min-w-0">
+                          <span className="font-black text-cyan">{artist.ticker}</span>{" "}
+                          <span className="font-bold text-paper">{artist.name}</span>
+                        </span>
+                        <span
+                          className={clsx(
+                            "shrink-0 text-xs font-black number-tabular",
+                            artist.dailyChangePercent >= 0 ? "text-mint" : "text-ember"
+                          )}
+                        >
+                          {formatPercent(artist.dailyChangePercent)}
+                        </span>
+                      </Link>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
             </form>
 
             <div className="ml-auto flex shrink-0 items-center gap-2">
@@ -126,27 +181,33 @@ export function Shell({ children }: { children: React.ReactNode }) {
                   >
                     {formatPercent(gainPercent)}
                   </span>
-                  <div className="relative">
-                    <button
-                      type="button"
-                      onClick={() => setAccountOpen((value) => !value)}
-                      className="flex h-10 w-10 items-center justify-center rounded-full border border-line bg-panelSoft text-sm font-black hover:border-cyan"
-                      aria-label="Open account menu"
-                      aria-expanded={accountOpen}
-                    >
-                      {accountInitial}
-                    </button>
-                    {accountOpen ? (
-                      <div className="absolute right-0 top-12 w-80 rounded border border-line bg-panel p-4 shadow-2xl">
-                        <div className="flex items-center gap-3 border-b border-line pb-4">
-                          <div className="grid h-14 w-14 place-items-center rounded bg-panelSoft text-2xl font-black">
-                            {accountInitial}
-                          </div>
-                          <div className="min-w-0">
-                            <p className="truncate text-lg font-black">{accountLabel}</p>
-                            <p className="truncate text-sm font-bold text-paper/50">{user?.email}</p>
-                          </div>
-                        </div>
+                </>
+              ) : null}
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setAccountOpen((value) => !value)}
+                  className="flex h-10 w-10 items-center justify-center rounded-full border border-line bg-panelSoft text-sm font-black hover:border-cyan"
+                  aria-label="Open account menu"
+                  aria-expanded={accountOpen}
+                >
+                  {session ? accountInitial : <UserCircle className="h-5 w-5 text-paper/60" aria-hidden="true" />}
+                </button>
+                {accountOpen ? (
+                  <div className="absolute right-0 top-12 w-80 rounded border border-line bg-panel p-4 shadow-2xl">
+                    <div className="flex items-center gap-3 border-b border-line pb-4">
+                      <div className="grid h-14 w-14 place-items-center rounded bg-panelSoft text-2xl font-black">
+                        {session ? accountInitial : <UserCircle className="h-8 w-8 text-paper/55" aria-hidden="true" />}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="truncate text-lg font-black">{accountLabel}</p>
+                        <p className="truncate text-sm font-bold text-paper/50">
+                          {session ? user?.email : "Sign in to trade and save watchlists"}
+                        </p>
+                      </div>
+                    </div>
+                    {session ? (
+                      <>
                         <div className="grid gap-2 py-3 text-sm font-bold">
                           <Link
                             href="/portfolio"
@@ -178,20 +239,30 @@ export function Shell({ children }: { children: React.ReactNode }) {
                           <LogOut className="h-4 w-4" />
                           Sign out
                         </button>
+                      </>
+                    ) : (
+                      <div className="grid gap-2 pt-4 text-sm font-black">
+                        <Link
+                          href="/account?mode=signup"
+                          onClick={() => setAccountOpen(false)}
+                          className="flex min-h-11 items-center justify-center gap-2 rounded bg-paper px-4 text-white hover:bg-paper/90"
+                        >
+                          <UserPlus className="h-4 w-4" />
+                          Create account
+                        </Link>
+                        <Link
+                          href="/account"
+                          onClick={() => setAccountOpen(false)}
+                          className="flex min-h-11 items-center justify-center gap-2 rounded border border-line hover:border-cyan"
+                        >
+                          <LogIn className="h-4 w-4" />
+                          Sign in
+                        </Link>
                       </div>
-                    ) : null}
+                    )}
                   </div>
-                </>
-              ) : (
-                <div className="flex items-center gap-2 text-sm font-black">
-                  <Link href="/account?mode=signup" className="rounded bg-paper px-3 py-2 text-white hover:bg-paper/90">
-                    Sign Up
-                  </Link>
-                  <Link href="/account" className="rounded border border-line px-3 py-2 hover:border-cyan">
-                    Login
-                  </Link>
-                </div>
-              )}
+                ) : null}
+              </div>
             </div>
           </div>
         </div>
@@ -218,13 +289,6 @@ export function Shell({ children }: { children: React.ReactNode }) {
                 </Link>
               );
             })}
-            <Link
-              href="/account"
-              className="inline-flex min-h-9 shrink-0 items-center gap-2 rounded px-3 text-sm font-bold text-paper/70 hover:bg-panelSoft hover:text-paper"
-            >
-              <UserCircle className="h-4 w-4" aria-hidden="true" />
-              Account
-            </Link>
           </nav>
         </div>
 
@@ -248,20 +312,23 @@ export function Shell({ children }: { children: React.ReactNode }) {
         {children}
       </main>
 
-      <footer className="border-t border-line bg-panel">
-        <div className="mx-auto grid max-w-[1440px] gap-8 px-4 py-10 text-sm text-paper/65 sm:px-6 md:grid-cols-[1.2fr_1fr_1fr_1fr] lg:px-8">
+      <footer className="border-t border-line bg-[#eef2f5]">
+        <div className="mx-auto grid max-w-[1440px] gap-10 px-4 py-12 text-sm text-paper/70 sm:px-6 md:grid-cols-[1.3fr_1fr_1fr_1fr] lg:px-8">
           <div>
             <div className="flex items-center gap-3">
-              <div className="grid h-10 w-10 place-items-center rounded border border-brass/30 bg-brass/10 text-brass">
-                <Landmark className="h-5 w-5" aria-hidden="true" />
+              <div className="grid h-11 w-11 place-items-center rounded border border-brass/30 bg-white text-brass">
+                <img src="/logo.svg" alt="" className="h-7 w-7" />
               </div>
               <div>
-                <p className="font-black text-paper">Rap Market Index</p>
+                <p className="text-xl font-black text-paper">Rap Market Index</p>
                 <p className="text-xs font-bold uppercase tracking-wide text-paper/45">Virtual rap exchange</p>
               </div>
             </div>
+            <p className="mt-5 max-w-sm text-sm leading-6 text-paper/60">
+              Artist prices, market news, portfolios, and leaderboards for fantasy rap trading.
+            </p>
             <p className="mt-4 max-w-sm text-xs font-bold uppercase leading-5 tracking-wide text-paper/45">
-              Fantasy rap trading game. No real money. No cash-out. Not affiliated with any artists.
+              No real money. No cash-out. Not affiliated with any artists, labels, or platforms.
             </p>
           </div>
 
@@ -275,15 +342,15 @@ export function Shell({ children }: { children: React.ReactNode }) {
           <FooterColumn title="Account">
             <Link href="/portfolio">Portfolio</Link>
             <Link href="/account">Profile</Link>
-            <Link href="/account?mode=signup">Sign Up</Link>
-            <Link href="/account">Login</Link>
+            <Link href="/account?mode=signup">Create account</Link>
+            <Link href="/dev">Admin console</Link>
           </FooterColumn>
 
           <FooterColumn title="About">
-            <span>How RMI Works</span>
-            <span>Rules</span>
-            <span>Data Disclaimer</span>
-            <span>Terms and Privacy</span>
+            <span>RMI Score: 1-99 artist market signal</span>
+            <span>Fantasy trading only</span>
+            <span>Data may update daily or during admin runs</span>
+            <span>Public beta</span>
           </FooterColumn>
         </div>
       </footer>
@@ -295,7 +362,7 @@ function FooterColumn({ title, children }: { title: string; children: React.Reac
   return (
     <div>
       <h2 className="font-black text-paper">{title}</h2>
-      <div className="mt-3 grid gap-2 font-bold text-paper/55 [&_a:hover]:text-cyan">{children}</div>
+      <div className="mt-4 grid gap-3 font-bold text-paper/58 [&_a:hover]:text-cyan">{children}</div>
     </div>
   );
 }
