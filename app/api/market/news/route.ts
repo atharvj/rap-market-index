@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createAnonServerClient, getSupabaseConfigStatus } from "@/lib/supabase/server";
 import type { Database } from "@/lib/supabase/database.types";
 import { getPacificMarketDate, shiftMarketDate } from "@/server/market/market-date";
+import { getArtistStatusSubtype } from "@/server/market/status-events";
 
 export const dynamic = "force-dynamic";
 
@@ -64,6 +65,7 @@ export async function GET(request: Request) {
 
     const events = ((data ?? []) as MarketEventRow[]).map((event) => {
       const artist = artistById.get(event.artist_id) ?? null;
+      const rawPayload = event.raw_payload as Record<string, unknown>;
 
       return {
         id: event.id,
@@ -78,6 +80,8 @@ export async function GET(request: Request) {
         sentimentScore: Number(event.sentiment_score),
         impactScore: Number(event.impact_score),
         confidence: Number(event.confidence),
+        statusSubtype: getArtistStatusSubtype(rawPayload.statusSubtype),
+        statusSeverity: typeof rawPayload.statusSeverity === "string" ? rawPayload.statusSeverity : null,
         createdAt: event.created_at
       };
     });

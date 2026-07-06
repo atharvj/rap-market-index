@@ -2,6 +2,11 @@ import { clamp } from "@/lib/pricing";
 import type { MarketUpdateArtist } from "@/server/market/daily-update";
 import { buildDefaultGdeltQuery } from "@/server/market/artist-text-identifiers";
 import { buildCommunityEventTitle, getCommunityEventLabel } from "@/server/market/event-title";
+import {
+  classifyArtistStatusText,
+  type ArtistStatusSeverity,
+  type ArtistStatusSubtype
+} from "@/server/market/status-events";
 import type {
   AdapterSignal,
   AdapterSignals,
@@ -89,6 +94,9 @@ type RedditPostClassification = {
   catalyst: boolean;
   negative: boolean;
   hype: boolean;
+  statusSubtype?: ArtistStatusSubtype;
+  statusSeverity?: ArtistStatusSeverity;
+  statusHaltRecommended?: boolean;
 };
 
 export type RedditMarketSignals = {
@@ -520,7 +528,10 @@ function buildRedditEvents({
       subredditTier: getSubredditTier(post.subreddit),
       upvoteRatio: post.upvoteRatio,
       matchConfidence: post.matchConfidence,
-      classificationReason: classification.reason
+      classificationReason: classification.reason,
+      statusSubtype: classification.statusSubtype ?? null,
+      statusSeverity: classification.statusSeverity ?? null,
+      statusHaltRecommended: classification.statusHaltRecommended ?? false
     }
   }));
 }
@@ -544,6 +555,23 @@ function classifyRedditPost(post: RedditPost): RedditPostClassification {
   const negative = negativeMatches > positiveMatches || hasDecline || hasControversy;
   const sentimentScore = clamp((positiveMatches - negativeMatches) * 14 + (hype ? 10 : 0) - (hasDecline ? 18 : 0), -80, 80);
   const engagementImpact = clamp(Math.log10(post.engagement + 1) * 7, 0, 30);
+  const status = classifyArtistStatusText(text, { engagementImpact });
+
+  if (status) {
+    return {
+      eventType: status.eventType,
+      sentimentScore: status.sentimentScore,
+      impactScore: status.impactScore,
+      confidence: status.baseConfidence,
+      reason: status.reason,
+      catalyst: true,
+      negative: status.impactScore < 0 || status.sentimentScore < -20,
+      hype: status.impactScore > 0,
+      statusSubtype: status.statusSubtype,
+      statusSeverity: status.statusSeverity,
+      statusHaltRecommended: status.statusHaltRecommended
+    };
+  }
 
   if (hasControversy) {
     return {

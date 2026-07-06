@@ -3,10 +3,11 @@ import { createServiceRoleClient, getSupabaseConfigStatus } from "@/lib/supabase
 import { requireAdminRequest } from "@/server/admin-auth";
 import { flattenEvents, mergeEvents } from "@/server/market/event-signals";
 import { collectGdeltMarketSignals } from "@/server/market/gdelt-source";
-import { collectMediaRssMarketEvents } from "@/server/market/media-rss-source";
+import { collectMediaRssMarketEvents, getDefaultMediaRssFeedUrls } from "@/server/market/media-rss-source";
 import { getPacificMarketDate } from "@/server/market/market-date";
 import type { MarketUpdateArtist } from "@/server/market/daily-update";
 import type { MarketEvent } from "@/server/market/market-data";
+import { getArtistStatusSubtype, shouldRecommendStatusTradingHalt } from "@/server/market/status-events";
 import {
   loadActiveArtists,
   loadArtistExternalIds,
@@ -31,6 +32,17 @@ type MarketEventScanBody = {
   rssLookbackDays?: number;
   rssMaxItemsPerFeed?: number;
   includeGoogleNews?: boolean;
+};
+
+type StatusHaltCandidate = {
+  artistId: string;
+  ticker: string;
+  name: string;
+  statusSubtype: string;
+  eventTitle: string;
+  eventDate: string;
+  confidence: number;
+  reason: string;
 };
 
 const DEFAULT_ARTIST_LIMIT = 10;
@@ -141,7 +153,7 @@ export async function POST(request: Request) {
       artists,
       runDate,
       externalIds,
-      feedUrls: normalizeFeedUrls(body.rssFeedUrls) ?? getEnvList("MARKET_RSS_FEEDS"),
+      feedUrls: getConfiguredRssFeedUrls(body.rssFeedUrls),
       includeGoogleNews: body.includeGoogleNews ?? getEnvBoolean("MARKET_RSS_GOOGLE_NEWS", true),
       lookbackDays: normalizeInteger(
         body.rssLookbackDays,
@@ -161,10 +173,15 @@ export async function POST(request: Request) {
     const mergedEventsByArtist = mergeEvents(result.eventsByArtist, mediaRss.eventsByArtist);
     const events = flattenEvents(mergedEventsByArtist);
     const observations = [...result.observations, ...mediaRss.observations];
+    const statusHaltCandidates = buildStatusHaltCandidates(events, artists);
+    const autoHaltStatusEvents = getEnvBoolean("MARKET_AUTO_HALT_DEATH_EVENTS", true);
 
     if (!dryRun) {
       await persistMarketObservations(supabase, observations);
       await persistMarketEvents(supabase, events);
+      if (autoHaltStatusEvents) {
+        await persistStatusTradingHalts(supabase, statusHaltCandidates);
+      }
     }
 
     return NextResponse.json({
@@ -182,6 +199,9 @@ export async function POST(request: Request) {
       mediaRssEventCount: flattenEvents(mediaRss.eventsByArtist).length,
       mediaRssScannedFeedCount: mediaRss.scannedFeedCount,
       warnings: mediaRss.warnings,
+      autoHaltStatusEvents,
+      statusHaltCandidateCount: statusHaltCandidates.length,
+      statusHaltCandidates,
       eventTypeCounts: countEventsByType(events),
       artists: artists.map((artist) => ({
         id: artist.id,
@@ -197,7 +217,8 @@ export async function POST(request: Request) {
         sourceName: event.sourceName ?? null,
         confidence: event.confidence,
         impactScore: event.impactScore,
-        sentimentScore: event.sentimentScore
+        sentimentScore: event.sentimentScore,
+        statusSubtype: getArtistStatusSubtype(event.rawPayload.statusSubtype)
       }))
     });
   } catch (error) {
@@ -266,6 +287,63 @@ function countEventsByType(events: MarketEvent[]) {
   }, {});
 }
 
+function buildStatusHaltCandidates(events: MarketEvent[], artists: MarketUpdateArtist[]): StatusHaltCandidate[] {
+  const artistsById = new Map(artists.map((artist) => [artist.id, artist]));
+  const seen = new Set<string>();
+  const candidates: StatusHaltCandidate[] = [];
+
+  for (const event of events) {
+    if (!shouldRecommendStatusTradingHalt(event)) {
+      continue;
+    }
+
+    const artist = artistsById.get(event.artistId);
+
+    if (!artist || seen.has(artist.id)) {
+      continue;
+    }
+
+    const statusSubtype = getArtistStatusSubtype(event.rawPayload.statusSubtype);
+
+    candidates.push({
+      artistId: artist.id,
+      ticker: artist.ticker,
+      name: artist.name,
+      statusSubtype: statusSubtype ?? "unknown",
+      eventTitle: event.title,
+      eventDate: event.eventDate,
+      confidence: event.confidence,
+      reason: `Trading halted for ${artist.ticker} while a reported artist status event is reviewed: ${event.title}`
+    });
+    seen.add(artist.id);
+  }
+
+  return candidates;
+}
+
+async function persistStatusTradingHalts(
+  supabase: ReturnType<typeof createServiceRoleClient>,
+  candidates: StatusHaltCandidate[]
+) {
+  if (!candidates.length) {
+    return;
+  }
+
+  const { error } = await supabase.from("artist_trading_halts").upsert(
+    candidates.map((candidate) => ({
+      artist_id: candidate.artistId,
+      is_halted: true,
+      reason: candidate.reason,
+      starts_at: new Date().toISOString(),
+      ends_at: null
+    }))
+  );
+
+  if (error) {
+    throw new Error(`Could not apply status trading halt: ${error.message}`);
+  }
+}
+
 function normalizeInteger(value: unknown, fallback: number, min: number, max: number) {
   if (typeof value !== "number" || !Number.isInteger(value)) {
     return fallback;
@@ -316,6 +394,23 @@ function getEnvList(name: string) {
     .filter(Boolean);
 
   return values.length ? values : undefined;
+}
+
+function getConfiguredRssFeedUrls(bodyValues: unknown) {
+  const requested = normalizeFeedUrls(bodyValues);
+
+  if (requested) {
+    return requested;
+  }
+
+  const configuredFeeds = getEnvList("MARKET_RSS_FEEDS");
+  const reviewerFeeds = getEnvList("MARKET_REVIEWER_RSS_FEEDS") ?? [];
+
+  if (!configuredFeeds && !reviewerFeeds.length) {
+    return undefined;
+  }
+
+  return Array.from(new Set([...(configuredFeeds ?? getDefaultMediaRssFeedUrls()), ...reviewerFeeds]));
 }
 
 function normalizeFeedUrls(values: unknown) {

@@ -35,6 +35,7 @@ This app still runs in development with unsaved demo data, but the backend found
    - `MARKET_CRON_MAX_BATCHES=1`
    - `MARKET_EVENT_SCAN_LIMIT=20`
    - `MARKET_EVENT_SCAN_MAX_RECORDS=12`
+   - `MARKET_AUTO_HALT_DEATH_EVENTS=true`
    - `MARKET_YOUTUBE_UPLOAD_EVENT_VIDEOS=5`
    - `MARKET_YOUTUBE_UPLOAD_EVENT_DAYS=14`
    - `MARKET_YOUTUBE_COMMENT_VIDEOS=0`
@@ -43,7 +44,7 @@ This app still runs in development with unsaved demo data, but the backend found
    - `MARKET_BLUESKY_LOOKBACK_DAYS=7`
    - `MARKET_BLUESKY_DELAY_MS=250`
    - `ADMIN_EMAILS=<comma-separated admin emails>`
-   - `MARKET_MODEL_VERSION=rmi-core-v11`
+   - `MARKET_MODEL_VERSION=rmi-core-v13`
    - `LASTFM_API_KEY` for optional Last.fm listener/playcount signals
    - `SPOTIFY_CLIENT_ID` and `SPOTIFY_CLIENT_SECRET` for optional Spotify popularity/follower signals
    - `YOUTUBE_API_KEY` for optional YouTube channel view/subscriber/video-count and comment-reaction signals
@@ -173,6 +174,10 @@ After deployment, manually call `/api/cron/daily-market-update?dryRun=1` with `A
 
 `MARKET_MODEL_VERSION` is an internal audit label, not a prominent user-facing product label. It is saved on market runs, signal snapshots, and price-history rows so future algorithm changes can be traced without rewriting historical prices. Normal market pages should keep broad language such as audience momentum, market activity, release signals, and media movement. Admin/health/debug views can show the exact model version.
 
+`rmi-core-v13` adds artist-status event handling for death, legal arrest/charges/conviction/sentencing/incarceration/release, hospitalization, and injury. These events are stored inside normal `market_events` with `statusSubtype` metadata so no new public enum is required. Death events are not treated as a simple bearish controversy because posthumous streaming and catalog attention can rise; they produce a mixed status shock and, when high-confidence, can automatically halt the artist for admin review through the existing `artist_trading_halts` mechanism. Legal release is handled as a possible positive catalyst, while sentencing/incarceration carry stronger negative caps than arrest or charges.
+
+`rmi-core-v12` adds reaction-consensus handling for reviews, public reaction clips, and social/community catalysts. Critic or streamer negativity is dampened when broader public/community/media reaction does not confirm it, boosted when multiple public source classes agree, and marked in raw diagnostics with reaction consensus labels. Media RSS also includes a free reviewer/video feed by default, and stored movement explanations are now written as high-level market notes instead of exposing model internals.
+
 `rmi-core-v11` adds public social-web catalyst detection through Bluesky, expands the automatic event scanner with music/media RSS plus Google News RSS search, and prepares a public market-news API. The `core` path searches recent public Bluesky posts for each artist with no API key, stores aggregate observations only, and creates normalized market events for snippets, album announcements, release dates, tracklists, viral clips, performance reactions, feature/cosign chatter, backlash, controversy, and decline terms. Bluesky carries lower model weight than stronger sources, so it can catch early social movement without overpowering streaming, video, release, news, and trade data. The event scanner stores `media_rss` observations and classified `market_events` from no-key media feeds, giving the model another way to catch reviews, announcements, tracklists, controversies, and article-backed viral moments before they show up in audience counts. The public `/api/market/news` endpoint returns recent normalized `market_events` with artist/ticker metadata so a future HSX/Yahoo-style news module can be built without changing storage.
 
 `rmi-core-v10` adds market integrity rules to the pricing loop. Trade-flow observations are still recorded, but they no longer become a `traderDemand` pricing signal unless order flow has at least three traders, at least $1,000 of eligible gross value, and no trader controlling more than 70% of the recent artist flow. New accounts can trade immediately, but their orders are marked market-ineligible for the first 24 hours by both the app route and `016_market_integrity_guardrails.sql`, so brand-new or duplicate accounts cannot immediately move public prices or feed the daily trade-flow model. The direct trade-impact function also checks database-side eligibility, so calling the Supabase RPC directly cannot bypass the cooldown.
@@ -279,7 +284,7 @@ The YouTube upload event path is separate from comment sentiment. It uses offici
 
 The Bluesky path is an early social-catalyst adapter. It searches recent public posts for each artist, stores aggregate observations only, and classifies snippet hype, album announcements, release dates, tracklists, viral clips, performance reaction, feature/cosign chatter, backlash, controversy, and decline terms. It can catch moments that may not have reached article coverage yet, but its source weight is intentionally below audience/video/release/news sources. Defaults are `MARKET_BLUESKY_POST_LIMIT=20`, `MARKET_BLUESKY_LOOKBACK_DAYS=7`, and `MARKET_BLUESKY_DELAY_MS=250`.
 
-The media RSS path is an automatic news/review adapter used by the scheduled event scan. It fetches a built-in list of free music/media feeds and optional Google News RSS searches for the selected artists, stores `media_rss:article_count`, `media_rss:source_count`, and `media_rss:classified_event_count` observations, then classifies release announcements, reviews, tracklists, snippets, major features, viral performance coverage, controversies, and decline/falloff articles into `market_events`. Project-release articles can also infer a release date from article text, so an album announcement published before release week can still anchor the release event when the project drops. Defaults are `MARKET_RSS_GOOGLE_NEWS=true`, `MARKET_RSS_LOOKBACK_DAYS=30`, and `MARKET_RSS_MAX_ITEMS_PER_FEED=40`; `MARKET_RSS_FEEDS` can override the built-in comma-separated feed list.
+The media RSS path is an automatic news/review adapter used by the scheduled event scan. It fetches a built-in list of free music/media/reviewer feeds and optional Google News RSS searches for the selected artists, stores `media_rss:article_count`, `media_rss:source_count`, and `media_rss:classified_event_count` observations, then classifies release announcements, reviews, tracklists, public reaction clips, snippets, major features, viral performance coverage, controversies, and decline/falloff articles into `market_events`. Project-release articles can also infer a release date from article text, so an album announcement published before release week can still anchor the release event when the project drops. Defaults are `MARKET_RSS_GOOGLE_NEWS=true`, `MARKET_RSS_LOOKBACK_DAYS=30`, and `MARKET_RSS_MAX_ITEMS_PER_FEED=40`; `MARKET_RSS_FEEDS` can override the built-in comma-separated feed list, and `MARKET_REVIEWER_RSS_FEEDS` can append extra critic, streamer, or YouTube-channel RSS feeds without replacing the built-ins.
 
 The Reddit path is a community-hype adapter, not a pure sentiment adapter. It searches configured music subreddits for each artist, stores aggregate observations only, and looks for broad attention plus catalyst language such as snippets, features, viral performances, release news, chart movement, controversies, or decline terms. It fetches both new and top weekly search results so high-engagement posts are not missed just because they are no longer the newest result. Defaults are `MARKET_REDDIT_POST_LIMIT=25`, `MARKET_REDDIT_LOOKBACK_DAYS=7`, and `MARKET_REDDIT_SUBREDDITS=hiphopheads,rap,trap,undergroundhiphop,playboicarti,soundcloud`. If Reddit credentials are missing, the rest of the `core` engine still runs.
 
@@ -357,9 +362,11 @@ Vercel schedules cron in UTC, so this runs around 2 AM Pacific during daylight s
 - `maxBatches`: `MARKET_CRON_MAX_BATCHES`, default `1`
 - `eventScanLimit`: `MARKET_EVENT_SCAN_LIMIT`, default `20`
 - `eventScanMaxRecords`: `MARKET_EVENT_SCAN_MAX_RECORDS`, default `12`
+- `autoHaltDeathEvents`: `MARKET_AUTO_HALT_DEATH_EVENTS`, default `true`
 - `mediaRssGoogleNews`: `MARKET_RSS_GOOGLE_NEWS`, default `true`
 - `mediaRssLookbackDays`: `MARKET_RSS_LOOKBACK_DAYS`, default `30`
 - `mediaRssMaxItemsPerFeed`: `MARKET_RSS_MAX_ITEMS_PER_FEED`, default `40`
+- `mediaReviewerFeeds`: `MARKET_REVIEWER_RSS_FEEDS`, optional additive comma-separated RSS feed list
 - `youtubeUploadEventVideos`: `MARKET_YOUTUBE_UPLOAD_EVENT_VIDEOS`, default `5`
 - `redditPostLimit`: `MARKET_REDDIT_POST_LIMIT`, default `25`
 - YouTube comments are quota-guarded separately. `MARKET_YOUTUBE_COMMENT_VIDEOS=0` keeps comment sentiment off; set it to `1` for limited comment sampling.

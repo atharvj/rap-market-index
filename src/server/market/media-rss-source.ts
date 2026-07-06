@@ -76,7 +76,8 @@ const DEFAULT_FEED_URLS = [
   "https://www.xxlmag.com/feed/",
   "https://stereogum.com/feed",
   "https://hypebeast.com/music/feed",
-  "https://www.nme.com/feed"
+  "https://www.nme.com/feed",
+  "https://www.youtube.com/feeds/videos.xml?channel_id=UCt7fwAhXDy3oNFTAzF2o8Pw"
 ];
 
 export function getDefaultMediaRssFeedUrls() {
@@ -274,6 +275,9 @@ function buildArtistEvents({
         releaseDate,
         classificationReason: classification.reason,
         releaseKind: classification.releaseKind ?? null,
+        statusSubtype: classification.statusSubtype ?? null,
+        statusSeverity: classification.statusSeverity ?? null,
+        statusHaltRecommended: classification.statusHaltRecommended ?? false,
         inferredReleaseTitle: inferredTitle,
         titleMatchedArtist,
         textMatchedArtist

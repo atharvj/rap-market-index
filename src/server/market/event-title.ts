@@ -24,6 +24,34 @@ export function getCommunityEventLabel(eventType: MarketEventType | null, reason
     return "album announcement reaction";
   }
 
+  if (normalized.includes("artist_death")) {
+    return "artist status report";
+  }
+
+  if (normalized.includes("legal_release")) {
+    return "legal release reaction";
+  }
+
+  if (normalized.includes("legal_sentencing")) {
+    return "legal sentencing reaction";
+  }
+
+  if (normalized.includes("legal_conviction")) {
+    return "legal conviction reaction";
+  }
+
+  if (normalized.includes("legal_charge")) {
+    return "legal charge reaction";
+  }
+
+  if (normalized.includes("legal_arrest") || normalized.includes("legal_incarceration")) {
+    return "legal status reaction";
+  }
+
+  if (normalized.includes("hospitalization") || normalized.includes("injury")) {
+    return "health status reaction";
+  }
+
   if (normalized.includes("project_release")) {
     return "project release reaction";
   }

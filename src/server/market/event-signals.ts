@@ -1,6 +1,7 @@
 import { clamp } from "@/lib/pricing";
 import type { MarketUpdateArtist } from "@/server/market/daily-update";
 import type { AdapterSignals, MarketEvent, MarketSignalModifier } from "@/server/market/market-data";
+import { getArtistStatusSubtype } from "@/server/market/status-events";
 import type { HypeStats } from "@/lib/types";
 
 export type ManualMarketEventInput = {
@@ -208,6 +209,12 @@ function buildArtistEventSignal(artist: MarketUpdateArtist, runDate: string, eve
         releaseCycleRelatedCount: event.releaseCycleRelatedCount,
         releaseCycleReceptionImpact: event.releaseCycleReceptionImpact,
         releaseCycleMultiplier: event.releaseCycleMultiplier,
+        reactionSourceClass: event.reactionSourceClass,
+        reactionConsensusLabel: event.reactionConsensusLabel,
+        reactionConsensusMultiplier: event.reactionConsensusMultiplier,
+        reactionConfirmingSourceCount: event.reactionConfirmingSourceCount,
+        reactionOpposingSourceCount: event.reactionOpposingSourceCount,
+        reactionNetPublicImpact: event.reactionNetPublicImpact,
         uncappedWeightedImpact: event.uncappedWeightedImpact,
         shockWeightedImpact: event.shockWeightedImpact,
         weightedImpact: event.weightedImpact
@@ -230,6 +237,12 @@ type ScoredMarketEvent = ReturnType<typeof scoreEvent> & {
   releaseCycleRelatedCount: number;
   releaseCycleReceptionImpact: number;
   releaseCycleMultiplier: number;
+  reactionSourceClass: string;
+  reactionConsensusLabel: string;
+  reactionConsensusMultiplier: number;
+  reactionConfirmingSourceCount: number;
+  reactionOpposingSourceCount: number;
+  reactionNetPublicImpact: number;
 };
 
 function getEventSignalConfidence(scoredEvents: ScoredMarketEvent[]) {
@@ -356,6 +369,16 @@ function getEventModifierReason(event: ScoredMarketEvent) {
     feature: "feature/cosign",
     major_feature: "major feature/cosign",
     performance: "live performance",
+    public_reaction: "public reaction",
+    status_death: "artist status",
+    status_legal_arrest: "legal status",
+    status_legal_charge: "legal charge",
+    status_legal_conviction: "legal conviction",
+    status_legal_sentencing: "legal sentencing",
+    status_legal_incarceration: "legal status",
+    status_legal_release: "legal release",
+    status_hospitalization: "health status",
+    status_injury: "injury status",
     chart: "chart momentum",
     snippet: "snippet",
     controversy: "controversy",
@@ -374,12 +397,22 @@ function getEventModifierReason(event: ScoredMarketEvent) {
 function getEventReasonPriority(subtype: string) {
   const priorities: Record<string, number> = {
     project_release: 12,
+    status_death: 13,
+    status_legal_sentencing: 12,
+    status_legal_conviction: 12,
     review: 11,
     major_feature: 11,
     feature: 10,
+    status_legal_release: 10,
+    status_legal_incarceration: 10,
+    status_hospitalization: 9,
+    status_legal_charge: 9,
+    status_legal_arrest: 9,
     performance: 9,
+    status_injury: 8,
     chart: 8,
     tracklist_reaction: 8,
+    public_reaction: 8,
     controversy: 8,
     decline: 8,
     single_video_release: 5,
@@ -602,13 +635,247 @@ function applyEventClusterCaps(scoredEvents: Array<ReturnType<typeof scoreEvent>
       releaseCycleRelatedCount: 0,
       releaseCycleReceptionImpact: 0,
       releaseCycleMultiplier: 1,
+      reactionSourceClass: "unknown",
+      reactionConsensusLabel: "not_checked",
+      reactionConsensusMultiplier: 1,
+      reactionConfirmingSourceCount: 0,
+      reactionOpposingSourceCount: 0,
+      reactionNetPublicImpact: 0,
       uncappedWeightedImpact: event.weightedImpact,
       shockWeightedImpact: clamp(weightedImpact * shockDecayMultiplier, -100, 100),
       weightedImpact
     };
   });
 
-  return applyReleaseCycleContext(clusteredEvents);
+  return applyReleaseCycleContext(applyReactionConsensusContext(clusteredEvents));
+}
+
+function applyReactionConsensusContext(scoredEvents: ScoredMarketEvent[]): ScoredMarketEvent[] {
+  return scoredEvents.map((event) => {
+    const sourceClass = getReactionSourceClass(event);
+    const relatedEvents = scoredEvents.filter((candidate) => isReactionConsensusRelated(event, candidate));
+    const publicRelatedEvents = relatedEvents.filter((candidate) => isPublicReactionSource(getReactionSourceClass(candidate)));
+    const eventSign = getImpactSign(event.weightedImpact);
+    const confirmingEvents = publicRelatedEvents.filter((candidate) => getImpactSign(candidate.weightedImpact) === eventSign);
+    const opposingEvents = publicRelatedEvents.filter((candidate) => getImpactSign(candidate.weightedImpact) === -eventSign);
+    const confirmingSourceCount = countDistinctReactionClasses(confirmingEvents);
+    const opposingSourceCount = countDistinctReactionClasses(opposingEvents);
+    const netPublicImpact = publicRelatedEvents.reduce((total, candidate) => total + candidate.weightedImpact, 0);
+    const consensus = getReactionConsensusAdjustment({
+      event,
+      sourceClass,
+      confirmingSourceCount,
+      opposingSourceCount,
+      netPublicImpact
+    });
+    const weightedImpact = clamp(event.weightedImpact * consensus.multiplier, -100, 100);
+    const shockWeightedImpact = clamp(event.shockWeightedImpact * consensus.multiplier, -100, 100);
+
+    return {
+      ...event,
+      reactionSourceClass: sourceClass,
+      reactionConsensusLabel: consensus.label,
+      reactionConsensusMultiplier: consensus.multiplier,
+      reactionConfirmingSourceCount: confirmingSourceCount,
+      reactionOpposingSourceCount: opposingSourceCount,
+      reactionNetPublicImpact: clamp(netPublicImpact, -100, 100),
+      weightedImpact,
+      shockWeightedImpact
+    };
+  });
+}
+
+function getReactionConsensusAdjustment({
+  event,
+  sourceClass,
+  confirmingSourceCount,
+  opposingSourceCount,
+  netPublicImpact
+}: {
+  event: ScoredMarketEvent;
+  sourceClass: string;
+  confirmingSourceCount: number;
+  opposingSourceCount: number;
+  netPublicImpact: number;
+}) {
+  if (!isReactionSensitiveEvent(event)) {
+    return {
+      label: "not_reaction_sensitive",
+      multiplier: 1
+    };
+  }
+
+  const eventSign = getImpactSign(event.weightedImpact);
+  const publicSign = getImpactSign(netPublicImpact);
+  const hasPublicDisagreement = publicSign !== 0 && publicSign === -eventSign && opposingSourceCount > 0;
+  const hasPublicConfirmation = publicSign === eventSign && confirmingSourceCount > 0;
+
+  if ((sourceClass === "critic" || sourceClass === "media") && hasPublicDisagreement) {
+    return {
+      label: "public_disagrees_with_critic",
+      multiplier: 0.58
+    };
+  }
+
+  if ((sourceClass === "critic" || sourceClass === "media") && !hasPublicConfirmation) {
+    return {
+      label: "critic_unconfirmed_by_public",
+      multiplier: event.eventSubtype === "review" ? 0.76 : 0.82
+    };
+  }
+
+  if ((sourceClass === "community" || sourceClass === "social") && hasPublicDisagreement) {
+    return {
+      label: "public_reaction_split",
+      multiplier: 0.7
+    };
+  }
+
+  if ((sourceClass === "community" || sourceClass === "social") && confirmingSourceCount === 0 && event.clusterSourceCount <= 1) {
+    return {
+      label: "social_reaction_unconfirmed",
+      multiplier: 0.82
+    };
+  }
+
+  if (hasPublicConfirmation && confirmingSourceCount >= 2) {
+    return {
+      label: "broad_public_confirmation",
+      multiplier: 1.14
+    };
+  }
+
+  if (hasPublicConfirmation) {
+    return {
+      label: "public_confirmation",
+      multiplier: 1.06
+    };
+  }
+
+  return {
+    label: "neutral_consensus",
+    multiplier: 1
+  };
+}
+
+function isReactionConsensusRelated(event: ScoredMarketEvent, candidate: ScoredMarketEvent) {
+  if (event === candidate) {
+    return false;
+  }
+
+  const distance = Math.abs(daysBetween(event.event.eventDate, candidate.event.eventDate));
+
+  if (distance > getReactionConsensusWindowDays(event, candidate)) {
+    return false;
+  }
+
+  if (isReactionSensitiveEvent(event) && isReactionSensitiveEvent(candidate)) {
+    return true;
+  }
+
+  return (
+    event.eventSubtype === "project_release" &&
+    ["review", "tracklist_reaction", "public_reaction", "viral", "performance"].includes(candidate.eventSubtype)
+  );
+}
+
+function getReactionConsensusWindowDays(event: ScoredMarketEvent, candidate: ScoredMarketEvent) {
+  if (event.eventSubtype === "review" || candidate.eventSubtype === "review") {
+    return 10;
+  }
+
+  if (event.eventSubtype === "project_release" || candidate.eventSubtype === "project_release") {
+    return 7;
+  }
+
+  return 4;
+}
+
+function isReactionSensitiveEvent(event: ScoredMarketEvent) {
+  return [
+    "review",
+    "tracklist_reaction",
+    "public_reaction",
+    "performance",
+    "snippet",
+    "viral",
+    "controversy",
+    "decline"
+  ].includes(event.eventSubtype);
+}
+
+function getReactionSourceClass(event: ScoredMarketEvent) {
+  const source = getRawString(event.event.rawPayload.source) ?? "";
+  const sourceName = (event.event.sourceName ?? "").toLowerCase();
+  const domain = (getRawString(event.event.rawPayload.domain) ?? "").toLowerCase();
+
+  if (source === "reddit_post") {
+    return "community";
+  }
+
+  if (source === "bluesky_post") {
+    return "social";
+  }
+
+  if (source === "youtube_upload_event") {
+    return "official";
+  }
+
+  if (source === "musicbrainz_release_group") {
+    return "release_database";
+  }
+
+  if (event.eventSubtype === "review" || event.eventSubtype === "public_reaction") {
+    if (isReviewerLikeSource(sourceName) || isReviewerLikeSource(domain)) {
+      return "critic";
+    }
+  }
+
+  if (source === "gdelt_article" || source === "media_rss_item") {
+    return event.eventSubtype === "review" ? "critic" : "media";
+  }
+
+  if (source === "manual_event") {
+    return "manual";
+  }
+
+  return source || "unknown";
+}
+
+function isPublicReactionSource(sourceClass: string) {
+  return sourceClass === "community" || sourceClass === "social" || sourceClass === "critic" || sourceClass === "media";
+}
+
+function countDistinctReactionClasses(events: ScoredMarketEvent[]) {
+  return new Set(events.map((event) => getReactionSourceClass(event))).size;
+}
+
+function getImpactSign(value: number) {
+  if (value >= 4) {
+    return 1;
+  }
+
+  if (value <= -4) {
+    return -1;
+  }
+
+  return 0;
+}
+
+function isReviewerLikeSource(value: string) {
+  return hasAnyTerm(value, [
+    "albumoftheyear",
+    "anthony fantano",
+    "dead end hip hop",
+    "fantano",
+    "pitchfork",
+    "rapreviews",
+    "review",
+    "reviewer",
+    "theneedledrop",
+    "the needle drop",
+    "youtube.com"
+  ]);
 }
 
 function applyReleaseCycleContext(scoredEvents: ScoredMarketEvent[]): ScoredMarketEvent[] {
@@ -634,7 +901,11 @@ function applyReleaseCycleContext(scoredEvents: ScoredMarketEvent[]): ScoredMark
     );
     const sourceCount = countDistinctScoredSources([project, ...relatedEvents]);
     const receptionImpact = relatedEvents
-      .filter((candidate) => candidate.eventSubtype === "tracklist_reaction" || candidate.eventSubtype === "review")
+      .filter((candidate) =>
+        candidate.eventSubtype === "tracklist_reaction" ||
+        candidate.eventSubtype === "review" ||
+        candidate.eventSubtype === "public_reaction"
+      )
       .reduce((total, candidate) => total + candidate.weightedImpact, 0);
     const relatedPositiveCount = relatedEvents.filter((candidate) => candidate.weightedImpact > 0).length;
     const cycleMultiplier = clamp(
@@ -707,6 +978,7 @@ function isReleaseCycleRelated(event: ScoredMarketEvent) {
     "single_video_release",
     "track_audio_release",
     "tracklist_reaction",
+    "public_reaction",
     "review",
     "snippet",
     "feature",
@@ -720,7 +992,7 @@ function getReleaseCycleWindowDays(event: ScoredMarketEvent) {
     return 14;
   }
 
-  if (event.eventSubtype === "review" || event.eventSubtype === "chart") {
+  if (event.eventSubtype === "review" || event.eventSubtype === "public_reaction" || event.eventSubtype === "chart") {
     return 10;
   }
 
@@ -822,6 +1094,11 @@ function getEventSubtype(event: MarketEvent) {
     getRawString(event.rawPayload.reason) ??
     getRawString(event.rawPayload.eventReason);
   const text = normalizeEventText(`${rawReason ?? ""} ${event.title}`);
+  const statusSubtype = getArtistStatusSubtype(event.rawPayload.statusSubtype);
+
+  if (statusSubtype) {
+    return `status_${statusSubtype}`;
+  }
 
   if (event.eventType === "review") {
     return "review";
@@ -941,6 +1218,24 @@ function getEventSubtype(event: MarketEvent) {
       return "performance";
     }
 
+    if (
+      hasAnyTerm(text, [
+        "hated it",
+        "hears",
+        "live reaction",
+        "listened to",
+        "listening to",
+        "reacted to",
+        "reacting to",
+        "reaction",
+        "reacts to",
+        "reviewer",
+        "streamer"
+      ])
+    ) {
+      return "public_reaction";
+    }
+
     if (hasAnyTerm(text, ["chart", "hot 100", "billboard", "streaming record", "number 1", "top 10"])) {
       return "chart";
     }
@@ -1005,6 +1300,16 @@ function getEventSubtypePriceProfile(subtype: string) {
     single_video_release: { divisor: 1900, minShock: -0.018, maxShock: 0.035 },
     track_audio_release: { divisor: 3500, minShock: -0.008, maxShock: 0.012 },
     tracklist_reaction: { divisor: 2100, minShock: -0.028, maxShock: 0.024 },
+    public_reaction: { divisor: 2150, minShock: -0.032, maxShock: 0.034 },
+    status_death: { divisor: 1550, minShock: -0.035, maxShock: 0.055 },
+    status_legal_arrest: { divisor: 1750, minShock: -0.045, maxShock: 0.01 },
+    status_legal_charge: { divisor: 1700, minShock: -0.048, maxShock: 0.01 },
+    status_legal_conviction: { divisor: 1500, minShock: -0.06, maxShock: 0.008 },
+    status_legal_sentencing: { divisor: 1425, minShock: -0.07, maxShock: 0.006 },
+    status_legal_incarceration: { divisor: 1500, minShock: -0.062, maxShock: 0.008 },
+    status_legal_release: { divisor: 1800, minShock: -0.01, maxShock: 0.04 },
+    status_hospitalization: { divisor: 1750, minShock: -0.045, maxShock: 0.01 },
+    status_injury: { divisor: 2100, minShock: -0.032, maxShock: 0.008 },
     major_feature: { divisor: 1325, minShock: -0.025, maxShock: 0.065 },
     feature: { divisor: 1450, minShock: -0.025, maxShock: 0.055 },
     performance: { divisor: 1550, minShock: -0.034, maxShock: 0.05 },
@@ -1070,6 +1375,16 @@ function getEventShockDecayMultiplier({
     single_video_release: 3,
     track_audio_release: 1.5,
     tracklist_reaction: 2.5,
+    public_reaction: 2.5,
+    status_death: 5.5,
+    status_legal_arrest: 3.5,
+    status_legal_charge: 4,
+    status_legal_conviction: 6,
+    status_legal_sentencing: 7,
+    status_legal_incarceration: 6,
+    status_legal_release: 4,
+    status_hospitalization: 4,
+    status_injury: 3,
     major_feature: 3.5,
     feature: 3,
     performance: 2.5,

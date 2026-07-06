@@ -9,6 +9,11 @@ import type {
   MarketObservation,
   ObservationBaselines
 } from "@/server/market/market-data";
+import {
+  classifyArtistStatusText,
+  type ArtistStatusSeverity,
+  type ArtistStatusSubtype
+} from "@/server/market/status-events";
 import type { HypeStats } from "@/lib/types";
 
 export type GdeltArticle = {
@@ -45,6 +50,9 @@ export type ArticleMarketClassification = {
   confidence: number;
   reason: string;
   releaseKind?: ArticleReleaseKind;
+  statusSubtype?: ArtistStatusSubtype;
+  statusSeverity?: ArtistStatusSeverity;
+  statusHaltRecommended?: boolean;
 };
 
 export type GdeltMarketSignals = {
@@ -367,6 +375,9 @@ function buildGdeltArticleEvents({
         tone: getNumber(article.tone),
         classificationReason: classification.reason,
         releaseKind: classification.releaseKind ?? null,
+        statusSubtype: classification.statusSubtype ?? null,
+        statusSeverity: classification.statusSeverity ?? null,
+        statusHaltRecommended: classification.statusHaltRecommended ?? false,
         titleMatchedArtist,
         relaxedTitlelessArtistMatch: !titleMatchedArtist,
         sourceTier
@@ -417,6 +428,20 @@ export function classifyArticleEvent(
   const lowerTitle = title.toLowerCase();
   const sourceTier = getSourceTier(domain);
   const toneScore = clamp((getNumber(tone) ?? 0) * 8, -45, 45);
+  const status = classifyArtistStatusText(lowerTitle, { toneScore });
+
+  if (status) {
+    return {
+      eventType: status.eventType,
+      sentimentScore: status.sentimentScore,
+      impactScore: status.impactScore,
+      confidence: getArticleConfidence(sourceTier, status.baseConfidence),
+      reason: status.reason,
+      statusSubtype: status.statusSubtype,
+      statusSeverity: status.statusSeverity,
+      statusHaltRecommended: status.statusHaltRecommended
+    };
+  }
 
   if (hasAny(lowerTitle, CONTROVERSY_TERMS)) {
     return {
@@ -449,6 +474,22 @@ export function classifyArticleEvent(
       confidence: getArticleConfidence(sourceTier, REVIEW_DOMAINS.has(domain) ? 0.82 : 0.68),
       reason: REVIEW_DOMAINS.has(domain) ? "review_domain" : "review_keyword"
     };
+  }
+
+  if (hasPublicReactionSignal(lowerTitle)) {
+    const keywordSentiment = getTitleSentiment(lowerTitle);
+    const reactionSentiment = keywordSentiment || toneScore;
+    const hasExplicitSentiment = Math.abs(reactionSentiment) >= 12;
+
+    if (hasExplicitSentiment) {
+      return {
+        eventType: "viral" as const,
+        sentimentScore: clamp(reactionSentiment + toneScore * 0.35, -80, 80),
+        impactScore: clamp(reactionSentiment * 0.9 + toneScore * 0.35, -76, 76),
+        confidence: getArticleConfidence(sourceTier, 0.56),
+        reason: "public_reaction_terms"
+      };
+    }
   }
 
   if (hasAny(lowerTitle, TRACKLIST_REACTION_TERMS)) {
@@ -648,6 +689,10 @@ function getArticleReleaseKind(title: string): ArticleReleaseKind | null {
 
 function hasReviewSignal(title: string) {
   return /\breview(s|ed)?\b/.test(title) || /\brated\b/.test(title) || hasAny(title, REVIEW_PHRASES);
+}
+
+function hasPublicReactionSignal(title: string) {
+  return hasAny(title, PUBLIC_REACTION_TERMS) && hasAny(title, PUBLIC_REACTION_CONTEXT_TERMS);
 }
 
 function getTitleSentiment(title: string) {
@@ -1087,6 +1132,36 @@ const SNIPPET_TERMS = [
   "unreleased"
 ];
 const PUBLIC_CONFLICT_TERMS = ["beef", "diss", "feud"];
+const PUBLIC_REACTION_CONTEXT_TERMS = [
+  "first listen",
+  "hears",
+  "listened to",
+  "listening to",
+  "live reaction",
+  "reacted to",
+  "reacting to",
+  "reaction",
+  "reacts to",
+  "reviewer",
+  "streamer"
+];
+const PUBLIC_REACTION_TERMS = [
+  "amazing",
+  "bad",
+  "classic",
+  "disappointing",
+  "fire",
+  "garbage",
+  "great",
+  "hated",
+  "hates",
+  "loves",
+  "mid",
+  "overrated",
+  "terrible",
+  "trash",
+  "worst"
+];
 const VIRAL_TERMS = [
   "breakout",
   "challenge",
@@ -1122,6 +1197,8 @@ const NEWS_TERMS = [
   ...PERFORMANCE_TERMS,
   ...SNIPPET_TERMS,
   ...PUBLIC_CONFLICT_TERMS,
+  ...PUBLIC_REACTION_CONTEXT_TERMS,
+  ...PUBLIC_REACTION_TERMS,
   ...VIRAL_TERMS,
   ...DECLINE_TERMS,
   ...CONTROVERSY_TERMS
@@ -1136,6 +1213,7 @@ const POSITIVE_REVIEW_TERMS = [
   "classic",
   "essential",
   "excellent",
+  "fire",
   "great",
   "highlights",
   "inventive",
@@ -1157,15 +1235,22 @@ const NEGATIVE_REVIEW_TERMS = [
   "fails",
   "flat",
   "forgettable",
+  "garbage",
+  "hated",
+  "hates",
   "inconsistent",
   "lifeless",
   "mess",
   "misfire",
   "mixed",
+  "mid",
   "negative",
+  "overrated",
   "panned",
   "poor",
   "sloppy",
+  "terrible",
+  "trash",
   "uneven",
   "weak",
   "worst"

@@ -851,7 +851,7 @@ function calculateArtistUpdate({
     hypeScore,
     stats,
     explanation: signals.hasMomentumSignal
-      ? explainMove(artist.ticker, stats, dailyChangePercent, catalystDiagnostics)
+      ? explainMove(artist.ticker, stats, dailyChangePercent, catalystDiagnostics, sourceAttribution)
       : explainNoSignalMove(artist.ticker, source, dailyChangePercent, staleMomentumDecayDelta),
     signalDelta,
     modelVersion,
@@ -1731,7 +1731,8 @@ function explainMove(
   ticker: string,
   stats: HypeStats,
   dailyChangePercent: number,
-  catalystDiagnostics: CatalystDiagnostics
+  catalystDiagnostics: CatalystDiagnostics,
+  sourceAttribution: SourceAttribution
 ) {
   const signals = [
     ["streaming momentum", stats.streamingGrowth],
@@ -1747,25 +1748,59 @@ function explainMove(
   const direction = dailyChangePercent >= 0 ? "moved higher" : "pulled back";
   const primaryCatalyst = catalystDiagnostics.primaryCatalyst;
   const counterCatalyst = catalystDiagnostics.counterCatalyst;
+  const sourceClause = getSourceConsensusClause(sourceAttribution);
 
   if (primaryCatalyst) {
     const counterClause = getCounterCatalystClause({
       dailyChangePercent,
       counterCatalyst
     });
+    const catalyst = formatCatalystReason(primaryCatalyst.reason);
 
     if (primaryCatalyst.reasonPriority >= 8) {
-      return `${ticker} ${direction} with ${primaryCatalyst.reason} as the strongest detected catalyst${counterClause}.`;
+      return `${ticker} ${direction} after ${catalyst} became the main market catalyst${counterClause}${sourceClause}.`;
     }
 
-    return `${ticker} ${direction} as ${signalName} led the daily model, with ${primaryCatalyst.reason} also affecting the move${counterClause}.`;
+    return `${ticker} ${direction} as ${signalName} shifted, with ${catalyst} also affecting sentiment${counterClause}${sourceClause}.`;
   }
 
   if (counterCatalyst?.reasonPriority && counterCatalyst.reasonPriority >= 8) {
-    return `${ticker} ${direction} as ${signalName} led the daily model, though ${counterCatalyst.reason} limited the move.`;
+    return `${ticker} ${direction} as ${signalName} shifted, though ${formatCatalystReason(counterCatalyst.reason)} offset part of the move${sourceClause}.`;
   }
 
-  return `${ticker} ${direction} as ${signalName} led the daily model.`;
+  const leadingSource = sourceAttribution.leadingSource?.label;
+
+  if (leadingSource) {
+    return `${ticker} ${direction} as ${signalName} shifted, led by ${leadingSource}${sourceClause}.`;
+  }
+
+  return `${ticker} ${direction} as ${signalName} shifted${sourceClause}.`;
+}
+
+function getSourceConsensusClause(sourceAttribution: SourceAttribution) {
+  if (sourceAttribution.positiveSourceCount > 0 && sourceAttribution.negativeSourceCount > 0) {
+    return ", while broader reaction stayed mixed";
+  }
+
+  if (sourceAttribution.leadingSource && sourceAttribution.sourceCount === 1) {
+    return ", with limited outside confirmation";
+  }
+
+  return "";
+}
+
+function formatCatalystReason(reason: string) {
+  const [label, detail] = reason.split(/:\s+(.+)/);
+  const cleanLabel = label
+    .replace("single/video", "single or video")
+    .replace("review/reception", "review reception")
+    .replace("feature/cosign", "feature or cosign");
+
+  if (!detail) {
+    return cleanLabel;
+  }
+
+  return `${cleanLabel} (${detail.slice(0, 90)})`;
 }
 
 function buildCatalystDiagnostics(
@@ -1808,11 +1843,11 @@ function getCounterCatalystClause({
   }
 
   if (dailyChangePercent >= 0 && counterCatalyst.priceShock < 0) {
-    return `, though ${counterCatalyst.reason} limited the move`;
+    return `, though ${formatCatalystReason(counterCatalyst.reason)} limited the move`;
   }
 
   if (dailyChangePercent < 0 && counterCatalyst.priceShock > 0) {
-    return `, though ${counterCatalyst.reason} softened the pullback`;
+    return `, though ${formatCatalystReason(counterCatalyst.reason)} softened the pullback`;
   }
 
   return "";

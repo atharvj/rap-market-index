@@ -2,6 +2,11 @@ import { clamp } from "@/lib/pricing";
 import type { MarketUpdateArtist } from "@/server/market/daily-update";
 import { buildDefaultGdeltQuery } from "@/server/market/artist-text-identifiers";
 import { buildCommunityEventTitle, getCommunityEventLabel } from "@/server/market/event-title";
+import {
+  classifyArtistStatusText,
+  type ArtistStatusSeverity,
+  type ArtistStatusSubtype
+} from "@/server/market/status-events";
 import type {
   AdapterSignal,
   AdapterSignals,
@@ -73,6 +78,9 @@ type BlueskyPostClassification = {
   catalyst: boolean;
   negative: boolean;
   hype: boolean;
+  statusSubtype?: ArtistStatusSubtype;
+  statusSeverity?: ArtistStatusSeverity;
+  statusHaltRecommended?: boolean;
 };
 
 export type BlueskyMarketSignals = {
@@ -450,7 +458,10 @@ function buildBlueskyEvents({
       engagement: post.engagement,
       viralityTier: getEngagementTier(post.engagement),
       matchConfidence: post.matchConfidence,
-      classificationReason: classification.reason
+      classificationReason: classification.reason,
+      statusSubtype: classification.statusSubtype ?? null,
+      statusSeverity: classification.statusSeverity ?? null,
+      statusHaltRecommended: classification.statusHaltRecommended ?? false
     }
   }));
 }
@@ -484,6 +495,23 @@ function classifyBlueskyPost(post: BlueskyPost): BlueskyPostClassification {
     positiveMatches > 0;
   const sentimentScore = clamp((positiveMatches - negativeMatches) * 15 + (hype ? 10 : 0) - (negative ? 22 : 0), -90, 86);
   const engagementImpact = clamp(Math.log10(post.engagement + 1) * 8, 0, 32);
+  const status = classifyArtistStatusText(text, { engagementImpact });
+
+  if (status) {
+    return {
+      eventType: status.eventType,
+      sentimentScore: status.sentimentScore,
+      impactScore: status.impactScore,
+      confidence: status.baseConfidence,
+      reason: status.reason,
+      catalyst: true,
+      negative: status.impactScore < 0 || status.sentimentScore < -20,
+      hype: status.impactScore > 0,
+      statusSubtype: status.statusSubtype,
+      statusSeverity: status.statusSeverity,
+      statusHaltRecommended: status.statusHaltRecommended
+    };
+  }
 
   if (hasBacklash || hasControversy) {
     return {
