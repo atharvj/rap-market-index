@@ -16,6 +16,8 @@ type MarketNewsItem = {
   title: string;
   sourceName?: string | null;
   sourceUrl?: string | null;
+  sourceDomain?: string | null;
+  sourceIconUrl?: string | null;
   thumbnailUrl?: string | null;
   sentimentScore: number;
   impactScore: number;
@@ -27,6 +29,8 @@ type MarketNewsResponse = {
   news?: MarketNewsItem[];
 };
 
+type MarketNewsVariant = "home" | "full" | "compact";
+
 const eventLabels: Record<string, string> = {
   release: "Release",
   review: "Review",
@@ -34,29 +38,40 @@ const eventLabels: Record<string, string> = {
   controversy: "Controversy",
   award: "Award",
   tour: "Tour",
-  viral: "Viral"
+  viral: "Viral",
+  market: "Market"
 };
 
 export function MarketNewsFeed({
   artistId,
+  eventType,
   limit = 8,
-  compact = false
+  compact = false,
+  variant
 }: {
   artistId?: string;
+  eventType?: string;
   limit?: number;
   compact?: boolean;
+  variant?: MarketNewsVariant;
 }) {
   const [items, setItems] = useState<MarketNewsItem[]>([]);
+  const resolvedVariant: MarketNewsVariant = variant ?? (compact ? "compact" : "full");
 
   useEffect(() => {
     const controller = new AbortController();
     const params = new URLSearchParams({
       limit: String(limit),
-      lookbackDays: "45"
+      lookbackDays: "45",
+      feed: artistId ? "artist" : resolvedVariant === "home" ? "home" : "news"
     });
 
     if (artistId) {
       params.set("artistId", artistId);
+    }
+
+    if (eventType) {
+      params.set("eventType", eventType);
     }
 
     fetch(`/api/market/news?${params.toString()}`, {
@@ -75,7 +90,7 @@ export function MarketNewsFeed({
     return () => {
       controller.abort();
     };
-  }, [artistId, limit]);
+  }, [artistId, eventType, limit, resolvedVariant]);
 
   if (!items.length) {
     return (
@@ -86,9 +101,15 @@ export function MarketNewsFeed({
   }
 
   return (
-    <div className="divide-y divide-line">
+    <div className={resolvedVariant === "home" ? "grid gap-3" : "divide-y divide-line"}>
       {items.map((item, index) => (
-        <MarketNewsArticle key={item.id} item={item} compact={compact} featured={!compact && index === 0} />
+        <MarketNewsArticle
+          key={item.id}
+          item={item}
+          variant={resolvedVariant}
+          featured={resolvedVariant === "full" && index === 0}
+          homeLead={resolvedVariant === "home" && index === 0}
+        />
       ))}
     </div>
   );
@@ -96,14 +117,17 @@ export function MarketNewsFeed({
 
 function MarketNewsArticle({
   item,
-  compact,
-  featured
+  variant,
+  featured,
+  homeLead
 }: {
   item: MarketNewsItem;
-  compact: boolean;
+  variant: MarketNewsVariant;
   featured: boolean;
+  homeLead: boolean;
 }) {
   const positive = item.sentimentScore >= 0;
+  const compact = variant === "compact";
   const titleLimit = featured ? 150 : compact ? 92 : 118;
   const title = item.title.length > titleLimit ? `${item.title.slice(0, titleLimit - 3)}...` : item.title;
   const meta = (
@@ -117,15 +141,33 @@ function MarketNewsArticle({
       >
         {eventLabels[item.eventType] ?? item.eventType}
       </span>
-      {item.sourceName ? <span>{item.sourceName}</span> : null}
+      <SourceMeta item={item} />
     </div>
   );
+
+  if (homeLead) {
+    return (
+      <article className="rounded border border-line bg-panelSoft px-3 py-3">
+        <div className="grid grid-cols-[74px_minmax(0,1fr)_18px] items-start gap-3">
+          <NewsThumbnail item={item} size="home" />
+          <div className="min-w-0">
+            {meta}
+            <h3 className="mt-1 text-base font-black leading-snug text-paper">{title}</h3>
+            <Link href={`/artists/${item.artistId}`} className="mt-1 inline-flex text-xs font-black text-cyan hover:text-cyan/75">
+              {item.artistName} · {item.ticker}
+            </Link>
+          </div>
+          <SourceLink item={item} />
+        </div>
+      </article>
+    );
+  }
 
   if (featured) {
     return (
       <article className="py-4">
-        <div className="grid gap-4 md:grid-cols-[180px_minmax(0,1fr)]">
-          <NewsThumbnail item={item} featured />
+        <div className="grid gap-4 md:grid-cols-[160px_minmax(0,1fr)]">
+          <NewsThumbnail item={item} size="featured" />
           <div className="min-w-0">
             <div className="mb-2 flex items-center justify-between gap-3">
               <Link
@@ -148,15 +190,19 @@ function MarketNewsArticle({
   }
 
   return (
-    <article className={clsx("py-3", compact ? "px-0" : "px-1")}>
-      <div className={clsx("grid items-start gap-3", compact ? "grid-cols-[72px_minmax(0,1fr)_18px]" : "grid-cols-[96px_minmax(0,1fr)_18px]")}>
-        <NewsThumbnail item={item} />
+    <article className={clsx("py-3", compact ? "px-0" : variant === "home" ? "rounded border border-line px-3 hover:bg-panelSoft/60" : "px-1")}>
+      <div className={clsx("grid items-start gap-3", compact ? "grid-cols-[minmax(0,1fr)_18px]" : variant === "home" ? "grid-cols-[54px_minmax(0,1fr)_18px]" : "grid-cols-[86px_minmax(0,1fr)_18px]")}>
+        {compact ? null : <NewsThumbnail item={item} size={variant === "home" ? "small" : "row"} />}
         <div className="min-w-0">
           {meta}
           <h3 className="mt-1 text-sm font-black leading-snug text-paper">{title}</h3>
-          {!compact ? (
+          {!compact && variant !== "home" ? (
             <Link href={`/artists/${item.artistId}`} className="mt-2 inline-flex text-xs font-black text-cyan hover:text-cyan/75">
               {item.artistName} · {item.ticker}
+            </Link>
+          ) : variant === "home" ? (
+            <Link href={`/artists/${item.artistId}`} className="mt-1 inline-flex text-xs font-black text-cyan hover:text-cyan/75">
+              {item.ticker}
             </Link>
           ) : null}
         </div>
@@ -166,18 +212,39 @@ function MarketNewsArticle({
   );
 }
 
-function NewsThumbnail({ item, featured = false }: { item: MarketNewsItem; featured?: boolean }) {
+function NewsThumbnail({ item, size = "row" }: { item: MarketNewsItem; size?: "featured" | "home" | "row" | "small" }) {
+  const hasThumbnail = Boolean(item.thumbnailUrl);
+  const fallbackIcon = item.sourceIconUrl;
+  const dimensions = {
+    featured: "h-24 w-full sm:h-28",
+    home: "h-16 w-[74px]",
+    row: "h-14 w-[86px]",
+    small: "h-12 w-[54px]"
+  }[size];
+
   return (
     <Link
       href={`/artists/${item.artistId}`}
       className={clsx(
-        "relative block overflow-hidden rounded border border-line bg-panelSoft",
-        featured ? "aspect-[16/10] min-h-28" : "h-14 w-full"
+        "relative block shrink-0 overflow-hidden rounded border border-line bg-panelSoft",
+        dimensions
       )}
       aria-label={`${item.artistName} quote`}
     >
       <span className="absolute inset-0 grid place-items-center bg-gradient-to-br from-cyan/10 via-brass/10 to-mint/12 text-sm font-black text-paper/75">
-        {item.ticker}
+        {fallbackIcon && !hasThumbnail ? (
+          <img
+            src={fallbackIcon}
+            alt=""
+            className="h-6 w-6 rounded object-contain"
+            loading="lazy"
+            onError={(event) => {
+              event.currentTarget.style.display = "none";
+            }}
+          />
+        ) : (
+          item.ticker
+        )}
       </span>
       {item.thumbnailUrl ? (
         <img
@@ -194,6 +261,31 @@ function NewsThumbnail({ item, featured = false }: { item: MarketNewsItem; featu
         {item.ticker}
       </span>
     </Link>
+  );
+}
+
+function SourceMeta({ item }: { item: MarketNewsItem }) {
+  const label = item.sourceName || item.sourceDomain;
+
+  if (!label) {
+    return null;
+  }
+
+  return (
+    <span className="inline-flex min-w-0 items-center gap-1.5">
+      {item.sourceIconUrl ? (
+        <img
+          src={item.sourceIconUrl}
+          alt=""
+          className="h-3.5 w-3.5 shrink-0 rounded object-contain"
+          loading="lazy"
+          onError={(event) => {
+            event.currentTarget.style.display = "none";
+          }}
+        />
+      ) : null}
+      <span className="truncate">{label}</span>
+    </span>
   );
 }
 

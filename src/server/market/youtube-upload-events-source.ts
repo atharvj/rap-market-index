@@ -351,7 +351,7 @@ function addOfficialAudioReleaseClusterEvent({
     eventType: "release",
     title: `${artist.name} project release cycle`.slice(0, 160),
     sourceName: "YouTube",
-    sourceUrl: firstVideoId ? `https://www.youtube.com/watch?v=${firstVideoId}` : undefined,
+    sourceUrl: undefined,
     sentimentScore,
     impactScore,
     confidence,

@@ -7,6 +7,8 @@ export const dynamic = "force-dynamic";
 
 type BootstrapBody = {
   username?: string;
+  profileBio?: string;
+  favoriteArtistIds?: string[];
 };
 
 type ProfileRow = Database["public"]["Tables"]["profiles"]["Row"];
@@ -60,7 +62,9 @@ export async function POST(request: Request) {
         supabase,
         userId: userData.user.id,
         email: userData.user.email,
-        username: body.username ?? userData.user.user_metadata?.username
+        username: body.username ?? userData.user.user_metadata?.username,
+        profileBio: body.profileBio,
+        favoriteArtistIds: body.favoriteArtistIds
       }),
       loadHoldings(supabase, userData.user.id),
       loadShortPositions(supabase, userData.user.id),
@@ -72,7 +76,9 @@ export async function POST(request: Request) {
       profile: {
         id: profile.id,
         username: profile.username,
-        cashBalance: Number(profile.cash_balance)
+        cashBalance: Number(profile.cash_balance),
+        bio: getProfileBio(profile),
+        favoriteArtistIds: getFavoriteArtistIds(profile)
       },
       holdings,
       shortPositions,
@@ -95,12 +101,16 @@ async function getOrCreateProfile({
   supabase,
   userId,
   email,
-  username
+  username,
+  profileBio,
+  favoriteArtistIds
 }: {
   supabase: ReturnType<typeof createAnonServerClient>;
   userId: string;
   email?: string;
   username?: string;
+  profileBio?: string;
+  favoriteArtistIds?: string[];
 }) {
   const existing = await supabase.from("profiles").select("*").eq("id", userId).maybeSingle();
 
@@ -112,16 +122,22 @@ async function getOrCreateProfile({
     const profile = existing.data as ProfileRow;
     const preferredUsername =
       typeof username === "string" && username.trim() ? normalizeUsername(username, undefined) : null;
+    const update: Partial<ProfileRow> = {};
 
     if (preferredUsername && preferredUsername !== profile.username) {
-      const updated = await supabase
-        .from("profiles")
-        .update({
-          username: preferredUsername
-        })
-        .eq("id", userId)
-        .select("*")
-        .single();
+      update.username = preferredUsername;
+    }
+
+    if (typeof profileBio === "string") {
+      update.bio = normalizeBio(profileBio);
+    }
+
+    if (Array.isArray(favoriteArtistIds)) {
+      update.favorite_artist_ids = normalizeFavoriteArtistIds(favoriteArtistIds);
+    }
+
+    if (Object.keys(update).length) {
+      const updated = await supabase.from("profiles").update(update).eq("id", userId).select("*").single();
 
       if (updated.error) {
         throw new Error(formatProfileWriteError(updated.error.message));
@@ -138,7 +154,9 @@ async function getOrCreateProfile({
     .from("profiles")
     .insert({
       id: userId,
-      username: safeUsername
+      username: safeUsername,
+      bio: typeof profileBio === "string" ? normalizeBio(profileBio) : undefined,
+      favorite_artist_ids: Array.isArray(favoriteArtistIds) ? normalizeFavoriteArtistIds(favoriteArtistIds) : undefined
     })
     .select("*")
     .single();
@@ -239,5 +257,34 @@ function formatProfileWriteError(message: string) {
     return "That username is already taken.";
   }
 
+  if (message.toLowerCase().includes("bio") || message.toLowerCase().includes("favorite_artist_ids")) {
+    return "Profile details are not ready yet. Run Supabase migration 019_profile_details.sql first.";
+  }
+
   return message;
+}
+
+function normalizeBio(value: string) {
+  return value.trim().replace(/\s+/g, " ").slice(0, 280);
+}
+
+function normalizeFavoriteArtistIds(value: string[]) {
+  return Array.from(
+    new Set(
+      value
+        .filter((artistId) => typeof artistId === "string")
+        .map((artistId) => artistId.trim())
+        .filter(Boolean)
+    )
+  ).slice(0, 12);
+}
+
+function getProfileBio(profile: ProfileRow) {
+  return typeof profile.bio === "string" ? profile.bio : "";
+}
+
+function getFavoriteArtistIds(profile: ProfileRow) {
+  return Array.isArray(profile.favorite_artist_ids)
+    ? profile.favorite_artist_ids.filter((artistId): artistId is string => typeof artistId === "string")
+    : [];
 }

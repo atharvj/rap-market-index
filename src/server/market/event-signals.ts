@@ -153,7 +153,7 @@ export function flattenEvents(eventsByArtist: Record<string, MarketEvent[]>) {
 }
 
 function buildArtistEventSignal(artist: MarketUpdateArtist, runDate: string, events: MarketEvent[]) {
-  const scoredEvents = applyEventClusterCaps(events.map((event) => scoreEvent(event, runDate)));
+  const scoredEvents = applyEventClusterCaps(events.map((event) => scoreEvent(event, runDate, artist)));
   const totalSignal = scoredEvents.reduce((total, event) => total + event.weightedImpact, 0);
   const reviewSignal = scoredEvents
     .filter((event) => event.event.eventType === "review")
@@ -428,13 +428,13 @@ function getEventReasonPriority(subtype: string) {
   return priorities[subtype] ?? 0;
 }
 
-function scoreEvent(event: MarketEvent, runDate: string) {
+function scoreEvent(event: MarketEvent, runDate: string, artist: MarketUpdateArtist) {
   const ageDays = Math.max(0, daysBetween(event.eventDate, runDate));
   const decay = getEventDecay(event.eventType, ageDays);
   const typeWeight = getEventTypeWeight(event.eventType);
   const sentiment = event.sentimentScore;
   const impact = event.impactScore || sentiment;
-  const provenance = getEventProvenance(event);
+  const provenance = getEventProvenance(event, artist);
   const weightedImpact = clamp(
     (impact * 0.65 + sentiment * 0.35) *
       event.confidence *
@@ -456,16 +456,16 @@ function scoreEvent(event: MarketEvent, runDate: string) {
   };
 }
 
-function getEventProvenance(event: MarketEvent) {
+function getEventProvenance(event: MarketEvent, artist: MarketUpdateArtist) {
   const source = getRawString(event.rawPayload.source) ?? "";
   const normalizedSource = source.toLowerCase();
 
   if (normalizedSource === "reddit_post") {
-    return getRedditEventProvenance(event);
+    return getRedditEventProvenance(event, artist);
   }
 
   if (normalizedSource === "bluesky_post") {
-    return getBlueskyEventProvenance(event);
+    return getBlueskyEventProvenance(event, artist);
   }
 
   if (normalizedSource === "gdelt_article") {
@@ -671,9 +671,10 @@ function hasExplicitYoutubeReleaseLanguage(normalizedTitle: string) {
   ]);
 }
 
-function getRedditEventProvenance(event: MarketEvent) {
+function getRedditEventProvenance(event: MarketEvent, artist: MarketUpdateArtist) {
   const viralityTier = getRawString(event.rawPayload.viralityTier) ?? "small";
   const subredditTier = getRawNumber(event.rawPayload.subredditTier, 0);
+  const audienceMultiplier = getCommunityAudienceMultiplier(artist);
   const tierProfiles: Record<string, { impact: number; confidence: number }> = {
     small: { impact: 0.58, confidence: 0.82 },
     notable: { impact: 0.95, confidence: 1 },
@@ -685,13 +686,14 @@ function getRedditEventProvenance(event: MarketEvent) {
 
   return {
     label: `reddit-${viralityTier}`,
-    impactMultiplier: clamp(profile.impact * subredditLift, 0.5, 1.42),
-    confidenceMultiplier: clamp(profile.confidence * subredditLift, 0.75, 1.18)
+    impactMultiplier: clamp(profile.impact * subredditLift * audienceMultiplier.impact, 0.5, 1.52),
+    confidenceMultiplier: clamp(profile.confidence * subredditLift * audienceMultiplier.confidence, 0.75, 1.22)
   };
 }
 
-function getBlueskyEventProvenance(event: MarketEvent) {
+function getBlueskyEventProvenance(event: MarketEvent, artist: MarketUpdateArtist) {
   const viralityTier = getRawString(event.rawPayload.viralityTier) ?? "small";
+  const audienceMultiplier = getCommunityAudienceMultiplier(artist);
   const tierProfiles: Record<string, { impact: number; confidence: number }> = {
     small: { impact: 0.28, confidence: 0.62 },
     notable: { impact: 0.55, confidence: 0.78 },
@@ -702,9 +704,25 @@ function getBlueskyEventProvenance(event: MarketEvent) {
 
   return {
     label: `bluesky-${viralityTier}`,
-    impactMultiplier: profile.impact,
-    confidenceMultiplier: profile.confidence
+    impactMultiplier: clamp(profile.impact * audienceMultiplier.impact, 0.22, 1.02),
+    confidenceMultiplier: clamp(profile.confidence * audienceMultiplier.confidence, 0.55, 1.06)
   };
+}
+
+function getCommunityAudienceMultiplier(artist: MarketUpdateArtist) {
+  if (artist.category === "underground") {
+    return { impact: 1.28, confidence: 1.06 };
+  }
+
+  if (artist.category === "rising") {
+    return { impact: 1.14, confidence: 1.03 };
+  }
+
+  if (artist.category === "superstar") {
+    return { impact: 0.88, confidence: 0.98 };
+  }
+
+  return { impact: 1, confidence: 1 };
 }
 
 function getGdeltEventProvenance(event: MarketEvent) {

@@ -3,29 +3,37 @@
 import { useAuth } from "@/components/AuthProvider";
 import { useGame } from "@/components/GameProvider";
 import { formatCurrency, formatPercent } from "@/lib/formatters";
+import { applyThemePreference, getStoredThemePreference, type ThemePreference } from "@/lib/theme";
 import clsx from "clsx";
 import {
+  Activity,
   BarChart3,
-  Newspaper,
+  Home,
   LogIn,
   LogOut,
+  Monitor,
+  Moon,
+  Newspaper,
   Search,
   Star,
+  Sun,
   UserCircle,
   UserPlus,
   Trophy,
-  WalletCards
+  WalletCards,
+  X
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 const navItems = [
-  { href: "/", label: "Market", icon: BarChart3 },
+  { href: "/", label: "Home", icon: Home },
+  { href: "/markets", label: "Now Trading", icon: BarChart3 },
+  { href: "/news", label: "News", icon: Newspaper },
   { href: "/watchlist", label: "Watchlist", icon: Star },
   { href: "/portfolio", label: "Portfolio", icon: WalletCards },
-  { href: "/leaderboard", label: "Leaderboard", icon: Trophy },
-  { href: "/news", label: "News", icon: Newspaper }
+  { href: "/leaderboard", label: "Leaderboard", icon: Trophy }
 ];
 
 export function Shell({ children }: { children: React.ReactNode }) {
@@ -36,6 +44,9 @@ export function Shell({ children }: { children: React.ReactNode }) {
   const [search, setSearch] = useState("");
   const [searchFocused, setSearchFocused] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
+  const [appearanceOpen, setAppearanceOpen] = useState(false);
+  const [themePreference, setThemePreference] = useState<ThemePreference>("system");
+  const [resolvedTheme, setResolvedTheme] = useState<"light" | "dark">("light");
   const tapeArtists = useMemo(
     () =>
       [...state.artists]
@@ -86,6 +97,37 @@ export function Shell({ children }: { children: React.ReactNode }) {
     router.push("/");
   }
 
+  useEffect(() => {
+    const preference = getStoredThemePreference();
+    const nextTheme = applyThemePreference(preference);
+
+    setThemePreference(preference);
+    setResolvedTheme(nextTheme);
+
+    const media = window.matchMedia("(prefers-color-scheme: dark)");
+    const handleSystemChange = () => {
+      if (getStoredThemePreference() === "system") {
+        setResolvedTheme(applyThemePreference("system"));
+      }
+    };
+
+    media.addEventListener("change", handleSystemChange);
+    return () => media.removeEventListener("change", handleSystemChange);
+  }, []);
+
+  function chooseTheme(preference: ThemePreference) {
+    setThemePreference(preference);
+    setResolvedTheme(applyThemePreference(preference));
+  }
+
+  function openAppearance() {
+    setAccountOpen(false);
+    setAppearanceOpen(true);
+  }
+
+  const themeLabel =
+    themePreference === "system" ? `System (${resolvedTheme})` : themePreference === "dark" ? "Dark" : "Light";
+
   const accountLabel =
     session && state.username && state.username !== "Demo Guest" ? state.username : user?.email?.split("@")[0] ?? "Guest";
   const accountInitial = (accountLabel.trim()[0] ?? "A").toUpperCase();
@@ -94,23 +136,15 @@ export function Shell({ children }: { children: React.ReactNode }) {
     <div className="min-h-screen bg-ink">
       <header className="sticky top-0 z-30 border-b border-line bg-panel">
         <div className="border-b border-line">
-          <div className="mx-auto flex max-w-[1440px] items-center gap-4 px-4 py-3 sm:px-6 lg:px-8">
-            <Link href="/" className="flex shrink-0 items-center gap-3">
-              <div className="grid h-10 w-10 place-items-center rounded border border-brass/30 bg-brass/10 text-brass">
-                <img src="/logo.svg" alt="" className="h-6 w-6" />
-              </div>
-              <div className="leading-tight">
-                <p className="text-lg font-black">Rap Market Index</p>
-                <p className="hidden text-[11px] font-bold uppercase tracking-wide text-paper/50 sm:block">
-                  Virtual rap exchange
-                </p>
-              </div>
+          <div className="mx-auto flex max-w-[1440px] items-center gap-4 px-4 py-2.5 sm:px-6 lg:px-8">
+            <Link href="/" className="flex shrink-0 items-center" aria-label="Rap Market Index home">
+              <img src="/logo.svg" alt="Rap Market Index" className="h-10 w-auto max-w-[148px]" />
             </Link>
 
             <form onSubmit={submitSearch} className="relative hidden min-w-0 flex-1 md:block">
               <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-paper/40" />
               <input
-                className="h-10 w-full rounded-full border border-line bg-panelSoft pl-11 pr-4 text-sm font-bold outline-none placeholder:text-paper/40 focus:border-cyan focus:bg-panel"
+                className="h-9 w-full rounded-full border border-line bg-panelSoft pl-11 pr-4 text-sm font-semibold outline-none placeholder:text-paper/40 focus:border-cyan focus:bg-panel"
                 placeholder="Search artists or tickers"
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
@@ -120,7 +154,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
                 }}
               />
               {searchFocused ? (
-                <div className="absolute left-0 right-0 top-12 z-40 rounded-2xl border border-line bg-panel p-4 shadow-2xl">
+                <div className="absolute left-0 right-0 top-11 z-40 rounded-2xl border border-line bg-panel p-4 shadow-2xl">
                   <div className="mb-3 flex items-center justify-between gap-3">
                     <h2 className="text-sm font-black">Trending Artists</h2>
                     {search.trim() ? (
@@ -133,11 +167,11 @@ export function Shell({ children }: { children: React.ReactNode }) {
                         key={artist.id}
                         href={`/artists/${artist.id}`}
                         onClick={() => setSearchFocused(false)}
-                        className="flex min-w-0 items-center justify-between gap-3 rounded-full bg-panelSoft px-3 py-2 hover:bg-brass/10"
+                        className="flex min-w-0 items-center justify-between gap-3 rounded-full bg-panelSoft px-3 py-1.5 text-sm hover:bg-brass/10"
                       >
                         <span className="min-w-0">
                           <span className="font-black text-cyan">{artist.ticker}</span>{" "}
-                          <span className="font-bold text-paper">{artist.name}</span>
+                          <span className="font-semibold text-paper">{artist.name}</span>
                         </span>
                         <span
                           className={clsx(
@@ -187,28 +221,28 @@ export function Shell({ children }: { children: React.ReactNode }) {
                 <button
                   type="button"
                   onClick={() => setAccountOpen((value) => !value)}
-                  className="flex h-10 w-10 items-center justify-center rounded-full border border-line bg-panelSoft text-sm font-black hover:border-cyan"
+                  className="flex h-9 w-9 items-center justify-center rounded-full border border-line bg-panelSoft text-sm font-black hover:border-cyan"
                   aria-label="Open account menu"
                   aria-expanded={accountOpen}
                 >
                   {session ? accountInitial : <UserCircle className="h-5 w-5 text-paper/60" aria-hidden="true" />}
                 </button>
                 {accountOpen ? (
-                  <div className="absolute right-0 top-12 w-80 rounded border border-line bg-panel p-4 shadow-2xl">
+                  <div className="absolute right-0 top-11 w-80 rounded border border-line bg-panel p-4 shadow-2xl">
                     <div className="flex items-center gap-3 border-b border-line pb-4">
-                      <div className="grid h-14 w-14 place-items-center rounded bg-panelSoft text-2xl font-black">
-                        {session ? accountInitial : <UserCircle className="h-8 w-8 text-paper/55" aria-hidden="true" />}
+                      <div className="grid h-12 w-12 place-items-center rounded bg-panelSoft text-xl font-black">
+                        {session ? accountInitial : <UserCircle className="h-7 w-7 text-paper/55" aria-hidden="true" />}
                       </div>
                       <div className="min-w-0">
-                        <p className="truncate text-lg font-black">{accountLabel}</p>
-                        <p className="truncate text-sm font-bold text-paper/50">
+                        <p className="truncate text-base font-black">{accountLabel}</p>
+                        <p className="truncate text-xs font-bold text-paper/50">
                           {session ? user?.email : "Sign in to trade and save watchlists"}
                         </p>
                       </div>
                     </div>
                     {session ? (
                       <>
-                        <div className="grid gap-2 py-3 text-sm font-bold">
+                        <div className="grid gap-1 py-3 text-sm font-bold">
                           <Link
                             href="/portfolio"
                             onClick={() => setAccountOpen(false)}
@@ -230,6 +264,14 @@ export function Shell({ children }: { children: React.ReactNode }) {
                           >
                             Watchlist
                           </Link>
+                          <button
+                            type="button"
+                            onClick={openAppearance}
+                            className="flex items-center justify-between gap-3 rounded px-2 py-2 text-left hover:bg-panelSoft"
+                          >
+                            <span>Appearance</span>
+                            <span className="text-xs font-black text-paper/45">{themeLabel}</span>
+                          </button>
                         </div>
                         <button
                           type="button"
@@ -242,10 +284,18 @@ export function Shell({ children }: { children: React.ReactNode }) {
                       </>
                     ) : (
                       <div className="grid gap-2 pt-4 text-sm font-black">
+                        <button
+                          type="button"
+                          onClick={openAppearance}
+                          className="flex min-h-10 items-center justify-between gap-3 rounded border border-line bg-panelSoft px-3 text-left hover:border-cyan"
+                        >
+                          <span>Appearance</span>
+                          <span className="text-xs font-black text-paper/45">{themeLabel}</span>
+                        </button>
                         <Link
                           href="/account?mode=signup"
                           onClick={() => setAccountOpen(false)}
-                          className="flex min-h-11 items-center justify-center gap-2 rounded bg-paper px-4 text-white hover:bg-paper/90"
+                          className="flex min-h-11 items-center justify-center gap-2 rounded bg-paper px-4 text-ink hover:bg-paper/90"
                         >
                           <UserPlus className="h-4 w-4" />
                           Create account
@@ -292,48 +342,60 @@ export function Shell({ children }: { children: React.ReactNode }) {
           </nav>
         </div>
 
-        <div className="bg-panel">
-          <div className="mx-auto flex max-w-[1440px] items-center gap-4 overflow-x-auto px-4 py-2 text-xs scrollbar-thin sm:px-6 lg:px-8">
-            <span className="sticky left-0 z-10 shrink-0 bg-panel pr-2 font-black text-paper">RMI Markets</span>
-            {tapeArtists.map((artist) => (
-              <Link key={artist.id} href={`/artists/${artist.id}`} className="flex shrink-0 items-center gap-2">
-                <span className="font-black text-cyan">{artist.ticker}</span>
-                <span className="number-tabular text-paper/70">{formatCurrency(artist.currentPrice)}</span>
-                <span className={clsx("font-black number-tabular", artist.dailyChangePercent >= 0 ? "text-mint" : "text-ember")}>
-                  {formatPercent(artist.dailyChangePercent)}
-                </span>
-              </Link>
-            ))}
+        <div className="border-t border-line bg-panel">
+          <div className="flex w-full items-center text-xs">
+            <span className="inline-flex min-h-9 shrink-0 items-center gap-2 bg-panel px-4 font-black text-paper sm:px-6 lg:px-8">
+              <Activity className="h-4 w-4 text-brass" aria-hidden="true" />
+              RMI Markets
+            </span>
+            <div className="min-w-0 flex-1 overflow-hidden">
+              <div className="flex items-center gap-5 overflow-x-auto px-3 py-2 scrollbar-thin">
+                {tapeArtists.map((artist) => (
+                  <Link key={artist.id} href={`/artists/${artist.id}`} className="flex shrink-0 items-center gap-2">
+                    <span className="font-black text-cyan">{artist.ticker}</span>
+                    <span className="number-tabular text-paper/70">{formatCurrency(artist.currentPrice)}</span>
+                    <span className={clsx("font-black number-tabular", artist.dailyChangePercent >= 0 ? "text-mint" : "text-ember")}>
+                      {formatPercent(artist.dailyChangePercent)}
+                    </span>
+                  </Link>
+                ))}
+              </div>
+            </div>
           </div>
         </div>
       </header>
+
+      {appearanceOpen ? (
+        <AppearanceModal
+          current={themePreference}
+          onChange={chooseTheme}
+          onClose={() => setAppearanceOpen(false)}
+        />
+      ) : null}
 
       <main className="mx-auto min-h-[calc(100vh-12rem)] max-w-[1440px] px-4 py-5 sm:px-6 lg:px-8">
         {children}
       </main>
 
-      <footer className="border-t border-line bg-[#eef2f5]">
-        <div className="mx-auto grid max-w-[1440px] gap-10 px-4 py-12 text-sm text-paper/70 sm:px-6 md:grid-cols-[1.3fr_1fr_1fr_1fr] lg:px-8">
+      <footer className="border-t border-black bg-black">
+        <div className="mx-auto grid max-w-[1440px] gap-10 px-4 py-12 text-sm text-white/70 sm:px-6 md:grid-cols-[1.3fr_1fr_1fr_1fr] lg:px-8">
           <div>
             <div className="flex items-center gap-3">
-              <div className="grid h-11 w-11 place-items-center rounded border border-brass/30 bg-white text-brass">
-                <img src="/logo.svg" alt="" className="h-7 w-7" />
-              </div>
+              <img src="/logo.svg" alt="Rap Market Index" className="h-9 w-auto max-w-[150px]" />
               <div>
-                <p className="text-xl font-black text-paper">Rap Market Index</p>
-                <p className="text-xs font-bold uppercase tracking-wide text-paper/45">Virtual rap exchange</p>
+                <p className="text-xs font-bold uppercase tracking-wide text-white/45">Virtual rap exchange</p>
               </div>
             </div>
-            <p className="mt-5 max-w-sm text-sm leading-6 text-paper/60">
+            <p className="mt-5 max-w-sm text-sm font-bold leading-6 text-white/60">
               Artist prices, market news, portfolios, and leaderboards for fantasy rap trading.
             </p>
-            <p className="mt-4 max-w-sm text-xs font-bold uppercase leading-5 tracking-wide text-paper/45">
+            <p className="mt-4 max-w-sm text-xs font-bold uppercase leading-5 tracking-wide text-white/40">
               No real money. No cash-out. Not affiliated with any artists, labels, or platforms.
             </p>
           </div>
 
           <FooterColumn title="Market">
-            <Link href="/">Now Trading</Link>
+            <Link href="/markets">Now Trading</Link>
             <Link href="/news">News</Link>
             <Link href="/leaderboard">Leaderboard</Link>
             <Link href="/watchlist">Watchlist</Link>
@@ -358,11 +420,87 @@ export function Shell({ children }: { children: React.ReactNode }) {
   );
 }
 
+function AppearanceModal({
+  current,
+  onChange,
+  onClose
+}: {
+  current: ThemePreference;
+  onChange: (preference: ThemePreference) => void;
+  onClose: () => void;
+}) {
+  const options: Array<{ value: ThemePreference; label: string; icon: React.ReactNode }> = [
+    { value: "light", label: "Light", icon: <Sun className="h-4 w-4" /> },
+    { value: "dark", label: "Dark", icon: <Moon className="h-4 w-4" /> },
+    { value: "system", label: "System", icon: <Monitor className="h-4 w-4" /> }
+  ];
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 px-4" role="dialog" aria-modal="true" aria-labelledby="appearance-title">
+      <div className="w-full max-w-2xl rounded-2xl border border-line bg-panel p-5 shadow-2xl sm:p-7">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h2 id="appearance-title" className="text-2xl font-black">
+              Appearance
+            </h2>
+            <p className="mt-1 text-sm font-bold text-paper/55">Choose how RMI looks on this device.</p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="grid h-9 w-9 place-items-center rounded-full border border-line text-paper/60 hover:border-cyan hover:text-cyan"
+            aria-label="Close appearance settings"
+          >
+            <X className="h-5 w-5" aria-hidden="true" />
+          </button>
+        </div>
+        <div className="mt-6 grid gap-3 sm:grid-cols-3">
+          {options.map((option) => (
+            <button
+              key={option.value}
+              type="button"
+              onClick={() => onChange(option.value)}
+              className={clsx(
+                "grid gap-4 rounded border p-4 text-left",
+                current === option.value
+                  ? "border-mint bg-mint/10 text-paper"
+                  : "border-line bg-panelSoft text-paper/70 hover:border-cyan"
+              )}
+            >
+              <span className="grid h-24 place-items-center rounded border border-line bg-panel">
+                <span className="grid h-11 w-16 place-items-center rounded bg-panelSoft text-paper/70">{option.icon}</span>
+              </span>
+              <span className="flex items-center gap-2 text-sm font-black">
+                <span
+                  className={clsx(
+                    "h-4 w-4 rounded-full border",
+                    current === option.value ? "border-mint bg-mint shadow-[inset_0_0_0_3px_rgb(var(--color-panel))]" : "border-paper/35"
+                  )}
+                />
+                {option.label}
+              </span>
+            </button>
+          ))}
+        </div>
+        <div className="mt-7 flex justify-center">
+          <button
+            type="button"
+            onClick={onClose}
+            className="inline-flex min-h-10 min-w-28 items-center justify-center rounded-full bg-mint px-6 text-sm font-black text-white hover:bg-mint/90"
+          >
+            OK
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function FooterColumn({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div>
-      <h2 className="font-black text-paper">{title}</h2>
-      <div className="mt-4 grid gap-3 font-bold text-paper/58 [&_a:hover]:text-cyan">{children}</div>
+      <h2 className="font-black text-white">{title}</h2>
+      <div className="mt-4 grid gap-3 font-bold text-white/60 [&_a:hover]:text-cyan">{children}</div>
     </div>
   );
 }

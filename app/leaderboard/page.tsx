@@ -10,6 +10,7 @@ export default function LeaderboardPage() {
   const { leaderboard } = useGame();
   const currentRank = leaderboard.findIndex((entry) => entry.isCurrentUser) + 1;
   const leader = leaderboard[0];
+  const rankLabel = currentRank > 0 ? `#${currentRank}` : "Unranked";
 
   return (
     <div className="space-y-6">
@@ -21,15 +22,15 @@ export default function LeaderboardPage() {
       <section className="grid gap-3 md:grid-cols-3">
         <MetricCard
           label="Your rank"
-          value={`#${currentRank}`}
+          value={rankLabel}
           detail={`${leaderboard.length} traders`}
           icon={<Trophy className="h-4 w-4" />}
           tone="warm"
         />
         <MetricCard
           label="Leader"
-          value={leader.username}
-          detail={formatCurrency(leader.portfolioValue)}
+          value={leader?.username ?? "N/A"}
+          detail={leader ? formatCurrency(leader.portfolioValue) : "No traders yet"}
           icon={<Medal className="h-4 w-4" />}
           tone="good"
         />
@@ -55,44 +56,52 @@ export default function LeaderboardPage() {
               </tr>
             </thead>
             <tbody>
-              {leaderboard.map((entry, index) => (
-                <tr
-                  key={entry.id}
-                  className={clsx(
-                    "border-b border-line/70 last:border-0",
-                    entry.isCurrentUser ? "bg-brass/10" : "hover:bg-panelSoft/70"
-                  )}
-                >
-                  <td className="px-4 py-4">
-                    <span
-                      className={clsx(
-                        "grid h-9 w-9 place-items-center rounded-md font-black",
-                        index === 0 ? "bg-brass text-white" : "border border-line bg-panelSoft text-paper/70"
-                      )}
-                    >
-                      {index + 1}
-                    </span>
-                  </td>
-                  <td className="px-4 py-4">
-                    <div className="font-black">{entry.username}</div>
-                    {entry.isCurrentUser ? <div className="text-sm font-bold text-brass">Current user</div> : null}
-                  </td>
-                  <td className="px-4 py-4 text-right font-black number-tabular">
-                    {formatCurrency(entry.portfolioValue)}
-                  </td>
-                  <td className="px-4 py-4 text-right number-tabular text-paper/60">
-                    {formatCurrency(entry.cashBalance)}
-                  </td>
-                  <td
+              {leaderboard.length ? (
+                leaderboard.map((entry, index) => (
+                  <tr
+                    key={entry.id}
                     className={clsx(
-                      "px-4 py-4 text-right font-black number-tabular",
-                      entry.gainPercent >= 0 ? "text-mint" : "text-ember"
+                      "border-b border-line/70 last:border-0",
+                      entry.isCurrentUser ? "bg-brass/10" : "hover:bg-panelSoft/70"
                     )}
                   >
-                    {formatPercent(entry.gainPercent)}
+                    <td className="px-4 py-4">
+                      <span
+                        className={clsx(
+                          "grid h-9 w-9 place-items-center rounded-md font-black",
+                          index === 0 ? "bg-brass text-white" : "border border-line bg-panelSoft text-paper/70"
+                        )}
+                      >
+                        {index + 1}
+                      </span>
+                    </td>
+                    <td className="px-4 py-4">
+                      <div className="font-black">{entry.username}</div>
+                      {entry.isCurrentUser ? <div className="text-sm font-bold text-brass">Current user</div> : null}
+                    </td>
+                    <td className="px-4 py-4 text-right font-black number-tabular">
+                      {formatCurrency(entry.portfolioValue)}
+                    </td>
+                    <td className="px-4 py-4 text-right number-tabular text-paper/60">
+                      {formatCurrency(entry.cashBalance)}
+                    </td>
+                    <td
+                      className={clsx(
+                        "px-4 py-4 text-right font-black number-tabular",
+                        entry.gainPercent >= 0 ? "text-mint" : "text-ember"
+                      )}
+                    >
+                      {formatPercent(entry.gainPercent)}
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td className="px-4 py-10 text-center text-paper/50" colSpan={5}>
+                    No leaderboard entries yet.
                   </td>
                 </tr>
-              ))}
+              )}
             </tbody>
           </table>
         </div>

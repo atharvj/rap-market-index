@@ -77,7 +77,7 @@ export default function PortfolioPage() {
         </div>
         <div className="grid gap-3 p-4 md:grid-cols-2 xl:grid-cols-4">
           {suggestedArtists.map((artist) => (
-            <Link key={artist.id} href={`/artists/${artist.id}`} className="min-w-0 rounded border border-line bg-white p-3 hover:border-cyan">
+            <Link key={artist.id} href={`/artists/${artist.id}`} className="min-w-0 rounded border border-line bg-panel p-3 hover:border-cyan">
               <div className="flex items-center gap-3">
                 <ArtistAvatar artist={artist} />
                 <div className="min-w-0">

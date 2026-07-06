@@ -8,15 +8,15 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        ink: "#f5f7f9",
-        panel: "#ffffff",
-        panelSoft: "#eef2f5",
-        line: "#d9e0e7",
-        paper: "#1f2933",
-        brass: "#6fa131",
-        mint: "#00856f",
-        ember: "#d93025",
-        cyan: "#2364c8"
+        ink: "rgb(var(--color-ink) / <alpha-value>)",
+        panel: "rgb(var(--color-panel) / <alpha-value>)",
+        panelSoft: "rgb(var(--color-panel-soft) / <alpha-value>)",
+        line: "rgb(var(--color-line) / <alpha-value>)",
+        paper: "rgb(var(--color-paper) / <alpha-value>)",
+        brass: "rgb(var(--color-brass) / <alpha-value>)",
+        mint: "rgb(var(--color-mint) / <alpha-value>)",
+        ember: "rgb(var(--color-ember) / <alpha-value>)",
+        cyan: "rgb(var(--color-cyan) / <alpha-value>)"
       },
       boxShadow: {
         market: "0 10px 28px rgba(31, 41, 51, 0.08)"

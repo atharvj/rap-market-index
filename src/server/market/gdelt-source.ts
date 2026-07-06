@@ -945,20 +945,28 @@ const CONTROVERSY_TERMS = [
   "arrest",
   "arrested",
   "backlash",
+  "boycott",
   "charged",
   "controversy",
   "criticized",
   "death",
   "dies",
   "died",
+  "exposed",
+  "flag",
+  "israel flag",
   "hospitalized",
   "injured",
   "lawsuit",
+  "palestine",
+  "problematic",
   "pleads",
   "pleads guilty",
+  "racist",
   "sentenced",
   "sued",
-  "trial"
+  "trial",
+  "zionist"
 ];
 
 const REVIEW_TERMS = ["review", "reviewed", "reviews", "rated"];
@@ -1108,7 +1116,9 @@ const MAJOR_FEATURE_TERMS = [
   "with travis"
 ];
 const PERFORMANCE_TERMS = [
+  "booed",
   "concert",
+  "crowd booed",
   "crowd goes wild",
   "crowd went crazy",
   "festival set",
@@ -1116,7 +1126,8 @@ const PERFORMANCE_TERMS = [
   "performs",
   "performed",
   "rolling loud",
-  "stage"
+  "stage",
+  "viral performance"
 ];
 const SNIPPET_TERMS = [
   "first listen",
@@ -1165,12 +1176,15 @@ const PUBLIC_REACTION_TERMS = [
 const VIRAL_TERMS = [
   "breakout",
   "challenge",
+  "clip goes viral",
   "goes viral",
   "meme",
   "streaming record",
   "tiktok",
+  "tiktok clip",
   "trending",
-  "viral"
+  "viral",
+  "viral clip"
 ];
 const DECLINE_TERMS = [
   "dead crowd",

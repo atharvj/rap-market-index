@@ -171,6 +171,7 @@ type SourceResolverCandidate = {
   externalId: string;
   confidence: number;
   reason: string;
+  metadata?: Record<string, unknown>;
 };
 
 type SourceResolverSuggestion = {
@@ -278,12 +279,33 @@ type ArtistRosterSaveState =
       message: string;
     };
 
+type AutoArtistPreviewResult = {
+  record: ArtistRosterRecord;
+  sourceIds: ArtistSourceIdRecord["externalIds"] | null;
+  suggestions: SourceResolverSuggestion[];
+  warnings: string[];
+  starter: {
+    source: string;
+    price: number;
+    category: ArtistCategory;
+    volatility: number;
+  };
+};
+
 type AutoArtistAddState =
   | {
       status: "idle";
     }
   | {
+      status: "previewing";
+    }
+  | {
+      status: "preview";
+      preview: AutoArtistPreviewResult;
+    }
+  | {
       status: "saving";
+      preview: AutoArtistPreviewResult;
     }
   | {
       status: "saved";
@@ -1285,7 +1307,7 @@ export default function DevPage() {
     setArtistRosterSave({ status: "idle" });
   }
 
-  async function addArtistByName() {
+  async function previewArtistByName() {
     const name = autoArtistName.trim();
 
     if (!name) {
@@ -1296,7 +1318,7 @@ export default function DevPage() {
       return;
     }
 
-    setAutoArtistAdd({ status: "saving" });
+    setAutoArtistAdd({ status: "previewing" });
 
     try {
       const response = await fetch("/api/admin/artist-autofill", {
@@ -1306,7 +1328,8 @@ export default function DevPage() {
           ...adminHeaders
         },
         body: JSON.stringify({
-          name
+          name,
+          dryRun: true
         })
       });
       const payload = await readJsonResponse(response);
@@ -1317,13 +1340,80 @@ export default function DevPage() {
 
       const record = payload.record as ArtistRosterRecord | undefined;
       const sourceIds = payload.sourceIds as ArtistSourceIdRecord["externalIds"] | null | undefined;
+
+      if (record) {
+        setArtistRosterForm(buildArtistRosterForm(record));
+        setManualSourceForm({
+          ...emptyManualSourceIdForm,
+          artistId: record.id,
+          spotifyId: sourceIds?.spotifyId ?? "",
+          youtubeChannelId: sourceIds?.youtubeChannelId ?? "",
+          musicbrainzId: sourceIds?.musicbrainzId ?? "",
+          lastfmName: sourceIds?.lastfmName ?? "",
+          gdeltQuery: sourceIds?.gdeltQuery ?? ""
+        });
+      }
+
+      if (!record) {
+        throw new Error("Artist autofill returned no preview record.");
+      }
+
+      setAutoArtistAdd({
+        status: "preview",
+        preview: {
+          record,
+          sourceIds: sourceIds ?? null,
+          suggestions: payload.resolver?.suggestions ?? [],
+          warnings: payload.resolver?.warnings ?? [],
+          starter: {
+            source: payload.starter?.source ?? "default",
+            price: typeof payload.starter?.price === "number" ? payload.starter.price : record.currentPrice,
+            category: payload.starter?.category ?? record.category,
+            volatility: typeof payload.starter?.volatility === "number" ? payload.starter.volatility : record.volatility
+          }
+        }
+      });
+    } catch (error) {
+      setAutoArtistAdd({
+        status: "error",
+        message: error instanceof Error ? error.message : "Artist autofill failed."
+      });
+    }
+  }
+
+  async function savePreviewedArtist() {
+    if (autoArtistAdd.status !== "preview") {
+      return;
+    }
+
+    const preview = autoArtistAdd.preview;
+    setAutoArtistAdd({ status: "saving", preview });
+
+    try {
+      const response = await fetch("/api/admin/artist-autofill", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          ...adminHeaders
+        },
+        body: JSON.stringify({
+          name: preview.record.name,
+          dryRun: false
+        })
+      });
+      const payload = await readJsonResponse(response);
+
+      if (!response.ok || !payload.ok) {
+        throw new Error(payload.error ?? "Artist save failed.");
+      }
+
+      const record = payload.record as ArtistRosterRecord | undefined;
+      const sourceIds = payload.sourceIds as ArtistSourceIdRecord["externalIds"] | null | undefined;
       const savedSourceLabels = sourceIds
         ? manualSourceIdFields
             .filter((field) => Boolean(sourceIds[field.key]))
             .map((field) => field.label)
         : [];
-      const starterPrice =
-        typeof payload.starter?.price === "number" ? `$${payload.starter.price.toFixed(2)}` : "starter price";
 
       if (record) {
         setArtistRosterForm(buildArtistRosterForm(record));
@@ -1341,8 +1431,8 @@ export default function DevPage() {
       setAutoArtistName("");
       setAutoArtistAdd({
         status: "saved",
-        message: `Added ${record?.ticker ?? name} at ${starterPrice}. ${
-          savedSourceLabels.length ? `Saved ${savedSourceLabels.join(", ")}.` : "No source IDs were saved."
+        message: `Saved ${record?.ticker ?? preview.record.ticker}. ${
+          savedSourceLabels.length ? `Source IDs: ${savedSourceLabels.join(", ")}.` : "No high-confidence source IDs were saved."
         }`,
         warnings: payload.resolver?.warnings ?? []
       });
@@ -1352,7 +1442,7 @@ export default function DevPage() {
     } catch (error) {
       setAutoArtistAdd({
         status: "error",
-        message: error instanceof Error ? error.message : "Artist autofill failed."
+        message: error instanceof Error ? error.message : "Artist save failed."
       });
     }
   }
@@ -1789,7 +1879,8 @@ export default function DevPage() {
           setAutoArtistName(value);
           setAutoArtistAdd({ status: "idle" });
         }}
-        onAutoAdd={addArtistByName}
+        onAutoPreview={previewArtistByName}
+        onAutoSave={savePreviewedArtist}
       />
 
       <ManualSourceIdEditor
@@ -3085,7 +3176,8 @@ function ArtistRosterManager({
   onSetActive,
   onDelete,
   onAutoNameChange,
-  onAutoAdd
+  onAutoPreview,
+  onAutoSave
 }: {
   state: AsyncState<ArtistRosterDirectory>;
   form: ArtistRosterForm;
@@ -3101,10 +3193,11 @@ function ArtistRosterManager({
   onSetActive: (isActive: boolean) => void;
   onDelete: () => void;
   onAutoNameChange: (value: string) => void;
-  onAutoAdd: () => void;
+  onAutoPreview: () => void;
+  onAutoSave: () => void;
 }) {
   const records = state.status === "ready" ? state.data.records : [];
-  const selectedDisabled = saveState.status === "saving" || autoState.status === "saving";
+  const selectedDisabled = saveState.status === "saving" || autoState.status === "saving" || autoState.status === "previewing";
 
   return (
     <section className="rounded-md border border-line bg-panel/88 p-5 shadow-market">
@@ -3145,14 +3238,14 @@ function ArtistRosterManager({
           <div className="rounded-md border border-cyan/25 bg-cyan/5 p-4">
             <div className="grid gap-3 lg:grid-cols-[1fr_auto] lg:items-end">
               <label className="block">
-                <span className="text-xs font-black uppercase tracking-wide text-paper/45">Add by artist name</span>
+                <span className="text-xs font-black uppercase tracking-wide text-paper/45">Find artist to add</span>
                 <input
                   value={autoName}
                   onChange={(event) => onAutoNameChange(event.target.value)}
                   onKeyDown={(event) => {
                     if (event.key === "Enter") {
                       event.preventDefault();
-                      onAutoAdd();
+                      onAutoPreview();
                     }
                   }}
                   disabled={selectedDisabled}
@@ -3160,19 +3253,26 @@ function ArtistRosterManager({
                   className="mt-2 min-h-11 w-full rounded-md border border-line bg-ink px-3 text-sm font-bold text-paper outline-none placeholder:text-paper/24 focus:border-cyan disabled:cursor-not-allowed disabled:opacity-55"
                 />
                 <span className="mt-1 block text-xs font-bold leading-5 text-paper/42">
-                  Creates the listing, estimates neutral starting values, and saves safe source defaults plus confident IDs.
+                  Preview ticker, starter price, volatility, category, and source matches before anything is saved.
                 </span>
               </label>
               <button
                 type="button"
-                onClick={onAutoAdd}
+                onClick={onAutoPreview}
                 disabled={!autoName.trim() || selectedDisabled}
                 className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-mint/45 bg-mint/10 px-4 text-sm font-black text-mint disabled:cursor-not-allowed disabled:opacity-50"
               >
                 <CheckCircle2 className="h-4 w-4" />
-                {autoState.status === "saving" ? "Adding" : "Auto-add artist"}
+                {autoState.status === "previewing" ? "Finding" : "Find info"}
               </button>
             </div>
+            {autoState.status === "preview" || autoState.status === "saving" ? (
+              <AutoArtistPreviewCard
+                preview={autoState.preview}
+                saving={autoState.status === "saving"}
+                onSave={onAutoSave}
+              />
+            ) : null}
             {autoState.status === "saved" ? (
               <div className="mt-3 rounded-md border border-mint/35 bg-mint/10 p-3 text-sm font-bold leading-6 text-paper/70">
                 <p className="text-mint">{autoState.message}</p>
@@ -3360,6 +3460,116 @@ function ArtistRosterManager({
         </div>
       ) : null}
     </section>
+  );
+}
+
+function AutoArtistPreviewCard({
+  preview,
+  saving,
+  onSave
+}: {
+  preview: AutoArtistPreviewResult;
+  saving: boolean;
+  onSave: () => void;
+}) {
+  const sourceIds = preview.sourceIds;
+  const savedSources = manualSourceIdFields
+    .map((field) => ({
+      label: field.label,
+      value: sourceIds?.[field.key]
+    }))
+    .filter((source): source is { label: string; value: string } => Boolean(source.value));
+  const candidates = preview.suggestions.flatMap((suggestion) =>
+    Object.entries(suggestion.candidates).flatMap(([source, sourceCandidates]) =>
+      (sourceCandidates ?? []).slice(0, 2).map((candidate) => ({
+        sourceKey: source,
+        ...candidate
+      }))
+    )
+  );
+
+  return (
+    <div className="mt-4 rounded-md border border-line bg-black/20 p-4">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+        <div>
+          <p className="text-xs font-black uppercase tracking-wide text-mint">Verification preview</p>
+          <h3 className="mt-1 text-xl font-black">
+            {preview.record.name} <span className="text-paper/45">{preview.record.ticker}</span>
+          </h3>
+          <p className="mt-2 max-w-2xl text-sm font-bold leading-6 text-paper/55">
+            Review the generated listing and source matches. Nothing is added to the public roster until you save it.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={onSave}
+          disabled={saving}
+          className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md border border-mint/45 bg-mint/10 px-4 text-sm font-black text-mint disabled:cursor-wait disabled:opacity-55"
+        >
+          <CheckCircle2 className="h-4 w-4" />
+          {saving ? "Saving verified artist" : "Save verified artist"}
+        </button>
+      </div>
+
+      <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <PreviewMetric label="Ticker" value={preview.record.ticker} />
+        <PreviewMetric label="Start price" value={formatCurrency(preview.starter.price)} />
+        <PreviewMetric label="Volatility" value={`${preview.starter.volatility.toFixed(2)}x`} />
+        <PreviewMetric label="Category" value={preview.starter.category} />
+      </div>
+
+      <div className="mt-4 grid gap-3 lg:grid-cols-2">
+        <div className="rounded-md border border-line bg-ink/70 p-3">
+          <p className="text-xs font-black uppercase tracking-wide text-paper/45">Source IDs to save</p>
+          <div className="mt-3 grid gap-2 text-xs font-bold">
+            {savedSources.length ? (
+              savedSources.map((source) => (
+                <div key={source.label} className="grid gap-1 rounded border border-line bg-panel/70 p-2">
+                  <span className="text-paper/45">{source.label}</span>
+                  <span className="break-all text-paper">{source.value}</span>
+                </div>
+              ))
+            ) : (
+              <p className="rounded border border-brass/35 bg-brass/10 p-3 leading-5 text-paper/65">
+                No high-confidence source IDs were found. You can still save the listing, then add exact IDs manually.
+              </p>
+            )}
+          </div>
+        </div>
+
+        <div className="rounded-md border border-line bg-ink/70 p-3">
+          <p className="text-xs font-black uppercase tracking-wide text-paper/45">Best matches found</p>
+          <div className="mt-3 grid gap-2 text-xs font-bold">
+            {candidates.length ? (
+              candidates.map((candidate) => (
+                <div key={`${candidate.sourceKey}-${candidate.externalId}`} className="rounded border border-line bg-panel/70 p-2">
+                  <div className="flex items-start justify-between gap-3">
+                    <span className="min-w-0">
+                      <span className="block truncate text-paper">{candidate.label}</span>
+                      <span className="uppercase text-paper/45">{candidate.sourceKey}</span>
+                    </span>
+                    <span className="shrink-0 text-mint">{Math.round(candidate.confidence * 100)}%</span>
+                  </div>
+                  <p className="mt-1 leading-5 text-paper/55">{candidate.reason}</p>
+                </div>
+              ))
+            ) : (
+              <p className="rounded border border-line bg-panel/70 p-3 leading-5 text-paper/55">
+                No resolver candidates were returned for this artist.
+              </p>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {preview.warnings.length ? (
+        <div className="mt-3 rounded-md border border-brass/35 bg-brass/10 p-3 text-xs font-bold leading-5 text-paper/65">
+          {preview.warnings.slice(0, 3).map((warning) => (
+            <p key={warning}>{warning}</p>
+          ))}
+        </div>
+      ) : null}
+    </div>
   );
 }
 

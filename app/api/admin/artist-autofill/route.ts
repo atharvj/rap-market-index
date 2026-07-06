@@ -14,6 +14,7 @@ type ArtistRow = Database["public"]["Tables"]["artists"]["Row"];
 
 type ArtistAutofillBody = {
   name?: string;
+  dryRun?: boolean;
 };
 
 const DEFAULT_STATS: HypeStats = {
@@ -59,6 +60,7 @@ export async function POST(request: Request) {
   try {
     const body = await parseBody(request);
     const name = normalizeArtistName(body.name);
+    const dryRun = body.dryRun !== false;
 
     if (!name) {
       return NextResponse.json(
@@ -96,8 +98,7 @@ export async function POST(request: Request) {
       category: starter.category,
       volatility: starter.volatility
     });
-    const inserted = await upsertArtist(supabase, artist);
-    const externalIds = await loadArtistExternalIds(supabase, [artist.id]);
+    const externalIds = dryRun ? {} : await loadArtistExternalIds(supabase, [artist.id]);
     const resolverResult = await resolveArtistSourceIds({
       artists: [artist],
       externalIds,
@@ -110,26 +111,34 @@ export async function POST(request: Request) {
       minConfidence: 0.88,
       delayMs: 0
     });
-    const savedSourceIds = resolverResult.records.length
+    const savedSourceIds = !dryRun && resolverResult.records.length
       ? await upsertArtistExternalIds(supabase, resolverResult.records)
       : {};
     const valuation = estimateStarterValuation(resolverResult.suggestions[0]?.candidates ?? {}, starter);
-    const finalArtist =
-      valuation.source === "default"
-        ? inserted
-        : await updateStarterValuation(supabase, {
-            ...artist,
-            currentPrice: valuation.price,
-            previousClose: valuation.price,
-            volatility: valuation.volatility,
-            category: valuation.category
-          });
+    const valuedArtist = {
+      ...artist,
+      currentPrice: valuation.price,
+      previousClose: valuation.price,
+      volatility: valuation.volatility,
+      category: valuation.category
+    };
+    let finalArtist = mapMarketArtist(valuedArtist);
+
+    if (!dryRun) {
+      if (valuation.source === "default") {
+        finalArtist = mapArtistRow(await upsertArtist(supabase, artist));
+      } else {
+        await upsertArtist(supabase, valuedArtist);
+        finalArtist = mapArtistRow(await updateStarterValuation(supabase, valuedArtist));
+      }
+    }
 
     return NextResponse.json({
       ok: true,
+      persisted: !dryRun,
       config,
-      record: mapArtistRow(finalArtist),
-      sourceIds: savedSourceIds[artist.id] ?? null,
+      record: finalArtist,
+      sourceIds: dryRun ? resolverResult.records[0] ?? null : savedSourceIds[artist.id] ?? null,
       resolver: {
         proposedRecordCount: resolverResult.records.length,
         warnings: resolverResult.warnings,
@@ -496,5 +505,21 @@ function mapArtistRow(row: ArtistRow) {
     category: row.category,
     accent: row.accent,
     isActive: row.is_active
+  };
+}
+
+function mapMarketArtist(artist: MarketUpdateArtist) {
+  return {
+    id: artist.id,
+    name: artist.name,
+    ticker: artist.ticker,
+    currentPrice: artist.currentPrice,
+    previousClose: artist.previousClose,
+    dailyChangePercent: getDailyChangePercent(artist.currentPrice, artist.previousClose),
+    hypeScore: artist.hypeScore,
+    volatility: artist.volatility,
+    category: artist.category,
+    accent: getAccent(artist.name),
+    isActive: true
   };
 }

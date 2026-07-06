@@ -1111,6 +1111,8 @@ const SNIPPET_TERMS = [
 ];
 
 const PERFORMANCE_TERMS = [
+  "booed",
+  "crowd booed",
   "crowd went crazy",
   "crowd knew every word",
   "dead crowd",
@@ -1122,8 +1124,10 @@ const PERFORMANCE_TERMS = [
   "performed",
   "rolling loud",
   "set went crazy",
+  "set was crazy",
   "stage",
-  "viral performance"
+  "viral performance",
+  "went viral at rolling loud"
 ];
 
 const FEATURE_TERMS = [
@@ -1171,12 +1175,15 @@ const VIRAL_TERMS = [
   "blew up",
   "breakout",
   "challenge",
+  "clip",
+  "fan cam",
   "getting attention",
   "going viral",
   "goes viral",
   "meme",
   "next up",
   "tiktok",
+  "tiktok clip",
   "trend",
   "trending",
   "viral",
@@ -1187,6 +1194,7 @@ const BACKLASH_TERMS = [
   "backlash",
   "boycott",
   "cancel him",
+  "canceled",
   "cancelled",
   "disrespectful",
   "fans angry",
@@ -1194,11 +1202,15 @@ const BACKLASH_TERMS = [
   "fans mad",
   "fans upset",
   "getting hate",
+  "hate train",
+  "holding a flag",
   "israel flag",
+  "palestine",
   "people are mad",
   "people mad",
   "problematic",
   "racist",
+  "unfollow",
   "zionist"
 ];
 
@@ -1210,9 +1222,13 @@ const CONTROVERSY_TERMS = [
   "controversial",
   "controversy",
   "diss",
+  "exposed",
+  "flag",
+  "insensitive",
   "lawsuit",
   "scandal",
-  "sentenced"
+  "sentenced",
+  "weird"
 ];
 
 const DECLINE_TERMS = [
@@ -1270,6 +1286,7 @@ const NEGATIVE_TERMS = [
   "lost momentum",
   "mid",
   "numbers down",
+  "nobody cares",
   "overrated",
   "streams down",
   "trash",

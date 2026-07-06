@@ -6,9 +6,34 @@ import { getArtistStatusSubtype } from "@/server/market/status-events";
 
 export const dynamic = "force-dynamic";
 
-type ArtistRow = Pick<Database["public"]["Tables"]["artists"]["Row"], "id" | "name" | "ticker">;
+type ArtistRow = Pick<
+  Database["public"]["Tables"]["artists"]["Row"],
+  "id" | "name" | "ticker" | "current_price" | "daily_change_percent" | "hype_score" | "last_move_explanation"
+>;
 type MarketEventRow = Database["public"]["Tables"]["market_events"]["Row"];
 type MarketNewsType = Database["public"]["Tables"]["market_events"]["Row"]["event_type"];
+type NewsFeedMode = "home" | "news" | "artist";
+
+type MarketNewsItem = {
+  id: string;
+  artistId: string;
+  artistName: string;
+  ticker: string;
+  eventDate: string;
+  eventType: string;
+  title: string;
+  sourceName: string | null;
+  sourceUrl: string | null;
+  sourceDomain: string | null;
+  sourceIconUrl: string | null;
+  thumbnailUrl: string | null;
+  sentimentScore: number;
+  impactScore: number;
+  confidence: number;
+  statusSubtype?: string | null;
+  statusSeverity?: string | null;
+  createdAt?: string | null;
+};
 
 const DEFAULT_LOOKBACK_DAYS = 30;
 const MAX_LOOKBACK_DAYS = 365;
@@ -36,6 +61,7 @@ export async function GET(request: Request) {
     const artistId = url.searchParams.get("artistId");
     const ticker = url.searchParams.get("ticker")?.toUpperCase() ?? null;
     const eventType = normalizeEventType(url.searchParams.get("eventType"));
+    const feedMode = normalizeFeedMode(url.searchParams.get("feed"));
     const supabase = createAnonServerClient();
     const artists = await loadArtists(supabase);
     const artistById = new Map(artists.map((artist) => [artist.id, artist]));
@@ -76,40 +102,28 @@ export async function GET(request: Request) {
       throw new Error(`Could not load market news: ${error.message}`);
     }
 
-    const events = ((data ?? []) as MarketEventRow[])
+    const rankedEvents = ((data ?? []) as MarketEventRow[])
       .filter((event) => artistById.has(event.artist_id) && isPublicMarketNewsEvent(event))
-      .slice(0, limit)
-      .map((event) => {
-      const artist = artistById.get(event.artist_id) ?? null;
-      const rawPayload = event.raw_payload as Record<string, unknown>;
-
-      return {
-        id: event.id,
-        artistId: event.artist_id,
-        artistName: artist?.name ?? event.artist_id,
-        ticker: artist?.ticker ?? event.artist_id,
-        eventDate: event.event_date,
-        eventType: event.event_type,
-        title: event.title,
-        sourceName: event.source_name,
-        sourceUrl: event.source_url,
-        thumbnailUrl: getEventThumbnailUrl(rawPayload),
-        sentimentScore: Number(event.sentiment_score),
-        impactScore: Number(event.impact_score),
-        confidence: Number(event.confidence),
-        statusSubtype: getArtistStatusSubtype(rawPayload.statusSubtype),
-        statusSeverity: typeof rawPayload.statusSeverity === "string" ? rawPayload.statusSeverity : null,
-        createdAt: event.created_at
-      };
-    });
+      .sort((first, second) => getNewsImportanceScore(second, runDate) - getNewsImportanceScore(first, runDate));
+    const eventNews = diversifyMarketNewsEvents(rankedEvents, {
+      feedMode: selectedArtistId ? "artist" : feedMode,
+      limit
+    }).map((event) => mapMarketEventToNewsItem(event, artistById));
+    const news = selectedArtistId
+      ? eventNews
+      : fillWithMarketPulseNews(eventNews, artists, {
+          feedMode,
+          limit,
+          runDate
+        });
 
     return NextResponse.json({
       ok: true,
       source: "supabase",
       runDate,
       lookbackDays,
-      eventCount: events.length,
-      news: events
+      eventCount: news.length,
+      news
     });
   } catch (error) {
     return NextResponse.json(
@@ -127,7 +141,7 @@ export async function GET(request: Request) {
 async function loadArtists(supabase: ReturnType<typeof createAnonServerClient>) {
   const { data, error } = await supabase
     .from("artists")
-    .select("id,name,ticker")
+    .select("id,name,ticker,current_price,daily_change_percent,hype_score,last_move_explanation")
     .eq("is_active", true);
 
   if (error) {
@@ -135,6 +149,38 @@ async function loadArtists(supabase: ReturnType<typeof createAnonServerClient>) 
   }
 
   return (data ?? []) as ArtistRow[];
+}
+
+function mapMarketEventToNewsItem(
+  event: MarketEventRow,
+  artistById: Map<string, ArtistRow>
+): MarketNewsItem {
+  const artist = artistById.get(event.artist_id) ?? null;
+  const rawPayload = toRawPayload(event.raw_payload);
+  const sourceUrl = event.source_url ?? null;
+  const sourceName = event.source_name ?? null;
+  const sourceDomain = getSourceDomain(sourceUrl, sourceName);
+
+  return {
+    id: event.id,
+    artistId: event.artist_id,
+    artistName: artist?.name ?? event.artist_id,
+    ticker: artist?.ticker ?? event.artist_id,
+    eventDate: event.event_date,
+    eventType: event.event_type,
+    title: event.title,
+    sourceName,
+    sourceUrl,
+    sourceDomain,
+    sourceIconUrl: getSourceIconUrl(sourceDomain, sourceName),
+    thumbnailUrl: getEventThumbnailUrl(rawPayload),
+    sentimentScore: Number(event.sentiment_score),
+    impactScore: Number(event.impact_score),
+    confidence: Number(event.confidence),
+    statusSubtype: getArtistStatusSubtype(rawPayload.statusSubtype),
+    statusSeverity: typeof rawPayload.statusSeverity === "string" ? rawPayload.statusSeverity : null,
+    createdAt: event.created_at
+  };
 }
 
 function normalizeEventType(value: string | null): MarketNewsType | null {
@@ -151,6 +197,10 @@ function normalizeEventType(value: string | null): MarketNewsType | null {
   }
 
   return null;
+}
+
+function normalizeFeedMode(value: string | null): NewsFeedMode {
+  return value === "home" || value === "artist" ? value : "news";
 }
 
 function normalizeDate(value: string | null) {
@@ -224,6 +274,193 @@ function isPublicMarketNewsEvent(event: MarketEventRow) {
   return impactScore >= 35 && confidence >= 0.65 && !isLowSignalSocialTitle(title);
 }
 
+function getNewsImportanceScore(event: MarketEventRow, runDate: string) {
+  const impactScore = Math.abs(Number(event.impact_score));
+  const confidence = Number(event.confidence);
+  const ageDays = Math.max(0, daysBetween(event.event_date, runDate));
+  const recency = Math.max(0, 28 - ageDays) * 1.85;
+  const source = getRawString(toRawPayload(event.raw_payload).source);
+  const sourceWeight = getSourceWeight(source);
+  const typeWeight: Record<MarketNewsType, number> = {
+    release: 16,
+    review: 13,
+    news: 8,
+    controversy: 18,
+    award: 7,
+    tour: 6,
+    viral: 12
+  };
+
+  return impactScore * 1.15 + confidence * 36 + recency + sourceWeight + (typeWeight[event.event_type] ?? 0);
+}
+
+function getSourceWeight(source: string) {
+  if (source === "manual_event") {
+    return 18;
+  }
+
+  if (source === "gdelt_article" || source === "media_rss_item") {
+    return 14;
+  }
+
+  if (source === "reddit_post") {
+    return 10;
+  }
+
+  if (source === "musicbrainz_release_group") {
+    return 8;
+  }
+
+  if (source === "bluesky_post") {
+    return 4;
+  }
+
+  if (source === "youtube_upload_event") {
+    return -18;
+  }
+
+  return 0;
+}
+
+function diversifyMarketNewsEvents(events: MarketEventRow[], options: { feedMode: NewsFeedMode; limit: number }) {
+  const selected: MarketEventRow[] = [];
+  const sourceCounts = new Map<string, number>();
+  const artistCounts = new Map<string, number>();
+  const youtubeCap = getYoutubeCap(options.feedMode, options.limit);
+  const perArtistCap = options.feedMode === "artist" ? options.limit : Math.max(1, Math.ceil(options.limit * 0.22));
+
+  for (const event of events) {
+    if (selected.length >= options.limit) {
+      break;
+    }
+
+    const source = getRawString(toRawPayload(event.raw_payload).source) || "unknown";
+    const sourceCount = sourceCounts.get(source) ?? 0;
+    const artistCount = artistCounts.get(event.artist_id) ?? 0;
+
+    if (source === "youtube_upload_event" && sourceCount >= youtubeCap) {
+      continue;
+    }
+
+    if (artistCount >= perArtistCap) {
+      continue;
+    }
+
+    selected.push(event);
+    sourceCounts.set(source, sourceCount + 1);
+    artistCounts.set(event.artist_id, artistCount + 1);
+  }
+
+  return selected;
+}
+
+function fillWithMarketPulseNews(
+  news: MarketNewsItem[],
+  artists: ArtistRow[],
+  options: {
+    feedMode: NewsFeedMode;
+    limit: number;
+    runDate: string;
+  }
+) {
+  const minimumRows = getMinimumFeedRows(options.feedMode, options.limit);
+
+  if (news.length >= minimumRows) {
+    return news.slice(0, options.limit);
+  }
+
+  const targetRows = Math.min(options.limit, minimumRows);
+  const existingArtistIds = new Set(news.map((item) => item.artistId));
+  const marketPulseItems = artists
+    .filter((artist) => !existingArtistIds.has(artist.id))
+    .map((artist) => createMarketPulseNewsItem(artist, options.runDate))
+    .filter((item): item is MarketNewsItem => Boolean(item))
+    .sort((first, second) => second.impactScore - first.impactScore);
+
+  return [...news, ...marketPulseItems].slice(0, targetRows);
+}
+
+function getMinimumFeedRows(feedMode: NewsFeedMode, limit: number) {
+  if (feedMode === "home") {
+    return Math.min(limit, 5);
+  }
+
+  if (feedMode === "news") {
+    return Math.min(limit, 14);
+  }
+
+  return 0;
+}
+
+function createMarketPulseNewsItem(artist: ArtistRow, runDate: string): MarketNewsItem | null {
+  const dailyChangePercent = Number(artist.daily_change_percent);
+  const hypeScore = Number(artist.hype_score);
+  const currentPrice = Number(artist.current_price);
+
+  if (!Number.isFinite(dailyChangePercent) || !Number.isFinite(hypeScore) || !Number.isFinite(currentPrice)) {
+    return null;
+  }
+
+  const absMove = Math.abs(dailyChangePercent);
+  const hasMarketMove = absMove >= 0.18;
+  const hasStrongScore = hypeScore >= 56;
+
+  if (!hasMarketMove && !hasStrongScore) {
+    return null;
+  }
+
+  const positive = dailyChangePercent >= 0;
+  const sourceName = "RMI Market Wire";
+  const moveText = `${positive ? "+" : ""}${dailyChangePercent.toFixed(2)}%`;
+  const title = hasMarketMove
+    ? `${artist.name} ${positive ? "rises" : "slips"} ${moveText} as RMI market signals ${positive ? "improve" : "cool"}.`
+    : `${artist.name} is among the highest-scoring artists on the RMI board.`;
+
+  return {
+    id: `market-pulse-${artist.id}-${runDate}`,
+    artistId: artist.id,
+    artistName: artist.name,
+    ticker: artist.ticker,
+    eventDate: runDate,
+    eventType: "market",
+    title,
+    sourceName,
+    sourceUrl: null,
+    sourceDomain: null,
+    sourceIconUrl: "/logo.svg",
+    thumbnailUrl: null,
+    sentimentScore: positive ? 18 : -18,
+    impactScore: Math.round(absMove * 12 + hypeScore * 0.75),
+    confidence: 0.72,
+    statusSubtype: null,
+    statusSeverity: null,
+    createdAt: null
+  };
+}
+
+function getYoutubeCap(feedMode: NewsFeedMode, limit: number) {
+  if (feedMode === "home") {
+    return 1;
+  }
+
+  if (feedMode === "artist") {
+    return Math.max(1, Math.floor(limit * 0.35));
+  }
+
+  return Math.max(2, Math.floor(limit * 0.22));
+}
+
+function daysBetween(date: string, runDate: string) {
+  const start = Date.parse(`${date}T00:00:00Z`);
+  const end = Date.parse(`${runDate}T00:00:00Z`);
+
+  if (!Number.isFinite(start) || !Number.isFinite(end)) {
+    return 0;
+  }
+
+  return Math.round((end - start) / 86_400_000);
+}
+
 function isPublicYoutubeUploadEvent(
   event: MarketEventRow,
   rawPayload: Record<string, unknown>,
@@ -232,11 +469,29 @@ function isPublicYoutubeUploadEvent(
   confidence: number
 ) {
   const releaseKind = getRawString(rawPayload.releaseKind);
+  const classificationReason = getRawString(rawPayload.classificationReason);
   const qualityMultiplier = getRawNumber(rawPayload.uploadQualityMultiplier) ?? 1;
   const relatedUploadCount = getRawNumber(rawPayload.relatedUploadCount) ?? 0;
   const viewCount = getRawNumber(rawPayload.viewCount);
+  const likeCount = getRawNumber(rawPayload.likeCount) ?? 0;
+  const commentCount = getRawNumber(rawPayload.commentCount) ?? 0;
+  const hasNamedProject = Boolean(getRawText(rawPayload.inferredReleaseTitle));
   const isProjectCluster = releaseKind === "project" || relatedUploadCount >= 2;
-  const hasEnoughReach = typeof viewCount !== "number" || viewCount >= 15_000 || isProjectCluster;
+  const isGenericCluster = classificationReason === "official_audio_release_cluster" && !hasNamedProject;
+  const isMusicVideo = title.includes("official video") || title.includes("music video");
+  const isTrackAudio = title.includes("official audio") || title.includes("audio");
+  const isMajorProjectRelease = ["album", "ep", "mixtape"].includes(releaseKind) || hasNamedProject;
+  const minimumViews = isMajorProjectRelease || isMusicVideo ? 25_000 : isTrackAudio ? 90_000 : 60_000;
+  const engagementScore = likeCount * 8 + commentCount * 20;
+  const hasStrongEngagement = engagementScore >= 25_000;
+  const hasEnoughReach =
+    typeof viewCount !== "number"
+      ? isMajorProjectRelease
+      : viewCount >= minimumViews || (viewCount >= 15_000 && hasStrongEngagement);
+
+  if (isGenericCluster || title.includes("project release cycle")) {
+    return false;
+  }
 
   if (hasLowSignalYoutubeTitle(title)) {
     return false;
@@ -251,7 +506,7 @@ function isPublicYoutubeUploadEvent(
   }
 
   if (event.event_type === "release") {
-    return impactScore >= 28 && confidence >= 0.55;
+    return impactScore >= 32 && confidence >= 0.58;
   }
 
   if (event.event_type === "viral" || event.event_type === "controversy") {
@@ -299,6 +554,66 @@ function getEventThumbnailUrl(rawPayload: Record<string, unknown>) {
   }
 
   return null;
+}
+
+function getSourceDomain(sourceUrl: string | null, sourceName: string | null) {
+  const sourceDomain = getDomainFromUrl(sourceUrl);
+
+  if (sourceDomain) {
+    return sourceDomain;
+  }
+
+  const normalizedSource = (sourceName ?? "").trim().toLowerCase();
+  const sourceMap: Record<string, string> = {
+    billboard: "billboard.com",
+    pitchfork: "pitchfork.com",
+    "pitchfork.com": "pitchfork.com",
+    yahoo: "yahoo.com",
+    youtube: "youtube.com",
+    reddit: "reddit.com",
+    bluesky: "bsky.app",
+    musicbrainz: "musicbrainz.org"
+  };
+
+  if (sourceMap[normalizedSource]) {
+    return sourceMap[normalizedSource];
+  }
+
+  if (/^[a-z0-9.-]+\.[a-z]{2,}$/i.test(normalizedSource)) {
+    return normalizedSource.replace(/^www\./, "");
+  }
+
+  return null;
+}
+
+function getDomainFromUrl(sourceUrl: string | null) {
+  if (!sourceUrl) {
+    return null;
+  }
+
+  try {
+    const hostname = new URL(sourceUrl).hostname.replace(/^www\./, "");
+
+    if (hostname === "news.google.com") {
+      return "news.google.com";
+    }
+
+    return hostname;
+  } catch {
+    return null;
+  }
+}
+
+function getSourceIconUrl(sourceDomain: string | null, sourceName: string | null) {
+  if (sourceName === "RMI Market Wire") {
+    return "/logo.svg";
+  }
+
+  if (!sourceDomain) {
+    return null;
+  }
+
+  return `https://www.google.com/s2/favicons?domain=${encodeURIComponent(sourceDomain)}&sz=64`;
 }
 
 function isSafeHttpUrl(value: string | undefined) {

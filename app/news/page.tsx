@@ -4,6 +4,7 @@ import { ArtistAvatar } from "@/components/ArtistAvatar";
 import { useGame } from "@/components/GameProvider";
 import { MarketNewsFeed } from "@/components/MarketNewsFeed";
 import { MiniSparkline } from "@/components/MiniSparkline";
+import { ScoreInfo } from "@/components/ScoreInfo";
 import { formatCurrency, formatPercent } from "@/lib/formatters";
 import type { Artist } from "@/lib/types";
 import { Newspaper, TrendingDown, TrendingUp } from "lucide-react";
@@ -28,21 +29,21 @@ export default function NewsPage() {
   return (
     <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_340px]">
       <div className="min-w-0 space-y-6">
-        <section className="rounded border border-line bg-panel shadow-market">
-          <div className="border-b border-line bg-panelSoft p-5">
-            <div className="flex items-center gap-2 text-brass">
+        <section className="bg-panel shadow-market md:rounded md:border md:border-line">
+          <div className="border-b border-line p-5">
+            <p className="inline-flex items-center gap-2 text-xs font-black uppercase tracking-wide text-brass">
               <Newspaper className="h-5 w-5" aria-hidden="true" />
-              <p className="text-xs font-black uppercase tracking-wide">Market news</p>
-            </div>
-            <h1 className="mt-3 text-3xl font-black leading-tight sm:text-4xl">
-              Releases, reviews, controversy, and major artist catalysts.
+              RMI News
+            </p>
+            <h1 className="mt-4 text-2xl font-black leading-tight sm:text-3xl">
+              News from the Rap Market Index network
             </h1>
-            <p className="mt-3 max-w-3xl text-sm font-medium leading-6 text-paper/60">
-              A cleaner feed of public events that are substantial enough to matter to artist prices and trader attention.
+            <p className="mt-2 max-w-3xl text-sm font-medium leading-6 text-paper/60">
+              Price-relevant artist events ranked by impact, confidence, and recency.
             </p>
           </div>
           <div className="p-5">
-            <MarketNewsFeed limit={40} />
+            <MarketNewsFeed limit={60} variant="full" />
           </div>
         </section>
       </div>
@@ -75,6 +76,7 @@ function MarketRail({
           {icon ? <span className="text-brass">{icon}</span> : null}
           <h2 className="text-sm font-black uppercase tracking-wide">{title}</h2>
         </div>
+        {score ? <ScoreInfo /> : null}
       </div>
       <div className="divide-y divide-line">
         {artists.map((artist) => (

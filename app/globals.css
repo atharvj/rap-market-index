@@ -3,7 +3,29 @@
 @tailwind utilities;
 
 :root {
+  --color-ink: 245 247 249;
+  --color-panel: 255 255 255;
+  --color-panel-soft: 238 242 245;
+  --color-line: 217 224 231;
+  --color-paper: 31 41 51;
+  --color-brass: 111 161 49;
+  --color-mint: 0 133 111;
+  --color-ember: 217 48 37;
+  --color-cyan: 35 100 200;
   color-scheme: light;
+}
+
+[data-theme="dark"] {
+  --color-ink: 12 16 20;
+  --color-panel: 18 23 29;
+  --color-panel-soft: 25 31 38;
+  --color-line: 48 59 70;
+  --color-paper: 238 242 247;
+  --color-brass: 134 179 73;
+  --color-mint: 51 201 166;
+  --color-ember: 255 100 91;
+  --color-cyan: 111 169 255;
+  color-scheme: dark;
 }
 
 * {
@@ -12,8 +34,8 @@
 
 body {
   margin: 0;
-  background: #f5f7f9;
-  color: #1f2933;
+  background: rgb(var(--color-ink));
+  color: rgb(var(--color-paper));
   font-family: Arial, Helvetica, sans-serif;
 }
 

@@ -31,6 +31,8 @@ type BootstrapResponse = {
     id: string;
     username: string;
     cashBalance: number;
+    bio?: string;
+    favoriteArtistIds?: string[];
   };
   holdings?: GameState["holdings"];
   shortPositions?: GameState["shortPositions"];

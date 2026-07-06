@@ -1244,6 +1244,8 @@ const SNIPPET_TERMS = [
 ];
 
 const PERFORMANCE_TERMS = [
+  "booed",
+  "crowd booed",
   "crowd went crazy",
   "crowd knew every word",
   "dead crowd",
@@ -1256,7 +1258,9 @@ const PERFORMANCE_TERMS = [
   "rolling loud",
   "set went crazy",
   "set was",
-  "stage"
+  "stage",
+  "viral performance",
+  "went viral at rolling loud"
 ];
 
 const FEATURE_TERMS = [
@@ -1314,29 +1318,49 @@ const VIRAL_TERMS = [
   "blew up",
   "breakout",
   "challenge",
+  "clip",
   "co-sign",
   "cosign",
+  "fan cam",
   "getting attention",
   "going viral",
   "goes viral",
   "meme",
   "next up",
   "tiktok",
+  "tiktok clip",
   "trend",
   "trending",
-  "viral"
+  "viral",
+  "viral clip"
 ];
 
 const CONTROVERSY_TERMS = [
   "arrested",
   "backlash",
   "beef",
+  "boycott",
+  "cancel him",
+  "canceled",
   "charged",
   "controversy",
   "diss",
+  "exposed",
+  "flag",
+  "hate train",
+  "holding a flag",
+  "insensitive",
+  "israel flag",
   "lawsuit",
+  "palestine",
+  "people are mad",
+  "problematic",
+  "racist",
   "scandal",
-  "sentenced"
+  "sentenced",
+  "unfollow",
+  "weird",
+  "zionist"
 ];
 
 const DECLINE_TERMS = [
@@ -1393,6 +1417,7 @@ const NEGATIVE_TERMS = [
   "lost momentum",
   "mid",
   "numbers down",
+  "nobody cares",
   "overrated",
   "streams down",
   "trash",
