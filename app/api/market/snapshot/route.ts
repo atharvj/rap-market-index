@@ -57,6 +57,7 @@ export async function GET() {
         mapArtist(artist, statsByArtist[artist.id] ?? null, historyByArtist[artist.id] ?? [])
       ),
       holdings: [],
+      shortPositions: [],
       transactions: [],
       lastUpdatedAt: getPacificMarketDate()
     };

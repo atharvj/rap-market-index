@@ -23,6 +23,8 @@ Rap Market Index uses Supabase for cloud accounts, saved portfolios, trades, mar
    - `supabase/migrations/014_market_economy_guardrails.sql`
    - `supabase/migrations/015_market_maker_quotes.sql`
    - `supabase/migrations/016_market_integrity_guardrails.sql`
+   - `supabase/migrations/017_market_operation_controls.sql`
+   - `supabase/migrations/018_short_selling_foundation.sql`
    - `supabase/seed.sql`
 
 ## Configure the app
@@ -82,6 +84,7 @@ The Cloud setup panel should show:
 - 55 active artists.
 - Watchlist storage configured.
 - Market engine storage configured.
+- Shorting foundation configured.
 - Server service key configured.
 - Market job secret configured.
 - Admin emails configured.

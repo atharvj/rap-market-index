@@ -453,8 +453,61 @@ type MarketHealth = {
     typeCounts: Record<string, number>;
     freshTypeCounts: Record<string, number>;
   };
+  marketOperations: {
+    ready: boolean;
+    checkedAt: string;
+    error: string | null;
+    tradingMode: string | null;
+    marketOpen: boolean;
+    marketImpactEnabled: boolean;
+    activeHaltCount: number;
+    statusNote: string | null;
+  };
+  shortingFoundation: {
+    ready: boolean;
+    checkedAt: string;
+    error: string | null;
+    openPositionCount: number;
+    transactionCount: number;
+    riskRowCount: number;
+  };
   warnings: string[];
 };
+
+type MarketControls = {
+  controls: {
+    trading_mode: "continuous" | "halted" | "maintenance";
+    allow_trading: boolean;
+    allow_market_impact: boolean;
+    status_note: string;
+    day_change_reset: string;
+    updated_at: string;
+  } | null;
+  activeHalts: Array<{
+    artist_id: string;
+    is_halted: boolean;
+    reason: string;
+    starts_at: string;
+    ends_at: string | null;
+  }>;
+};
+
+type MarketControlActionState =
+  | {
+      status: "idle";
+    }
+  | {
+      status: "saving";
+      label: string;
+    }
+  | {
+      status: "saved";
+      message: string;
+    }
+  | {
+      status: "error";
+      message: string;
+    };
 
 type MarketIntegrity = {
   generatedAt: string;
@@ -471,6 +524,10 @@ type MarketIntegrity = {
     excludedGrossOrderValue: number;
     buyGrossOrderValue: number;
     sellGrossOrderValue: number;
+    coverGrossOrderValue: number;
+    shortGrossOrderValue: number;
+    bullishGrossOrderValue: number;
+    bearishGrossOrderValue: number;
     commissionTotal: number;
   };
   excludedTradeSummary: {
@@ -489,6 +546,8 @@ type MarketIntegrity = {
     tradeCount: number;
     buyCount: number;
     sellCount: number;
+    coverCount: number;
+    shortCount: number;
     uniqueTraderCount: number;
     grossOrderValue: number;
     netOrderValue: number;
@@ -585,6 +644,10 @@ export default function DevPage() {
   const [adminAccess, setAdminAccess] = useState<AdminAccessState>({ status: "loading" });
   const [cloudStatus, setCloudStatus] = useState<AsyncState<CloudStatus>>({ status: "loading" });
   const [marketHealth, setMarketHealth] = useState<AsyncState<MarketHealth>>({ status: "loading" });
+  const [marketControls, setMarketControls] = useState<AsyncState<MarketControls>>({ status: "loading" });
+  const [marketControlAction, setMarketControlAction] = useState<MarketControlActionState>({ status: "idle" });
+  const [haltArtistId, setHaltArtistId] = useState("");
+  const [haltReason, setHaltReason] = useState("Trading halted for data review.");
   const [marketIntegrity, setMarketIntegrity] = useState<AsyncState<MarketIntegrity>>({ status: "loading" });
   const [preview, setPreview] = useState<PreviewState>({ status: "idle" });
   const [runNow, setRunNow] = useState<RunNowState>({ status: "idle" });
@@ -674,6 +737,7 @@ export default function DevPage() {
 
     void refreshCloudStatus();
     void refreshMarketHealth();
+    void refreshMarketControls();
     void refreshMarketIntegrity();
     void refreshArtistRoster();
     void refreshSourceIds();
@@ -760,6 +824,112 @@ export default function DevPage() {
         message: error instanceof Error ? error.message : "Market health check failed."
       });
     }
+  }
+
+  async function refreshMarketControls() {
+    setMarketControls({ status: "loading" });
+
+    try {
+      const response = await fetch("/api/admin/market-controls", {
+        headers: adminHeaders
+      });
+      const payload = await readJsonResponse(response);
+
+      if (!response.ok || !payload.ok) {
+        throw new Error(payload.error ?? "Market controls check failed.");
+      }
+
+      setMarketControls({
+        status: "ready",
+        data: {
+          controls: payload.controls ?? null,
+          activeHalts: payload.activeHalts ?? []
+        }
+      });
+    } catch (error) {
+      setMarketControls({
+        status: "error",
+        message: error instanceof Error ? error.message : "Market controls check failed."
+      });
+    }
+  }
+
+  async function updateMarketControls(
+    label: string,
+    body: {
+      tradingMode?: "continuous" | "halted" | "maintenance";
+      allowTrading?: boolean;
+      allowMarketImpact?: boolean;
+      statusNote?: string;
+      artistHalts?: Array<{
+        artistId: string;
+        isHalted?: boolean;
+        reason?: string;
+        endsAt?: string | null;
+      }>;
+    }
+  ) {
+    setMarketControlAction({ status: "saving", label });
+
+    try {
+      const response = await fetch("/api/admin/market-controls", {
+        method: "PATCH",
+        headers: {
+          "content-type": "application/json",
+          ...adminHeaders
+        },
+        body: JSON.stringify(body)
+      });
+      const payload = await readJsonResponse(response);
+
+      if (!response.ok || !payload.ok) {
+        throw new Error(payload.error ?? "Market control update failed.");
+      }
+
+      setMarketControlAction({
+        status: "saved",
+        message: `${label} saved.`
+      });
+      await Promise.all([refreshMarketControls(), refreshMarketHealth()]);
+    } catch (error) {
+      setMarketControlAction({
+        status: "error",
+        message: error instanceof Error ? error.message : "Market control update failed."
+      });
+    }
+  }
+
+  function haltSelectedArtist() {
+    if (!haltArtistId) {
+      setMarketControlAction({ status: "error", message: "Select an artist to halt." });
+      return;
+    }
+
+    void updateMarketControls("Artist halt", {
+      artistHalts: [
+        {
+          artistId: haltArtistId,
+          isHalted: true,
+          reason: haltReason
+        }
+      ]
+    });
+  }
+
+  function unhaltSelectedArtist() {
+    if (!haltArtistId) {
+      setMarketControlAction({ status: "error", message: "Select an artist to unhalt." });
+      return;
+    }
+
+    void updateMarketControls("Artist resume", {
+      artistHalts: [
+        {
+          artistId: haltArtistId,
+          isHalted: false
+        }
+      ]
+    });
   }
 
   async function refreshMarketIntegrity() {
@@ -961,6 +1131,7 @@ export default function DevPage() {
       });
 
       await refreshMarketHealth();
+      await refreshMarketControls();
       await refreshMarketIntegrity();
     } catch (error) {
       setRunNow({
@@ -1427,6 +1598,55 @@ export default function DevPage() {
       </section>
 
       <Panel
+        title="Trading controls"
+        eyebrow="Market operations"
+        actionLabel="Refresh"
+        onAction={refreshMarketControls}
+      >
+        {marketControls.status === "loading" ? <LoadingText text="Checking market controls..." /> : null}
+        {marketControls.status === "error" ? <ErrorText text={marketControls.message} /> : null}
+        {marketControls.status === "ready" ? (
+          <MarketControlsPanel
+            data={marketControls.data}
+            actionState={marketControlAction}
+            artistRecords={artistRoster.status === "ready" ? artistRoster.data.records : []}
+            selectedArtistId={haltArtistId}
+            haltReason={haltReason}
+            onSelectArtist={setHaltArtistId}
+            onReasonChange={setHaltReason}
+            onPauseTrading={() =>
+              updateMarketControls("Pause trading", {
+                tradingMode: "halted",
+                allowTrading: false,
+                statusNote: "Trading paused by market operator."
+              })
+            }
+            onResumeTrading={() =>
+              updateMarketControls("Resume trading", {
+                tradingMode: "continuous",
+                allowTrading: true,
+                statusNote: "Continuous virtual trading is open."
+              })
+            }
+            onPauseImpact={() =>
+              updateMarketControls("Pause market impact", {
+                allowMarketImpact: false,
+                statusNote: "Trading is open; market impact is paused for review."
+              })
+            }
+            onResumeImpact={() =>
+              updateMarketControls("Resume market impact", {
+                allowMarketImpact: true,
+                statusNote: "Continuous virtual trading is open."
+              })
+            }
+            onHaltArtist={haltSelectedArtist}
+            onUnhaltArtist={unhaltSelectedArtist}
+          />
+        ) : null}
+      </Panel>
+
+      <Panel
         title="Market integrity"
         eyebrow="Anti-manipulation"
         actionLabel="Refresh"
@@ -1679,7 +1899,7 @@ function CloudStatusPanel({ data }: { data: CloudStatus }) {
 function MarketHealthPanel({ data }: { data: MarketHealth }) {
   return (
     <div className="space-y-4">
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
         <ReadinessTile
           label="Price history"
           ready={data.priceHistoryHealth.freshCoveragePercent >= 80}
@@ -1714,6 +1934,13 @@ function MarketHealthPanel({ data }: { data: MarketHealth }) {
           readyText={`${data.eventHealth.freshEventCount} fresh`}
           pendingText="Idle"
           icon={<FileWarning className="h-4 w-4" />}
+        />
+        <ReadinessTile
+          label="Shorting"
+          ready={data.shortingFoundation.ready}
+          readyText="Ready"
+          pendingText="Run 018"
+          icon={<ShieldCheck className="h-4 w-4" />}
         />
       </div>
 
@@ -1775,6 +2002,27 @@ function MarketHealthPanel({ data }: { data: MarketHealth }) {
           label: "Seed ticks",
           value: String(data.priceTickHealth.migrationTickCount + data.priceTickHealth.manualTickCount),
           detail: "Initial/manual quote records"
+        }
+      ]} />
+
+      <CoverageGrid title="Shorting foundation" items={[
+        {
+          key: "shorting:status",
+          label: "Storage and RPC base",
+          value: data.shortingFoundation.ready ? "Ready" : "Missing",
+          detail: data.shortingFoundation.error ?? "Short/cover tables and views are reachable"
+        },
+        {
+          key: "shorting:positions",
+          label: "Open short positions",
+          value: String(data.shortingFoundation.openPositionCount),
+          detail: `${data.shortingFoundation.riskRowCount} risk rows`
+        },
+        {
+          key: "shorting:transactions",
+          label: "Short/cover trades",
+          value: String(data.shortingFoundation.transactionCount),
+          detail: "Historical short-side order flow"
         }
       ]} />
 
@@ -1855,6 +2103,217 @@ function MarketHealthPanel({ data }: { data: MarketHealth }) {
   );
 }
 
+function MarketControlsPanel({
+  data,
+  actionState,
+  artistRecords,
+  selectedArtistId,
+  haltReason,
+  onSelectArtist,
+  onReasonChange,
+  onPauseTrading,
+  onResumeTrading,
+  onPauseImpact,
+  onResumeImpact,
+  onHaltArtist,
+  onUnhaltArtist
+}: {
+  data: MarketControls;
+  actionState: MarketControlActionState;
+  artistRecords: ArtistRosterRecord[];
+  selectedArtistId: string;
+  haltReason: string;
+  onSelectArtist: (artistId: string) => void;
+  onReasonChange: (reason: string) => void;
+  onPauseTrading: () => void;
+  onResumeTrading: () => void;
+  onPauseImpact: () => void;
+  onResumeImpact: () => void;
+  onHaltArtist: () => void;
+  onUnhaltArtist: () => void;
+}) {
+  const controls = data.controls;
+  const tradingOpen = controls?.allow_trading === true && controls.trading_mode === "continuous";
+  const impactEnabled = controls?.allow_market_impact !== false;
+  const selectedArtist = artistRecords.find((artist) => artist.id === selectedArtistId) ?? null;
+  const selectedHalt = data.activeHalts.find((halt) => halt.artist_id === selectedArtistId) ?? null;
+  const actionBusy = actionState.status === "saving";
+
+  return (
+    <div className="space-y-4">
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <ReadinessTile
+          label="Trading"
+          ready={tradingOpen}
+          readyText="Open"
+          pendingText={controls?.trading_mode ?? "Unknown"}
+          icon={<ServerCog className="h-4 w-4" />}
+        />
+        <ReadinessTile
+          label="Market impact"
+          ready={impactEnabled}
+          readyText="Enabled"
+          pendingText="Paused"
+          icon={<SlidersHorizontal className="h-4 w-4" />}
+        />
+        <ReadinessTile
+          label="Artist halts"
+          ready={data.activeHalts.length === 0}
+          readyText="None"
+          pendingText={`${data.activeHalts.length} active`}
+          icon={<FileWarning className="h-4 w-4" />}
+        />
+        <ReadinessTile
+          label="Daily reset"
+          ready={Boolean(controls?.day_change_reset)}
+          readyText={controls?.day_change_reset ?? "12:01 AM PT"}
+          pendingText="Unknown"
+          icon={<RefreshCcw className="h-4 w-4" />}
+        />
+      </div>
+
+      <div className="rounded-md border border-line bg-black/20 p-3">
+        <p className="text-sm font-black">Status note</p>
+        <p className="mt-1 text-sm leading-6 text-paper/58">
+          {controls?.status_note ?? "Market controls are not loaded."}
+        </p>
+        {controls?.updated_at ? (
+          <p className="mt-1 text-xs font-bold text-paper/42">Updated {formatDate(controls.updated_at)}</p>
+        ) : null}
+      </div>
+
+      <div className="grid gap-3 lg:grid-cols-2">
+        <div className="rounded-md border border-line bg-black/20 p-4">
+          <h3 className="text-sm font-black uppercase tracking-wide text-paper/45">Global controls</h3>
+          <div className="mt-3 grid gap-2 sm:grid-cols-2">
+            <button
+              type="button"
+              onClick={onPauseTrading}
+              disabled={actionBusy || !tradingOpen}
+              className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md border border-ember/45 bg-ember/10 px-3 text-sm font-black text-ember disabled:cursor-not-allowed disabled:opacity-45"
+            >
+              <XCircle className="h-4 w-4" />
+              Pause trading
+            </button>
+            <button
+              type="button"
+              onClick={onResumeTrading}
+              disabled={actionBusy || tradingOpen}
+              className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md border border-mint/45 bg-mint/10 px-3 text-sm font-black text-mint disabled:cursor-not-allowed disabled:opacity-45"
+            >
+              <CheckCircle2 className="h-4 w-4" />
+              Open trading
+            </button>
+            <button
+              type="button"
+              onClick={onPauseImpact}
+              disabled={actionBusy || !impactEnabled}
+              className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md border border-brass/45 bg-brass/10 px-3 text-sm font-black text-brass disabled:cursor-not-allowed disabled:opacity-45"
+            >
+              <ShieldCheck className="h-4 w-4" />
+              Pause impact
+            </button>
+            <button
+              type="button"
+              onClick={onResumeImpact}
+              disabled={actionBusy || impactEnabled}
+              className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md border border-cyan/45 bg-cyan/10 px-3 text-sm font-black text-cyan disabled:cursor-not-allowed disabled:opacity-45"
+            >
+              <RefreshCcw className="h-4 w-4" />
+              Resume impact
+            </button>
+          </div>
+          <p className="mt-3 text-xs font-bold leading-5 text-paper/45">
+            Pausing impact keeps trading open but prevents eligible orders from moving public prices.
+          </p>
+        </div>
+
+        <div className="rounded-md border border-line bg-black/20 p-4">
+          <h3 className="text-sm font-black uppercase tracking-wide text-paper/45">Artist halt</h3>
+          <div className="mt-3 grid gap-3">
+            <label className="grid gap-2 text-sm font-bold text-paper/62">
+              Artist
+              <select
+                value={selectedArtistId}
+                onChange={(event) => onSelectArtist(event.target.value)}
+                className="min-h-11 rounded-md border border-line bg-ink px-3 text-sm font-bold text-paper outline-none"
+              >
+                <option value="">Select artist</option>
+                {artistRecords
+                  .filter((artist) => artist.isActive)
+                  .map((artist) => (
+                    <option key={artist.id} value={artist.id}>
+                      {artist.ticker} - {artist.name}
+                    </option>
+                  ))}
+              </select>
+            </label>
+            <label className="grid gap-2 text-sm font-bold text-paper/62">
+              Reason
+              <input
+                value={haltReason}
+                onChange={(event) => onReasonChange(event.target.value)}
+                className="min-h-11 rounded-md border border-line bg-ink px-3 text-sm font-bold text-paper outline-none"
+              />
+            </label>
+            <div className="grid gap-2 sm:grid-cols-2">
+              <button
+                type="button"
+                onClick={onHaltArtist}
+                disabled={actionBusy || !selectedArtistId || Boolean(selectedHalt)}
+                className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md border border-ember/45 bg-ember/10 px-3 text-sm font-black text-ember disabled:cursor-not-allowed disabled:opacity-45"
+              >
+                <XCircle className="h-4 w-4" />
+                Halt artist
+              </button>
+              <button
+                type="button"
+                onClick={onUnhaltArtist}
+                disabled={actionBusy || !selectedArtistId || !selectedHalt}
+                className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md border border-mint/45 bg-mint/10 px-3 text-sm font-black text-mint disabled:cursor-not-allowed disabled:opacity-45"
+              >
+                <CheckCircle2 className="h-4 w-4" />
+                Unhalt artist
+              </button>
+            </div>
+            <p className="text-xs font-bold leading-5 text-paper/45">
+              {selectedHalt
+                ? `${selectedArtist?.ticker ?? selectedHalt.artist_id} is halted: ${selectedHalt.reason}`
+                : selectedArtist
+                  ? `${selectedArtist.ticker} is currently open.`
+                  : "Select one active artist to manage a halt."}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {data.activeHalts.length ? (
+        <CoverageGrid
+          title="Active artist halts"
+          items={data.activeHalts.map((halt) => {
+            const artist = artistRecords.find((record) => record.id === halt.artist_id);
+
+            return {
+              key: halt.artist_id,
+              label: artist ? `${artist.ticker} - ${artist.name}` : halt.artist_id,
+              value: "Halted",
+              detail: halt.reason
+            };
+          })}
+        />
+      ) : null}
+
+      {actionState.status === "saving" ? <LoadingText text={`${actionState.label}...`} /> : null}
+      {actionState.status === "saved" ? (
+        <p className="rounded-md border border-mint/25 bg-mint/10 p-3 text-sm font-bold text-mint">
+          {actionState.message}
+        </p>
+      ) : null}
+      {actionState.status === "error" ? <ErrorText text={actionState.message} /> : null}
+    </div>
+  );
+}
+
 function MarketIntegrityPanel({ data }: { data: MarketIntegrity }) {
   const hasTrades = data.summary.tradeCount > 0;
 
@@ -1883,7 +2342,13 @@ function MarketIntegrityPanel({ data }: { data: MarketIntegrity }) {
           key: "integrity:eligible-value",
           label: "Eligible order value",
           value: formatCurrency(data.summary.marketEligibleGrossOrderValue),
-          detail: `${formatCurrency(data.summary.buyGrossOrderValue)} buys, ${formatCurrency(data.summary.sellGrossOrderValue)} sells`
+          detail: `${formatCurrency(data.summary.bullishGrossOrderValue)} bullish, ${formatCurrency(data.summary.bearishGrossOrderValue)} bearish`
+        },
+        {
+          key: "integrity:short-flow",
+          label: "Short-side flow",
+          value: formatCurrency(data.summary.shortGrossOrderValue + data.summary.coverGrossOrderValue),
+          detail: `${formatCurrency(data.summary.shortGrossOrderValue)} shorts, ${formatCurrency(data.summary.coverGrossOrderValue)} covers`
         },
         {
           key: "integrity:commission",
@@ -1933,6 +2398,9 @@ function MarketIntegrityPanel({ data }: { data: MarketIntegrity }) {
                 <span>{formatSignedCurrency(flag.netOrderValue)} net</span>
                 <span>{flag.uniqueTraderCount} traders</span>
               </div>
+              <p className="mt-2 text-xs font-bold text-paper/45">
+                Long {flag.buyCount}/{flag.sellCount}; short {flag.shortCount}/{flag.coverCount}.
+              </p>
               <p className="mt-2 text-xs font-bold text-paper/45">
                 Top trader {flag.largestTrader.username ?? shortId(flag.largestTrader.userId)} controls{" "}
                 {formatUnsignedPercent(flag.largestTrader.sharePercent)}.

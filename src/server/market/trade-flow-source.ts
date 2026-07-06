@@ -16,7 +16,7 @@ type TradeFlowCollectOptions = {
 };
 
 type TradeRow = Pick<
-  Database["public"]["Tables"]["transactions"]["Row"],
+  Database["public"]["Views"]["market_trade_events"]["Row"],
   "artist_id" | "user_id" | "type" | "shares" | "price" | "cash_delta" | "gross_value" | "market_eligible" | "created_at"
 >;
 
@@ -25,8 +25,12 @@ type TradeBucket = {
   sellValue: number;
   buyCount: number;
   sellCount: number;
+  coverCount: number;
+  shortCount: number;
   sharesBought: number;
   sharesSold: number;
+  sharesCovered: number;
+  sharesShorted: number;
   traders: Set<string>;
   traderValues: Map<string, number>;
 };
@@ -70,7 +74,7 @@ export async function collectTradeFlowMarketSignals({
   const artistIds = artists.map((artist) => artist.id);
   const { start: windowStart, end: windowEnd } = getPacificMarketLookbackBoundsUtc(runDate, lookbackDays);
   const { data, error } = await supabase
-    .from("transactions")
+    .from("market_trade_events")
     .select("artist_id,user_id,type,shares,price,cash_delta,gross_value,market_eligible,created_at")
     .in("artist_id", artistIds)
     .eq("market_eligible", true)
@@ -80,6 +84,10 @@ export async function collectTradeFlowMarketSignals({
     .limit(MAX_TRADE_ROWS);
 
   if (error) {
+    if (error.message.includes("market_trade_events")) {
+      throw new Error("Could not load trade flow: run supabase/migrations/018_short_selling_foundation.sql.");
+    }
+
     throw new Error(`Could not load trade flow: ${error.message}`);
   }
 
@@ -137,22 +145,36 @@ function groupTrades(trades: TradeRow[]) {
         sellValue: 0,
         buyCount: 0,
         sellCount: 0,
+        coverCount: 0,
+        shortCount: 0,
         sharesBought: 0,
         sharesSold: 0,
+        sharesCovered: 0,
+        sharesShorted: 0,
         traders: new Set<string>(),
         traderValues: new Map<string, number>()
       };
     const orderValue = Number(trade.gross_value) || Math.abs(Number(trade.cash_delta));
     const shares = Number(trade.shares);
 
-    if (trade.type === "buy") {
+    if (isBullishTrade(trade.type)) {
       bucket.buyValue += orderValue;
       bucket.buyCount += 1;
-      bucket.sharesBought += shares;
+      if (trade.type === "cover") {
+        bucket.coverCount += 1;
+        bucket.sharesCovered += shares;
+      } else {
+        bucket.sharesBought += shares;
+      }
     } else {
       bucket.sellValue += orderValue;
       bucket.sellCount += 1;
-      bucket.sharesSold += shares;
+      if (trade.type === "short") {
+        bucket.shortCount += 1;
+        bucket.sharesShorted += shares;
+      } else {
+        bucket.sharesSold += shares;
+      }
     }
 
     bucket.traders.add(trade.user_id);
@@ -208,12 +230,16 @@ function buildTradeFlowSignal({
     grossOrderValue: round(grossOrderValue),
     buyCount: bucket.buyCount,
     sellCount: bucket.sellCount,
+    coverCount: bucket.coverCount,
+    shortCount: bucket.shortCount,
     tradeCount,
     uniqueTraderCount,
     largestTraderValue: round(largestTraderValue),
     largestTraderShare,
     sharesBought: round(bucket.sharesBought),
     sharesSold: round(bucket.sharesSold),
+    sharesCovered: round(bucket.sharesCovered),
+    sharesShorted: round(bucket.sharesShorted),
     valueImbalance,
     countImbalance,
     activityScale,
@@ -253,6 +279,10 @@ function buildTradeFlowSignal({
     ],
     suppressed: !eligibility.eligible
   };
+}
+
+function isBullishTrade(type: TradeRow["type"]) {
+  return type === "buy" || type === "cover";
 }
 
 function getLargestTraderValue(traderValues: Map<string, number>) {

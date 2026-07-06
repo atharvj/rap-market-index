@@ -52,10 +52,17 @@ export type Holding = {
   averageBuyPrice: number;
 };
 
+export type ShortPosition = {
+  artistId: string;
+  shares: number;
+  averageShortPrice: number;
+  collateral: number;
+};
+
 export type Transaction = {
   id: string;
   artistId: string;
-  type: "buy" | "sell";
+  type: "buy" | "sell" | "short" | "cover";
   shares: number;
   price: number;
   grossValue?: number;
@@ -70,6 +77,7 @@ export type GameState = {
   cashBalance: number;
   artists: Artist[];
   holdings: Holding[];
+  shortPositions: ShortPosition[];
   transactions: Transaction[];
   lastUpdatedAt: string;
 };
@@ -80,6 +88,14 @@ export type HoldingView = Holding & {
   costBasis: number;
   profitLoss: number;
   profitLossPercent: number;
+};
+
+export type ShortPositionView = ShortPosition & {
+  artist: Artist;
+  currentLiability: number;
+  shortEquity: number;
+  unrealizedProfitLoss: number;
+  equityPercent: number;
 };
 
 export type LeaderboardEntry = {

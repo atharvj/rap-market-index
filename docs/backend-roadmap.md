@@ -21,6 +21,8 @@ This app still runs in development with unsaved demo data, but the backend found
 15. Run `supabase/migrations/014_market_economy_guardrails.sql`.
 16. Run `supabase/migrations/015_market_maker_quotes.sql`.
 17. Run `supabase/migrations/016_market_integrity_guardrails.sql`.
+18. Run `supabase/migrations/017_market_operation_controls.sql`.
+19. Run `supabase/migrations/018_short_selling_foundation.sql`.
 17. Run `supabase/seed.sql` for the starter artists.
 18. Create `.env.local` in the project root and fill in:
    - `NEXT_PUBLIC_SUPABASE_URL`
@@ -510,7 +512,7 @@ Rap Market Index should follow an HSX-style virtual specialist model instead of 
 - Chart/streaming momentum adapter.
 - Search/social trend adapter.
 - Manual review/release/news event adapter.
-- Trader demand adapter from real buy/sell transaction volume.
+- Trader demand adapter from real buy/sell/short/cover transaction volume.
 
 The important thing is that every adapter returns normalized momentum values, not raw popularity counts.
 
@@ -526,6 +528,8 @@ The real backend trading path is prepared through database functions:
 
 - `public.buy_artist_shares(artist_id, shares, market_eligible)`
 - `public.sell_artist_shares(artist_id, shares, market_eligible)`
+- `public.short_artist_shares(artist_id, shares, market_eligible)`
+- `public.cover_artist_shares(artist_id, shares, market_eligible)`
 
 The app-facing API route is:
 
@@ -563,6 +567,16 @@ PATCH /api/admin/market-controls
 ```
 
 Admin control writes require admin auth or the market update secret. This makes halts and market-impact pauses available before launch without exposing them to normal users.
+
+Migration `018_short_selling_foundation.sql` adds the conservative short-selling backend:
+
+- `public.short_positions` stores open short exposure and collateral.
+- `public.short_transactions` stores short/cover order history.
+- `public.market_trade_events` unifies long and short-side trades for integrity checks and trade-flow pricing.
+- `public.short_position_risk` exposes current short liability and equity for account/admin views.
+- Short proceeds are not spendable cash; users post collateral and realize P/L only when covering.
+- A user cannot hold long and short exposure in the same artist at the same time.
+- Short/cover trades use the same trading halts, market-impact pause, admin/test exclusion, commission, quote, slippage, daily limit, and anti-spam controls as long trades.
 
 ## Frontend bridge
 

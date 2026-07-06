@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createAnonServerClient, getSupabaseConfigStatus } from "@/lib/supabase/server";
 import type { Database } from "@/lib/supabase/database.types";
-import type { Holding, Transaction } from "@/lib/types";
+import type { Holding, ShortPosition, Transaction } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -11,7 +11,8 @@ type BootstrapBody = {
 
 type ProfileRow = Database["public"]["Tables"]["profiles"]["Row"];
 type HoldingRow = Database["public"]["Tables"]["holdings"]["Row"];
-type TransactionRow = Database["public"]["Tables"]["transactions"]["Row"];
+type ShortPositionRow = Database["public"]["Tables"]["short_positions"]["Row"];
+type TransactionRow = Database["public"]["Views"]["market_trade_events"]["Row"];
 
 export async function POST(request: Request) {
   const config = getSupabaseConfigStatus();
@@ -54,7 +55,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const [profile, holdings, transactions] = await Promise.all([
+    const [profile, holdings, shortPositions, transactions] = await Promise.all([
       getOrCreateProfile({
         supabase,
         userId: userData.user.id,
@@ -62,6 +63,7 @@ export async function POST(request: Request) {
         username: body.username ?? userData.user.user_metadata?.username
       }),
       loadHoldings(supabase, userData.user.id),
+      loadShortPositions(supabase, userData.user.id),
       loadTransactions(supabase, userData.user.id)
     ]);
 
@@ -73,6 +75,7 @@ export async function POST(request: Request) {
         cashBalance: Number(profile.cash_balance)
       },
       holdings,
+      shortPositions,
       transactions,
       config
     });
@@ -167,12 +170,33 @@ async function loadHoldings(
   }));
 }
 
+async function loadShortPositions(
+  supabase: ReturnType<typeof createAnonServerClient>,
+  userId: string
+): Promise<ShortPosition[]> {
+  const { data, error } = await supabase
+    .from("short_positions")
+    .select("*")
+    .eq("user_id", userId);
+
+  if (error) {
+    throw new Error(`Could not load short positions: ${error.message}`);
+  }
+
+  return ((data ?? []) as ShortPositionRow[]).map((position) => ({
+    artistId: position.artist_id,
+    shares: Number(position.shares),
+    averageShortPrice: Number(position.average_short_price),
+    collateral: Number(position.collateral)
+  }));
+}
+
 async function loadTransactions(
   supabase: ReturnType<typeof createAnonServerClient>,
   userId: string
 ): Promise<Transaction[]> {
   const { data, error } = await supabase
-    .from("transactions")
+    .from("market_trade_events")
     .select("*")
     .eq("user_id", userId)
     .order("created_at", { ascending: false })

@@ -8,11 +8,12 @@ import {
   getMockLeaderboard,
   getPortfolioDayChange,
   getPortfolioValue,
+  getShortPositionViews,
   resetGame,
   simulateDailyUpdate
 } from "@/lib/market";
 import { estimateMarketMakerQuote } from "@/lib/trading";
-import type { Artist, GameState, HoldingView, LeaderboardEntry, TradeResult } from "@/lib/types";
+import type { Artist, GameState, HoldingView, LeaderboardEntry, ShortPositionView, TradeResult } from "@/lib/types";
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 
 type SyncMode = "demo" | "supabase";
@@ -32,6 +33,7 @@ type BootstrapResponse = {
     cashBalance: number;
   };
   holdings?: GameState["holdings"];
+  shortPositions?: GameState["shortPositions"];
   transactions?: GameState["transactions"];
 };
 
@@ -54,6 +56,7 @@ type GameContextValue = {
   syncStatus: string;
   serverRefreshing: boolean;
   holdings: HoldingView[];
+  shortPositions: ShortPositionView[];
   leaderboard: LeaderboardEntry[];
   portfolioValue: number;
   portfolioDayChange: number;
@@ -68,6 +71,7 @@ type GameContextValue = {
   refreshServerState: (preferredUsername?: string) => Promise<boolean>;
   getArtist: (artistId: string) => Artist | undefined;
   getHolding: (artistId: string) => HoldingView | undefined;
+  getShortPosition: (artistId: string) => ShortPositionView | undefined;
   isWatchlisted: (artistId: string) => boolean;
 };
 
@@ -104,6 +108,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
           username: current.username,
           cashBalance: current.cashBalance,
           holdings: current.holdings,
+          shortPositions: current.shortPositions,
           transactions: current.transactions
         }));
         setSyncStatus(session ? "Server market loaded" : "Server market loaded");
@@ -120,6 +125,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
   }, [authConfigured, hydrated, session]);
 
   const holdings = useMemo(() => getHoldingViews(state), [state]);
+  const shortPositions = useMemo(() => getShortPositionViews(state), [state]);
   const portfolioValue = useMemo(() => getPortfolioValue(state), [state]);
   const portfolioDayChange = useMemo(() => getPortfolioDayChange(state), [state]);
   const mockLeaderboard = useMemo(() => getMockLeaderboard(state), [state]);
@@ -148,6 +154,11 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
   const getHolding = useCallback(
     (artistId: string) => holdings.find((holding) => holding.artistId === artistId),
     [holdings]
+  );
+
+  const getShortPosition = useCallback(
+    (artistId: string) => shortPositions.find((position) => position.artistId === artistId),
+    [shortPositions]
   );
 
   const isWatchlisted = useCallback(
@@ -259,6 +270,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
             username: profileData.username,
             cashBalance: profileData.cashBalance,
             holdings: profile.holdings ?? [],
+            shortPositions: profile.shortPositions ?? [],
             transactions: profile.transactions ?? []
           };
         });
@@ -451,6 +463,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       syncStatus,
       serverRefreshing,
       holdings,
+      shortPositions,
       leaderboard,
       portfolioValue,
       portfolioDayChange,
@@ -465,6 +478,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       refreshServerState,
       getArtist,
       getHolding,
+      getShortPosition,
       isWatchlisted
     }),
     [
@@ -474,6 +488,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       syncStatus,
       serverRefreshing,
       holdings,
+      shortPositions,
       leaderboard,
       portfolioValue,
       portfolioDayChange,
@@ -488,6 +503,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       refreshServerState,
       getArtist,
       getHolding,
+      getShortPosition,
       isWatchlisted
     ]
   );
@@ -501,7 +517,7 @@ async function submitServerTrade({
   shares,
   accessToken
 }: {
-  side: "buy" | "sell";
+  side: "buy" | "sell" | "short" | "cover";
   artistId: string;
   shares: number;
   accessToken: string;
@@ -548,7 +564,7 @@ function formatTradeMessage({
   commission,
   marketEligible
 }: {
-  side: "buy" | "sell";
+  side: "buy" | "sell" | "short" | "cover";
   shares: number;
   ticker?: string;
   executionPrice?: number;
@@ -565,7 +581,23 @@ function formatTradeMessage({
       : "";
   const testingText = marketEligible === false ? " Test/admin trade: no market impact." : "";
 
-  return `${side === "buy" ? "Bought" : "Sold"} ${shares} ${ticker ?? "shares"}${executionText}.${commissionText}${testingText}`;
+  return `${getTradeVerb(side)} ${shares} ${ticker ?? "shares"}${executionText}.${commissionText}${testingText}`;
+}
+
+function getTradeVerb(side: "buy" | "sell" | "short" | "cover") {
+  if (side === "sell") {
+    return "Sold";
+  }
+
+  if (side === "short") {
+    return "Shorted";
+  }
+
+  if (side === "cover") {
+    return "Covered";
+  }
+
+  return "Bought";
 }
 
 function markCurrentLeaderboardUser(entries: LeaderboardEntry[], currentUserId?: string) {

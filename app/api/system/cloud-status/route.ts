@@ -115,6 +115,12 @@ export async function GET() {
           ok: false,
           detail: "Missing SUPABASE_SERVICE_ROLE_KEY"
         };
+    const shortingFoundation = config.serviceRoleConfigured
+      ? await probeShortingFoundation()
+      : {
+          ok: false,
+          detail: "Missing SUPABASE_SERVICE_ROLE_KEY"
+        };
 
     checks.push(
       {
@@ -134,6 +140,12 @@ export async function GET() {
         label: "Market engine storage",
         ok: marketEngineStorage.ok,
         detail: marketEngineStorage.detail
+      },
+      {
+        id: "shorting-foundation",
+        label: "Shorting foundation",
+        ok: shortingFoundation.ok,
+        detail: shortingFoundation.detail
       }
     );
 
@@ -295,6 +307,12 @@ async function probeMarketEngineStorage() {
     }
   }
 
+  const marketOperationsStorage = await probeMarketOperationsStorage(supabase);
+
+  if (!marketOperationsStorage.ok) {
+    return marketOperationsStorage;
+  }
+
   return {
     ok: true,
     detail: "Configured"
@@ -319,6 +337,57 @@ async function probeModelVersionStorage(supabase: ReturnType<typeof createServic
   return formatMarketEngineProbeError(failed.error.message);
 }
 
+async function probeMarketOperationsStorage(supabase: ReturnType<typeof createServiceRoleClient>) {
+  const controls = await supabase.from("market_controls").select("id", { count: "exact", head: true });
+
+  if (controls.error) {
+    return formatMarketEngineProbeError(controls.error.message);
+  }
+
+  const rpc = supabase.rpc as unknown as (
+    fn: string,
+    args: Record<string, unknown>
+  ) => Promise<{ error: { message: string } | null }>;
+  const status = await rpc("get_market_trading_status", {
+    p_artist_id: null
+  });
+
+  if (status.error) {
+    return formatMarketEngineProbeError(status.error.message);
+  }
+
+  const halts = await supabase.from("artist_trading_halts").select("artist_id", { count: "exact", head: true });
+
+  if (halts.error) {
+    return formatMarketEngineProbeError(halts.error.message);
+  }
+
+  return {
+    ok: true,
+    detail: "Configured"
+  };
+}
+
+async function probeShortingFoundation() {
+  const supabase = createServiceRoleClient();
+  const checks = await Promise.all([
+    supabase.from("short_positions").select("artist_id", { count: "exact", head: true }),
+    supabase.from("short_transactions").select("id", { count: "exact", head: true }),
+    supabase.from("market_trade_events").select("id", { count: "exact", head: true }),
+    supabase.from("short_position_risk").select("artist_id", { count: "exact", head: true })
+  ]);
+  const failed = checks.find((check) => check.error);
+
+  if (!failed?.error) {
+    return {
+      ok: true,
+      detail: "Configured"
+    };
+  }
+
+  return formatShortingFoundationProbeError(failed.error.message);
+}
+
 function formatMarketEngineProbeError(message: string) {
   const normalized = message.toLowerCase();
 
@@ -328,11 +397,36 @@ function formatMarketEngineProbeError(message: string) {
     normalized.includes("artist_external_ids") ||
     normalized.includes("market_events") ||
     normalized.includes("price_ticks") ||
+    normalized.includes("market_controls") ||
+    normalized.includes("artist_trading_halts") ||
+    normalized.includes("get_market_trading_status") ||
     normalized.includes("model_version")
   ) {
     return {
       ok: false,
-      detail: "Run Supabase migrations through 016_market_integrity_guardrails.sql"
+      detail: "Run Supabase migrations through 017_market_operation_controls.sql"
+    };
+  }
+
+  return {
+    ok: false,
+    detail: message
+  };
+}
+
+function formatShortingFoundationProbeError(message: string) {
+  const normalized = message.toLowerCase();
+
+  if (
+    normalized.includes("schema cache") ||
+    normalized.includes("short_positions") ||
+    normalized.includes("short_transactions") ||
+    normalized.includes("market_trade_events") ||
+    normalized.includes("short_position_risk")
+  ) {
+    return {
+      ok: false,
+      detail: "Run supabase/migrations/018_short_selling_foundation.sql"
     };
   }
 

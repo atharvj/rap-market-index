@@ -86,6 +86,26 @@ type IntegrityGuardrailHealth = {
   error: string | null;
 };
 
+type MarketOperationHealth = {
+  ready: boolean;
+  checkedAt: string;
+  error: string | null;
+  tradingMode: string | null;
+  marketOpen: boolean;
+  marketImpactEnabled: boolean;
+  activeHaltCount: number;
+  statusNote: string | null;
+};
+
+type ShortingFoundationHealth = {
+  ready: boolean;
+  checkedAt: string;
+  error: string | null;
+  openPositionCount: number;
+  transactionCount: number;
+  riskRowCount: number;
+};
+
 const SOURCE_ID_FIELDS = [
   { key: "lastfmName", label: "Audience search names", warningThreshold: 80 },
   { key: "gdeltQuery", label: "News search queries", warningThreshold: 80 },
@@ -157,7 +177,17 @@ export async function GET(request: Request) {
     const artists = await loadActiveArtists(supabase);
     const artistIds = artists.map((artist) => artist.id);
     const eventFreshnessDays = Math.max(7, freshnessDays);
-    const [externalIds, recentRuns, observations, priceHistory, priceTicks, recentEvents, integrityGuardrails] = await Promise.all([
+    const [
+      externalIds,
+      recentRuns,
+      observations,
+      priceHistory,
+      priceTicks,
+      recentEvents,
+      integrityGuardrails,
+      marketOperations,
+      shortingFoundation
+    ] = await Promise.all([
       loadArtistExternalIds(supabase, artistIds),
       loadRecentMarketRuns(supabase),
       loadRecentObservations({
@@ -184,7 +214,9 @@ export async function GET(request: Request) {
         runDate,
         lookbackDays
       }),
-      checkIntegrityGuardrails(supabase)
+      checkIntegrityGuardrails(supabase),
+      checkMarketOperations(supabase),
+      checkShortingFoundation(supabase)
     ]);
     const sourceCoverage = buildSourceCoverage({
       activeArtistCount: artists.length,
@@ -223,6 +255,8 @@ export async function GET(request: Request) {
       priceTickHealth,
       eventHealth,
       integrityGuardrails,
+      marketOperations,
+      shortingFoundation,
       configuredModelVersion,
       defaultModelVersion: DEFAULT_MARKET_MODEL_VERSION,
       observationRowsTruncated: observations.length >= MAX_OBSERVATION_ROWS
@@ -244,6 +278,8 @@ export async function GET(request: Request) {
       priceTickHealth,
       eventHealth,
       integrityGuardrails,
+      marketOperations,
+      shortingFoundation,
       latestRun: recentRuns[0] ?? null,
       recentRuns,
       warnings
@@ -272,6 +308,106 @@ async function loadRecentMarketRuns(supabase: ReturnType<typeof createServiceRol
   }
 
   return (data ?? []) as MarketRunRow[];
+}
+
+async function checkShortingFoundation(
+  supabase: ReturnType<typeof createServiceRoleClient>
+): Promise<ShortingFoundationHealth> {
+  const checkedAt = new Date().toISOString();
+
+  try {
+    const [positions, transactions, riskRows, tradeEvents] = await Promise.all([
+      supabase.from("short_positions").select("artist_id", { count: "exact", head: true }),
+      supabase.from("short_transactions").select("id", { count: "exact", head: true }),
+      supabase.from("short_position_risk").select("artist_id", { count: "exact", head: true }),
+      supabase.from("market_trade_events").select("id", { count: "exact", head: true })
+    ]);
+    const failed = [positions, transactions, riskRows, tradeEvents].find((result) => result.error);
+
+    if (failed?.error) {
+      throw new Error(failed.error.message);
+    }
+
+    return {
+      ready: true,
+      checkedAt,
+      error: null,
+      openPositionCount: positions.count ?? 0,
+      transactionCount: transactions.count ?? 0,
+      riskRowCount: riskRows.count ?? 0
+    };
+  } catch (error) {
+    return {
+      ready: false,
+      checkedAt,
+      error: error instanceof Error ? error.message : "Shorting foundation is missing.",
+      openPositionCount: 0,
+      transactionCount: 0,
+      riskRowCount: 0
+    };
+  }
+}
+
+async function checkMarketOperations(
+  supabase: ReturnType<typeof createServiceRoleClient>
+): Promise<MarketOperationHealth> {
+  const checkedAt = new Date().toISOString();
+
+  try {
+    const rpc = supabase.rpc as unknown as (
+      fn: string,
+      args: Record<string, unknown>
+    ) => Promise<{
+      data: Array<{
+        trading_mode: string;
+        market_open: boolean;
+        market_impact_enabled: boolean;
+        artist_halted: boolean;
+        reason: string;
+      }> | null;
+      error: { message: string } | null;
+    }>;
+    const status = await rpc("get_market_trading_status", {
+      p_artist_id: null
+    });
+
+    if (status.error) {
+      throw new Error(status.error.message);
+    }
+
+    const halts = await supabase
+      .from("artist_trading_halts")
+      .select("artist_id", { count: "exact", head: true })
+      .eq("is_halted", true);
+
+    if (halts.error) {
+      throw new Error(halts.error.message);
+    }
+
+    const row = status.data?.[0] ?? null;
+
+    return {
+      ready: true,
+      checkedAt,
+      error: null,
+      tradingMode: row?.trading_mode ?? "continuous",
+      marketOpen: Boolean(row?.market_open ?? true),
+      marketImpactEnabled: Boolean(row?.market_impact_enabled ?? true),
+      activeHaltCount: halts.count ?? 0,
+      statusNote: row?.reason ?? null
+    };
+  } catch (error) {
+    return {
+      ready: false,
+      checkedAt,
+      error: error instanceof Error ? error.message : "Market operation controls are missing.",
+      tradingMode: null,
+      marketOpen: false,
+      marketImpactEnabled: false,
+      activeHaltCount: 0,
+      statusNote: null
+    };
+  }
 }
 
 async function checkIntegrityGuardrails(
@@ -627,6 +763,8 @@ function buildWarnings({
   priceTickHealth,
   eventHealth,
   integrityGuardrails,
+  marketOperations,
+  shortingFoundation,
   configuredModelVersion,
   defaultModelVersion,
   observationRowsTruncated
@@ -639,6 +777,8 @@ function buildWarnings({
   priceTickHealth: PriceTickHealth;
   eventHealth: EventHealth;
   integrityGuardrails: IntegrityGuardrailHealth;
+  marketOperations: MarketOperationHealth;
+  shortingFoundation: ShortingFoundationHealth;
   configuredModelVersion: string;
   defaultModelVersion: string;
   observationRowsTruncated: boolean;
@@ -752,6 +892,22 @@ function buildWarnings({
     warnings.push("Market integrity guardrails are missing. Run supabase/migrations/016_market_integrity_guardrails.sql.");
   }
 
+  if (!marketOperations.ready) {
+    warnings.push("Market operation controls are missing. Run supabase/migrations/017_market_operation_controls.sql.");
+  } else {
+    if (!marketOperations.marketOpen) {
+      warnings.push(`Trading is currently paused: ${marketOperations.statusNote ?? "No status note."}`);
+    }
+
+    if (!marketOperations.marketImpactEnabled) {
+      warnings.push("Market impact is currently paused; trades can execute but should not move public prices.");
+    }
+  }
+
+  if (!shortingFoundation.ready) {
+    warnings.push("Shorting foundation is missing. Run supabase/migrations/018_short_selling_foundation.sql before enabling short/cover UI.");
+  }
+
   if (observationRowsTruncated) {
     warnings.push("Observation health reached the row cap; add an aggregate SQL view before scaling much further.");
   }
@@ -839,10 +995,13 @@ function formatMarketHealthError(error: unknown) {
     normalized.includes("market_events") ||
     normalized.includes("price_history") ||
     normalized.includes("price_ticks") ||
+    normalized.includes("market_controls") ||
+    normalized.includes("artist_trading_halts") ||
+    normalized.includes("get_market_trading_status") ||
     normalized.includes("model_version") ||
     normalized.includes("schema cache")
   ) {
-    return "Market engine storage needs setup. Run the Supabase migrations through 016_market_integrity_guardrails.sql.";
+    return "Market engine storage needs setup. Run the Supabase migrations through 017_market_operation_controls.sql.";
   }
 
   return message;

@@ -7,7 +7,7 @@ import { loadActiveArtists } from "@/server/market/supabase-repository";
 export const dynamic = "force-dynamic";
 
 type TransactionRow = Pick<
-  Database["public"]["Tables"]["transactions"]["Row"],
+  Database["public"]["Views"]["market_trade_events"]["Row"],
   | "id"
   | "user_id"
   | "artist_id"
@@ -45,6 +45,8 @@ type ArtistAggregate = {
   tradeCount: number;
   buyCount: number;
   sellCount: number;
+  coverCount: number;
+  shortCount: number;
   grossOrderValue: number;
   netOrderValue: number;
   uniqueTraderCount: number;
@@ -143,13 +145,17 @@ export async function GET(request: Request) {
 
 async function loadRecentTransactions(supabase: ReturnType<typeof createServiceRoleClient>, since: string) {
   const { data, error } = await supabase
-    .from("transactions")
+    .from("market_trade_events")
     .select("id,user_id,artist_id,type,shares,price,cash_delta,gross_value,commission,market_eligible,created_at")
     .gte("created_at", since)
     .order("created_at", { ascending: false })
     .limit(MAX_TRANSACTION_ROWS);
 
   if (error) {
+    if (error.message.includes("market_trade_events")) {
+      throw new Error("Market integrity needs migration 018. Run supabase/migrations/018_short_selling_foundation.sql.");
+    }
+
     if (error.message.includes("gross_value") || error.message.includes("market_eligible")) {
       throw new Error("Market integrity needs migration 014. Run supabase/migrations/014_market_economy_guardrails.sql.");
     }
@@ -179,6 +185,10 @@ function buildSummary(transactions: TransactionRow[]) {
   const excludedTrades = transactions.filter((transaction) => !transaction.market_eligible);
   const buyTrades = marketEligibleTrades.filter((transaction) => transaction.type === "buy");
   const sellTrades = marketEligibleTrades.filter((transaction) => transaction.type === "sell");
+  const coverTrades = marketEligibleTrades.filter((transaction) => transaction.type === "cover");
+  const shortTrades = marketEligibleTrades.filter((transaction) => transaction.type === "short");
+  const bullishTrades = marketEligibleTrades.filter((transaction) => isBullishTrade(transaction.type));
+  const bearishTrades = marketEligibleTrades.filter((transaction) => !isBullishTrade(transaction.type));
 
   return {
     tradeCount: transactions.length,
@@ -191,6 +201,10 @@ function buildSummary(transactions: TransactionRow[]) {
     excludedGrossOrderValue: roundMoney(sum(excludedTrades, getGrossOrderValue)),
     buyGrossOrderValue: roundMoney(sum(buyTrades, getGrossOrderValue)),
     sellGrossOrderValue: roundMoney(sum(sellTrades, getGrossOrderValue)),
+    coverGrossOrderValue: roundMoney(sum(coverTrades, getGrossOrderValue)),
+    shortGrossOrderValue: roundMoney(sum(shortTrades, getGrossOrderValue)),
+    bullishGrossOrderValue: roundMoney(sum(bullishTrades, getGrossOrderValue)),
+    bearishGrossOrderValue: roundMoney(sum(bearishTrades, getGrossOrderValue)),
     commissionTotal: roundMoney(sum(transactions, (transaction) => Number(transaction.commission) || 0))
   };
 }
@@ -213,7 +227,7 @@ function buildConcentrationFlags({
       name: transaction.artist_id
     };
     const grossOrderValue = getGrossOrderValue(transaction);
-    const signedOrderValue = transaction.type === "buy" ? grossOrderValue : -grossOrderValue;
+    const signedOrderValue = isBullishTrade(transaction.type) ? grossOrderValue : -grossOrderValue;
     const aggregate =
       byArtist.get(transaction.artist_id) ??
       ({
@@ -223,6 +237,8 @@ function buildConcentrationFlags({
         tradeCount: 0,
         buyCount: 0,
         sellCount: 0,
+        coverCount: 0,
+        shortCount: 0,
         grossOrderValue: 0,
         netOrderValue: 0,
         uniqueTraderCount: 0,
@@ -245,6 +261,8 @@ function buildConcentrationFlags({
     aggregate.tradeCount += 1;
     aggregate.buyCount += transaction.type === "buy" ? 1 : 0;
     aggregate.sellCount += transaction.type === "sell" ? 1 : 0;
+    aggregate.coverCount += transaction.type === "cover" ? 1 : 0;
+    aggregate.shortCount += transaction.type === "short" ? 1 : 0;
     aggregate.grossOrderValue += grossOrderValue;
     aggregate.netOrderValue += signedOrderValue;
     aggregate.firstTradeAt = minIsoDate(aggregate.firstTradeAt, transaction.created_at);
@@ -275,6 +293,8 @@ function buildConcentrationFlags({
         tradeCount: aggregate.tradeCount,
         buyCount: aggregate.buyCount,
         sellCount: aggregate.sellCount,
+        coverCount: aggregate.coverCount,
+        shortCount: aggregate.shortCount,
         uniqueTraderCount: aggregate.uniqueTraderCount,
         grossOrderValue: roundMoney(aggregate.grossOrderValue),
         netOrderValue: roundMoney(aggregate.netOrderValue),
@@ -445,6 +465,10 @@ function getConcentrationReason(aggregate: ArtistAggregate, largestTraderShare: 
 
 function getGrossOrderValue(transaction: TransactionRow) {
   return Number(transaction.gross_value) || Math.abs(Number(transaction.cash_delta) || Number(transaction.price) * Number(transaction.shares));
+}
+
+function isBullishTrade(type: TransactionRow["type"]) {
+  return type === "buy" || type === "cover";
 }
 
 function getInteger(value: string | null, fallback: number, min: number, max: number) {

@@ -337,6 +337,28 @@ export type Database = {
         Update: Partial<Database["public"]["Tables"]["holdings"]["Insert"]>;
         Relationships: [];
       };
+      short_positions: {
+        Row: {
+          user_id: string;
+          artist_id: string;
+          shares: number;
+          average_short_price: number;
+          collateral: number;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          user_id: string;
+          artist_id: string;
+          shares: number;
+          average_short_price: number;
+          collateral?: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["short_positions"]["Insert"]>;
+        Relationships: [];
+      };
       transactions: {
         Row: {
           id: string;
@@ -367,6 +389,40 @@ export type Database = {
         Update: Partial<Database["public"]["Tables"]["transactions"]["Insert"]>;
         Relationships: [];
       };
+      short_transactions: {
+        Row: {
+          id: string;
+          user_id: string;
+          artist_id: string;
+          type: "short" | "cover";
+          shares: number;
+          price: number;
+          cash_delta: number;
+          gross_value: number;
+          commission: number;
+          collateral_delta: number;
+          realized_pnl: number;
+          market_eligible: boolean;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          artist_id: string;
+          type: "short" | "cover";
+          shares: number;
+          price: number;
+          cash_delta: number;
+          gross_value?: number;
+          commission?: number;
+          collateral_delta?: number;
+          realized_pnl?: number;
+          market_eligible?: boolean;
+          created_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["short_transactions"]["Insert"]>;
+        Relationships: [];
+      };
       watchlist: {
         Row: {
           user_id: string;
@@ -390,7 +446,46 @@ export type Database = {
           portfolio_value: number;
           cash_balance: number;
           holdings_value: number;
+          short_liability: number;
+          short_equity: number;
           gain_percent: number;
+        };
+        Relationships: [];
+      };
+      market_trade_events: {
+        Row: {
+          id: string;
+          user_id: string;
+          artist_id: string;
+          type: "buy" | "sell" | "short" | "cover";
+          shares: number;
+          price: number;
+          cash_delta: number;
+          gross_value: number;
+          commission: number;
+          collateral_delta: number;
+          realized_pnl: number;
+          market_eligible: boolean;
+          created_at: string;
+          position_kind: "long" | "short";
+        };
+        Relationships: [];
+      };
+      short_position_risk: {
+        Row: {
+          user_id: string;
+          artist_id: string;
+          ticker: string;
+          name: string;
+          shares: number;
+          average_short_price: number;
+          collateral: number;
+          current_price: number;
+          current_liability: number;
+          unrealized_pnl: number;
+          short_equity: number;
+          equity_percent: number;
+          updated_at: string;
         };
         Relationships: [];
       };
@@ -442,6 +537,36 @@ export type Database = {
           liquidity_score: number;
         }>;
       };
+      cover_artist_shares: {
+        Args: {
+          p_artist_id: string;
+          p_shares: number;
+          p_market_eligible?: boolean;
+        };
+        Returns: Array<{
+          transaction_id: string;
+          artist_id: string;
+          ticker: string;
+          shares: number;
+          execution_price: number;
+          order_value: number;
+          gross_order_value: number;
+          commission: number;
+          collateral_released: number;
+          realized_pnl: number;
+          cash_balance: number;
+          short_shares: number;
+          average_short_price: number;
+          updated_artist_price: number;
+          price_impact_percent: number;
+          market_eligible: boolean;
+          quote_bid_price: number;
+          quote_ask_price: number;
+          spread_percent: number;
+          slippage_percent: number;
+          liquidity_score: number;
+        }>;
+      };
       get_market_trading_status: {
         Args: {
           p_artist_id?: string | null;
@@ -452,6 +577,35 @@ export type Database = {
           market_impact_enabled: boolean;
           artist_halted: boolean;
           reason: string;
+        }>;
+      };
+      short_artist_shares: {
+        Args: {
+          p_artist_id: string;
+          p_shares: number;
+          p_market_eligible?: boolean;
+        };
+        Returns: Array<{
+          transaction_id: string;
+          artist_id: string;
+          ticker: string;
+          shares: number;
+          execution_price: number;
+          order_value: number;
+          gross_order_value: number;
+          commission: number;
+          collateral_required: number;
+          cash_balance: number;
+          short_shares: number;
+          average_short_price: number;
+          updated_artist_price: number;
+          price_impact_percent: number;
+          market_eligible: boolean;
+          quote_bid_price: number;
+          quote_ask_price: number;
+          spread_percent: number;
+          slippage_percent: number;
+          liquidity_score: number;
         }>;
       };
       sell_artist_shares: {

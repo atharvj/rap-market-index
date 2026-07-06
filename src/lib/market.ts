@@ -14,6 +14,7 @@ import type {
   HoldingView,
   HypeStats,
   LeaderboardEntry,
+  ShortPositionView,
   Transaction
 } from "@/lib/types";
 
@@ -28,6 +29,7 @@ export function createInitialGameState(): GameState {
     cashBalance: STARTING_CASH,
     artists: createInitialArtists(),
     holdings: [],
+    shortPositions: [],
     transactions: [],
     lastUpdatedAt: BASE_DATE
   };
@@ -58,18 +60,50 @@ export function getHoldingViews(state: GameState): HoldingView[] {
     .filter((holding): holding is HoldingView => Boolean(holding));
 }
 
+export function getShortPositionViews(state: GameState): ShortPositionView[] {
+  return state.shortPositions
+    .map((position) => {
+      const artist = state.artists.find((candidate) => candidate.id === position.artistId);
+
+      if (!artist) {
+        return null;
+      }
+
+      const currentLiability = position.shares * artist.currentPrice;
+      const unrealizedProfitLoss = (position.averageShortPrice - artist.currentPrice) * position.shares;
+      const shortEquity = position.collateral + unrealizedProfitLoss;
+
+      return {
+        ...position,
+        artist,
+        currentLiability,
+        shortEquity,
+        unrealizedProfitLoss,
+        equityPercent: currentLiability === 0 ? 0 : (shortEquity / currentLiability) * 100
+      };
+    })
+    .filter((position): position is ShortPositionView => Boolean(position));
+}
+
 export function getPortfolioValue(state: GameState) {
   return (
     state.cashBalance +
-    getHoldingViews(state).reduce((total, holding) => total + holding.currentValue, 0)
+    getHoldingViews(state).reduce((total, holding) => total + holding.currentValue, 0) +
+    getShortPositionViews(state).reduce((total, position) => total + position.shortEquity, 0)
   );
 }
 
 export function getPortfolioDayChange(state: GameState) {
-  return getHoldingViews(state).reduce((total, holding) => {
+  const longDayChange = getHoldingViews(state).reduce((total, holding) => {
     const previousValue = holding.shares * holding.artist.previousClose;
     return total + (holding.currentValue - previousValue);
   }, 0);
+  const shortDayChange = getShortPositionViews(state).reduce((total, position) => {
+    const previousLiability = position.shares * position.artist.previousClose;
+    return total + (previousLiability - position.currentLiability);
+  }, 0);
+
+  return longDayChange + shortDayChange;
 }
 
 export function getMockLeaderboard(state: GameState): LeaderboardEntry[] {

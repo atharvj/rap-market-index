@@ -4,7 +4,7 @@ import { createAnonServerClient, getSupabaseConfigStatus } from "@/lib/supabase/
 export const dynamic = "force-dynamic";
 
 type TradeBody = {
-  side?: "buy" | "sell";
+  side?: "buy" | "sell" | "short" | "cover";
   artistId?: string;
   shares?: number;
 };
@@ -60,8 +60,9 @@ export async function POST(request: Request) {
 
   const artistId = body.artistId;
   const shares = body.shares;
+  const side = body.side;
 
-  if (!artistId || typeof shares !== "number") {
+  if (!artistId || typeof shares !== "number" || !side) {
     return NextResponse.json(
       {
         ok: false,
@@ -100,7 +101,7 @@ export async function POST(request: Request) {
     );
   }
 
-  const functionName = body.side === "sell" ? "sell_artist_shares" : "buy_artist_shares";
+  const functionName = getTradeFunctionName(side);
   const { data, error } = await supabase.rpc(functionName, {
     p_artist_id: artistId,
     p_shares: shares,
@@ -197,8 +198,8 @@ async function parseBody(request: Request): Promise<TradeBody> {
 }
 
 function validateTradeBody(body: TradeBody): { ok: true } | { ok: false; error: string } {
-  if (body.side !== "buy" && body.side !== "sell") {
-    return { ok: false, error: "Trade side must be buy or sell." };
+  if (!body.side || !["buy", "sell", "short", "cover"].includes(body.side)) {
+    return { ok: false, error: "Trade side must be buy, sell, short, or cover." };
   }
 
   if (!body.artistId) {
@@ -210,4 +211,20 @@ function validateTradeBody(body: TradeBody): { ok: true } | { ok: false; error: 
   }
 
   return { ok: true };
+}
+
+function getTradeFunctionName(side: NonNullable<TradeBody["side"]>) {
+  if (side === "sell") {
+    return "sell_artist_shares";
+  }
+
+  if (side === "short") {
+    return "short_artist_shares";
+  }
+
+  if (side === "cover") {
+    return "cover_artist_shares";
+  }
+
+  return "buy_artist_shares";
 }
