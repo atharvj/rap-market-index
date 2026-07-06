@@ -390,8 +390,16 @@ function getEventProvenance(event: MarketEvent) {
     return getRedditEventProvenance(event);
   }
 
+  if (normalizedSource === "bluesky_post") {
+    return getBlueskyEventProvenance(event);
+  }
+
   if (normalizedSource === "gdelt_article") {
     return getGdeltEventProvenance(event);
+  }
+
+  if (normalizedSource === "media_rss_item") {
+    return getMediaRssEventProvenance(event);
   }
 
   if (normalizedSource === "musicbrainz_release_group") {
@@ -444,6 +452,23 @@ function getRedditEventProvenance(event: MarketEvent) {
   };
 }
 
+function getBlueskyEventProvenance(event: MarketEvent) {
+  const viralityTier = getRawString(event.rawPayload.viralityTier) ?? "small";
+  const tierProfiles: Record<string, { impact: number; confidence: number }> = {
+    small: { impact: 0.5, confidence: 0.76 },
+    notable: { impact: 0.86, confidence: 0.94 },
+    major: { impact: 1.05, confidence: 1.03 },
+    breakout: { impact: 1.22, confidence: 1.1 }
+  };
+  const profile = tierProfiles[viralityTier] ?? tierProfiles.small;
+
+  return {
+    label: `bluesky-${viralityTier}`,
+    impactMultiplier: profile.impact,
+    confidenceMultiplier: profile.confidence
+  };
+}
+
 function getGdeltEventProvenance(event: MarketEvent) {
   const sourceTier = getRawNumber(event.rawPayload.sourceTier, 0);
   const tierProfiles: Record<number, { impact: number; confidence: number }> = {
@@ -458,6 +483,25 @@ function getGdeltEventProvenance(event: MarketEvent) {
     label: `news-tier-${sourceTier}`,
     impactMultiplier: profile.impact,
     confidenceMultiplier: profile.confidence
+  };
+}
+
+function getMediaRssEventProvenance(event: MarketEvent) {
+  const sourceTier = getRawNumber(event.rawPayload.sourceTier, 0);
+  const feedScope = getRawString(event.rawPayload.feedScope);
+  const tierProfiles: Record<number, { impact: number; confidence: number }> = {
+    0: { impact: 0.7, confidence: 0.88 },
+    1: { impact: 0.9, confidence: 0.98 },
+    2: { impact: 1.03, confidence: 1.05 },
+    3: { impact: 1.12, confidence: 1.1 }
+  };
+  const profile = tierProfiles[sourceTier] ?? tierProfiles[0];
+  const searchMultiplier = feedScope === "artist_search" ? 0.96 : 1;
+
+  return {
+    label: `media-rss-tier-${sourceTier}`,
+    impactMultiplier: clamp(profile.impact * searchMultiplier, 0.65, 1.16),
+    confidenceMultiplier: clamp(profile.confidence * searchMultiplier, 0.82, 1.12)
   };
 }
 
@@ -659,6 +703,10 @@ function normalizeEventSource(value: string) {
     return normalized;
   }
 
+  if (normalized === "bluesky" || normalized.includes("bsky.app")) {
+    return "bluesky";
+  }
+
   if (normalized.includes("youtube")) {
     return "youtube";
   }
@@ -669,6 +717,10 @@ function normalizeEventSource(value: string) {
 
   if (normalized.includes("gdelt")) {
     return "gdelt";
+  }
+
+  if (normalized.includes("rss") || normalized.includes("news.google.com")) {
+    return "media-rss";
   }
 
   try {

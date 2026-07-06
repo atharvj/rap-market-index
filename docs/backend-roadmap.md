@@ -37,8 +37,11 @@ This app still runs in development with unsaved demo data, but the backend found
    - `MARKET_YOUTUBE_UPLOAD_EVENT_DAYS=14`
    - `MARKET_YOUTUBE_COMMENT_VIDEOS=0`
    - `MARKET_YOUTUBE_COMMENT_LIMIT=25`
+   - `MARKET_BLUESKY_POST_LIMIT=20`
+   - `MARKET_BLUESKY_LOOKBACK_DAYS=7`
+   - `MARKET_BLUESKY_DELAY_MS=250`
    - `ADMIN_EMAILS=<comma-separated admin emails>`
-   - `MARKET_MODEL_VERSION=rmi-core-v10`
+   - `MARKET_MODEL_VERSION=rmi-core-v11`
    - `LASTFM_API_KEY` for optional Last.fm listener/playcount signals
    - `SPOTIFY_CLIENT_ID` and `SPOTIFY_CLIENT_SECRET` for optional Spotify popularity/follower signals
    - `YOUTUBE_API_KEY` for optional YouTube channel view/subscriber/video-count and comment-reaction signals
@@ -168,6 +171,8 @@ After deployment, manually call `/api/cron/daily-market-update?dryRun=1` with `A
 
 `MARKET_MODEL_VERSION` is an internal audit label, not a prominent user-facing product label. It is saved on market runs, signal snapshots, and price-history rows so future algorithm changes can be traced without rewriting historical prices. Normal market pages should keep broad language such as audience momentum, market activity, release signals, and media movement. Admin/health/debug views can show the exact model version.
 
+`rmi-core-v11` adds public social-web catalyst detection through Bluesky, expands the automatic event scanner with music/media RSS plus Google News RSS search, and prepares a public market-news API. The `core` path searches recent public Bluesky posts for each artist with no API key, stores aggregate observations only, and creates normalized market events for snippets, album announcements, release dates, tracklists, viral clips, performance reactions, feature/cosign chatter, backlash, controversy, and decline terms. Bluesky carries lower model weight than stronger sources, so it can catch early social movement without overpowering streaming, video, release, news, and trade data. The event scanner stores `media_rss` observations and classified `market_events` from no-key media feeds, giving the model another way to catch reviews, announcements, tracklists, controversies, and article-backed viral moments before they show up in audience counts. The public `/api/market/news` endpoint returns recent normalized `market_events` with artist/ticker metadata so a future HSX/Yahoo-style news module can be built without changing storage.
+
 `rmi-core-v10` adds market integrity rules to the pricing loop. Trade-flow observations are still recorded, but they no longer become a `traderDemand` pricing signal unless order flow has at least three traders, at least $1,000 of eligible gross value, and no trader controlling more than 70% of the recent artist flow. New accounts can trade immediately, but their orders are marked market-ineligible for the first 24 hours by both the app route and `016_market_integrity_guardrails.sql`, so brand-new or duplicate accounts cannot immediately move public prices or feed the daily trade-flow model. The direct trade-impact function also checks database-side eligibility, so calling the Supabase RPC directly cannot bypass the cooldown.
 
 `rmi-core-v9` makes event provenance part of pricing. Reddit catalysts now scale by engagement tier and subreddit tier, so small fan posts are dampened while major or breakout community attention gets more trust. Reddit collection queries both new and top weekly posts, then dedupes them, so a viral snippet or performance can still be detected if it happened earlier in the lookback window. GDELT/news events now scale by source tier, so weak article sources have less pricing power than stronger music or mainstream sources. Major features/cosigns, such as Drake, Carti, Future, Kendrick, or Travis-linked moments, are separated from ordinary feature chatter with a higher priority and wider positive shock cap. GDELT can also accept a high-signal article that matched the artist query even when the title leads with the bigger artist, but only for non-ambiguous artist names and stronger source/event matches. GDELT and official YouTube upload events now carry structured release kind metadata, so album, EP, mixtape, and deluxe/project catalysts are preferred over nearby individual track-upload reasons. Official YouTube upload sampling defaults to five recent uploads per artist, still without using expensive YouTube search, so release weeks with several track uploads are less likely to hide the real project catalyst. Relative repricing now adds a small opportunity-cost drift to the weakest quartile during broad positive markets when they do not have a positive high-priority catalyst, making all-green days less likely without suppressing real artist news. Release-database and official-upload events carry explicit provenance metadata in signal snapshots, and the default Reddit search pool now includes `trap` and `soundcloud` for better underground and SoundCloud-era coverage.
@@ -256,7 +261,7 @@ The production daily source is:
 }
 ```
 
-`core` combines Last.fm, public attention, YouTube channel stats, official YouTube upload events, Reddit community-hype signals when Reddit credentials are configured, MusicBrainz release detection, stored market events, trade-flow demand, and Spotify when Spotify credentials are configured. YouTube comments are optional and disabled by default with `MARKET_YOUTUBE_COMMENT_VIDEOS=0`. `core` intentionally skips direct GDELT pricing because the free news endpoint can be slow or rate-limited. Instead, the scheduler can pre-scan a small artist batch for article-based events and store those events for `core` to price through the normal event layer. Use `blended` when you intentionally want to include GDELT/news observations directly in a supervised run.
+`core` combines Last.fm, public attention, YouTube channel stats, official YouTube upload events, public Bluesky social chatter, Reddit community-hype signals when Reddit credentials are configured, MusicBrainz release detection, stored market events, trade-flow demand, and Spotify when Spotify credentials are configured. YouTube comments are optional and disabled by default with `MARKET_YOUTUBE_COMMENT_VIDEOS=0`. `core` intentionally skips direct GDELT pricing because the free news endpoint can be slow or rate-limited. Instead, the scheduler can pre-scan a small artist batch for article-based events through GDELT plus media RSS feeds, then store those events for `core` to price through the normal event layer. Use `blended` when you intentionally want to include GDELT/news observations directly in a supervised run.
 
 When enabled, the YouTube comments path samples recent comments from each artist's official channel. It stores aggregate observations only:
 
@@ -269,6 +274,10 @@ When enabled, the YouTube comments path samples recent comments from each artist
 Raw comment text is not saved. The first run is treated as a baseline; later runs move the social/news/search parts of the model from changes in sentiment, likes, and net positive-vs-negative share. This prevents every naturally positive fan comment section from pushing a stock up every day.
 
 The YouTube upload event path is separate from comment sentiment. It uses official channel upload playlists for artists with `youtube_channel_id`, classifies recent upload titles such as official videos, new singles, album trailers, deluxe/tracklist announcements, snippets, teasers, freestyles, performances, and tour announcements, and stores those matches as `market_events`. It does not use YouTube search, so it is much cheaper and less ambiguous than searching all of YouTube for an artist name. Defaults are `MARKET_YOUTUBE_UPLOAD_EVENT_VIDEOS=5` and `MARKET_YOUTUBE_UPLOAD_EVENT_DAYS=14`.
+
+The Bluesky path is an early social-catalyst adapter. It searches recent public posts for each artist, stores aggregate observations only, and classifies snippet hype, album announcements, release dates, tracklists, viral clips, performance reaction, feature/cosign chatter, backlash, controversy, and decline terms. It can catch moments that may not have reached article coverage yet, but its source weight is intentionally below audience/video/release/news sources. Defaults are `MARKET_BLUESKY_POST_LIMIT=20`, `MARKET_BLUESKY_LOOKBACK_DAYS=7`, and `MARKET_BLUESKY_DELAY_MS=250`.
+
+The media RSS path is an automatic news/review adapter used by the scheduled event scan. It fetches a built-in list of free music/media feeds and optional Google News RSS searches for the selected artists, stores `media_rss:article_count`, `media_rss:source_count`, and `media_rss:classified_event_count` observations, then classifies release announcements, reviews, tracklists, snippets, major features, viral performance coverage, controversies, and decline/falloff articles into `market_events`. Defaults are `MARKET_RSS_GOOGLE_NEWS=true`, `MARKET_RSS_LOOKBACK_DAYS=10`, and `MARKET_RSS_MAX_ITEMS_PER_FEED=40`; `MARKET_RSS_FEEDS` can override the built-in comma-separated feed list.
 
 The Reddit path is a community-hype adapter, not a pure sentiment adapter. It searches configured music subreddits for each artist, stores aggregate observations only, and looks for broad attention plus catalyst language such as snippets, features, viral performances, release news, chart movement, controversies, or decline terms. It fetches both new and top weekly search results so high-engagement posts are not missed just because they are no longer the newest result. Defaults are `MARKET_REDDIT_POST_LIMIT=25`, `MARKET_REDDIT_LOOKBACK_DAYS=7`, and `MARKET_REDDIT_SUBREDDITS=hiphopheads,rap,trap,undergroundhiphop,playboicarti,soundcloud`. If Reddit credentials are missing, the rest of the `core` engine still runs.
 
@@ -346,13 +355,16 @@ Vercel schedules cron in UTC, so this runs around 2 AM Pacific during daylight s
 - `maxBatches`: `MARKET_CRON_MAX_BATCHES`, default `1`
 - `eventScanLimit`: `MARKET_EVENT_SCAN_LIMIT`, default `20`
 - `eventScanMaxRecords`: `MARKET_EVENT_SCAN_MAX_RECORDS`, default `12`
+- `mediaRssGoogleNews`: `MARKET_RSS_GOOGLE_NEWS`, default `true`
+- `mediaRssLookbackDays`: `MARKET_RSS_LOOKBACK_DAYS`, default `10`
+- `mediaRssMaxItemsPerFeed`: `MARKET_RSS_MAX_ITEMS_PER_FEED`, default `40`
 - `youtubeUploadEventVideos`: `MARKET_YOUTUBE_UPLOAD_EVENT_VIDEOS`, default `5`
 - `redditPostLimit`: `MARKET_REDDIT_POST_LIMIT`, default `25`
 - YouTube comments are quota-guarded separately. `MARKET_YOUTUBE_COMMENT_VIDEOS=0` keeps comment sentiment off; set it to `1` for limited comment sampling.
 
-Before pricing, the cron route calls `POST /api/admin/market-event-scan` unless `MARKET_EVENT_SCAN_LIMIT=0`. That scanner uses the free GDELT news endpoint on the least-recently-scanned artists, stores `gdelt:article_count` observations, and persists classified `market_events` for releases, reviews, controversies, awards, tours, viral moments, and major news. The pricing job then reads those saved events through the `market_events` adapter, so news can affect the normal daily move without turning the whole production job into a slow full-GDELT run.
+Before pricing, the cron route calls `POST /api/admin/market-event-scan` unless `MARKET_EVENT_SCAN_LIMIT=0`. That scanner uses the free GDELT news endpoint plus media RSS/Google News RSS search on the least-recently-scanned artists, stores `gdelt:article_count` and `media_rss:*` observations, and persists classified `market_events` for releases, reviews, tracklists, snippets, controversies, awards, tours, viral moments, and major news. The pricing job then reads those saved events through the `market_events` adapter, so news can affect the normal daily move without turning the whole production job into a slow full-GDELT run.
 
-Event ingestion should be automatic in normal operation. The free automatic event sources are rotating GDELT news scans, official YouTube upload detection, Reddit community-hype detection, and MusicBrainz release detection.
+Event ingestion should be automatic in normal operation. The free automatic event sources are rotating GDELT news scans, media RSS/Google News RSS scans, official YouTube upload detection, public Bluesky social-catalyst detection, Reddit community-hype detection when credentials are configured, and MusicBrainz release detection.
 
 The route skips duplicate same-day runs when a successful or running `core` run already exists. This matters because cron delivery is best-effort and can occasionally miss or duplicate invocations. For manual local testing, call the cron route with `x-market-update-secret: <MARKET_UPDATE_SECRET>`. Add `?dryRun=1` to exercise the full path without persisting another market run.
 
@@ -393,7 +405,7 @@ and a body like:
 }
 ```
 
-Those events are saved and then loaded by future market update runs. This endpoint is kept for server-side automation and emergency operator tooling, not for the normal market workflow. The normal event workflow should stay automatic through cron, GDELT news scans, YouTube official-upload detection, and MusicBrainz release detection.
+Those events are saved and then loaded by future market update runs. This endpoint is kept for server-side automation and emergency operator tooling, not for the normal market workflow. The normal event workflow should stay automatic through cron, GDELT/media RSS scans, Bluesky social detection, YouTube official-upload detection, and MusicBrainz release detection.
 
 The protected event scanner endpoint is:
 

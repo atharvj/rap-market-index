@@ -9,6 +9,7 @@ import {
   type MarketUpdateSummary,
   type MarketUpdateSource
 } from "@/server/market/daily-update";
+import { collectBlueskyMarketSignals } from "@/server/market/bluesky-source";
 import {
   buildEventMarketSignals,
   flattenEvents,
@@ -233,6 +234,7 @@ function normalizeSource(source: DailyUpdateBody["source"]): MarketUpdateSource 
     source === "youtube" ||
     source === "wikimedia" ||
     source === "reddit" ||
+    source === "bluesky" ||
     source === "core" ||
     source === "blended"
   ) {
@@ -473,10 +475,11 @@ async function collectRealSignals({
   const useYoutube = source === "youtube" || source === "core" || source === "blended";
   const useWikimedia = source === "wikimedia" || source === "core" || source === "blended";
   const useReddit = source === "reddit" || ((source === "core" || source === "blended") && hasRedditCredentials());
+  const useBluesky = source === "bluesky" || source === "core" || source === "blended";
   const useTradeFlow = Boolean(supabase) && isRealExternalSource(source);
   const warnings: string[] = [];
 
-  if (!useGdelt && !useLastfm && !useSpotify && !useYoutube && !useWikimedia && !useReddit) {
+  if (!useGdelt && !useLastfm && !useSpotify && !useYoutube && !useWikimedia && !useReddit && !useBluesky) {
     return {
       adapterSignalSources: [],
       observations: [],
@@ -495,6 +498,7 @@ async function collectRealSignals({
   let youtubeCommentBaselines: ObservationBaselines = {};
   let wikimediaBaselines: ObservationBaselines = {};
   let redditBaselines: ObservationBaselines = {};
+  let blueskyBaselines: ObservationBaselines = {};
 
   if (supabase) {
     try {
@@ -506,7 +510,8 @@ async function collectRealSignals({
         youtubeBaselines,
         youtubeCommentBaselines,
         wikimediaBaselines,
-        redditBaselines
+        redditBaselines,
+        blueskyBaselines
       ] = await Promise.all([
         loadArtistExternalIds(supabase, artistIds),
         useGdelt
@@ -587,6 +592,16 @@ async function collectRealSignals({
               beforeDate: runDate,
               lookbackDays: 30
             })
+          : Promise.resolve({}),
+        useBluesky
+          ? loadObservationBaselines({
+              supabase,
+              artistIds,
+              source: "bluesky",
+              metrics: ["post_count", "engagement_score", "hype_post_count", "negative_post_count"],
+              beforeDate: runDate,
+              lookbackDays: 30
+            })
           : Promise.resolve({})
       ]);
     } catch (error) {
@@ -599,6 +614,7 @@ async function collectRealSignals({
       youtubeCommentBaselines = {};
       wikimediaBaselines = {};
       redditBaselines = {};
+      blueskyBaselines = {};
     }
   }
 
@@ -762,6 +778,27 @@ async function collectRealSignals({
       observations.push(...reddit.observations);
       warnings.push(...reddit.warnings);
       detectedEventsByArtist = mergeEvents(detectedEventsByArtist, reddit.eventsByArtist);
+    }
+  }
+
+  if (useBluesky) {
+    const bluesky = await collectExternalSource("Bluesky social chatter", warnings, () =>
+      collectBlueskyMarketSignals({
+        artists,
+        runDate,
+        externalIds,
+        baselines: blueskyBaselines,
+        postsPerArtist: getEnvInteger("MARKET_BLUESKY_POST_LIMIT", 20, 5, 100),
+        lookbackDays: getEnvInteger("MARKET_BLUESKY_LOOKBACK_DAYS", 7, 1, 30),
+        delayMs: getEnvInteger("MARKET_BLUESKY_DELAY_MS", 250, 0, 2000)
+      })
+    );
+
+    if (bluesky) {
+      sources.push(bluesky.signals);
+      observations.push(...bluesky.observations);
+      warnings.push(...bluesky.warnings);
+      detectedEventsByArtist = mergeEvents(detectedEventsByArtist, bluesky.eventsByArtist);
     }
   }
 

@@ -36,9 +36,9 @@ type GdeltCollectOptions = {
   fetchImpl?: typeof fetch;
 };
 
-type ArticleReleaseKind = "album" | "ep" | "mixtape" | "single";
+export type ArticleReleaseKind = "album" | "ep" | "mixtape" | "single";
 
-type GdeltArticleClassification = {
+export type ArticleMarketClassification = {
   eventType: MarketEvent["eventType"];
   sentimentScore: number;
   impactScore: number;
@@ -390,7 +390,7 @@ function isRelevantGdeltEvent({
 }: {
   artistName: string;
   query: string;
-  classification: GdeltArticleClassification;
+  classification: ArticleMarketClassification;
   sourceTier: number;
   titleMatchedArtist: boolean;
 }) {
@@ -408,7 +408,11 @@ function isRelevantGdeltEvent({
   );
 }
 
-function classifyArticleEvent(title: string, domain: string, tone: unknown): GdeltArticleClassification | null {
+export function classifyArticleEvent(
+  title: string,
+  domain: string,
+  tone: unknown = undefined
+): ArticleMarketClassification | null {
   const lowerTitle = title.toLowerCase();
   const sourceTier = getSourceTier(domain);
   const toneScore = clamp((getNumber(tone) ?? 0) * 8, -45, 45);
@@ -630,7 +634,7 @@ function getArticleConfidence(sourceTier: number, base: number) {
   return clamp(base + sourceTier * 0.055, 0.45, 0.9);
 }
 
-function getSourceTier(domain: string) {
+export function getSourceTier(domain: string) {
   if (TIER_THREE_DOMAINS.has(domain)) {
     return 3;
   }
@@ -650,7 +654,7 @@ function hasAny(value: string, terms: string[]) {
   return terms.some((term) => value.includes(term));
 }
 
-function mentionsArtist(title: string, artistName: string, query?: string) {
+export function mentionsArtist(title: string, artistName: string, query?: string) {
   const normalizedTitle = normalizeSearchText(title);
   const compactTitle = normalizedTitle.replace(/\s+/g, "");
   const candidateNames = [artistName, ...extractQuotedSearchPhrases(query)].filter(Boolean);
@@ -721,7 +725,7 @@ function normalizeArticleTitle(value: string | undefined) {
   return title ? title.slice(0, 160) : null;
 }
 
-function normalizeDomain(domain: string | undefined, url: string | undefined) {
+export function normalizeDomain(domain: string | undefined, url: string | undefined) {
   const fromDomain = domain?.trim().toLowerCase();
 
   if (fromDomain) {

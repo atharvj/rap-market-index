@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 import { createServiceRoleClient, getSupabaseConfigStatus } from "@/lib/supabase/server";
 import { requireAdminRequest } from "@/server/admin-auth";
-import { flattenEvents } from "@/server/market/event-signals";
+import { flattenEvents, mergeEvents } from "@/server/market/event-signals";
 import { collectGdeltMarketSignals } from "@/server/market/gdelt-source";
+import { collectMediaRssMarketEvents } from "@/server/market/media-rss-source";
 import { getPacificMarketDate } from "@/server/market/market-date";
 import type { MarketUpdateArtist } from "@/server/market/daily-update";
 import type { MarketEvent } from "@/server/market/market-data";
@@ -25,6 +26,10 @@ type MarketEventScanBody = {
   maxRecords?: number;
   delayMs?: number;
   timeoutMs?: number;
+  rssFeedUrls?: string[];
+  rssLookbackDays?: number;
+  rssMaxItemsPerFeed?: number;
+  includeGoogleNews?: boolean;
 };
 
 const DEFAULT_ARTIST_LIMIT = 10;
@@ -33,6 +38,8 @@ const DEFAULT_MAX_RECORDS = 12;
 const MAX_GDELT_RECORDS = 50;
 const DEFAULT_DELAY_MS = 5200;
 const DEFAULT_TIMEOUT_MS = 12000;
+const DEFAULT_RSS_LOOKBACK_DAYS = 10;
+const DEFAULT_RSS_MAX_ITEMS_PER_FEED = 40;
 
 export async function GET(request: Request) {
   const auth = await requireAdminRequest(request);
@@ -79,16 +86,26 @@ export async function POST(request: Request) {
     const supabase = createServiceRoleClient();
     const allArtists = await loadActiveArtists(supabase);
     const artistIds = allArtists.map((artist) => artist.id);
-    const latestGdeltDates = await loadLatestObservationDates({
-      supabase,
-      artistIds,
-      source: "gdelt",
-      metric: "article_count",
-      runDate
-    });
+    const [latestGdeltDates, latestMediaRssDates] = await Promise.all([
+      loadLatestObservationDates({
+        supabase,
+        artistIds,
+        source: "gdelt",
+        metric: "article_count",
+        runDate
+      }),
+      loadLatestObservationDates({
+        supabase,
+        artistIds,
+        source: "media_rss",
+        metric: "article_count",
+        runDate
+      })
+    ]);
     const artists = selectArtistsForEventScan({
       artists: allArtists,
       latestGdeltDates,
+      latestMediaRssDates,
       limit: artistLimit
     });
     const selectedArtistIds = artists.map((artist) => artist.id);
@@ -112,10 +129,33 @@ export async function POST(request: Request) {
       maxRecords,
       timeoutMs
     });
-    const events = flattenEvents(result.eventsByArtist);
+    const mediaRss = await collectMediaRssMarketEvents({
+      artists,
+      runDate,
+      externalIds,
+      feedUrls: normalizeFeedUrls(body.rssFeedUrls) ?? getEnvList("MARKET_RSS_FEEDS"),
+      includeGoogleNews: body.includeGoogleNews ?? getEnvBoolean("MARKET_RSS_GOOGLE_NEWS", true),
+      lookbackDays: normalizeInteger(
+        body.rssLookbackDays,
+        getEnvInteger("MARKET_RSS_LOOKBACK_DAYS", DEFAULT_RSS_LOOKBACK_DAYS, 1, 30),
+        1,
+        30
+      ),
+      maxItemsPerFeed: normalizeInteger(
+        body.rssMaxItemsPerFeed,
+        getEnvInteger("MARKET_RSS_MAX_ITEMS_PER_FEED", DEFAULT_RSS_MAX_ITEMS_PER_FEED, 5, 100),
+        5,
+        100
+      ),
+      delayMs: Math.min(delayMs, 1000),
+      timeoutMs
+    });
+    const mergedEventsByArtist = mergeEvents(result.eventsByArtist, mediaRss.eventsByArtist);
+    const events = flattenEvents(mergedEventsByArtist);
+    const observations = [...result.observations, ...mediaRss.observations];
 
     if (!dryRun) {
-      await persistMarketObservations(supabase, result.observations);
+      await persistMarketObservations(supabase, observations);
       await persistMarketEvents(supabase, events);
     }
 
@@ -125,17 +165,21 @@ export async function POST(request: Request) {
       persisted: !dryRun,
       config,
       runDate,
-      source: "gdelt_event_scan",
+      source: "market_event_scan",
       totalArtistCount: allArtists.length,
       scannedArtistCount: artists.length,
-      observationCount: result.observations.length,
+      observationCount: observations.length,
       eventCount: events.length,
+      gdeltEventCount: flattenEvents(result.eventsByArtist).length,
+      mediaRssEventCount: flattenEvents(mediaRss.eventsByArtist).length,
+      mediaRssScannedFeedCount: mediaRss.scannedFeedCount,
+      warnings: mediaRss.warnings,
       eventTypeCounts: countEventsByType(events),
       artists: artists.map((artist) => ({
         id: artist.id,
         ticker: artist.ticker,
         name: artist.name,
-        latestNewsScanDate: latestGdeltDates[artist.id] ?? null
+        latestNewsScanDate: getOldestScanDate(latestGdeltDates[artist.id], latestMediaRssDates[artist.id])
       })),
       topEvents: events.slice(0, 8).map((event) => ({
         artistId: event.artistId,
@@ -171,16 +215,18 @@ async function parseBody(request: Request): Promise<MarketEventScanBody> {
 function selectArtistsForEventScan({
   artists,
   latestGdeltDates,
+  latestMediaRssDates,
   limit
 }: {
   artists: MarketUpdateArtist[];
   latestGdeltDates: Record<string, string>;
+  latestMediaRssDates: Record<string, string>;
   limit: number;
 }) {
   return [...artists]
     .sort((first, second) => {
-      const firstDate = latestGdeltDates[first.id] ?? "";
-      const secondDate = latestGdeltDates[second.id] ?? "";
+      const firstDate = getOldestScanDate(latestGdeltDates[first.id], latestMediaRssDates[first.id]) ?? "";
+      const secondDate = getOldestScanDate(latestGdeltDates[second.id], latestMediaRssDates[second.id]) ?? "";
 
       if (firstDate !== secondDate) {
         return firstDate.localeCompare(secondDate);
@@ -204,6 +250,55 @@ function normalizeInteger(value: unknown, fallback: number, min: number, max: nu
   }
 
   return Math.min(max, Math.max(min, value));
+}
+
+function getEnvInteger(name: string, fallback: number, min: number, max: number) {
+  const parsed = Number.parseInt(process.env[name] ?? "", 10);
+
+  if (!Number.isFinite(parsed)) {
+    return fallback;
+  }
+
+  return Math.min(max, Math.max(min, parsed));
+}
+
+function getEnvBoolean(name: string, fallback: boolean) {
+  const value = process.env[name]?.trim().toLowerCase();
+
+  if (!value) {
+    return fallback;
+  }
+
+  return value === "1" || value === "true" || value === "yes";
+}
+
+function getEnvList(name: string) {
+  const values = (process.env[name] ?? "")
+    .split(",")
+    .map((value) => value.trim())
+    .filter(Boolean);
+
+  return values.length ? values : undefined;
+}
+
+function normalizeFeedUrls(values: unknown) {
+  if (!Array.isArray(values)) {
+    return undefined;
+  }
+
+  const urls = values.filter(
+    (value): value is string => typeof value === "string" && Boolean(value.trim())
+  );
+
+  return urls.length ? urls : undefined;
+}
+
+function getOldestScanDate(first?: string, second?: string) {
+  if (first && second) {
+    return first < second ? first : second;
+  }
+
+  return first ?? second ?? null;
 }
 
 function normalizeDate(value: unknown) {

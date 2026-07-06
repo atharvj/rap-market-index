@@ -81,6 +81,18 @@ const SERIES_DEFINITIONS: Record<string, { label: string; unit: string }> = {
     label: "News sources",
     unit: "sources"
   },
+  "media_rss:article_count": {
+    label: "Media feed articles",
+    unit: "articles"
+  },
+  "media_rss:source_count": {
+    label: "Media feed sources",
+    unit: "sources"
+  },
+  "media_rss:classified_event_count": {
+    label: "Media feed events",
+    unit: "events"
+  },
   "reddit:post_count": {
     label: "Community posts",
     unit: "posts"
@@ -100,6 +112,38 @@ const SERIES_DEFINITIONS: Record<string, { label: string; unit: string }> = {
   "reddit:catalyst_post_count": {
     label: "Community catalyst posts",
     unit: "posts"
+  },
+  "bluesky:post_count": {
+    label: "Social posts",
+    unit: "posts"
+  },
+  "bluesky:engagement_score": {
+    label: "Social engagement",
+    unit: "engagement"
+  },
+  "bluesky:hype_post_count": {
+    label: "Social hype posts",
+    unit: "posts"
+  },
+  "bluesky:negative_post_count": {
+    label: "Social negative posts",
+    unit: "posts"
+  },
+  "bluesky:catalyst_post_count": {
+    label: "Social catalyst posts",
+    unit: "posts"
+  },
+  "bluesky:unique_author_count": {
+    label: "Social authors",
+    unit: "authors"
+  },
+  "bluesky:top_post_engagement": {
+    label: "Top social post",
+    unit: "engagement"
+  },
+  "bluesky:average_sentiment": {
+    label: "Social sentiment",
+    unit: "score"
   },
   "wikimedia:pageviews_7d": {
     label: "Public attention",

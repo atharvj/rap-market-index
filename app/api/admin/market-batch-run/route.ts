@@ -266,6 +266,7 @@ function normalizeSource(source: MarketBatchRunBody["source"]): MarketUpdateSour
     source === "youtube" ||
     source === "wikimedia" ||
     source === "reddit" ||
+    source === "bluesky" ||
     source === "core" ||
     source === "blended"
   ) {

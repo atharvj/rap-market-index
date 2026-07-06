@@ -12,6 +12,7 @@ export type MarketUpdateSource =
   | "youtube"
   | "wikimedia"
   | "reddit"
+  | "bluesky"
   | "core"
   | "blended";
 
@@ -913,6 +914,7 @@ function getSignalsForArtist(
     source === "youtube" ||
     source === "wikimedia" ||
     source === "reddit" ||
+    source === "bluesky" ||
     source === "core" ||
     source === "blended"
   ) {
@@ -962,6 +964,7 @@ function isRealExternalSource(source: MarketUpdateSource) {
     source === "youtube" ||
     source === "wikimedia" ||
     source === "reddit" ||
+    source === "bluesky" ||
     source === "core" ||
     source === "blended"
   );
@@ -1262,6 +1265,7 @@ function getDefaultSignalConfidence(sourceName: string) {
     youtube: 0.84,
     youtube_comments: 0.68,
     reddit: 0.64,
+    bluesky: 0.58,
     spotify: 0.7,
     gdelt: 0.58,
     wikimedia: 0.62,
@@ -1301,6 +1305,11 @@ function getStatSourceWeight(key: keyof HypeStats, sourceName: string) {
       socialGrowth: 0.88,
       searchGrowth: 0.55,
       newsScore: 0.48
+    },
+    bluesky: {
+      socialGrowth: 0.78,
+      searchGrowth: 0.48,
+      newsScore: 0.42
     },
     gdelt: {
       searchGrowth: 0.75,
@@ -1623,6 +1632,7 @@ function getSourceAttributionLabel(source: string) {
     youtube_comments: "video comment sentiment",
     youtube_uploads: "official upload activity",
     reddit: "community discussion",
+    bluesky: "social chatter",
     gdelt: "news coverage",
     wikimedia: "public attention",
     market_events: "release and news events",
@@ -1833,6 +1843,7 @@ function explainNoSignalMove(
     source === "youtube" ||
     source === "wikimedia" ||
     source === "reddit" ||
+    source === "bluesky" ||
     source === "core" ||
     source === "blended"
   ) {
