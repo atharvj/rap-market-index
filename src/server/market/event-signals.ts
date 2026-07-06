@@ -193,12 +193,15 @@ function buildArtistEventSignal(artist: MarketUpdateArtist, runDate: string, eve
         impactScore: event.event.impactScore,
         confidence: event.event.confidence,
         decay: event.decay,
+        ageDays: event.ageDays,
         eventSubtype: event.eventSubtype,
+        shockDecayMultiplier: event.shockDecayMultiplier,
         clusterKey: event.clusterKey,
         clusterMultiplier: event.clusterMultiplier,
         clusterSourceCount: event.clusterSourceCount,
         clusterConfirmationMultiplier: event.clusterConfirmationMultiplier,
         uncappedWeightedImpact: event.uncappedWeightedImpact,
+        shockWeightedImpact: event.shockWeightedImpact,
         weightedImpact: event.weightedImpact
       }))
     }
@@ -211,6 +214,8 @@ type ScoredMarketEvent = ReturnType<typeof scoreEvent> & {
   clusterSourceCount: number;
   clusterConfirmationMultiplier: number;
   eventSubtype: string;
+  shockDecayMultiplier: number;
+  shockWeightedImpact: number;
   uncappedWeightedImpact: number;
 };
 
@@ -237,7 +242,7 @@ function buildPriceModifiers(scoredEvents: ScoredMarketEvent[]): MarketSignalMod
   const modifiers: MarketSignalModifier[] = [];
 
   for (const event of scoredEvents) {
-    const score = event.weightedImpact;
+    const score = event.shockWeightedImpact;
     const isReview = event.event.eventType === "review";
     const isRelease = event.event.eventType === "release";
     const subtypeProfile = getEventSubtypePriceProfile(event.eventSubtype);
@@ -248,7 +253,7 @@ function buildPriceModifiers(scoredEvents: ScoredMarketEvent[]): MarketSignalMod
       : undefined;
     const priceShock = reviewShock ?? releaseShock ?? generalShock;
 
-    if (priceShock === undefined) {
+    if (priceShock === undefined || Math.abs(score) < 3.5) {
       continue;
     }
 
@@ -270,11 +275,12 @@ function scoreEvent(event: MarketEvent, runDate: string) {
   const impact = event.impactScore || sentiment;
   const weightedImpact = clamp((impact * 0.65 + sentiment * 0.35) * event.confidence * typeWeight * decay, -100, 100);
 
-  return {
-    event,
-    decay,
-    weightedImpact
-  };
+    return {
+      event,
+      ageDays,
+      decay,
+      weightedImpact
+    };
 }
 
 function applyEventClusterCaps(scoredEvents: Array<ReturnType<typeof scoreEvent>>): ScoredMarketEvent[] {
@@ -312,6 +318,13 @@ function applyEventClusterCaps(scoredEvents: Array<ReturnType<typeof scoreEvent>
       confirmationMultiplier: 1
     };
     const confirmedImpact = event.weightedImpact * cluster.confirmationMultiplier;
+    const eventSubtype = getEventSubtype(event.event);
+    const shockDecayMultiplier = getEventShockDecayMultiplier({
+      eventType: event.event.eventType,
+      eventSubtype,
+      ageDays: event.ageDays
+    });
+    const weightedImpact = clamp(confirmedImpact * cluster.multiplier, -100, 100);
 
     return {
       ...event,
@@ -319,9 +332,11 @@ function applyEventClusterCaps(scoredEvents: Array<ReturnType<typeof scoreEvent>
       clusterMultiplier: cluster.multiplier,
       clusterSourceCount: cluster.sourceCount,
       clusterConfirmationMultiplier: cluster.confirmationMultiplier,
-      eventSubtype: getEventSubtype(event.event),
+      eventSubtype,
+      shockDecayMultiplier,
       uncappedWeightedImpact: event.weightedImpact,
-      weightedImpact: clamp(confirmedImpact * cluster.multiplier, -100, 100)
+      shockWeightedImpact: clamp(weightedImpact * shockDecayMultiplier, -100, 100),
+      weightedImpact
     };
   });
 }
@@ -431,11 +446,43 @@ function getEventSubtype(event: MarketEvent) {
   }
 
   if (event.eventType === "viral") {
-    if (hasAnyTerm(text, ["feature", "featured", "featuring", "collab", "collaboration", "with drake", "with carti"])) {
+    if (
+      hasAnyTerm(text, [
+        "co sign",
+        "cosign",
+        "feature",
+        "featured",
+        "featuring",
+        "collab",
+        "collaboration",
+        "drake feature",
+        "guest verse",
+        "verse",
+        "with drake",
+        "with carti",
+        "with future",
+        "with kendrick",
+        "with travis"
+      ])
+    ) {
       return "feature";
     }
 
-    if (hasAnyTerm(text, ["performance", "performed", "rolling loud", "festival", "live"])) {
+    if (
+      hasAnyTerm(text, [
+        "crowd knew every word",
+        "crowd went crazy",
+        "festival",
+        "live",
+        "mosh pit",
+        "moshpit",
+        "performance",
+        "performed",
+        "rolling loud",
+        "set went crazy",
+        "stage"
+      ])
+    ) {
       return "performance";
     }
 
@@ -443,14 +490,47 @@ function getEventSubtype(event: MarketEvent) {
       return "chart";
     }
 
-    if (hasAnyTerm(text, ["snippet", "snippets", "teaser", "preview", "unreleased", "leak", "leaked"])) {
+    if (
+      hasAnyTerm(text, [
+        "first listen",
+        "grail",
+        "ig live",
+        "snippet",
+        "snippets",
+        "teaser",
+        "preview",
+        "previewed",
+        "unreleased",
+        "leak",
+        "leaked"
+      ])
+    ) {
       return "snippet";
     }
 
     return "viral";
   }
 
-  if (event.eventType === "news" && hasAnyTerm(text, ["fell off", "fall off", "decline", "washed", "flop", "flopped"])) {
+  if (
+    event.eventType === "news" &&
+    hasAnyTerm(text, [
+      "dead crowd",
+      "decline",
+      "empty crowd",
+      "fell off",
+      "fall off",
+      "fallen off",
+      "flop",
+      "flopped",
+      "lost hype",
+      "lost momentum",
+      "low sales",
+      "numbers down",
+      "streams down",
+      "underperformed",
+      "washed"
+    ])
+  ) {
     return "decline";
   }
 
@@ -459,8 +539,8 @@ function getEventSubtype(event: MarketEvent) {
 
 function getEventSubtypePriceProfile(subtype: string) {
   const profiles: Record<string, { divisor: number; minShock: number; maxShock: number }> = {
-    feature: { divisor: 1600, minShock: -0.025, maxShock: 0.048 },
-    performance: { divisor: 1700, minShock: -0.026, maxShock: 0.044 },
+    feature: { divisor: 1450, minShock: -0.025, maxShock: 0.055 },
+    performance: { divisor: 1550, minShock: -0.034, maxShock: 0.05 },
     chart: { divisor: 1550, minShock: -0.022, maxShock: 0.05 },
     snippet: { divisor: 2350, minShock: -0.015, maxShock: 0.026 },
     viral: { divisor: 2200, minShock: -0.022, maxShock: 0.034 },
@@ -503,6 +583,44 @@ function getEventDecay(eventType: MarketEvent["eventType"], ageDays: number) {
   };
 
   return Math.pow(0.5, ageDays / halfLifeDays[eventType]);
+}
+
+function getEventShockDecayMultiplier({
+  eventType,
+  eventSubtype,
+  ageDays
+}: {
+  eventType: MarketEvent["eventType"];
+  eventSubtype: string;
+  ageDays: number;
+}) {
+  const subtypeHalfLives: Record<string, number> = {
+    project_release: 4.5,
+    single_video_release: 3,
+    feature: 3,
+    performance: 2.5,
+    chart: 4,
+    snippet: 1.4,
+    viral: 2,
+    controversy: 2.7,
+    decline: 4
+  };
+  const typeHalfLives: Record<MarketEvent["eventType"], number> = {
+    release: 3.5,
+    review: 4,
+    news: 2.5,
+    controversy: 2.7,
+    award: 3,
+    tour: 3,
+    viral: 2
+  };
+  const halfLife = subtypeHalfLives[eventSubtype] ?? typeHalfLives[eventType];
+
+  if (ageDays > 21) {
+    return 0;
+  }
+
+  return Math.pow(0.5, ageDays / halfLife);
 }
 
 function getEventTypeWeight(eventType: MarketEvent["eventType"]) {

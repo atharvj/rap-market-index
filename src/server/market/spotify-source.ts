@@ -1,4 +1,5 @@
 import { clamp } from "@/lib/pricing";
+import { scoreArtistNameMatch, type ArtistNameMatchResult } from "@/server/market/artist-name-match";
 import type { MarketUpdateArtist } from "@/server/market/daily-update";
 import type {
   AdapterSignal,
@@ -40,6 +41,8 @@ type SpotifyArtistInfo = {
   followers?: number;
   popularity?: number;
   matchedBy: "spotify_id" | "search";
+  matchConfidence: number;
+  matchStatus: string;
 };
 
 type SpotifyTokenResponse = {
@@ -249,6 +252,8 @@ function buildSpotifySignal({
     followerMomentumQuality: buildMomentumQualityPayload(followerMomentum),
     popularityMomentumQuality: buildMomentumQualityPayload(popularityMomentum),
     matchedBy: info.matchedBy,
+    matchConfidence: info.matchConfidence,
+    matchStatus: info.matchStatus,
     status: Object.keys(stats).length ? "ok" : "baseline_only"
   };
   const observations: MarketObservation[] = [];
@@ -264,7 +269,11 @@ function buildSpotifySignal({
   return {
     signal: {
       stats,
-      confidence: clamp(0.7 * getCombinedConfidenceMultiplier([popularityMomentum, followerMomentum]), 0.28, 0.7),
+      confidence: clamp(
+        0.7 * getCombinedConfidenceMultiplier([popularityMomentum, followerMomentum]) * info.matchConfidence,
+        0.16,
+        0.7
+      ),
       rawPayload
     },
     observations
@@ -379,7 +388,10 @@ async function fetchSpotifyArtistById({
     return result;
   }
 
-  const info = parseSpotifyArtist(result.value as SpotifyArtistObject, requestedName, "spotify_id");
+  const info = parseSpotifyArtist(result.value as SpotifyArtistObject, requestedName, "spotify_id", {
+    confidence: 1,
+    status: "trusted_external_id"
+  });
 
   if (!info) {
     return {
@@ -409,7 +421,7 @@ async function fetchSpotifyArtistBySearch({
 
   url.searchParams.set("q", `artist:${artist.name}`);
   url.searchParams.set("type", "artist");
-  url.searchParams.set("limit", "1");
+  url.searchParams.set("limit", "5");
   url.searchParams.set("market", "US");
 
   const result = await fetchSpotifyJson({
@@ -424,19 +436,45 @@ async function fetchSpotifyArtistBySearch({
   }
 
   const parsed = result.value as SpotifySearchResponse;
-  const candidate = parsed.artists?.items?.[0];
-  const info = candidate ? parseSpotifyArtist(candidate, artist.name, "search") : null;
+  const candidates = (parsed.artists?.items ?? [])
+    .map((candidate) => {
+      const match = scoreArtistNameMatch(artist.name, candidate.name);
+      const info = parseSpotifyArtist(candidate, artist.name, "search", match);
 
-  if (!info) {
+      return info ? { info, popularity: getNumber(candidate.popularity) ?? 0 } : null;
+    })
+    .filter((candidate): candidate is { info: SpotifyArtistInfo; popularity: number } => Boolean(candidate))
+    .sort((left, right) => {
+      const confidenceDelta = right.info.matchConfidence - left.info.matchConfidence;
+
+      if (Math.abs(confidenceDelta) > 0.015) {
+        return confidenceDelta;
+      }
+
+      return right.popularity - left.popularity;
+    });
+  const bestCandidate = candidates[0];
+  const minimumConfidence = getSpotifySearchConfidenceThreshold(artist.name);
+
+  if (!bestCandidate) {
     return {
       ok: false,
       error: "No Spotify artist search match was returned."
     };
   }
 
+  if (bestCandidate.info.matchConfidence < minimumConfidence) {
+    return {
+      ok: false,
+      error: `No high-confidence Spotify artist search match was returned. Best match: ${bestCandidate.info.name} (${Math.round(
+        bestCandidate.info.matchConfidence * 100
+      )}%).`
+    };
+  }
+
   return {
     ok: true,
-    info
+    info: bestCandidate.info
   };
 }
 
@@ -494,11 +532,14 @@ async function fetchSpotifyJson({
 function parseSpotifyArtist(
   value: SpotifyArtistObject,
   requestedName: string,
-  matchedBy: SpotifyArtistInfo["matchedBy"]
+  matchedBy: SpotifyArtistInfo["matchedBy"],
+  match?: Pick<ArtistNameMatchResult, "confidence" | "status">
 ): SpotifyArtistInfo | null {
   if (!value.id || !value.name) {
     return null;
   }
+
+  const nameMatch = match ?? scoreArtistNameMatch(requestedName, value.name);
 
   return {
     requestedName,
@@ -507,8 +548,24 @@ function parseSpotifyArtist(
     url: value.external_urls?.spotify,
     followers: getNumber(value.followers?.total),
     popularity: getNumber(value.popularity),
-    matchedBy
+    matchedBy,
+    matchConfidence: nameMatch.confidence,
+    matchStatus: nameMatch.status
   };
+}
+
+function getSpotifySearchConfidenceThreshold(artistName: string) {
+  const normalized = scoreArtistNameMatch(artistName, artistName);
+
+  if (normalized.compactExpected.length <= 3) {
+    return 0.9;
+  }
+
+  if (normalized.compactExpected.length <= 4) {
+    return 0.82;
+  }
+
+  return 0.72;
 }
 
 function createObservation(

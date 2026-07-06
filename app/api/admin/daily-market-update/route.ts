@@ -41,6 +41,7 @@ import {
   loadArtistExternalIds,
   loadObservationBaselines,
   loadPreviousClosePrices,
+  loadPriceTrendContexts,
   loadRecentMarketEvents,
   persistMarketEvents,
   persistMarketObservations,
@@ -126,7 +127,7 @@ export async function POST(request: Request) {
     });
 
     if (!dryRun && supabase) {
-      artists = await applyPreviousCloseBaselines({
+      artists = await applyMarketHistoryBaselines({
         supabase,
         artists,
         runDate
@@ -404,7 +405,7 @@ function getMarketCoverageRatio(batch: NonNullable<MarketUpdateSummary["batch"]>
   return Math.min(1, Math.max(0, batch.artistCount / batch.totalArtists));
 }
 
-async function applyPreviousCloseBaselines({
+async function applyMarketHistoryBaselines({
   supabase,
   artists,
   runDate
@@ -413,23 +414,36 @@ async function applyPreviousCloseBaselines({
   artists: ReturnType<typeof getMockMarketArtists>;
   runDate: string;
 }) {
-  const previousCloses = await loadPreviousClosePrices({
-    supabase,
-    artistIds: artists.map((artist) => artist.id),
-    runDate
-  });
+  const artistIds = artists.map((artist) => artist.id);
+  const [previousCloses, priceTrends] = await Promise.all([
+    loadPreviousClosePrices({
+      supabase,
+      artistIds,
+      runDate
+    }),
+    loadPriceTrendContexts({
+      supabase,
+      artistIds,
+      runDate
+    })
+  ]);
 
   return artists.map((artist) => {
     const previousClose = previousCloses[artist.id];
+    const priceTrend = priceTrends[artist.id];
 
     if (previousClose === undefined || !Number.isFinite(previousClose) || previousClose <= 0) {
-      return artist;
+      return {
+        ...artist,
+        priceTrend
+      };
     }
 
     return {
       ...artist,
       previousClose,
-      previousCloseSource: "price_history" as const
+      previousCloseSource: "price_history" as const,
+      priceTrend
     };
   });
 }

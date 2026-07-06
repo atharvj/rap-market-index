@@ -367,6 +367,16 @@ function classifyArticleEvent(title: string, domain: string, tone: unknown) {
     };
   }
 
+  if (hasAny(lowerTitle, DECLINE_TERMS)) {
+    return {
+      eventType: "news" as const,
+      sentimentScore: clamp(Math.min(-28, toneScore - 24), -90, 20),
+      impactScore: clamp(Math.min(-36, toneScore - 32), -95, 12),
+      confidence: getArticleConfidence(sourceTier, 0.62),
+      reason: "decline_terms"
+    };
+  }
+
   if (hasReviewSignal(lowerTitle)) {
     const keywordSentiment = getTitleSentiment(lowerTitle);
     const sentimentScore = clamp(keywordSentiment + toneScore * 0.75, -90, 90);
@@ -400,6 +410,26 @@ function classifyArticleEvent(title: string, domain: string, tone: unknown) {
     };
   }
 
+  if (hasAny(lowerTitle, FEATURE_TERMS)) {
+    return {
+      eventType: "viral" as const,
+      sentimentScore: clamp(30 + Math.max(0, toneScore * 0.6), -20, 82),
+      impactScore: clamp(48 + Math.max(0, toneScore), -15, 92),
+      confidence: getArticleConfidence(sourceTier, 0.7),
+      reason: "feature_terms"
+    };
+  }
+
+  if (hasAny(lowerTitle, PERFORMANCE_TERMS)) {
+    return {
+      eventType: "viral" as const,
+      sentimentScore: clamp(24 + toneScore * 0.55, -35, 80),
+      impactScore: clamp(42 + Math.max(0, toneScore), -20, 88),
+      confidence: getArticleConfidence(sourceTier, 0.66),
+      reason: "performance_terms"
+    };
+  }
+
   if (hasAny(lowerTitle, CHART_TERMS)) {
     return {
       eventType: "viral" as const,
@@ -407,6 +437,16 @@ function classifyArticleEvent(title: string, domain: string, tone: unknown) {
       impactScore: clamp(46 + Math.max(0, toneScore), -20, 90),
       confidence: getArticleConfidence(sourceTier, 0.74),
       reason: "chart_terms"
+    };
+  }
+
+  if (hasAny(lowerTitle, SNIPPET_TERMS)) {
+    return {
+      eventType: "viral" as const,
+      sentimentScore: clamp(18 + toneScore * 0.45, -35, 65),
+      impactScore: clamp(28 + Math.max(0, toneScore * 0.75), -18, 70),
+      confidence: getArticleConfidence(sourceTier, 0.58),
+      reason: "snippet_terms"
     };
   }
 
@@ -500,13 +540,14 @@ function mentionsArtist(title: string, artistName: string, query?: string) {
   for (const candidate of candidateNames) {
     const normalizedArtist = normalizeSearchText(candidate);
 
-    if (normalizedArtist && normalizedTitle.includes(normalizedArtist)) {
+    if (normalizedArtist && containsNormalizedPhrase(normalizedTitle, normalizedArtist)) {
       return true;
     }
 
     const compactArtist = normalizedArtist.replace(/\s+/g, "");
+    const allowCompactMatch = normalizedArtist.includes(" ") || /[^a-z0-9\s]/i.test(candidate);
 
-    if (compactArtist.length > 2 && compactTitle.includes(compactArtist)) {
+    if (allowCompactMatch && compactArtist.length > 3 && compactTitle.includes(compactArtist)) {
       return true;
     }
 
@@ -518,6 +559,10 @@ function mentionsArtist(title: string, artistName: string, query?: string) {
   }
 
   return false;
+}
+
+function containsNormalizedPhrase(normalizedText: string, normalizedPhrase: string) {
+  return ` ${normalizedText} `.includes(` ${normalizedPhrase} `);
 }
 
 function normalizeSearchText(value: string) {
@@ -762,6 +807,48 @@ const CHART_TERMS = [
   "spotify chart",
   "tops chart"
 ];
+const FEATURE_TERMS = [
+  "co-sign",
+  "cosign",
+  "collab",
+  "collaboration",
+  "feature",
+  "featured on",
+  "featuring",
+  "guest verse",
+  "joins",
+  "teams up",
+  "verse",
+  "with carti",
+  "with drake",
+  "with future",
+  "with kendrick",
+  "with travis"
+];
+const PERFORMANCE_TERMS = [
+  "concert",
+  "crowd goes wild",
+  "crowd went crazy",
+  "festival set",
+  "live performance",
+  "performs",
+  "performed",
+  "rolling loud",
+  "stage"
+];
+const SNIPPET_TERMS = [
+  "first listen",
+  "grail",
+  "ig live",
+  "leak",
+  "leaked",
+  "preview",
+  "previewed",
+  "snippet",
+  "snippets",
+  "teaser",
+  "unreleased"
+];
 const PUBLIC_CONFLICT_TERMS = ["beef", "diss", "feud"];
 const VIRAL_TERMS = [
   "breakout",
@@ -773,14 +860,32 @@ const VIRAL_TERMS = [
   "trending",
   "viral"
 ];
+const DECLINE_TERMS = [
+  "dead crowd",
+  "decline",
+  "declines",
+  "fall off",
+  "fallen off",
+  "fell off",
+  "flop",
+  "flopped",
+  "low sales",
+  "lost momentum",
+  "underperforms",
+  "washed"
+];
 const NEWS_TERMS = [
   ...REVIEW_TERMS,
   ...RELEASE_TERMS,
   ...TOUR_TERMS,
   ...AWARD_TERMS,
   ...CHART_TERMS,
+  ...FEATURE_TERMS,
+  ...PERFORMANCE_TERMS,
+  ...SNIPPET_TERMS,
   ...PUBLIC_CONFLICT_TERMS,
   ...VIRAL_TERMS,
+  ...DECLINE_TERMS,
   ...CONTROVERSY_TERMS
 ];
 

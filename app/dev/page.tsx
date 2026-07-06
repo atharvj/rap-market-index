@@ -399,6 +399,8 @@ type MarketHealth = {
       sourceQualityAnomalyCount?: number;
       sourceQualityStaleCount?: number;
       averageSourceQualityMultiplier?: number;
+      technicalAdjustmentCount?: number;
+      averageTechnicalAdjustment?: number;
       signalCoverageScore?: number;
       reliabilityScore?: number;
       movementBalanceScore?: number;
@@ -1813,6 +1815,12 @@ function MarketHealthPanel({ data }: { data: MarketHealth }) {
             label: "Source quality",
             value: `${Math.round((data.latestRun.summary.averageSourceQualityMultiplier ?? 1) * 100)}/100`,
             detail: `${data.latestRun.summary.sourceQualityAnomalyCount ?? 0} anomalies, ${data.latestRun.summary.sourceQualityStaleCount ?? 0} stale inputs`
+          },
+          {
+            key: "latest-run:technicals",
+            label: "Price action guardrails",
+            value: String(data.latestRun.summary.technicalAdjustmentCount ?? 0),
+            detail: `${formatPercent((data.latestRun.summary.averageTechnicalAdjustment ?? 0) * 100)} average signal adjustment`
           }
         ]} />
       ) : null}

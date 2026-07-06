@@ -52,6 +52,8 @@ type DailyUpdateResponse = {
     sourceQualityAnomalyCount?: number;
     sourceQualityStaleCount?: number;
     averageSourceQualityMultiplier?: number;
+    technicalAdjustmentCount?: number;
+    averageTechnicalAdjustment?: number;
     signalCoverageScore?: number;
     reliabilityScore?: number;
     movementBalanceScore?: number;
@@ -82,6 +84,8 @@ type BatchRunSummary = {
   sourceQualityAnomalyCount: number;
   sourceQualityStaleCount: number;
   averageSourceQualityMultiplier: number;
+  technicalAdjustmentCount: number;
+  averageTechnicalAdjustment: number;
   signalCoverageScore: number;
   reliabilityScore: number;
   movementBalanceScore: number;
@@ -297,6 +301,8 @@ function buildBatchRunSummary({
     0
   );
   const averageSourceQualityMultiplier = getWeightedAverage(runs, "averageSourceQualityMultiplier", artistCount);
+  const technicalAdjustmentCount = runs.reduce((total, run) => total + (run.summary?.technicalAdjustmentCount ?? 0), 0);
+  const averageTechnicalAdjustment = getWeightedAverage(runs, "averageTechnicalAdjustment", artistCount);
   const signalCoverageScore = getWeightedAverage(runs, "signalCoverageScore", artistCount);
   const reliabilityScore = getWeightedAverage(runs, "reliabilityScore", artistCount);
   const movementBalanceScore = getWeightedAverage(runs, "movementBalanceScore", artistCount);
@@ -329,6 +335,8 @@ function buildBatchRunSummary({
     sourceQualityAnomalyCount,
     sourceQualityStaleCount,
     averageSourceQualityMultiplier,
+    technicalAdjustmentCount,
+    averageTechnicalAdjustment,
     signalCoverageScore,
     reliabilityScore,
     movementBalanceScore,
@@ -362,6 +370,7 @@ function getWeightedAverage(
     | "averageAbsMovePercent"
     | "averageSignalDelta"
     | "averageSourceQualityMultiplier"
+    | "averageTechnicalAdjustment"
     | "signalCoverageScore"
     | "reliabilityScore"
     | "movementBalanceScore"

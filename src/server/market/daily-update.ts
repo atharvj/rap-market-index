@@ -24,6 +24,16 @@ type ResolvedMarketSignal = {
   reliabilityDetails: Record<string, unknown>;
 };
 
+export type PriceTrendContext = {
+  sampleCount: number;
+  return7dPercent: number;
+  return30dPercent: number;
+  realizedVolatilityPercent: number;
+  upDayCount: number;
+  downDayCount: number;
+  latestPriceDate: string | null;
+};
+
 export type MarketUpdateArtist = {
   id: string;
   name: string;
@@ -35,6 +45,7 @@ export type MarketUpdateArtist = {
   volatility: number;
   category: ArtistCategory;
   stats: HypeStats;
+  priceTrend?: PriceTrendContext;
 };
 
 export type ManualSignals = Record<string, Partial<HypeStats>>;
@@ -83,6 +94,8 @@ export type MarketUpdateSummary = {
   sourceQualityAnomalyCount: number;
   sourceQualityStaleCount: number;
   averageSourceQualityMultiplier: number;
+  technicalAdjustmentCount: number;
+  averageTechnicalAdjustment: number;
   signalCoverageScore: number;
   reliabilityScore: number;
   movementBalanceScore: number;
@@ -130,6 +143,7 @@ export function calculateDailyMarketUpdates(input: MarketUpdateInput) {
   const downMoveCount = updates.filter((update) => update.dailyChangePercent < -0.01).length;
   const flatMoveCount = updates.filter((update) => Math.abs(update.dailyChangePercent) <= 0.01).length;
   const sourceQuality = summarizeSourceQuality(updates);
+  const technicals = summarizeTechnicalAdjustments(updates);
   const quality = calculateMarketRunQuality({
     artistCount: updates.length,
     momentumArtistCount,
@@ -162,6 +176,8 @@ export function calculateDailyMarketUpdates(input: MarketUpdateInput) {
       sourceQualityAnomalyCount: sourceQuality.anomalyCount,
       sourceQualityStaleCount: sourceQuality.staleCount,
       averageSourceQualityMultiplier: sourceQuality.averageMultiplier,
+      technicalAdjustmentCount: technicals.adjustmentCount,
+      averageTechnicalAdjustment: technicals.averageAdjustment,
       signalCoverageScore: quality.signalCoverageScore,
       reliabilityScore: quality.reliabilityScore,
       movementBalanceScore: quality.movementBalanceScore,
@@ -356,6 +372,38 @@ function summarizeSourceQuality(updates: ArtistMarketUpdate[]) {
   };
 }
 
+function summarizeTechnicalAdjustments(updates: ArtistMarketUpdate[]) {
+  if (!updates.length) {
+    return {
+      adjustmentCount: 0,
+      averageAdjustment: 0
+    };
+  }
+
+  const summary = updates.reduce(
+    (memo, update) => {
+      const technicalAdjustment = getObjectRecord(update.rawPayload.technicalAdjustment);
+      const adjustment = getNumber(technicalAdjustment.adjustment, 0);
+
+      if (Math.abs(adjustment) >= 0.0001) {
+        memo.adjustmentCount += 1;
+      }
+
+      memo.adjustmentTotal += adjustment;
+      return memo;
+    },
+    {
+      adjustmentCount: 0,
+      adjustmentTotal: 0
+    }
+  );
+
+  return {
+    adjustmentCount: summary.adjustmentCount,
+    averageAdjustment: summary.adjustmentTotal / Math.max(1, updates.length)
+  };
+}
+
 function countReliabilityBands(updates: ArtistMarketUpdate[]) {
   return updates.reduce(
     (counts, update) => {
@@ -448,6 +496,89 @@ function getObjectRecord(value: unknown) {
   return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
 }
 
+function applyTechnicalPriceContext({
+  signalDelta,
+  priceTrend,
+  hasMomentumSignal,
+  reliability
+}: {
+  signalDelta: number;
+  priceTrend?: PriceTrendContext;
+  hasMomentumSignal: boolean;
+  reliability: number;
+}) {
+  if (!priceTrend || priceTrend.sampleCount < 3) {
+    return {
+      signalDelta,
+      adjustment: 0,
+      volatilityMultiplier: 1,
+      reasons: [],
+      priceTrend: priceTrend ?? null
+    };
+  }
+
+  const reasons: string[] = [];
+  let adjustment = 0;
+  const overextendedMove = Math.max(
+    clamp((priceTrend.return7dPercent - 12) / 100, 0, 0.018),
+    clamp((priceTrend.return30dPercent - 35) / 100, 0, 0.018)
+  );
+  const downtrendPressure = Math.max(
+    clamp((-priceTrend.return7dPercent - 8) / 140, 0, 0.012),
+    clamp((-priceTrend.return30dPercent - 24) / 150, 0, 0.016)
+  );
+  const strongPositiveSignal = signalDelta >= 0.035 && reliability >= 0.64;
+  const weakPositiveSignal = signalDelta > 0 && reliability < 0.58;
+
+  if (overextendedMove > 0 && (!strongPositiveSignal || !hasMomentumSignal)) {
+    const pullback = overextendedMove * (hasMomentumSignal ? 0.55 : 0.9);
+    adjustment -= pullback;
+    reasons.push("overextended_price_action");
+  }
+
+  if (downtrendPressure > 0 && weakPositiveSignal) {
+    adjustment -= downtrendPressure;
+    reasons.push("weak_signal_against_downtrend");
+  } else if (downtrendPressure > 0 && !hasMomentumSignal) {
+    adjustment -= Math.min(0.007, downtrendPressure * 0.75);
+    reasons.push("downtrend_continuation");
+  } else if (downtrendPressure > 0 && strongPositiveSignal) {
+    adjustment += Math.min(0.006, downtrendPressure * 0.45);
+    reasons.push("confirmed_reversal_support");
+  }
+
+  if (
+    hasMomentumSignal &&
+    reliability >= 0.72 &&
+    signalDelta > 0.025 &&
+    priceTrend.return7dPercent > 3 &&
+    priceTrend.return30dPercent > -10 &&
+    overextendedMove <= 0.006
+  ) {
+    adjustment += Math.min(0.005, signalDelta * 0.08);
+    reasons.push("confirmed_breakout_follow_through");
+  }
+
+  const volatilityMultiplier =
+    priceTrend.realizedVolatilityPercent > 10 && reliability < 0.7
+      ? clamp(1 - (priceTrend.realizedVolatilityPercent - 10) * 0.018, 0.78, 1)
+      : 1;
+  const adjustedSignalDelta = clamp((signalDelta + adjustment) * volatilityMultiplier, -0.75, 0.75);
+
+  if (volatilityMultiplier < 1) {
+    reasons.push("high_recent_volatility");
+  }
+
+  return {
+    signalDelta: adjustedSignalDelta,
+    adjustment: adjustedSignalDelta - signalDelta,
+    rawAdjustment: adjustment,
+    volatilityMultiplier,
+    reasons,
+    priceTrend
+  };
+}
+
 function calculateArtistUpdate({
   artist,
   index,
@@ -475,9 +606,16 @@ function calculateArtistUpdate({
     : staleMomentumDecayDelta * artist.volatility;
   const reliabilityMultiplier = signals.hasMomentumSignal ? getReliabilityPriceMultiplier(signals.reliability) : 0;
   const reliabilityAdjustedDelta = rawSignalDelta * reliabilityMultiplier;
-  const signalDelta = signals.hasMomentumSignal
+  const signalDeltaBeforeTechnicals = signals.hasMomentumSignal
     ? applySignalModifiers(reliabilityAdjustedDelta * conflictMoveMultiplier, signals.modifiers, reliabilityMultiplier)
     : rawSignalDelta;
+  const technicalAdjustment = applyTechnicalPriceContext({
+    signalDelta: signalDeltaBeforeTechnicals,
+    priceTrend: artist.priceTrend,
+    hasMomentumSignal: signals.hasMomentumSignal,
+    reliability: signals.reliability
+  });
+  const signalDelta = technicalAdjustment.signalDelta;
   const previousClose = getValidPrice(artist.previousClose, artist.currentPrice);
   const categoryDailyCap = getCategoryDailyCap(artist.category);
   const dailyCap = getEffectiveDailyCap({
@@ -523,6 +661,8 @@ function calculateArtistUpdate({
       staleMomentumDecayDelta,
       rawSignalDelta,
       reliabilityAdjustedDelta,
+      signalDeltaBeforeTechnicals,
+      technicalAdjustment,
       previousClose,
       previousCloseSource: artist.previousCloseSource ?? "artist",
       oldPrice: artist.currentPrice,

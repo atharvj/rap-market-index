@@ -1,4 +1,5 @@
 import { clamp } from "@/lib/pricing";
+import { scoreArtistNameMatch } from "@/server/market/artist-name-match";
 import type { MarketUpdateArtist } from "@/server/market/daily-update";
 import type {
   AdapterSignal,
@@ -24,6 +25,7 @@ type LastfmArtistInfo = LastfmArtistStats & {
   requestedName: string;
   returnedName?: string;
   url?: string;
+  matchedBy: "musicbrainz_id" | "name_search";
 };
 
 type LastfmCollectOptions = {
@@ -145,8 +147,19 @@ function buildLastfmSignal({
 } {
   const listenerBaselineAgeDays = getBaselineAgeDays(baseline, LISTENERS);
   const playcountBaselineAgeDays = getBaselineAgeDays(baseline, PLAYCOUNT);
+  const nameMatch =
+    info.matchedBy === "musicbrainz_id"
+      ? {
+          ...scoreArtistNameMatch(info.requestedName, info.returnedName ?? info.requestedName),
+          confidence: 1,
+          status: "trusted_external_id" as const
+        }
+      : scoreArtistNameMatch(info.requestedName, info.returnedName);
+  const trustedIdentity = info.matchedBy === "musicbrainz_id" || nameMatch.confidence >= 0.58;
+  const listeners = trustedIdentity ? info.listeners : undefined;
+  const playcount = trustedIdentity ? info.playcount : undefined;
   const listenerMomentum = calculateSnapshotMomentum({
-    current: info.listeners,
+    current: listeners,
     baseline: baseline[LISTENERS],
     baselineAgeDays: listenerBaselineAgeDays,
     multiplier: 5.5,
@@ -155,7 +168,7 @@ function buildLastfmSignal({
     monotonic: true
   });
   const playcountMomentum = calculateSnapshotMomentum({
-    current: info.playcount,
+    current: playcount,
     baseline: baseline[PLAYCOUNT],
     baselineAgeDays: playcountBaselineAgeDays,
     multiplier: 4.5,
@@ -189,6 +202,9 @@ function buildLastfmSignal({
     runDate,
     requestedName: info.requestedName,
     returnedName: info.returnedName ?? null,
+    matchedBy: info.matchedBy,
+    nameMatchConfidence: nameMatch.confidence,
+    nameMatchStatus: nameMatch.status,
     url: info.url ?? null,
     listeners: info.listeners ?? null,
     playcount: info.playcount ?? null,
@@ -200,22 +216,24 @@ function buildLastfmSignal({
     playcountMomentum: playcountMomentum.value,
     listenerMomentumQuality: buildMomentumQualityPayload(listenerMomentum),
     playcountMomentumQuality: buildMomentumQualityPayload(playcountMomentum),
-    status: Object.keys(stats).length ? "ok" : "baseline_only"
+    status: trustedIdentity ? (Object.keys(stats).length ? "ok" : "baseline_only") : "name_mismatch"
   };
   const observations: MarketObservation[] = [];
 
-  if (typeof info.listeners === "number") {
+  if (trustedIdentity && typeof info.listeners === "number") {
     observations.push(createObservation(artist.id, runDate, LISTENERS, info.listeners, "listeners", rawPayload));
   }
 
-  if (typeof info.playcount === "number") {
+  if (trustedIdentity && typeof info.playcount === "number") {
     observations.push(createObservation(artist.id, runDate, PLAYCOUNT, info.playcount, "plays", rawPayload));
   }
 
   return {
     signal: {
       stats,
-      confidence: clamp(0.86 * getCombinedConfidenceMultiplier([listenerMomentum, playcountMomentum]), 0.3, 0.86),
+      confidence: trustedIdentity
+        ? clamp(0.86 * getCombinedConfidenceMultiplier([listenerMomentum, playcountMomentum]) * nameMatch.confidence, 0.18, 0.86)
+        : 0.05,
       rawPayload
     },
     observations
@@ -303,6 +321,7 @@ async function fetchLastfmArtistInfo({
         requestedName: artistName,
         returnedName: typeof artist?.name === "string" ? artist.name : undefined,
         url: typeof artist?.url === "string" ? artist.url : undefined,
+        matchedBy: musicbrainzId?.trim() ? "musicbrainz_id" : "name_search",
         listeners,
         playcount
       }

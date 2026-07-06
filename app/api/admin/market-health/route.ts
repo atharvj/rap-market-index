@@ -645,6 +645,13 @@ function buildWarnings({
     if (movementSummary.artistCount >= 10 && movementSummary.averageSourceQualityMultiplier < 0.75) {
       warnings.push("Latest market run source quality was weak; several signals may be stale, missing baselines, or anomaly-dampened.");
     }
+
+    if (
+      movementSummary.artistCount >= 10 &&
+      movementSummary.technicalAdjustmentCount / Math.max(1, movementSummary.artistCount) >= 0.4
+    ) {
+      warnings.push("Latest market run used price-action guardrails on many artists; review whether the market is overextended or unusually volatile.");
+    }
   }
 
   if (!config.cronSecretConfigured) {
@@ -703,7 +710,8 @@ function getMovementSummary(summary: MarketRunRow["summary"]) {
       marketQualityScore: 0,
       sourceQualityAnomalyCount: 0,
       sourceQualityStaleCount: 0,
-      averageSourceQualityMultiplier: 1
+      averageSourceQualityMultiplier: 1,
+      technicalAdjustmentCount: 0
     };
   }
 
@@ -718,7 +726,8 @@ function getMovementSummary(summary: MarketRunRow["summary"]) {
     marketQualityScore: getSummaryNumber(value.marketQualityScore),
     sourceQualityAnomalyCount: getSummaryNumber(value.sourceQualityAnomalyCount),
     sourceQualityStaleCount: getSummaryNumber(value.sourceQualityStaleCount),
-    averageSourceQualityMultiplier: getSummaryNumber(value.averageSourceQualityMultiplier, 1)
+    averageSourceQualityMultiplier: getSummaryNumber(value.averageSourceQualityMultiplier, 1),
+    technicalAdjustmentCount: getSummaryNumber(value.technicalAdjustmentCount)
   };
 }
 

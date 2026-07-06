@@ -1,6 +1,11 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database, Json } from "@/lib/supabase/database.types";
-import type { ArtistMarketUpdate, MarketUpdateArtist, MarketUpdateSummary } from "@/server/market/daily-update";
+import type {
+  ArtistMarketUpdate,
+  MarketUpdateArtist,
+  MarketUpdateSummary,
+  PriceTrendContext
+} from "@/server/market/daily-update";
 import type {
   ArtistExternalIds,
   MarketEvent,
@@ -129,6 +134,120 @@ export async function loadPreviousClosePrices({
 
     return previousCloses;
   }, {});
+}
+
+export async function loadPriceTrendContexts({
+  supabase,
+  artistIds,
+  runDate,
+  lookbackDays = 35
+}: {
+  supabase: Supabase;
+  artistIds: string[];
+  runDate: string;
+  lookbackDays?: number;
+}): Promise<Record<string, PriceTrendContext>> {
+  if (!artistIds.length) {
+    return {};
+  }
+
+  const startDate = shiftDate(runDate, -lookbackDays);
+  const { data, error } = await supabase
+    .from("price_history")
+    .select("artist_id,price,price_date")
+    .in("artist_id", artistIds)
+    .gte("price_date", startDate)
+    .lt("price_date", runDate)
+    .order("price_date", { ascending: true });
+
+  if (error) {
+    throw new Error(`Could not load price trend contexts: ${error.message}`);
+  }
+
+  const grouped = ((data ?? []) as Pick<
+    Database["public"]["Tables"]["price_history"]["Row"],
+    "artist_id" | "price" | "price_date"
+  >[]).reduce<Record<string, Array<{ price: number; priceDate: string }>>>((memo, row) => {
+    memo[row.artist_id] ??= [];
+    memo[row.artist_id].push({
+      price: Number(row.price),
+      priceDate: row.price_date
+    });
+    return memo;
+  }, {});
+
+  return Object.fromEntries(
+    Object.entries(grouped)
+      .map(([artistId, rows]) => [artistId, buildPriceTrendContext(rows, runDate)] as const)
+      .filter((entry): entry is readonly [string, PriceTrendContext] => Boolean(entry[1]))
+  );
+}
+
+function buildPriceTrendContext(
+  rows: Array<{ price: number; priceDate: string }>,
+  runDate: string
+): PriceTrendContext | null {
+  const cleanRows = rows
+    .filter((row) => Number.isFinite(row.price) && row.price > 0)
+    .sort((first, second) => first.priceDate.localeCompare(second.priceDate));
+
+  if (!cleanRows.length) {
+    return null;
+  }
+
+  const latest = cleanRows[cleanRows.length - 1];
+  const sevenDayBase = getPriceAtOrBefore(cleanRows, shiftDate(runDate, -7)) ?? cleanRows[0];
+  const thirtyDayBase = getPriceAtOrBefore(cleanRows, shiftDate(runDate, -30)) ?? cleanRows[0];
+  const dailyReturns = getDailyReturns(cleanRows);
+
+  return {
+    sampleCount: cleanRows.length,
+    return7dPercent: getReturnPercent(latest.price, sevenDayBase.price),
+    return30dPercent: getReturnPercent(latest.price, thirtyDayBase.price),
+    realizedVolatilityPercent: getRealizedVolatilityPercent(dailyReturns),
+    upDayCount: dailyReturns.filter((value) => value > 0.001).length,
+    downDayCount: dailyReturns.filter((value) => value < -0.001).length,
+    latestPriceDate: latest.priceDate
+  };
+}
+
+function getPriceAtOrBefore(rows: Array<{ price: number; priceDate: string }>, targetDate: string) {
+  return [...rows].reverse().find((row) => row.priceDate <= targetDate);
+}
+
+function getDailyReturns(rows: Array<{ price: number; priceDate: string }>) {
+  const returns: number[] = [];
+
+  for (let index = 1; index < rows.length; index += 1) {
+    const previous = rows[index - 1];
+    const current = rows[index];
+
+    if (previous.price > 0) {
+      returns.push((current.price - previous.price) / previous.price);
+    }
+  }
+
+  return returns;
+}
+
+function getReturnPercent(current: number, baseline: number) {
+  if (baseline <= 0) {
+    return 0;
+  }
+
+  return (current / baseline - 1) * 100;
+}
+
+function getRealizedVolatilityPercent(returns: number[]) {
+  if (returns.length < 2) {
+    return 0;
+  }
+
+  const average = returns.reduce((total, value) => total + value, 0) / returns.length;
+  const variance =
+    returns.reduce((total, value) => total + (value - average) ** 2, 0) / Math.max(1, returns.length - 1);
+
+  return Math.sqrt(variance) * 100;
 }
 
 async function loadStatsByArtist(supabase: Supabase, artistIds: string[]) {

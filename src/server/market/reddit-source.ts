@@ -558,6 +558,19 @@ function classifyRedditPost(post: RedditPost): RedditPostClassification {
     };
   }
 
+  if (hasDecline && negative) {
+    return {
+      eventType: "news",
+      sentimentScore: clamp(sentimentScore - 18, -88, 30),
+      impactScore: clamp(sentimentScore - 12 - engagementImpact * 0.7, -88, 28),
+      confidence: 0.58,
+      reason: "decline_terms",
+      catalyst: true,
+      negative: true,
+      hype: false
+    };
+  }
+
   if (hasRelease) {
     return {
       eventType: "release",
@@ -1027,7 +1040,9 @@ const MUSIC_CONTEXT_TERMS = [
   "ep",
   "feature",
   "festival",
+  "grail",
   "hip hop",
+  "ig live",
   "mixtape",
   "music",
   "performance",
@@ -1036,6 +1051,7 @@ const MUSIC_CONTEXT_TERMS = [
   "rolling loud",
   "song",
   "snippet",
+  "soundcloud",
   "track",
   "video"
 ];
@@ -1044,6 +1060,7 @@ const RELEASE_TERMS = [
   "album",
   "announced",
   "announces",
+  "available now",
   "deluxe",
   "drops",
   "dropped",
@@ -1054,6 +1071,9 @@ const RELEASE_TERMS = [
   "new song",
   "new single",
   "out now",
+  "pre save",
+  "pre-save",
+  "premiere",
   "release",
   "released",
   "releases",
@@ -1063,9 +1083,13 @@ const RELEASE_TERMS = [
 ];
 
 const SNIPPET_TERMS = [
+  "first listen",
+  "grail",
+  "ig live",
   "leak",
   "leaked",
   "preview",
+  "previewed",
   "snippet",
   "snippets",
   "teaser",
@@ -1074,11 +1098,16 @@ const SNIPPET_TERMS = [
 
 const PERFORMANCE_TERMS = [
   "crowd went crazy",
+  "crowd knew every word",
+  "dead crowd",
   "festival",
   "live",
+  "mosh pit",
+  "moshpit",
   "performance",
   "performed",
   "rolling loud",
+  "set went crazy",
   "set was",
   "stage"
 ];
@@ -1088,10 +1117,15 @@ const FEATURE_TERMS = [
   "cosign",
   "collab",
   "collaboration",
+  "drake feature",
   "feat",
   "feature",
+  "feature on",
   "featured",
   "featuring",
+  "guest verse",
+  "opium co-sign",
+  "verse",
   "with carti",
   "with drake",
   "with future",
@@ -1123,9 +1157,13 @@ const VIRAL_TERMS = [
   "blew up",
   "breakout",
   "challenge",
+  "co-sign",
+  "cosign",
+  "getting attention",
   "going viral",
   "goes viral",
   "meme",
+  "next up",
   "tiktok",
   "trend",
   "trending",
@@ -1148,12 +1186,20 @@ const DECLINE_TERMS = [
   "dead crowd",
   "decline",
   "declined",
+  "empty crowd",
   "fall off",
   "fallen off",
   "fell off",
   "flop",
   "flopped",
   "low sales",
+  "lost hype",
+  "lost momentum",
+  "numbers down",
+  "sales down",
+  "streams down",
+  "underperformed",
+  "underperforming",
   "washed"
 ];
 
@@ -1161,10 +1207,14 @@ const POSITIVE_TERMS = [
   "amazing",
   "blew up",
   "classic",
+  "co-sign",
+  "cosign",
   "crazy",
   "fire",
   "goes hard",
+  "grail",
   "hard",
+  "hype",
   "insane",
   "killed",
   "love",
@@ -1178,12 +1228,18 @@ const NEGATIVE_TERMS = [
   "boring",
   "dead crowd",
   "disappointing",
+  "empty crowd",
   "fell off",
   "flop",
   "flopped",
+  "lost hype",
+  "lost momentum",
   "mid",
+  "numbers down",
   "overrated",
+  "streams down",
   "trash",
+  "underperformed",
   "weak",
   "washed"
 ];
