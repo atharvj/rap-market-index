@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServiceRoleClient, getSupabaseConfigStatus } from "@/lib/supabase/server";
 import type { MarketUpdateSource } from "@/server/market/daily-update";
+import { getPacificMarketDate } from "@/server/market/market-date";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
@@ -45,9 +46,9 @@ type ExistingRun = {
 };
 
 const DEFAULT_SOURCE: MarketUpdateSource = "core";
-const DEFAULT_ARTIST_LIMIT = 25;
-const DEFAULT_MAX_BATCHES = 4;
-const DEFAULT_EVENT_SCAN_LIMIT = 10;
+const DEFAULT_ARTIST_LIMIT = 100;
+const DEFAULT_MAX_BATCHES = 1;
+const DEFAULT_EVENT_SCAN_LIMIT = 20;
 const DEFAULT_EVENT_SCAN_MAX_RECORDS = 12;
 
 export async function GET(request: Request) {
@@ -79,7 +80,7 @@ export async function GET(request: Request) {
   const url = new URL(request.url);
   const force = url.searchParams.get("force") === "1";
   const dryRun = url.searchParams.get("dryRun") === "1";
-  const runDate = normalizeDate(url.searchParams.get("runDate")) ?? getPacificDate();
+  const runDate = normalizeDate(url.searchParams.get("runDate")) ?? getPacificMarketDate();
   const source = normalizeSource(process.env.MARKET_CRON_SOURCE);
   const artistLimit = getInteger(process.env.MARKET_CRON_ARTIST_LIMIT, DEFAULT_ARTIST_LIMIT, 1, 100);
   const maxBatches = getInteger(process.env.MARKET_CRON_MAX_BATCHES, DEFAULT_MAX_BATCHES, 1, 10);
@@ -303,18 +304,6 @@ function normalizeSource(value: string | undefined): MarketUpdateSource {
 
 function normalizeDate(value: string | null) {
   return value && /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : null;
-}
-
-function getPacificDate() {
-  const parts = new Intl.DateTimeFormat("en-US", {
-    timeZone: "America/Los_Angeles",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit"
-  }).formatToParts(new Date());
-  const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
-
-  return `${values.year}-${values.month}-${values.day}`;
 }
 
 function getInteger(value: string | undefined, fallback: number, min: number, max: number) {

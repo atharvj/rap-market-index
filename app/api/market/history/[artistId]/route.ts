@@ -3,6 +3,7 @@ import { createInitialGameState } from "@/lib/market";
 import { createAnonServerClient, getSupabaseConfigStatus } from "@/lib/supabase/server";
 import type { Database } from "@/lib/supabase/database.types";
 import type { PricePoint } from "@/lib/types";
+import { getPacificMarketDate, getPacificMarketDayBoundsUtc, shiftMarketDate } from "@/server/market/market-date";
 
 export const dynamic = "force-dynamic";
 
@@ -107,7 +108,7 @@ async function loadArtistHistory({
     .order("price_date", { ascending: true });
 
   if (range !== "ALL") {
-    query = query.gte("price_date", shiftDate(getToday(), -RANGE_DAYS[range]));
+    query = query.gte("price_date", shiftMarketDate(getPacificMarketDate(), -RANGE_DAYS[range]));
   }
 
   const { data, error } = await query;
@@ -135,12 +136,12 @@ async function loadArtistTicksIfAvailable({
     return [];
   }
 
-  const minDate = shiftDate(getToday(), -RANGE_DAYS[range]);
+  const minDate = shiftMarketDate(getPacificMarketDate(), -RANGE_DAYS[range]);
   const { data, error } = await supabase
     .from("price_ticks")
     .select("observed_at, price")
     .eq("artist_id", artistId)
-    .gte("observed_at", `${minDate}T00:00:00.000Z`)
+    .gte("observed_at", getPacificMarketDayBoundsUtc(minDate).start)
     .order("observed_at", { ascending: false })
     .limit(900);
 
@@ -200,7 +201,7 @@ function getMockHistoryResponse(artistId: string, range: HistoryRange) {
     };
   }
 
-  const cutoff = range === "ALL" ? null : shiftDate(getToday(), -RANGE_DAYS[range]);
+  const cutoff = range === "ALL" ? null : shiftMarketDate(getPacificMarketDate(), -RANGE_DAYS[range]);
   const points = cutoff
     ? artist.priceHistory.filter((point) => point.date >= cutoff)
     : artist.priceHistory;
@@ -219,15 +220,4 @@ function normalizeRange(value: string | null): HistoryRange {
   }
 
   return "1M";
-}
-
-function getToday() {
-  return new Date().toISOString().slice(0, 10);
-}
-
-function shiftDate(date: string, days: number) {
-  const value = new Date(`${date}T00:00:00.000Z`);
-  value.setUTCDate(value.getUTCDate() + days);
-
-  return value.toISOString().slice(0, 10);
 }

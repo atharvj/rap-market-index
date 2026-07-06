@@ -26,6 +26,7 @@ import { collectWikimediaMarketSignals } from "@/server/market/wikimedia-source"
 import { collectYoutubeMarketSignals } from "@/server/market/youtube-source";
 import { collectYoutubeCommentMarketSignals } from "@/server/market/youtube-comments-source";
 import { collectYoutubeUploadEvents } from "@/server/market/youtube-upload-events-source";
+import { getPacificMarketDate } from "@/server/market/market-date";
 import { getMockMarketArtists } from "@/server/market/mock-source";
 import type {
   AdapterSignals,
@@ -65,7 +66,7 @@ type ArtistBatch = {
   batch: NonNullable<MarketUpdateSummary["batch"]>;
 };
 
-const DEFAULT_LIVE_REAL_SOURCE_BATCH_SIZE = 50;
+const DEFAULT_LIVE_REAL_SOURCE_BATCH_SIZE = 100;
 const MAX_ARTIST_BATCH_SIZE = 100;
 
 export async function GET(request: Request) {
@@ -86,7 +87,7 @@ export async function POST(request: Request) {
   const body = await parseBody(request);
   const dryRun = body.dryRun !== false;
   const source = normalizeSource(body.source);
-  const runDate = body.runDate ?? getToday();
+  const runDate = body.runDate ?? getPacificMarketDate();
   const config = getSupabaseConfigStatus();
   const auth = await requireAdminRequest(request);
 
@@ -224,6 +225,7 @@ async function parseBody(request: Request): Promise<DailyUpdateBody> {
 
 function normalizeSource(source: DailyUpdateBody["source"]): MarketUpdateSource {
   if (
+    source === "mock" ||
     source === "manual" ||
     source === "gdelt" ||
     source === "lastfm" ||
@@ -237,7 +239,7 @@ function normalizeSource(source: DailyUpdateBody["source"]): MarketUpdateSource 
     return source;
   }
 
-  return "mock";
+  return "core";
 }
 
 function sanitizeManualSignals(signals: DailyUpdateBody["manualSignals"]): ManualSignals | undefined {
@@ -262,10 +264,6 @@ function sanitizeManualSignals(signals: DailyUpdateBody["manualSignals"]): Manua
 
 function getNumber(value: unknown) {
   return typeof value === "number" && Number.isFinite(value) ? value : undefined;
-}
-
-function getToday() {
-  return new Date().toISOString().slice(0, 10);
 }
 
 function limitArtists<T>(artists: T[], limit: unknown) {
@@ -470,10 +468,11 @@ async function collectRealSignals({
 }> {
   const useGdelt = source === "gdelt" || source === "blended";
   const useLastfm = source === "lastfm" || source === "core" || source === "blended";
-  const useSpotify = source === "spotify" || source === "core" || source === "blended";
+  const useSpotify =
+    source === "spotify" || ((source === "core" || source === "blended") && hasSpotifyCredentials());
   const useYoutube = source === "youtube" || source === "core" || source === "blended";
   const useWikimedia = source === "wikimedia" || source === "core" || source === "blended";
-  const useReddit = source === "reddit" || source === "core" || source === "blended";
+  const useReddit = source === "reddit" || ((source === "core" || source === "blended") && hasRedditCredentials());
   const useTradeFlow = Boolean(supabase) && isRealExternalSource(source);
   const warnings: string[] = [];
 
@@ -680,7 +679,7 @@ async function collectRealSignals({
       warnings.push(...youtube.warnings);
     }
 
-    const maxUploadEventVideos = getEnvInteger("MARKET_YOUTUBE_UPLOAD_EVENT_VIDEOS", 2, 0, 5);
+    const maxUploadEventVideos = getEnvInteger("MARKET_YOUTUBE_UPLOAD_EVENT_VIDEOS", 5, 0, 5);
 
     if (maxUploadEventVideos > 0) {
       const youtubeUploadEvents = await collectExternalSource("YouTube upload events", warnings, () =>
@@ -721,8 +720,6 @@ async function collectRealSignals({
         observations.push(...youtubeComments.observations);
         warnings.push(...youtubeComments.warnings);
       }
-    } else {
-      warnings.push("YouTube comment reaction signals skipped by quota guard.");
     }
   }
 
@@ -792,6 +789,18 @@ async function collectRealSignals({
     externalIds,
     detectedEventsByArtist
   };
+}
+
+function hasSpotifyCredentials() {
+  return Boolean(process.env.SPOTIFY_CLIENT_ID?.trim() && process.env.SPOTIFY_CLIENT_SECRET?.trim());
+}
+
+function hasRedditCredentials() {
+  return Boolean(
+    process.env.REDDIT_CLIENT_ID?.trim() &&
+      process.env.REDDIT_CLIENT_SECRET?.trim() &&
+      process.env.REDDIT_USER_AGENT?.trim()
+  );
 }
 
 async function collectExternalSource<T>(

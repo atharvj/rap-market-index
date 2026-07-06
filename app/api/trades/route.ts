@@ -9,6 +9,8 @@ type TradeBody = {
   shares?: number;
 };
 
+const MARKET_IMPACT_MIN_ACCOUNT_AGE_HOURS = 24;
+
 export async function POST(request: Request) {
   const config = getSupabaseConfigStatus();
 
@@ -63,8 +65,20 @@ export async function POST(request: Request) {
 
   const supabase = createAnonServerClient(authorization);
   const user = await supabase.auth.getUser();
-  const email = user.data.user?.email?.toLowerCase() ?? "";
-  const marketEligible = !isMarketImpactExemptEmail(email);
+
+  if (user.error || !user.data.user?.id || !user.data.user.email) {
+    return NextResponse.json(
+      {
+        ok: false,
+        error: "You must be signed in to trade."
+      },
+      { status: 401 }
+    );
+  }
+
+  const authUser = user.data.user;
+  const email = (authUser.email ?? "").toLowerCase();
+  const marketEligible = !isMarketImpactExemptEmail(email) && isAccountOldEnoughForMarketImpact(authUser.created_at);
   const functionName = body.side === "sell" ? "sell_artist_shares" : "buy_artist_shares";
   const { data, error } = await supabase.rpc(functionName, {
     p_artist_id: artistId,
@@ -84,7 +98,14 @@ export async function POST(request: Request) {
 
   return NextResponse.json({
     ok: true,
-    trade: data?.[0] ?? null
+    trade: data?.[0] ?? null,
+    marketEligibility: {
+      eligible: marketEligible,
+      reason: getMarketEligibilityReason({
+        email,
+        createdAt: authUser.created_at
+      })
+    }
   });
 }
 
@@ -99,6 +120,28 @@ function isMarketImpactExemptEmail(email: string) {
     .filter(Boolean);
 
   return configured.includes(email);
+}
+
+function isAccountOldEnoughForMarketImpact(createdAt: string | undefined) {
+  const createdAtMs = createdAt ? new Date(createdAt).getTime() : Number.NaN;
+
+  if (!Number.isFinite(createdAtMs)) {
+    return false;
+  }
+
+  return Date.now() - createdAtMs >= MARKET_IMPACT_MIN_ACCOUNT_AGE_HOURS * 60 * 60 * 1000;
+}
+
+function getMarketEligibilityReason({ email, createdAt }: { email: string; createdAt: string | undefined }) {
+  if (isMarketImpactExemptEmail(email)) {
+    return "market_impact_exempt_account";
+  }
+
+  if (!isAccountOldEnoughForMarketImpact(createdAt)) {
+    return "new_account_cooldown";
+  }
+
+  return "eligible";
 }
 
 async function parseBody(request: Request): Promise<TradeBody> {

@@ -194,6 +194,9 @@ function buildArtistEventSignal(artist: MarketUpdateArtist, runDate: string, eve
         confidence: event.event.confidence,
         decay: event.decay,
         ageDays: event.ageDays,
+        provenanceLabel: event.provenanceLabel,
+        provenanceImpactMultiplier: event.provenanceImpactMultiplier,
+        provenanceConfidenceMultiplier: event.provenanceConfidenceMultiplier,
         eventSubtype: event.eventSubtype,
         shockDecayMultiplier: event.shockDecayMultiplier,
         clusterKey: event.clusterKey,
@@ -231,7 +234,8 @@ type ScoredMarketEvent = ReturnType<typeof scoreEvent> & {
 
 function getEventSignalConfidence(scoredEvents: ScoredMarketEvent[]) {
   const highestConfidence = scoredEvents.reduce(
-    (highest, event) => Math.max(highest, event.event.confidence * event.decay),
+    (highest, event) =>
+      Math.max(highest, event.event.confidence * event.decay * event.provenanceConfidenceMultiplier),
     0
   );
   const maxSourceCount = scoredEvents.reduce(
@@ -309,6 +313,7 @@ function getEventModifierReason(event: ScoredMarketEvent) {
     track_audio_release: "track upload",
     tracklist_reaction: "tracklist reaction",
     feature: "feature/cosign",
+    major_feature: "major feature/cosign",
     performance: "live performance",
     chart: "chart momentum",
     snippet: "snippet",
@@ -329,6 +334,7 @@ function getEventReasonPriority(subtype: string) {
   const priorities: Record<string, number> = {
     project_release: 12,
     review: 11,
+    major_feature: 11,
     feature: 10,
     performance: 9,
     chart: 8,
@@ -354,13 +360,104 @@ function scoreEvent(event: MarketEvent, runDate: string) {
   const typeWeight = getEventTypeWeight(event.eventType);
   const sentiment = event.sentimentScore;
   const impact = event.impactScore || sentiment;
-  const weightedImpact = clamp((impact * 0.65 + sentiment * 0.35) * event.confidence * typeWeight * decay, -100, 100);
+  const provenance = getEventProvenance(event);
+  const weightedImpact = clamp(
+    (impact * 0.65 + sentiment * 0.35) *
+      event.confidence *
+      typeWeight *
+      decay *
+      provenance.impactMultiplier,
+    -100,
+    100
+  );
 
   return {
     event,
     ageDays,
     decay,
+    provenanceLabel: provenance.label,
+    provenanceImpactMultiplier: provenance.impactMultiplier,
+    provenanceConfidenceMultiplier: provenance.confidenceMultiplier,
     weightedImpact
+  };
+}
+
+function getEventProvenance(event: MarketEvent) {
+  const source = getRawString(event.rawPayload.source) ?? "";
+  const normalizedSource = source.toLowerCase();
+
+  if (normalizedSource === "reddit_post") {
+    return getRedditEventProvenance(event);
+  }
+
+  if (normalizedSource === "gdelt_article") {
+    return getGdeltEventProvenance(event);
+  }
+
+  if (normalizedSource === "musicbrainz_release_group") {
+    return {
+      label: "release-database",
+      impactMultiplier: 1.08,
+      confidenceMultiplier: 1.06
+    };
+  }
+
+  if (normalizedSource === "youtube_upload_event") {
+    return {
+      label: "official-upload",
+      impactMultiplier: 1.03,
+      confidenceMultiplier: 1
+    };
+  }
+
+  if (normalizedSource === "manual_event") {
+    return {
+      label: "manual",
+      impactMultiplier: 0.95,
+      confidenceMultiplier: 0.95
+    };
+  }
+
+  return {
+    label: normalizedSource || "unknown",
+    impactMultiplier: 1,
+    confidenceMultiplier: 1
+  };
+}
+
+function getRedditEventProvenance(event: MarketEvent) {
+  const viralityTier = getRawString(event.rawPayload.viralityTier) ?? "small";
+  const subredditTier = getRawNumber(event.rawPayload.subredditTier, 0);
+  const tierProfiles: Record<string, { impact: number; confidence: number }> = {
+    small: { impact: 0.58, confidence: 0.82 },
+    notable: { impact: 0.95, confidence: 1 },
+    major: { impact: 1.18, confidence: 1.08 },
+    breakout: { impact: 1.36, confidence: 1.14 }
+  };
+  const profile = tierProfiles[viralityTier] ?? tierProfiles.small;
+  const subredditLift = clamp(1 + subredditTier * 0.045, 1, 1.1);
+
+  return {
+    label: `reddit-${viralityTier}`,
+    impactMultiplier: clamp(profile.impact * subredditLift, 0.5, 1.42),
+    confidenceMultiplier: clamp(profile.confidence * subredditLift, 0.75, 1.18)
+  };
+}
+
+function getGdeltEventProvenance(event: MarketEvent) {
+  const sourceTier = getRawNumber(event.rawPayload.sourceTier, 0);
+  const tierProfiles: Record<number, { impact: number; confidence: number }> = {
+    0: { impact: 0.74, confidence: 0.9 },
+    1: { impact: 0.92, confidence: 0.98 },
+    2: { impact: 1.05, confidence: 1.05 },
+    3: { impact: 1.15, confidence: 1.1 }
+  };
+  const profile = tierProfiles[sourceTier] ?? tierProfiles[0];
+
+  return {
+    label: `news-tier-${sourceTier}`,
+    impactMultiplier: profile.impact,
+    confidenceMultiplier: profile.confidence
   };
 }
 
@@ -528,6 +625,7 @@ function isReleaseCycleRelated(event: ScoredMarketEvent) {
     "review",
     "snippet",
     "feature",
+    "major_feature",
     "chart"
   ].includes(event.eventSubtype);
 }
@@ -669,6 +767,49 @@ function getEventSubtype(event: MarketEvent) {
   if (event.eventType === "viral") {
     if (
       hasAnyTerm(text, [
+        "carti feature",
+        "carti verse",
+        "carti cosign",
+        "carti co sign",
+        "carti co-sign",
+        "carti assisted",
+        "carti-assisted",
+        "drake feature",
+        "drake verse",
+        "drake cosign",
+        "drake co sign",
+        "drake co-sign",
+        "drake assisted",
+        "drake-assisted",
+        "feat carti",
+        "feat drake",
+        "feat future",
+        "feat kendrick",
+        "feat travis",
+        "featuring carti",
+        "featuring drake",
+        "featuring future",
+        "featuring kendrick",
+        "featuring travis",
+        "ft carti",
+        "ft drake",
+        "ft future",
+        "ft kendrick",
+        "ft travis",
+        "opium co sign",
+        "opium cosign",
+        "with carti",
+        "with drake",
+        "with future",
+        "with kendrick",
+        "with travis"
+      ])
+    ) {
+      return "major_feature";
+    }
+
+    if (
+      hasAnyTerm(text, [
         "co sign",
         "cosign",
         "feature",
@@ -771,6 +912,7 @@ function getEventSubtypePriceProfile(subtype: string) {
     single_video_release: { divisor: 1900, minShock: -0.018, maxShock: 0.035 },
     track_audio_release: { divisor: 3500, minShock: -0.008, maxShock: 0.012 },
     tracklist_reaction: { divisor: 2100, minShock: -0.028, maxShock: 0.024 },
+    major_feature: { divisor: 1325, minShock: -0.025, maxShock: 0.065 },
     feature: { divisor: 1450, minShock: -0.025, maxShock: 0.055 },
     performance: { divisor: 1550, minShock: -0.034, maxShock: 0.05 },
     chart: { divisor: 1550, minShock: -0.022, maxShock: 0.05 },
@@ -803,6 +945,10 @@ function getRawString(value: unknown) {
   return typeof value === "string" && value.trim() ? value.trim() : null;
 }
 
+function getRawNumber(value: unknown, fallback = 0) {
+  return typeof value === "number" && Number.isFinite(value) ? value : fallback;
+}
+
 function getEventDecay(eventType: MarketEvent["eventType"], ageDays: number) {
   const halfLifeDays: Record<MarketEvent["eventType"], number> = {
     release: 18,
@@ -831,6 +977,7 @@ function getEventShockDecayMultiplier({
     single_video_release: 3,
     track_audio_release: 1.5,
     tracklist_reaction: 2.5,
+    major_feature: 3.5,
     feature: 3,
     performance: 2.5,
     chart: 4,

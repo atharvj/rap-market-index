@@ -885,8 +885,8 @@ export default function DevPage() {
     setRunNow({ status: "loading", completedBatchCount: 0, processedArtistCount: 0 });
 
     try {
-      const batchSize = 10;
-      const maxLoopCount = 20;
+      const batchSize = 100;
+      const maxLoopCount = 5;
       let nextOffset: number | null = 0;
       let completedBatchCount = 0;
       let processedArtistCount = 0;

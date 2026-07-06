@@ -107,7 +107,8 @@ const UNIQUE_SUBREDDIT_COUNT = "unique_subreddit_count";
 const TOP_POST_ENGAGEMENT = "top_post_engagement";
 const AVERAGE_SENTIMENT = "average_sentiment";
 const REQUEST_ERROR = "request_error";
-const DEFAULT_SUBREDDITS = ["hiphopheads", "rap", "undergroundhiphop", "playboicarti"];
+const DEFAULT_SUBREDDITS = ["hiphopheads", "rap", "trap", "undergroundhiphop", "playboicarti", "soundcloud"];
+const REDDIT_SEARCH_SORTS = ["new", "top"] as const;
 
 export async function collectRedditMarketSignals({
   artists,
@@ -786,6 +787,67 @@ async function fetchRedditSearch({
   timeoutMs: number;
   fetchImpl: typeof fetch;
 }): Promise<{ ok: true; posts: RedditPostData[] } | { ok: false; error: string }> {
+  const postsById = new Map<string, RedditPostData>();
+  const errors: string[] = [];
+
+  for (const sort of REDDIT_SEARCH_SORTS) {
+    const result = await fetchRedditSearchPage({
+      accessToken,
+      userAgent,
+      subreddits,
+      query,
+      postsPerArtist,
+      timeoutMs,
+      fetchImpl,
+      sort
+    });
+
+    if (!result.ok) {
+      errors.push(result.error);
+      continue;
+    }
+
+    for (const post of result.posts) {
+      const key = post.name ?? post.id;
+
+      if (key) {
+        postsById.set(key, post);
+      }
+    }
+  }
+
+  if (postsById.size > 0 || errors.length < REDDIT_SEARCH_SORTS.length) {
+    return {
+      ok: true,
+      posts: Array.from(postsById.values())
+    };
+  }
+
+  return {
+    ok: false,
+    error: errors[0] ?? "Reddit search returned no usable posts."
+  };
+}
+
+async function fetchRedditSearchPage({
+  accessToken,
+  userAgent,
+  subreddits,
+  query,
+  postsPerArtist,
+  timeoutMs,
+  fetchImpl,
+  sort
+}: {
+  accessToken: string;
+  userAgent: string;
+  subreddits: string[];
+  query: string;
+  postsPerArtist: number;
+  timeoutMs: number;
+  fetchImpl: typeof fetch;
+  sort: "new" | "top";
+}): Promise<{ ok: true; posts: RedditPostData[] } | { ok: false; error: string }> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
   const subredditPath = subreddits.join("+");
@@ -793,7 +855,7 @@ async function fetchRedditSearch({
 
   url.searchParams.set("q", query);
   url.searchParams.set("restrict_sr", "1");
-  url.searchParams.set("sort", "new");
+  url.searchParams.set("sort", sort);
   url.searchParams.set("t", "week");
   url.searchParams.set("raw_json", "1");
   url.searchParams.set("limit", String(clampInteger(postsPerArtist, 5, 100)));
@@ -812,7 +874,9 @@ async function fetchRedditSearch({
     if (!response.ok) {
       return {
         ok: false,
-        error: parsed?.message ? `Reddit search failed: ${parsed.message}.` : `Reddit search failed with ${response.status}.`
+        error: parsed?.message
+          ? `Reddit ${sort} search failed: ${parsed.message}.`
+          : `Reddit ${sort} search failed with ${response.status}.`
       };
     }
 
@@ -825,7 +889,7 @@ async function fetchRedditSearch({
   } catch (error) {
     return {
       ok: false,
-      error: error instanceof Error ? error.message : "Reddit search failed."
+      error: error instanceof Error ? error.message : `Reddit ${sort} search failed.`
     };
   } finally {
     clearTimeout(timeout);
@@ -1063,8 +1127,8 @@ function sleep(ms: number) {
   });
 }
 
-const TIER_TWO_SUBREDDITS = new Set(["hiphopheads", "popheads"]);
-const TIER_ONE_SUBREDDITS = new Set(["rap", "undergroundhiphop", "playboicarti"]);
+const TIER_TWO_SUBREDDITS = new Set(["hiphopheads", "trap", "popheads"]);
+const TIER_ONE_SUBREDDITS = new Set(["rap", "undergroundhiphop", "playboicarti", "soundcloud"]);
 
 const MUSIC_CONTEXT_TERMS = [
   "album",

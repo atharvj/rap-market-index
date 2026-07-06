@@ -3,6 +3,7 @@ import { createServiceRoleClient, getSupabaseConfigStatus } from "@/lib/supabase
 import { requireAdminRequest } from "@/server/admin-auth";
 import { flattenEvents } from "@/server/market/event-signals";
 import { collectGdeltMarketSignals } from "@/server/market/gdelt-source";
+import { getPacificMarketDate } from "@/server/market/market-date";
 import type { MarketUpdateArtist } from "@/server/market/daily-update";
 import type { MarketEvent } from "@/server/market/market-data";
 import {
@@ -70,7 +71,7 @@ export async function POST(request: Request) {
   try {
     const body = await parseBody(request);
     const dryRun = body.dryRun !== false;
-    const runDate = normalizeDate(body.runDate) ?? getToday();
+    const runDate = normalizeDate(body.runDate) ?? getPacificMarketDate();
     const artistLimit = normalizeInteger(body.artistLimit, DEFAULT_ARTIST_LIMIT, 1, MAX_ARTIST_LIMIT);
     const maxRecords = normalizeInteger(body.maxRecords, DEFAULT_MAX_RECORDS, 1, MAX_GDELT_RECORDS);
     const delayMs = normalizeInteger(body.delayMs, DEFAULT_DELAY_MS, 0, 15000);
@@ -207,10 +208,6 @@ function normalizeInteger(value: unknown, fallback: number, min: number, max: nu
 
 function normalizeDate(value: unknown) {
   return typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : null;
-}
-
-function getToday() {
-  return new Date().toISOString().slice(0, 10);
 }
 
 function formatMarketEventScanError(error: unknown) {

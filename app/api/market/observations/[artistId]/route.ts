@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createAnonServerClient, getSupabaseConfigStatus } from "@/lib/supabase/server";
 import type { Database } from "@/lib/supabase/database.types";
 import type { MarketObservationSeries } from "@/lib/types";
+import { getPacificMarketDate, shiftMarketDate } from "@/server/market/market-date";
 
 export const dynamic = "force-dynamic";
 
@@ -131,6 +132,10 @@ const SERIES_DEFINITIONS: Record<string, { label: string; unit: string }> = {
   "trade_flow:unique_trader_count": {
     label: "Active traders",
     unit: "traders"
+  },
+  "trade_flow:signal_eligibility": {
+    label: "Order-flow signal eligibility",
+    unit: "boolean"
   }
 };
 
@@ -216,7 +221,7 @@ async function loadObservationSeries({
     .order("observed_date", { ascending: true });
 
   if (range !== "ALL") {
-    query = query.gte("observed_date", shiftDate(getToday(), -RANGE_DAYS[range]));
+    query = query.gte("observed_date", shiftMarketDate(getPacificMarketDate(), -RANGE_DAYS[range]));
   }
 
   const { data, error } = await query;
@@ -261,15 +266,4 @@ function normalizeRange(value: string | null): ObservationRange {
   }
 
   return "1M";
-}
-
-function getToday() {
-  return new Date().toISOString().slice(0, 10);
-}
-
-function shiftDate(date: string, days: number) {
-  const value = new Date(`${date}T00:00:00.000Z`);
-  value.setUTCDate(value.getUTCDate() + days);
-
-  return value.toISOString().slice(0, 10);
 }

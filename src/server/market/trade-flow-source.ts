@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { clamp } from "@/lib/pricing";
 import type { Database } from "@/lib/supabase/database.types";
 import type { MarketUpdateArtist } from "@/server/market/daily-update";
+import { getPacificMarketLookbackBoundsUtc } from "@/server/market/market-date";
 import type { AdapterSignals, MarketObservation } from "@/server/market/market-data";
 import type { HypeStats } from "@/lib/types";
 
@@ -46,7 +47,11 @@ const UNIQUE_TRADER_COUNT = "unique_trader_count";
 const LARGEST_TRADER_SHARE = "largest_trader_share";
 const BREADTH_MULTIPLIER = "breadth_multiplier";
 const CONCENTRATION_PENALTY = "concentration_penalty";
+const SIGNAL_ELIGIBILITY = "signal_eligibility";
 const MAX_TRADE_ROWS = 10000;
+const MIN_SIGNAL_TRADERS = 3;
+const MIN_SIGNAL_GROSS_ORDER_VALUE = 1000;
+const MAX_SIGNAL_LARGEST_TRADER_SHARE = 0.7;
 
 export async function collectTradeFlowMarketSignals({
   supabase,
@@ -63,8 +68,7 @@ export async function collectTradeFlowMarketSignals({
   }
 
   const artistIds = artists.map((artist) => artist.id);
-  const windowStart = `${shiftDate(runDate, -lookbackDays)}T00:00:00.000Z`;
-  const windowEnd = `${runDate}T00:00:00.000Z`;
+  const { start: windowStart, end: windowEnd } = getPacificMarketLookbackBoundsUtc(runDate, lookbackDays);
   const { data, error } = await supabase
     .from("transactions")
     .select("artist_id,user_id,type,shares,price,cash_delta,gross_value,market_eligible,created_at")
@@ -83,6 +87,7 @@ export async function collectTradeFlowMarketSignals({
   const artistsById = new Map(artists.map((artist) => [artist.id, artist]));
   const signals: AdapterSignals = {};
   const observations: MarketObservation[] = [];
+  let suppressedSignalCount = 0;
 
   for (const [artistId, bucket] of buckets) {
     const artist = artistsById.get(artistId);
@@ -101,15 +106,25 @@ export async function collectTradeFlowMarketSignals({
 
     signals[artistId] = signal.signal;
     observations.push(...signal.observations);
+    suppressedSignalCount += signal.suppressed ? 1 : 0;
+  }
+
+  const warnings: string[] = [];
+
+  if ((data?.length ?? 0) >= MAX_TRADE_ROWS) {
+    warnings.push("Trade-flow signal hit the row cap; add a SQL aggregate before scaling trading volume further.");
+  }
+
+  if (suppressedSignalCount > 0) {
+    warnings.push(
+      `Suppressed ${suppressedSignalCount} thin or concentrated trade-flow signal${suppressedSignalCount === 1 ? "" : "s"} from the pricing model.`
+    );
   }
 
   return {
     signals,
     observations,
-    warnings:
-      (data?.length ?? 0) >= MAX_TRADE_ROWS
-        ? ["Trade-flow signal hit the row cap; add a SQL aggregate before scaling trading volume further."]
-        : []
+    warnings
   };
 }
 
@@ -173,11 +188,14 @@ function buildTradeFlowSignal({
   const breadthMultiplier = getBreadthMultiplier(uniqueTraderCount);
   const concentrationPenalty = getConcentrationPenalty(largestTraderShare);
   const reliabilityMultiplier = breadthMultiplier * concentrationPenalty;
+  const eligibility = getSignalEligibility({
+    grossOrderValue,
+    uniqueTraderCount,
+    largestTraderShare
+  });
   const rawTraderDemand = clamp((valueImbalance * 30 + countImbalance * 10) * (0.62 + activityScale * 0.28 + traderBreadth * 0.1), -40, 40);
-  const traderDemand = clamp(rawTraderDemand * reliabilityMultiplier, -28, 28);
-  const stats: Partial<HypeStats> = {
-    traderDemand
-  };
+  const traderDemand = eligibility.eligible ? clamp(rawTraderDemand * reliabilityMultiplier, -28, 28) : 0;
+  const stats: Partial<HypeStats> = eligibility.eligible ? { traderDemand } : {};
   const rawPayload = {
     source: SOURCE,
     runDate,
@@ -203,6 +221,8 @@ function buildTradeFlowSignal({
     breadthMultiplier,
     concentrationPenalty,
     reliabilityMultiplier,
+    signalEligible: eligibility.eligible,
+    signalEligibilityReason: eligibility.reason,
     rawTraderDemand,
     traderDemand,
     currentPrice: artist.currentPrice
@@ -228,8 +248,10 @@ function buildTradeFlowSignal({
       createObservation(artist.id, runDate, UNIQUE_TRADER_COUNT, uniqueTraderCount, "traders", rawPayload),
       createObservation(artist.id, runDate, LARGEST_TRADER_SHARE, largestTraderShare, "ratio", rawPayload),
       createObservation(artist.id, runDate, BREADTH_MULTIPLIER, breadthMultiplier, "ratio", rawPayload),
-      createObservation(artist.id, runDate, CONCENTRATION_PENALTY, concentrationPenalty, "ratio", rawPayload)
-    ]
+      createObservation(artist.id, runDate, CONCENTRATION_PENALTY, concentrationPenalty, "ratio", rawPayload),
+      createObservation(artist.id, runDate, SIGNAL_ELIGIBILITY, eligibility.eligible ? 1 : 0, "boolean", rawPayload)
+    ],
+    suppressed: !eligibility.eligible
   };
 }
 
@@ -239,15 +261,15 @@ function getLargestTraderValue(traderValues: Map<string, number>) {
 
 function getBreadthMultiplier(uniqueTraderCount: number) {
   if (uniqueTraderCount <= 1) {
-    return 0.08;
+    return 0.02;
   }
 
   if (uniqueTraderCount === 2) {
-    return 0.22;
+    return 0.1;
   }
 
   if (uniqueTraderCount <= 4) {
-    return 0.45;
+    return 0.32;
   }
 
   if (uniqueTraderCount <= 7) {
@@ -266,7 +288,43 @@ function getConcentrationPenalty(largestTraderShare: number) {
     return 1;
   }
 
-  return clamp(1 - (largestTraderShare - 0.35) * 1.25, 0.12, 1);
+  return clamp(1 - (largestTraderShare - 0.35) * 1.35, 0.06, 1);
+}
+
+function getSignalEligibility({
+  grossOrderValue,
+  uniqueTraderCount,
+  largestTraderShare
+}: {
+  grossOrderValue: number;
+  uniqueTraderCount: number;
+  largestTraderShare: number;
+}) {
+  if (uniqueTraderCount < MIN_SIGNAL_TRADERS) {
+    return {
+      eligible: false,
+      reason: "insufficient_trader_breadth"
+    };
+  }
+
+  if (grossOrderValue < MIN_SIGNAL_GROSS_ORDER_VALUE) {
+    return {
+      eligible: false,
+      reason: "insufficient_order_value"
+    };
+  }
+
+  if (largestTraderShare > MAX_SIGNAL_LARGEST_TRADER_SHARE) {
+    return {
+      eligible: false,
+      reason: "concentrated_order_flow"
+    };
+  }
+
+  return {
+    eligible: true,
+    reason: "eligible"
+  };
 }
 
 function getConfidence({
@@ -307,13 +365,6 @@ function createObservation(
     unit,
     rawPayload
   };
-}
-
-function shiftDate(date: string, days: number) {
-  const value = new Date(`${date}T00:00:00.000Z`);
-  value.setUTCDate(value.getUTCDate() + days);
-
-  return value.toISOString().slice(0, 10);
 }
 
 function round(value: number) {

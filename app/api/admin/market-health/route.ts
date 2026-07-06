@@ -2,6 +2,11 @@ import { NextResponse } from "next/server";
 import { createServiceRoleClient, getSupabaseConfigStatus } from "@/lib/supabase/server";
 import type { Database } from "@/lib/supabase/database.types";
 import { requireAdminRequest } from "@/server/admin-auth";
+import {
+  getPacificMarketDayBoundsUtc,
+  getPacificMarketDate,
+  getPacificMarketLookbackBoundsUtc
+} from "@/server/market/market-date";
 import { DEFAULT_MARKET_MODEL_VERSION, getMarketModelVersion } from "@/server/market/model-version";
 import { loadActiveArtists, loadArtistExternalIds } from "@/server/market/supabase-repository";
 
@@ -75,6 +80,12 @@ type PriceTickHealth = {
   freshCoveragePercent: number;
 };
 
+type IntegrityGuardrailHealth = {
+  ready: boolean;
+  checkedAt: string;
+  error: string | null;
+};
+
 const SOURCE_ID_FIELDS = [
   { key: "lastfmName", label: "Audience search names", warningThreshold: 80 },
   { key: "gdeltQuery", label: "News search queries", warningThreshold: 80 },
@@ -131,7 +142,7 @@ export async function GET(request: Request) {
 
   try {
     const url = new URL(request.url);
-    const runDate = url.searchParams.get("runDate") ?? getToday();
+    const runDate = url.searchParams.get("runDate") ?? getPacificMarketDate();
     const lookbackDays = getInteger(url.searchParams.get("lookbackDays"), 30, 1, 180);
     const freshnessDays = getInteger(url.searchParams.get("freshnessDays"), 2, 0, 30);
     const configuredModelVersion = getMarketModelVersion();
@@ -139,7 +150,7 @@ export async function GET(request: Request) {
     const artists = await loadActiveArtists(supabase);
     const artistIds = artists.map((artist) => artist.id);
     const eventFreshnessDays = Math.max(7, freshnessDays);
-    const [externalIds, recentRuns, observations, priceHistory, priceTicks, recentEvents] = await Promise.all([
+    const [externalIds, recentRuns, observations, priceHistory, priceTicks, recentEvents, integrityGuardrails] = await Promise.all([
       loadArtistExternalIds(supabase, artistIds),
       loadRecentMarketRuns(supabase),
       loadRecentObservations({
@@ -165,7 +176,8 @@ export async function GET(request: Request) {
         artistIds,
         runDate,
         lookbackDays
-      })
+      }),
+      checkIntegrityGuardrails(supabase)
     ]);
     const sourceCoverage = buildSourceCoverage({
       activeArtistCount: artists.length,
@@ -203,6 +215,7 @@ export async function GET(request: Request) {
       priceHistoryHealth,
       priceTickHealth,
       eventHealth,
+      integrityGuardrails,
       configuredModelVersion,
       defaultModelVersion: DEFAULT_MARKET_MODEL_VERSION,
       observationRowsTruncated: observations.length >= MAX_OBSERVATION_ROWS
@@ -223,6 +236,7 @@ export async function GET(request: Request) {
       priceHistoryHealth,
       priceTickHealth,
       eventHealth,
+      integrityGuardrails,
       latestRun: recentRuns[0] ?? null,
       recentRuns,
       warnings
@@ -251,6 +265,26 @@ async function loadRecentMarketRuns(supabase: ReturnType<typeof createServiceRol
   }
 
   return (data ?? []) as MarketRunRow[];
+}
+
+async function checkIntegrityGuardrails(
+  supabase: ReturnType<typeof createServiceRoleClient>
+): Promise<IntegrityGuardrailHealth> {
+  const checkedAt = new Date().toISOString();
+  const rpc = supabase.rpc as unknown as (
+    fn: string,
+    args: Record<string, unknown>
+  ) => Promise<{ error: { message: string } | null }>;
+  const { error } = await rpc("resolve_trade_market_eligibility", {
+    p_user_id: null,
+    p_requested: true
+  });
+
+  return {
+    ready: !error,
+    checkedAt,
+    error: error?.message ?? null
+  };
 }
 
 async function loadRecentObservations({
@@ -334,14 +368,13 @@ async function loadRecentPriceTicks({
     return [];
   }
 
-  const startDate = shiftDate(runDate, -lookbackDays);
-  const endDate = shiftDate(runDate, 1);
+  const { start, end } = getPacificMarketLookbackBoundsUtc(shiftDate(runDate, 1), lookbackDays + 1);
   const { data, error } = await supabase
     .from("price_ticks")
     .select("artist_id, observed_at, source")
     .in("artist_id", artistIds)
-    .gte("observed_at", `${startDate}T00:00:00.000Z`)
-    .lt("observed_at", `${endDate}T00:00:00.000Z`)
+    .gte("observed_at", start)
+    .lt("observed_at", end)
     .order("observed_at", { ascending: false })
     .limit(MAX_OBSERVATION_ROWS);
 
@@ -498,7 +531,7 @@ function buildPriceTickHealth({
   runDate: string;
   freshnessDays: number;
 }): PriceTickHealth {
-  const freshAt = `${shiftDate(runDate, -freshnessDays)}T00:00:00.000Z`;
+  const freshAt = getPacificMarketDayBoundsUtc(shiftDate(runDate, -freshnessDays)).start;
   const latestByArtist = new Map<string, string>();
 
   for (const tick of priceTicks) {
@@ -586,6 +619,7 @@ function buildWarnings({
   priceHistoryHealth,
   priceTickHealth,
   eventHealth,
+  integrityGuardrails,
   configuredModelVersion,
   defaultModelVersion,
   observationRowsTruncated
@@ -597,6 +631,7 @@ function buildWarnings({
   priceHistoryHealth: ReturnType<typeof buildPriceHistoryHealth>;
   priceTickHealth: PriceTickHealth;
   eventHealth: EventHealth;
+  integrityGuardrails: IntegrityGuardrailHealth;
   configuredModelVersion: string;
   defaultModelVersion: string;
   observationRowsTruncated: boolean;
@@ -706,6 +741,10 @@ function buildWarnings({
     warnings.push("No recent market events are recorded, so release/news/review modifiers are idle.");
   }
 
+  if (!integrityGuardrails.ready) {
+    warnings.push("Market integrity guardrails are missing. Run supabase/migrations/016_market_integrity_guardrails.sql.");
+  }
+
   if (observationRowsTruncated) {
     warnings.push("Observation health reached the row cap; add an aggregate SQL view before scaling much further.");
   }
@@ -775,10 +814,6 @@ function getPercent(numerator: number, denominator: number) {
   return (numerator / denominator) * 100;
 }
 
-function getToday() {
-  return new Date().toISOString().slice(0, 10);
-}
-
 function shiftDate(date: string, days: number) {
   const value = new Date(`${date}T00:00:00.000Z`);
   value.setUTCDate(value.getUTCDate() + days);
@@ -800,7 +835,7 @@ function formatMarketHealthError(error: unknown) {
     normalized.includes("model_version") ||
     normalized.includes("schema cache")
   ) {
-    return "Market engine storage needs setup. Run the Supabase migrations through 015_market_maker_quotes.sql.";
+    return "Market engine storage needs setup. Run the Supabase migrations through 016_market_integrity_guardrails.sql.";
   }
 
   return message;

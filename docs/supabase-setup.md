@@ -22,6 +22,7 @@ Rap Market Index uses Supabase for cloud accounts, saved portfolios, trades, mar
    - `supabase/migrations/013_price_ticks.sql`
    - `supabase/migrations/014_market_economy_guardrails.sql`
    - `supabase/migrations/015_market_maker_quotes.sql`
+   - `supabase/migrations/016_market_integrity_guardrails.sql`
    - `supabase/seed.sql`
 
 ## Configure the app
@@ -37,15 +38,15 @@ CRON_SECRET=
 ADMIN_EMAILS=
 MARKET_IMPACT_EXEMPT_EMAILS=
 MARKET_CRON_SOURCE=core
-MARKET_CRON_ARTIST_LIMIT=25
-MARKET_CRON_MAX_BATCHES=4
-MARKET_EVENT_SCAN_LIMIT=10
+MARKET_CRON_ARTIST_LIMIT=100
+MARKET_CRON_MAX_BATCHES=1
+MARKET_EVENT_SCAN_LIMIT=20
 MARKET_EVENT_SCAN_MAX_RECORDS=12
-MARKET_YOUTUBE_UPLOAD_EVENT_VIDEOS=2
+MARKET_YOUTUBE_UPLOAD_EVENT_VIDEOS=5
 MARKET_YOUTUBE_UPLOAD_EVENT_DAYS=14
 MARKET_YOUTUBE_COMMENT_VIDEOS=0
 MARKET_YOUTUBE_COMMENT_LIMIT=25
-MARKET_MODEL_VERSION=rmi-core-v8
+MARKET_MODEL_VERSION=rmi-core-v10
 LASTFM_API_KEY=
 SPOTIFY_CLIENT_ID=
 SPOTIFY_CLIENT_SECRET=
@@ -55,10 +56,10 @@ REDDIT_CLIENT_SECRET=
 REDDIT_USER_AGENT=
 MARKET_REDDIT_POST_LIMIT=25
 MARKET_REDDIT_LOOKBACK_DAYS=7
-MARKET_REDDIT_SUBREDDITS=hiphopheads,rap,undergroundhiphop,playboicarti
+MARKET_REDDIT_SUBREDDITS=hiphopheads,rap,trap,undergroundhiphop,playboicarti,soundcloud
 ```
 
-Use long random values for `MARKET_UPDATE_SECRET` and `CRON_SECRET`. Set `ADMIN_EMAILS` to the comma-separated email address list allowed to open `/dev`, for example `ADMIN_EMAILS=you@example.com`. Admin emails are also excluded from public price impact by default so you can test trades without moving the market; add `MARKET_IMPACT_EXEMPT_EMAILS` only if you want extra non-admin tester accounts excluded too. The service role key must stay server-only. `CRON_SECRET` is used by Vercel Cron to trigger the scheduled market update endpoint. `MARKET_CRON_SOURCE=core` runs the production daily market from Last.fm, public attention, YouTube channel stats, Reddit community-hype signals if credentials are configured, MusicBrainz release detection, trade flow, and Spotify if credentials are configured. The scheduled job also runs a small free GDELT event scan before pricing so news, reviews, releases, and major public moments can be saved into `market_events`; `MARKET_EVENT_SCAN_LIMIT=10` scans ten least-recently-scanned artists per day and `MARKET_EVENT_SCAN_LIMIT=0` disables that pre-scan. YouTube upload event detection reads recent official channel uploads without using expensive YouTube search; `MARKET_YOUTUBE_UPLOAD_EVENT_VIDEOS=2` samples up to two recent uploads per mapped artist and `MARKET_YOUTUBE_UPLOAD_EVENT_VIDEOS=0` disables it. YouTube comment sentiment is off by default; set `MARKET_YOUTUBE_COMMENT_VIDEOS=1` only when you want to spend extra YouTube quota on comments. Reddit community-hype detection uses app-only OAuth, stores aggregate observations only, and can classify snippet, feature, viral performance, release, chart, controversy, and decline posts as events when engagement is strong enough. `MARKET_MODEL_VERSION` is an internal audit label saved with market runs and price history; keep it at `rmi-core-v8` until the pricing algorithm materially changes. MusicBrainz release detection does not require an API key, but artists need `musicbrainz_id` set in `artist_external_ids`. `LASTFM_API_KEY` is optional, but it enables the free Last.fm listener/playcount market signal adapter. `SPOTIFY_CLIENT_ID` and `SPOTIFY_CLIENT_SECRET` are optional, but they enable Spotify artist popularity and follower signals. `YOUTUBE_API_KEY` is optional, but it enables YouTube channel view/subscriber/video-count signals for artists with `youtube_channel_id` set in `artist_external_ids`.
+Use long random values for `MARKET_UPDATE_SECRET` and `CRON_SECRET`. Set `ADMIN_EMAILS` to the comma-separated email address list allowed to open `/dev`, for example `ADMIN_EMAILS=you@example.com`. Admin emails are also excluded from public price impact by default so you can test trades without moving the market; add `MARKET_IMPACT_EXEMPT_EMAILS` only if you want extra non-admin tester accounts excluded too. New accounts can trade immediately, but migration `016` excludes their first-day orders from public price impact and trade-flow pricing signals. The service role key must stay server-only. `CRON_SECRET` is used by Vercel Cron to trigger the scheduled market update endpoint. `MARKET_CRON_SOURCE=core` runs the production daily market from Last.fm, public attention, YouTube channel stats, Reddit community-hype signals if credentials are configured, MusicBrainz release detection, trade flow, and Spotify if credentials are configured. The scheduled job also runs a small free GDELT event scan before pricing so news, reviews, releases, and major public moments can be saved into `market_events`; `MARKET_EVENT_SCAN_LIMIT=20` scans twenty least-recently-scanned artists per day and `MARKET_EVENT_SCAN_LIMIT=0` disables that pre-scan. YouTube upload event detection reads recent official channel uploads without using expensive YouTube search; `MARKET_YOUTUBE_UPLOAD_EVENT_VIDEOS=5` samples up to five recent uploads per mapped artist and `MARKET_YOUTUBE_UPLOAD_EVENT_VIDEOS=0` disables it. YouTube comment sentiment is off by default; set `MARKET_YOUTUBE_COMMENT_VIDEOS=1` only when you want to spend extra YouTube quota on comments. Reddit community-hype detection uses app-only OAuth, stores aggregate observations only, and can classify snippet, feature, viral performance, release, chart, controversy, and decline posts as events when engagement is strong enough. `MARKET_MODEL_VERSION` is an internal audit label saved with market runs and price history; keep it at `rmi-core-v10` until the pricing algorithm materially changes. MusicBrainz release detection does not require an API key, but artists need `musicbrainz_id` set in `artist_external_ids`. `LASTFM_API_KEY` is optional, but it enables the free Last.fm listener/playcount market signal adapter. `SPOTIFY_CLIENT_ID` and `SPOTIFY_CLIENT_SECRET` are optional, but they enable Spotify artist popularity and follower signals. `YOUTUBE_API_KEY` is optional, but it enables YouTube channel view/subscriber/video-count signals for artists with `youtube_channel_id` set in `artist_external_ids`.
 
 ## Verify
 

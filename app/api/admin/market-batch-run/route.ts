@@ -3,6 +3,7 @@ import { createServiceRoleClient, getSupabaseConfigStatus } from "@/lib/supabase
 import type { Json } from "@/lib/supabase/database.types";
 import { requireAdminRequest } from "@/server/admin-auth";
 import type { MarketUpdateSource } from "@/server/market/daily-update";
+import { getPacificMarketDate } from "@/server/market/market-date";
 import { getMarketModelVersion } from "@/server/market/model-version";
 
 export const dynamic = "force-dynamic";
@@ -54,6 +55,14 @@ type DailyUpdateResponse = {
     averageSourceQualityMultiplier?: number;
     technicalAdjustmentCount?: number;
     averageTechnicalAdjustment?: number;
+    catalystArtistCount?: number;
+    highPriorityCatalystArtistCount?: number;
+    mixedCatalystArtistCount?: number;
+    averageNetCatalystShock?: number;
+    averageAbsCatalystShock?: number;
+    sourceConflictArtistCount?: number;
+    averageSourceDirectionSpread?: number;
+    averageSourceCount?: number;
     signalCoverageScore?: number;
     reliabilityScore?: number;
     movementBalanceScore?: number;
@@ -86,6 +95,14 @@ type BatchRunSummary = {
   averageSourceQualityMultiplier: number;
   technicalAdjustmentCount: number;
   averageTechnicalAdjustment: number;
+  catalystArtistCount: number;
+  highPriorityCatalystArtistCount: number;
+  mixedCatalystArtistCount: number;
+  averageNetCatalystShock: number;
+  averageAbsCatalystShock: number;
+  sourceConflictArtistCount: number;
+  averageSourceDirectionSpread: number;
+  averageSourceCount: number;
   signalCoverageScore: number;
   reliabilityScore: number;
   movementBalanceScore: number;
@@ -103,7 +120,7 @@ type BatchRunSummary = {
   };
 };
 
-const DEFAULT_BATCH_SIZE = 50;
+const DEFAULT_BATCH_SIZE = 100;
 const MAX_BATCH_SIZE = 100;
 const MAX_BATCHES_PER_REQUEST = 10;
 
@@ -150,7 +167,7 @@ export async function POST(request: Request) {
   const body = await parseBody(request);
   const source = normalizeSource(body.source);
   const dryRun = body.dryRun !== false;
-  const runDate = body.runDate ?? getToday();
+  const runDate = body.runDate ?? getPacificMarketDate();
   const modelVersion = getMarketModelVersion();
   const artistLimit = normalizePositiveInteger(body.artistLimit, DEFAULT_BATCH_SIZE, MAX_BATCH_SIZE);
   const maxBatches = normalizePositiveInteger(body.maxBatches, 1, MAX_BATCHES_PER_REQUEST);
@@ -303,6 +320,20 @@ function buildBatchRunSummary({
   const averageSourceQualityMultiplier = getWeightedAverage(runs, "averageSourceQualityMultiplier", artistCount);
   const technicalAdjustmentCount = runs.reduce((total, run) => total + (run.summary?.technicalAdjustmentCount ?? 0), 0);
   const averageTechnicalAdjustment = getWeightedAverage(runs, "averageTechnicalAdjustment", artistCount);
+  const catalystArtistCount = runs.reduce((total, run) => total + (run.summary?.catalystArtistCount ?? 0), 0);
+  const highPriorityCatalystArtistCount = runs.reduce(
+    (total, run) => total + (run.summary?.highPriorityCatalystArtistCount ?? 0),
+    0
+  );
+  const mixedCatalystArtistCount = runs.reduce((total, run) => total + (run.summary?.mixedCatalystArtistCount ?? 0), 0);
+  const averageNetCatalystShock = getWeightedAverage(runs, "averageNetCatalystShock", artistCount);
+  const averageAbsCatalystShock = getWeightedAverage(runs, "averageAbsCatalystShock", artistCount);
+  const sourceConflictArtistCount = runs.reduce(
+    (total, run) => total + (run.summary?.sourceConflictArtistCount ?? 0),
+    0
+  );
+  const averageSourceDirectionSpread = getWeightedAverage(runs, "averageSourceDirectionSpread", artistCount);
+  const averageSourceCount = getWeightedAverage(runs, "averageSourceCount", artistCount);
   const signalCoverageScore = getWeightedAverage(runs, "signalCoverageScore", artistCount);
   const reliabilityScore = getWeightedAverage(runs, "reliabilityScore", artistCount);
   const movementBalanceScore = getWeightedAverage(runs, "movementBalanceScore", artistCount);
@@ -337,6 +368,14 @@ function buildBatchRunSummary({
     averageSourceQualityMultiplier,
     technicalAdjustmentCount,
     averageTechnicalAdjustment,
+    catalystArtistCount,
+    highPriorityCatalystArtistCount,
+    mixedCatalystArtistCount,
+    averageNetCatalystShock,
+    averageAbsCatalystShock,
+    sourceConflictArtistCount,
+    averageSourceDirectionSpread,
+    averageSourceCount,
     signalCoverageScore,
     reliabilityScore,
     movementBalanceScore,
@@ -371,6 +410,10 @@ function getWeightedAverage(
     | "averageSignalDelta"
     | "averageSourceQualityMultiplier"
     | "averageTechnicalAdjustment"
+    | "averageNetCatalystShock"
+    | "averageAbsCatalystShock"
+    | "averageSourceDirectionSpread"
+    | "averageSourceCount"
     | "signalCoverageScore"
     | "reliabilityScore"
     | "movementBalanceScore"
@@ -419,8 +462,4 @@ async function persistBatchRunSummary(runDate: string, summary: BatchRunSummary)
   if (error) {
     throw new Error(`Could not save aggregate market run summary: ${error.message}`);
   }
-}
-
-function getToday() {
-  return new Date().toISOString().slice(0, 10);
 }

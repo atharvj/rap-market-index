@@ -36,6 +36,17 @@ type GdeltCollectOptions = {
   fetchImpl?: typeof fetch;
 };
 
+type ArticleReleaseKind = "album" | "ep" | "mixtape" | "single";
+
+type GdeltArticleClassification = {
+  eventType: MarketEvent["eventType"];
+  sentimentScore: number;
+  impactScore: number;
+  confidence: number;
+  reason: string;
+  releaseKind?: ArticleReleaseKind;
+};
+
 export type GdeltMarketSignals = {
   signals: AdapterSignals;
   observations: MarketObservation[];
@@ -305,14 +316,29 @@ function buildGdeltArticleEvents({
     const url = article.url?.trim();
     const domain = normalizeDomain(article.domain, url);
     const eventDate = parseGdeltSeenDate(article.seendate) ?? runDate;
+    const sourceTier = domain ? getSourceTier(domain) : 0;
 
-    if (!title || !url || !domain || !mentionsArtist(title, artist.name, query)) {
+    if (!title || !url || !domain) {
       continue;
     }
 
     const classification = classifyArticleEvent(title, domain, article.tone);
 
     if (!classification) {
+      continue;
+    }
+
+    const titleMatchedArtist = mentionsArtist(title, artist.name, query);
+
+    if (
+      !isRelevantGdeltEvent({
+        artistName: artist.name,
+        query,
+        classification,
+        sourceTier,
+        titleMatchedArtist
+      })
+    ) {
       continue;
     }
 
@@ -340,7 +366,10 @@ function buildGdeltArticleEvents({
         seenDate: article.seendate ?? null,
         tone: getNumber(article.tone),
         classificationReason: classification.reason,
-        sourceTier: getSourceTier(domain)
+        releaseKind: classification.releaseKind ?? null,
+        titleMatchedArtist,
+        relaxedTitlelessArtistMatch: !titleMatchedArtist,
+        sourceTier
       }
     });
 
@@ -352,7 +381,34 @@ function buildGdeltArticleEvents({
   return events;
 }
 
-function classifyArticleEvent(title: string, domain: string, tone: unknown) {
+function isRelevantGdeltEvent({
+  artistName,
+  query,
+  classification,
+  sourceTier,
+  titleMatchedArtist
+}: {
+  artistName: string;
+  query: string;
+  classification: GdeltArticleClassification;
+  sourceTier: number;
+  titleMatchedArtist: boolean;
+}) {
+  if (titleMatchedArtist) {
+    return true;
+  }
+
+  if (!classification || sourceTier < 1 || isAmbiguousArtistSearch(artistName, query)) {
+    return false;
+  }
+
+  return (
+    TITLELESS_ARTIST_MATCH_REASONS.has(classification.reason) &&
+    Math.abs(classification.impactScore) >= 45
+  );
+}
+
+function classifyArticleEvent(title: string, domain: string, tone: unknown): GdeltArticleClassification | null {
   const lowerTitle = title.toLowerCase();
   const sourceTier = getSourceTier(domain);
   const toneScore = clamp((getNumber(tone) ?? 0) * 8, -45, 45);
@@ -426,6 +482,16 @@ function classifyArticleEvent(title: string, domain: string, tone: unknown) {
     };
   }
 
+  if (hasAny(lowerTitle, MAJOR_FEATURE_TERMS)) {
+    return {
+      eventType: "viral" as const,
+      sentimentScore: clamp(38 + Math.max(0, toneScore * 0.6), -15, 88),
+      impactScore: clamp(58 + Math.max(0, toneScore), -12, 96),
+      confidence: getArticleConfidence(sourceTier, 0.74),
+      reason: "major_feature_terms"
+    };
+  }
+
   if (hasAny(lowerTitle, FEATURE_TERMS)) {
     return {
       eventType: "viral" as const,
@@ -487,12 +553,16 @@ function classifyArticleEvent(title: string, domain: string, tone: unknown) {
   }
 
   if (hasAny(lowerTitle, RELEASE_TERMS) && sourceTier >= 1) {
+    const releaseKind = getArticleReleaseKind(lowerTitle);
+    const isProjectRelease = releaseKind === "album" || releaseKind === "ep" || releaseKind === "mixtape";
+
     return {
       eventType: "release" as const,
-      sentimentScore: clamp(28 + toneScore * 0.4, -35, 75),
-      impactScore: clamp(38 + Math.max(0, toneScore), -15, 85),
-      confidence: getArticleConfidence(sourceTier, 0.62),
-      reason: "release_terms"
+      sentimentScore: clamp((isProjectRelease ? 34 : 28) + toneScore * 0.4, -35, 78),
+      impactScore: clamp((isProjectRelease ? 52 : 38) + Math.max(0, toneScore), -15, 88),
+      confidence: getArticleConfidence(sourceTier, isProjectRelease ? 0.68 : 0.62),
+      reason: "release_terms",
+      releaseKind: releaseKind ?? undefined
     };
   }
 
@@ -504,6 +574,38 @@ function classifyArticleEvent(title: string, domain: string, tone: unknown) {
       confidence: getArticleConfidence(sourceTier, 0.58),
       reason: "tiered_news_tone"
     };
+  }
+
+  return null;
+}
+
+function getArticleReleaseKind(title: string): ArticleReleaseKind | null {
+  if (
+    hasAny(title, [
+      "album",
+      "full-length",
+      "full length",
+      "lp",
+      "new project",
+      "project out now",
+      "upcoming project",
+      "deluxe",
+      "tracklist"
+    ])
+  ) {
+    return "album";
+  }
+
+  if (/\bep\b/.test(title)) {
+    return "ep";
+  }
+
+  if (hasAny(title, ["mixtape", "tape"])) {
+    return "mixtape";
+  }
+
+  if (hasAny(title, ["single", "new song", "music video", "visualizer", "new track"])) {
+    return "single";
   }
 
   return null;
@@ -575,6 +677,18 @@ function mentionsArtist(title: string, artistName: string, query?: string) {
   }
 
   return false;
+}
+
+function isAmbiguousArtistSearch(artistName: string, query?: string) {
+  const candidateNames = [artistName, ...extractQuotedSearchPhrases(query)].filter(Boolean);
+
+  return candidateNames.some((candidate) => {
+    const normalized = normalizeSearchText(candidate);
+    const compact = normalized.replace(/\s+/g, "");
+    const wordCount = normalized.split(/\s+/).filter(Boolean).length;
+
+    return compact.length <= 3 || (wordCount === 1 && compact.length <= 4);
+  });
 }
 
 function containsNormalizedPhrase(normalizedText: string, normalizedPhrase: string) {
@@ -737,6 +851,15 @@ const TIER_ONE_DOMAINS = new Set([
   "xxlmag.com"
 ]);
 
+const TITLELESS_ARTIST_MATCH_REASONS = new Set([
+  "major_feature_terms",
+  "feature_terms",
+  "chart_terms",
+  "review_domain",
+  "performance_terms",
+  "viral_terms"
+]);
+
 const CONTROVERSY_TERMS = [
   "accused",
   "arrest",
@@ -775,15 +898,21 @@ const RELEASE_TERMS = [
   "deluxe",
   "drops",
   "ep out now",
+  "full album",
+  "full project",
   "hear new",
   "mixtape",
+  "mixtape out now",
   "music video",
   "new album",
   "new ep",
+  "new mixtape",
   "new project",
   "new song",
   "new single",
+  "new tape",
   "out now",
+  "project out now",
   "release",
   "release date",
   "released",
@@ -844,6 +973,54 @@ const FEATURE_TERMS = [
   "joins",
   "teams up",
   "verse",
+  "with carti",
+  "with drake",
+  "with future",
+  "with kendrick",
+  "with travis"
+];
+const MAJOR_FEATURE_TERMS = [
+  "carti feature",
+  "carti verse",
+  "carti cosign",
+  "carti co sign",
+  "carti co-sign",
+  "carti assisted",
+  "carti-assisted",
+  "drake feature",
+  "drake verse",
+  "drake cosign",
+  "drake co sign",
+  "drake co-sign",
+  "drake assisted",
+  "drake-assisted",
+  "feat. carti",
+  "feat. drake",
+  "feat. future",
+  "feat. kendrick",
+  "feat. travis",
+  "feat carti",
+  "feat drake",
+  "feat future",
+  "feat kendrick",
+  "feat travis",
+  "featuring carti",
+  "featuring drake",
+  "featuring future",
+  "featuring kendrick",
+  "featuring travis",
+  "ft. carti",
+  "ft. drake",
+  "ft. future",
+  "ft. kendrick",
+  "ft. travis",
+  "ft carti",
+  "ft drake",
+  "ft future",
+  "ft kendrick",
+  "ft travis",
+  "opium co-sign",
+  "opium cosign",
   "with carti",
   "with drake",
   "with future",
@@ -918,14 +1095,18 @@ const NEWS_TERMS = [
 const POSITIVE_REVIEW_TERMS = [
   "acclaimed",
   "best",
+  "best new music",
+  "best new track",
   "brilliant",
   "classic",
   "essential",
   "excellent",
   "great",
+  "highlights",
   "inventive",
   "must-hear",
   "must hear",
+  "standout",
   "powerful",
   "revelatory",
   "strong",
@@ -936,15 +1117,21 @@ const NEGATIVE_REVIEW_TERMS = [
   "bad",
   "bloated",
   "boring",
+  "confusing",
   "disappointing",
   "fails",
   "flat",
   "forgettable",
+  "inconsistent",
+  "lifeless",
   "mess",
   "misfire",
+  "mixed",
   "negative",
+  "panned",
   "poor",
   "sloppy",
+  "uneven",
   "weak",
   "worst"
 ];

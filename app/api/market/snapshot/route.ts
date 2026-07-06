@@ -3,6 +3,7 @@ import { createInitialGameState } from "@/lib/market";
 import { createAnonServerClient, getSupabaseConfigStatus } from "@/lib/supabase/server";
 import type { Database } from "@/lib/supabase/database.types";
 import type { Artist, GameState, HypeStats, PricePoint } from "@/lib/types";
+import { getPacificMarketDate, shiftMarketDate } from "@/server/market/market-date";
 
 export const dynamic = "force-dynamic";
 
@@ -57,7 +58,7 @@ export async function GET() {
       ),
       holdings: [],
       transactions: [],
-      lastUpdatedAt: new Date().toISOString().slice(0, 10)
+      lastUpdatedAt: getPacificMarketDate()
     };
 
     return NextResponse.json({
@@ -111,7 +112,7 @@ async function loadHistoryByArtist(
     .from("price_history")
     .select("artist_id, price_date, price")
     .in("artist_id", artistIds)
-    .gte("price_date", shiftDate(new Date().toISOString().slice(0, 10), -PRICE_HISTORY_LOOKBACK_DAYS))
+    .gte("price_date", shiftMarketDate(getPacificMarketDate(), -PRICE_HISTORY_LOOKBACK_DAYS))
     .order("price_date", { ascending: true });
 
   if (error) {
@@ -131,7 +132,7 @@ async function loadHistoryByArtist(
 function mapArtist(row: ArtistRow, stats: ArtistStatsRow | null, history: PricePoint[]): Artist {
   const fallbackHistory = [
     {
-      date: new Date().toISOString().slice(0, 10),
+      date: getPacificMarketDate(),
       price: Number(row.current_price)
     }
   ];
@@ -162,11 +163,4 @@ function mapStats(stats: ArtistStatsRow | null): HypeStats {
     newsScore: Number(stats?.news_score ?? 50),
     traderDemand: Number(stats?.trader_demand ?? 0)
   };
-}
-
-function shiftDate(date: string, days: number) {
-  const value = new Date(`${date}T00:00:00.000Z`);
-  value.setUTCDate(value.getUTCDate() + days);
-
-  return value.toISOString().slice(0, 10);
 }

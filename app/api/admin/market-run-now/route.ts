@@ -12,6 +12,20 @@ type MarketRunNowBody = {
   artistLimit?: number;
   artistOffset?: number;
   maxBatches?: number;
+  eventScanLimit?: number;
+  eventScanMaxRecords?: number;
+};
+
+type MarketEventScanResponse = {
+  ok: boolean;
+  error?: string;
+  dryRun?: boolean;
+  persisted?: boolean;
+  runDate?: string;
+  scannedArtistCount?: number;
+  observationCount?: number;
+  eventCount?: number;
+  eventTypeCounts?: Record<string, number>;
 };
 
 type MarketBatchRunResponse = {
@@ -48,6 +62,8 @@ type MarketBatchRunResponse = {
 
 const DEFAULT_RUN_NOW_ARTIST_LIMIT = 10;
 const DEFAULT_RUN_NOW_MAX_BATCHES = 1;
+const DEFAULT_RUN_NOW_EVENT_SCAN_LIMIT = 20;
+const DEFAULT_RUN_NOW_EVENT_SCAN_MAX_RECORDS = 12;
 
 export async function POST(request: Request) {
   const auth = await requireAdminRequest(request, { allowMarketSecret: false });
@@ -84,9 +100,25 @@ export async function POST(request: Request) {
   const body = await parseBody(request);
   const dryRun = body.dryRun === true;
   const force = body.force !== false;
+  const runDate = body.runDate && /^\d{4}-\d{2}-\d{2}$/.test(body.runDate) ? body.runDate : undefined;
   const artistLimit = normalizeInteger(body.artistLimit, DEFAULT_RUN_NOW_ARTIST_LIMIT, 1, 25);
   const artistOffset = normalizeInteger(body.artistOffset, 0, 0, Number.MAX_SAFE_INTEGER);
   const maxBatches = normalizeInteger(body.maxBatches, DEFAULT_RUN_NOW_MAX_BATCHES, 1, 2);
+  const eventScanLimit = normalizeInteger(body.eventScanLimit, DEFAULT_RUN_NOW_EVENT_SCAN_LIMIT, 0, 20);
+  const eventScanMaxRecords = normalizeInteger(
+    body.eventScanMaxRecords,
+    DEFAULT_RUN_NOW_EVENT_SCAN_MAX_RECORDS,
+    1,
+    25
+  );
+  const eventScan = await runEventScan({
+    request,
+    marketSecret,
+    dryRun,
+    runDate,
+    artistLimit: eventScanLimit,
+    maxRecords: eventScanMaxRecords
+  });
   const response = await fetch(new URL("/api/admin/market-batch-run", request.url), {
     method: "POST",
     headers: {
@@ -96,7 +128,7 @@ export async function POST(request: Request) {
     body: JSON.stringify({
       dryRun,
       source: "core",
-      runDate: body.runDate && /^\d{4}-\d{2}-\d{2}$/.test(body.runDate) ? body.runDate : undefined,
+      runDate,
       artistLimit,
       artistOffset,
       maxBatches
@@ -109,6 +141,7 @@ export async function POST(request: Request) {
       {
         ok: false,
         error: payload.error ?? "Market run failed.",
+        eventScan,
         payload
       },
       { status: response.status || 500 }
@@ -124,8 +157,66 @@ export async function POST(request: Request) {
     source: payload.source ?? null,
     artistLimit,
     artistOffset,
+    eventScan,
     result: payload
   });
+}
+
+async function runEventScan({
+  request,
+  marketSecret,
+  dryRun,
+  runDate,
+  artistLimit,
+  maxRecords
+}: {
+  request: Request;
+  marketSecret: string;
+  dryRun: boolean;
+  runDate?: string;
+  artistLimit: number;
+  maxRecords: number;
+}): Promise<
+  | {
+      ok: true;
+      disabled: true;
+      reason: string;
+    }
+  | {
+      ok: boolean;
+      disabled?: false;
+      error?: string;
+      payload?: MarketEventScanResponse;
+    }
+> {
+  if (artistLimit <= 0) {
+    return {
+      ok: true,
+      disabled: true,
+      reason: "eventScanLimit is 0."
+    };
+  }
+
+  const response = await fetch(new URL("/api/admin/market-event-scan", request.url), {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      "x-market-update-secret": marketSecret
+    },
+    body: JSON.stringify({
+      dryRun,
+      runDate,
+      artistLimit,
+      maxRecords
+    })
+  });
+  const payload = await readJsonResponse<MarketEventScanResponse>(response);
+
+  return {
+    ok: response.ok && payload.ok,
+    error: response.ok && payload.ok ? undefined : payload.error ?? "Market event scan failed.",
+    payload
+  };
 }
 
 async function parseBody(request: Request): Promise<MarketRunNowBody> {

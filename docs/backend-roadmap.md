@@ -20,6 +20,7 @@ This app still runs in development with unsaved demo data, but the backend found
 14. Run `supabase/migrations/013_price_ticks.sql`.
 15. Run `supabase/migrations/014_market_economy_guardrails.sql`.
 16. Run `supabase/migrations/015_market_maker_quotes.sql`.
+17. Run `supabase/migrations/016_market_integrity_guardrails.sql`.
 17. Run `supabase/seed.sql` for the starter artists.
 18. Create `.env.local` in the project root and fill in:
    - `NEXT_PUBLIC_SUPABASE_URL`
@@ -28,16 +29,16 @@ This app still runs in development with unsaved demo data, but the backend found
    - `MARKET_UPDATE_SECRET`
    - `CRON_SECRET`
    - `MARKET_CRON_SOURCE=core`
-   - `MARKET_CRON_ARTIST_LIMIT=25`
-   - `MARKET_CRON_MAX_BATCHES=4`
-   - `MARKET_EVENT_SCAN_LIMIT=10`
+   - `MARKET_CRON_ARTIST_LIMIT=100`
+   - `MARKET_CRON_MAX_BATCHES=1`
+   - `MARKET_EVENT_SCAN_LIMIT=20`
    - `MARKET_EVENT_SCAN_MAX_RECORDS=12`
-   - `MARKET_YOUTUBE_UPLOAD_EVENT_VIDEOS=2`
+   - `MARKET_YOUTUBE_UPLOAD_EVENT_VIDEOS=5`
    - `MARKET_YOUTUBE_UPLOAD_EVENT_DAYS=14`
    - `MARKET_YOUTUBE_COMMENT_VIDEOS=0`
    - `MARKET_YOUTUBE_COMMENT_LIMIT=25`
    - `ADMIN_EMAILS=<comma-separated admin emails>`
-   - `MARKET_MODEL_VERSION=rmi-core-v8`
+   - `MARKET_MODEL_VERSION=rmi-core-v10`
    - `LASTFM_API_KEY` for optional Last.fm listener/playcount signals
    - `SPOTIFY_CLIENT_ID` and `SPOTIFY_CLIENT_SECRET` for optional Spotify popularity/follower signals
    - `YOUTUBE_API_KEY` for optional YouTube channel view/subscriber/video-count and comment-reaction signals
@@ -167,6 +168,10 @@ After deployment, manually call `/api/cron/daily-market-update?dryRun=1` with `A
 
 `MARKET_MODEL_VERSION` is an internal audit label, not a prominent user-facing product label. It is saved on market runs, signal snapshots, and price-history rows so future algorithm changes can be traced without rewriting historical prices. Normal market pages should keep broad language such as audience momentum, market activity, release signals, and media movement. Admin/health/debug views can show the exact model version.
 
+`rmi-core-v10` adds market integrity rules to the pricing loop. Trade-flow observations are still recorded, but they no longer become a `traderDemand` pricing signal unless order flow has at least three traders, at least $1,000 of eligible gross value, and no trader controlling more than 70% of the recent artist flow. New accounts can trade immediately, but their orders are marked market-ineligible for the first 24 hours by both the app route and `016_market_integrity_guardrails.sql`, so brand-new or duplicate accounts cannot immediately move public prices or feed the daily trade-flow model. The direct trade-impact function also checks database-side eligibility, so calling the Supabase RPC directly cannot bypass the cooldown.
+
+`rmi-core-v9` makes event provenance part of pricing. Reddit catalysts now scale by engagement tier and subreddit tier, so small fan posts are dampened while major or breakout community attention gets more trust. Reddit collection queries both new and top weekly posts, then dedupes them, so a viral snippet or performance can still be detected if it happened earlier in the lookback window. GDELT/news events now scale by source tier, so weak article sources have less pricing power than stronger music or mainstream sources. Major features/cosigns, such as Drake, Carti, Future, Kendrick, or Travis-linked moments, are separated from ordinary feature chatter with a higher priority and wider positive shock cap. GDELT can also accept a high-signal article that matched the artist query even when the title leads with the bigger artist, but only for non-ambiguous artist names and stronger source/event matches. GDELT and official YouTube upload events now carry structured release kind metadata, so album, EP, mixtape, and deluxe/project catalysts are preferred over nearby individual track-upload reasons. Official YouTube upload sampling defaults to five recent uploads per artist, still without using expensive YouTube search, so release weeks with several track uploads are less likely to hide the real project catalyst. Relative repricing now adds a small opportunity-cost drift to the weakest quartile during broad positive markets when they do not have a positive high-priority catalyst, making all-green days less likely without suppressing real artist news. Release-database and official-upload events carry explicit provenance metadata in signal snapshots, and the default Reddit search pool now includes `trap` and `soundcloud` for better underground and SoundCloud-era coverage.
+
 `rmi-core-v8` improves catalyst attribution and broad-market realism. Full project releases now outrank nearby single-track uploads, and structured MusicBrainz release kinds such as album, EP, mixtape, and single are trusted even when the title does not say "album" or "single". The event layer builds release-cycle context so project drops can absorb related track uploads, reviews, chart signals, snippets, and tracklist/cover-art reception instead of letting one small upload become the headline reason. Price runs now store `catalystDiagnostics`, `modifierImpact`, and `sourceAttribution` in signal snapshots so admin/debug views can identify the main catalyst, opposing catalyst, source disagreement, and net event shock behind a move. Reddit events now tag project-release chatter and engagement tier, helping separate small fan hype from major community attention. Relative repricing also adds a small crowded-market pressure adjustment, so weak/no-signal names are less likely to drift up merely because the full market had positive inputs. Run summaries now include catalyst counts, mixed-catalyst counts, source-conflict counts, and average source spread so `/dev` can warn when a market run is difficult to trust.
 
 `rmi-core-v7` tightens price discovery for continuous markets. Audience snapshot sources such as Last.fm listeners/plays, Spotify followers/popularity, and YouTube channel totals compare against the latest prior observation instead of the 30-day average, then normalize by baseline age so multi-day accumulated growth is not mistaken for a one-day breakout. Snapshot adapters now lower confidence for stale baselines, impossible counter drops, extreme one-run jumps, and weak external artist-name matches before those values reach the blended model. Price-history context is also loaded from recent `price_history` rows, letting the model dampen overextended run-ups, respect weak downtrends, support confirmed reversals, and reduce noisy moves after high recent volatility. Old stored momentum decays toward neutral every run, and stale prior hype can create a small pullback when no fresh confirming signal appears. It also caps reliability for thin single-source moves, while allowing broader multi-source confirmation and event support to carry more weight. Source-level disagreement is now scored, so cases like streaming growth with negative reviews/news/community reaction are dampened instead of treated as clean bullish moves. Daily movement caps now scale down with low reliability, weak source quality, or source conflict. Same-day duplicate event detections are cluster-capped by event type so one release, snippet, or controversy cannot stack unlimited shocks from several sources; independent source confirmation can lift confidence inside that cap. Event shocks are subtype-aware, so features, viral performances, chart moments, snippets, reviews, controversies, and decline chatter use different price-shock limits. Feature, performance, snippet, and decline vocabulary is recognized across article events, Reddit posts, and official upload titles so early hype and falloff signals can be classified automatically. The event layer now separates longer-lived background event signal from short-lived direct price shock, preventing the same older release, review, or viral post from repricing the stock like a brand-new catalyst every day. Relative repricing is stronger so weak or missing momentum can drift lower when stronger artists are attracting the day's attention, and that relative pressure is dampened when a cron batch only covers part of the active roster. Run summaries now record up/down/flat counts, reliability bands, source-quality diagnostics, price-action guardrail usage, and market quality scores so `/dev` can warn when the market is one-sided, low-confidence, overextended, or low-quality.
@@ -263,9 +268,9 @@ When enabled, the YouTube comments path samples recent comments from each artist
 
 Raw comment text is not saved. The first run is treated as a baseline; later runs move the social/news/search parts of the model from changes in sentiment, likes, and net positive-vs-negative share. This prevents every naturally positive fan comment section from pushing a stock up every day.
 
-The YouTube upload event path is separate from comment sentiment. It uses official channel upload playlists for artists with `youtube_channel_id`, classifies recent upload titles such as official videos, new singles, album trailers, deluxe/tracklist announcements, snippets, teasers, freestyles, performances, and tour announcements, and stores those matches as `market_events`. It does not use YouTube search, so it is much cheaper and less ambiguous than searching all of YouTube for an artist name. Defaults are `MARKET_YOUTUBE_UPLOAD_EVENT_VIDEOS=2` and `MARKET_YOUTUBE_UPLOAD_EVENT_DAYS=14`.
+The YouTube upload event path is separate from comment sentiment. It uses official channel upload playlists for artists with `youtube_channel_id`, classifies recent upload titles such as official videos, new singles, album trailers, deluxe/tracklist announcements, snippets, teasers, freestyles, performances, and tour announcements, and stores those matches as `market_events`. It does not use YouTube search, so it is much cheaper and less ambiguous than searching all of YouTube for an artist name. Defaults are `MARKET_YOUTUBE_UPLOAD_EVENT_VIDEOS=5` and `MARKET_YOUTUBE_UPLOAD_EVENT_DAYS=14`.
 
-The Reddit path is a community-hype adapter, not a pure sentiment adapter. It searches configured music subreddits for each artist, stores aggregate observations only, and looks for broad attention plus catalyst language such as snippets, features, viral performances, release news, chart movement, controversies, or decline terms. Defaults are `MARKET_REDDIT_POST_LIMIT=25`, `MARKET_REDDIT_LOOKBACK_DAYS=7`, and `MARKET_REDDIT_SUBREDDITS=hiphopheads,rap,undergroundhiphop,playboicarti`. If Reddit credentials are missing, the rest of the `core` engine still runs.
+The Reddit path is a community-hype adapter, not a pure sentiment adapter. It searches configured music subreddits for each artist, stores aggregate observations only, and looks for broad attention plus catalyst language such as snippets, features, viral performances, release news, chart movement, controversies, or decline terms. It fetches both new and top weekly search results so high-engagement posts are not missed just because they are no longer the newest result. Defaults are `MARKET_REDDIT_POST_LIMIT=25`, `MARKET_REDDIT_LOOKBACK_DAYS=7`, and `MARKET_REDDIT_SUBREDDITS=hiphopheads,rap,trap,undergroundhiphop,playboicarti,soundcloud`. If Reddit credentials are missing, the rest of the `core` engine still runs.
 
 The `core` and `blended` paths also detect recent MusicBrainz release groups for artists with `musicbrainz_id` set. The detector reads up to 100 release groups per artist so major artists with large catalogs do not hide recent releases behind older metadata. It stores confirmed releases as `market_events` with `eventType: "release"`, then lets the existing event/review layer apply decay, confidence, and price-shock caps. It only accepts full `YYYY-MM-DD` release dates and filters compilation/live/catalog-style records so vague metadata does not move the market.
 
@@ -283,7 +288,7 @@ The update endpoint is batch-aware for a larger artist universe:
 
 - `artistLimit` caps a single request at 100 artists.
 - `artistOffset` starts the batch from a later point in the ticker-sorted artist list.
-- Persisted real-source runs default to 50 artists per request when no limit is supplied.
+- Persisted real-source runs default to 100 artists per request when no limit is supplied.
 - The response includes `batch.hasMore` and `batch.nextOffset`, so a scheduler can keep running the next batch without rereading every artist.
 
 Example persisted batch:
@@ -337,11 +342,11 @@ GET /api/cron/daily-market-update
 Vercel schedules cron in UTC, so this runs around 2 AM Pacific during daylight saving time. Hobby accounts support once-daily cron jobs, with per-hour scheduling precision. The route verifies `Authorization: Bearer <CRON_SECRET>`, then calls the protected batch runner with:
 
 - `source`: `MARKET_CRON_SOURCE`, default `core`
-- `artistLimit`: `MARKET_CRON_ARTIST_LIMIT`, default `25`
-- `maxBatches`: `MARKET_CRON_MAX_BATCHES`, default `4`
-- `eventScanLimit`: `MARKET_EVENT_SCAN_LIMIT`, default `10`
+- `artistLimit`: `MARKET_CRON_ARTIST_LIMIT`, default `100`
+- `maxBatches`: `MARKET_CRON_MAX_BATCHES`, default `1`
+- `eventScanLimit`: `MARKET_EVENT_SCAN_LIMIT`, default `20`
 - `eventScanMaxRecords`: `MARKET_EVENT_SCAN_MAX_RECORDS`, default `12`
-- `youtubeUploadEventVideos`: `MARKET_YOUTUBE_UPLOAD_EVENT_VIDEOS`, default `2`
+- `youtubeUploadEventVideos`: `MARKET_YOUTUBE_UPLOAD_EVENT_VIDEOS`, default `5`
 - `redditPostLimit`: `MARKET_REDDIT_POST_LIMIT`, default `25`
 - YouTube comments are quota-guarded separately. `MARKET_YOUTUBE_COMMENT_VIDEOS=0` keeps comment sentiment off; set it to `1` for limited comment sampling.
 
@@ -491,7 +496,7 @@ The YouTube channel-stat adapter intentionally uses `artist_external_ids.youtube
 
 The YouTube comment adapter uses the channel's uploads playlist, samples a small number of recent official videos, and calls `commentThreads.list` for each sampled video. Keep `artistLimit`, `maxBatches`, and scheduler frequency conservative so a large market does not burn the free daily quota on comments. The current implementation defaults to two recent videos and 50 top-level comments per video.
 
-The MusicBrainz release detector uses the public MusicBrainz web service and follows its one-request-per-second expectation. Keep daily batches modest when the artist universe grows; the current Vercel cron defaults to 25 artists per batch and four batches per day.
+The MusicBrainz release detector uses the public MusicBrainz web service and follows its one-request-per-second expectation. The current cron default is one 100-artist batch so the full market can be repriced against the same daily context while the active roster is still modest. When the roster grows beyond that, either increase runtime capacity or split batches knowingly, because relative pricing becomes less exact when the market is processed in separate slices.
 
 ## Trading flow
 

@@ -331,6 +331,20 @@ function applyRelativePressure({
           0.01
         )
       : 0;
+  const relativeOpportunityCostDrift =
+    marketAverageSignalDelta > 0 &&
+    marketMedianSignalDelta > 0 &&
+    marketSignalBreadth >= 0.55 &&
+    signalStrengthRank <= 0.25 &&
+    !hasPositiveHighPriorityCatalyst(update)
+      ? -clamp(
+          (marketMedianSignalDelta - update.signalDelta + marketAverageSignalDelta * 0.65) *
+            0.42 *
+            marketContextConfidence,
+          0.0015,
+          0.012
+        )
+      : 0;
   const noSignalLiquidityDrift =
     update.rawPayload.hasMomentumSignal === true || marketAverageSignalDelta <= 0
       ? 0
@@ -341,6 +355,7 @@ function applyRelativePressure({
     broadMarketDampener +
     crowdedPositiveMarketPressure +
     laggardRotationDrift +
+    relativeOpportunityCostDrift +
     noSignalLiquidityDrift;
   const repriced = priceFromSignalDelta(update, adjustedSignalDelta);
   const shouldExplainRelativeMove =
@@ -368,10 +383,30 @@ function applyRelativePressure({
       broadMarketDampener,
       crowdedPositiveMarketPressure,
       laggardRotationDrift,
+      relativeOpportunityCostDrift,
       noSignalLiquidityDrift,
       adjustedSignalDelta
     }
   } satisfies ArtistMarketUpdate;
+}
+
+function hasPositiveHighPriorityCatalyst(update: ArtistMarketUpdate) {
+  const diagnostics = getObjectRecord(update.rawPayload.catalystDiagnostics);
+  const catalysts = diagnostics.topCatalysts;
+
+  if (!Array.isArray(catalysts)) {
+    return false;
+  }
+
+  return catalysts.some((value) => {
+    const catalyst = getObjectRecord(value);
+
+    return (
+      catalyst.direction === "positive" &&
+      getNumber(catalyst.reasonPriority, 0) >= 8 &&
+      getNumber(catalyst.priceShock, 0) >= 0.004
+    );
+  });
 }
 
 function priceFromSignalDelta(update: ArtistMarketUpdate, signalDelta: number) {

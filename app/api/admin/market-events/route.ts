@@ -6,6 +6,7 @@ import {
   normalizeManualMarketEventList,
   type ManualMarketEventInput
 } from "@/server/market/event-signals";
+import { getPacificMarketDate } from "@/server/market/market-date";
 import { loadActiveArtists, loadRecentMarketEvents, persistMarketEvents } from "@/server/market/supabase-repository";
 
 export const dynamic = "force-dynamic";
@@ -39,7 +40,7 @@ export async function GET(request: Request) {
     const url = new URL(request.url);
     const artistId = url.searchParams.get("artistId");
     const ticker = url.searchParams.get("ticker");
-    const runDate = url.searchParams.get("runDate") ?? getToday();
+    const runDate = url.searchParams.get("runDate") ?? getPacificMarketDate();
     const lookbackDays = getInteger(url.searchParams.get("lookbackDays"), 30, 1, 365);
     const supabase = createServiceRoleClient();
     const artists = await loadActiveArtists(supabase);
@@ -107,7 +108,7 @@ export async function POST(request: Request) {
 
   try {
     const body = await parseBody(request);
-    const runDate = body.runDate ?? getToday();
+    const runDate = body.runDate ?? getPacificMarketDate();
     const supabase = createServiceRoleClient();
     const artists = await loadActiveArtists(supabase);
     const events = flattenEvents(
@@ -169,10 +170,6 @@ function getInteger(value: string | null, fallback: number, min: number, max: nu
   }
 
   return Math.min(max, Math.max(min, parsed));
-}
-
-function getToday() {
-  return new Date().toISOString().slice(0, 10);
 }
 
 function formatMarketEventError(error: unknown) {

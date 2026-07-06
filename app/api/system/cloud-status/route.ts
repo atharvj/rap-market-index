@@ -332,7 +332,7 @@ function formatMarketEngineProbeError(message: string) {
   ) {
     return {
       ok: false,
-      detail: "Run Supabase migrations through 015_market_maker_quotes.sql"
+      detail: "Run Supabase migrations through 016_market_integrity_guardrails.sql"
     };
   }
 

@@ -59,6 +59,7 @@ type YoutubeUploadClassification = {
   impactScore: number;
   confidence: number;
   reason: string;
+  releaseKind?: "album" | "ep" | "mixtape" | "single";
 };
 
 export type YoutubeUploadEventSignals = {
@@ -255,7 +256,8 @@ function buildYoutubeUploadEvents({
         channelId,
         videoId: video.id,
         publishedAt: video.publishedAt ?? null,
-        classificationReason: classification.reason
+        classificationReason: classification.reason,
+        releaseKind: classification.releaseKind ?? null
       }
     });
   }
@@ -275,11 +277,17 @@ function classifyYoutubeUploadTitle(title: string): YoutubeUploadClassification 
   const hasOfficialVideoSignal = hasAny(normalized, OFFICIAL_VIDEO_TERMS);
   const hasTrackAudioSignal = hasAny(normalized, TRACK_AUDIO_TERMS);
   const hasVideoReleaseSignal = hasAny(normalized, VIDEO_RELEASE_TERMS);
+  const hasMajorFeatureSignal = hasAny(normalized, MAJOR_FEATURE_TERMS);
   const hasSnippetSignal = hasAny(normalized, SNIPPET_TERMS);
   const hasTourSignal = hasAny(normalized, TOUR_TERMS);
   const hasPerformanceSignal = hasAny(normalized, PERFORMANCE_TERMS);
   const hasStrongMusicSignal =
-    hasAlbumSignal || hasSingleSignal || hasOfficialVideoSignal || hasSnippetSignal || hasPerformanceSignal;
+    hasAlbumSignal ||
+    hasSingleSignal ||
+    hasOfficialVideoSignal ||
+    hasMajorFeatureSignal ||
+    hasSnippetSignal ||
+    hasPerformanceSignal;
 
   if (hasAny(normalized, LOW_SIGNAL_TERMS) && !hasStrongMusicSignal) {
     return null;
@@ -296,12 +304,25 @@ function classifyYoutubeUploadTitle(title: string): YoutubeUploadClassification 
   }
 
   if (hasAlbumSignal) {
+    const releaseKind = getYoutubeProjectReleaseKind(normalized);
+
     return {
       eventType: "release",
       sentimentScore: 32,
       impactScore: 55,
       confidence: 0.78,
-      reason: "album_announcement_upload_title"
+      reason: "album_announcement_upload_title",
+      releaseKind
+    };
+  }
+
+  if (hasMajorFeatureSignal && (hasSingleSignal || hasOfficialVideoSignal || hasTrackAudioSignal)) {
+    return {
+      eventType: "viral",
+      sentimentScore: 38,
+      impactScore: 58,
+      confidence: 0.78,
+      reason: "major_feature_upload_title"
     };
   }
 
@@ -321,7 +342,8 @@ function classifyYoutubeUploadTitle(title: string): YoutubeUploadClassification 
       sentimentScore: 26,
       impactScore: hasOfficialVideoSignal ? 44 : 38,
       confidence: 0.74,
-      reason: hasOfficialVideoSignal ? "official_video_upload_title" : "single_upload_title"
+      reason: hasOfficialVideoSignal ? "official_video_upload_title" : "single_upload_title",
+      releaseKind: "single"
     };
   }
 
@@ -346,6 +368,18 @@ function classifyYoutubeUploadTitle(title: string): YoutubeUploadClassification 
   }
 
   return null;
+}
+
+function getYoutubeProjectReleaseKind(title: string): "album" | "ep" | "mixtape" {
+  if (/\bep\b/.test(title)) {
+    return "ep";
+  }
+
+  if (hasAny(title, ["mixtape", "tape"])) {
+    return "mixtape";
+  }
+
+  return "album";
 }
 
 async function fetchYoutubeUploadPlaylists({
@@ -648,12 +682,19 @@ const ALBUM_ANNOUNCEMENT_TERMS = [
   "cover art",
   "deluxe",
   "deluxe edition",
+  "ep",
   "ep out now",
+  "full album",
+  "full project",
   "mixtape announcement",
+  "mixtape out now",
   "mixtape",
   "new album",
   "new ep",
+  "new mixtape",
   "new project",
+  "new tape",
+  "project out now",
   "project trailer",
   "pre-save",
   "pre save",
@@ -698,6 +739,55 @@ const VIDEO_RELEASE_TERMS = [
   "official lyric video",
   "official video",
   "visualizer"
+];
+
+const MAJOR_FEATURE_TERMS = [
+  "carti feature",
+  "carti verse",
+  "carti cosign",
+  "carti co sign",
+  "carti co-sign",
+  "carti assisted",
+  "carti-assisted",
+  "drake feature",
+  "drake verse",
+  "drake cosign",
+  "drake co sign",
+  "drake co-sign",
+  "drake assisted",
+  "drake-assisted",
+  "feat. carti",
+  "feat. drake",
+  "feat. future",
+  "feat. kendrick",
+  "feat. travis",
+  "feat carti",
+  "feat drake",
+  "feat future",
+  "feat kendrick",
+  "feat travis",
+  "featuring carti",
+  "featuring drake",
+  "featuring future",
+  "featuring kendrick",
+  "featuring travis",
+  "ft. carti",
+  "ft. drake",
+  "ft. future",
+  "ft. kendrick",
+  "ft. travis",
+  "ft carti",
+  "ft drake",
+  "ft future",
+  "ft kendrick",
+  "ft travis",
+  "opium co sign",
+  "opium cosign",
+  "with carti",
+  "with drake",
+  "with future",
+  "with kendrick",
+  "with travis"
 ];
 
 const SNIPPET_TERMS = [
