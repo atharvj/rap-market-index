@@ -390,6 +390,22 @@ function classifyArticleEvent(title: string, domain: string, tone: unknown) {
     };
   }
 
+  if (hasAny(lowerTitle, TRACKLIST_REACTION_TERMS)) {
+    const keywordSentiment = getTitleSentiment(lowerTitle);
+    const sentimentScore = clamp(keywordSentiment + toneScore * 0.65, -75, 75);
+    const hasExplicitSentiment = Math.abs(keywordSentiment) > 0 || Math.abs(toneScore) >= 10;
+
+    if (hasExplicitSentiment) {
+      return {
+        eventType: "news" as const,
+        sentimentScore,
+        impactScore: clamp(sentimentScore * 0.9, -70, 70),
+        confidence: getArticleConfidence(sourceTier, 0.6),
+        reason: "tracklist_reaction_terms"
+      };
+    }
+  }
+
   if (hasAny(lowerTitle, TOUR_TERMS)) {
     return {
       eventType: "tour" as const,
@@ -807,6 +823,15 @@ const CHART_TERMS = [
   "spotify chart",
   "tops chart"
 ];
+const TRACKLIST_REACTION_TERMS = [
+  "cover art",
+  "feature list",
+  "features list",
+  "no features",
+  "track list",
+  "tracklist",
+  "tracklist reaction"
+];
 const FEATURE_TERMS = [
   "co-sign",
   "cosign",
@@ -880,6 +905,7 @@ const NEWS_TERMS = [
   ...TOUR_TERMS,
   ...AWARD_TERMS,
   ...CHART_TERMS,
+  ...TRACKLIST_REACTION_TERMS,
   ...FEATURE_TERMS,
   ...PERFORMANCE_TERMS,
   ...SNIPPET_TERMS,

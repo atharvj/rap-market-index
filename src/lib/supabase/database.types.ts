@@ -371,6 +371,29 @@ export type Database = {
           updated_artist_price: number;
           price_impact_percent: number;
           market_eligible: boolean;
+          quote_bid_price: number;
+          quote_ask_price: number;
+          spread_percent: number;
+          slippage_percent: number;
+          liquidity_score: number;
+        }>;
+      };
+      calculate_artist_market_quote: {
+        Args: {
+          p_artist_id: string;
+          p_shares?: number;
+        };
+        Returns: Array<{
+          artist_id: string;
+          ticker: string;
+          mid_price: number;
+          bid_price: number;
+          ask_price: number;
+          buy_execution_price: number;
+          sell_execution_price: number;
+          spread_percent: number;
+          slippage_percent: number;
+          liquidity_score: number;
         }>;
       };
       sell_artist_shares: {
@@ -394,6 +417,11 @@ export type Database = {
           updated_artist_price: number;
           price_impact_percent: number;
           market_eligible: boolean;
+          quote_bid_price: number;
+          quote_ask_price: number;
+          spread_percent: number;
+          slippage_percent: number;
+          liquidity_score: number;
         }>;
       };
     };

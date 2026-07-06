@@ -200,6 +200,11 @@ function buildArtistEventSignal(artist: MarketUpdateArtist, runDate: string, eve
         clusterMultiplier: event.clusterMultiplier,
         clusterSourceCount: event.clusterSourceCount,
         clusterConfirmationMultiplier: event.clusterConfirmationMultiplier,
+        releaseCycleAnchorTitle: event.releaseCycleAnchorTitle,
+        releaseCycleSourceCount: event.releaseCycleSourceCount,
+        releaseCycleRelatedCount: event.releaseCycleRelatedCount,
+        releaseCycleReceptionImpact: event.releaseCycleReceptionImpact,
+        releaseCycleMultiplier: event.releaseCycleMultiplier,
         uncappedWeightedImpact: event.uncappedWeightedImpact,
         shockWeightedImpact: event.shockWeightedImpact,
         weightedImpact: event.weightedImpact
@@ -217,6 +222,11 @@ type ScoredMarketEvent = ReturnType<typeof scoreEvent> & {
   shockDecayMultiplier: number;
   shockWeightedImpact: number;
   uncappedWeightedImpact: number;
+  releaseCycleAnchorTitle: string | null;
+  releaseCycleSourceCount: number;
+  releaseCycleRelatedCount: number;
+  releaseCycleReceptionImpact: number;
+  releaseCycleMultiplier: number;
 };
 
 function getEventSignalConfidence(scoredEvents: ScoredMarketEvent[]) {
@@ -225,7 +235,7 @@ function getEventSignalConfidence(scoredEvents: ScoredMarketEvent[]) {
     0
   );
   const maxSourceCount = scoredEvents.reduce(
-    (highest, event) => Math.max(highest, event.clusterSourceCount),
+    (highest, event) => Math.max(highest, event.clusterSourceCount, event.releaseCycleSourceCount),
     0
   );
   const averageAbsImpact =
@@ -240,14 +250,17 @@ function getEventSignalConfidence(scoredEvents: ScoredMarketEvent[]) {
 
 function buildPriceModifiers(scoredEvents: ScoredMarketEvent[]): MarketSignalModifier[] {
   const modifiers: MarketSignalModifier[] = [];
+  const visibleEvents = suppressTrackLevelReleaseModifiers(scoredEvents);
 
-  for (const event of scoredEvents) {
+  for (const event of visibleEvents) {
     const score = event.shockWeightedImpact;
     const isReview = event.event.eventType === "review";
     const isRelease = event.event.eventType === "release";
     const subtypeProfile = getEventSubtypePriceProfile(event.eventSubtype);
     const reviewShock = isReview ? clamp(score / 1700, -0.05, 0.045) : undefined;
-    const releaseShock = isRelease ? clamp(score / 1750, -0.025, 0.045) : undefined;
+    const releaseShock = isRelease
+      ? clamp(score / subtypeProfile.divisor, subtypeProfile.minShock, subtypeProfile.maxShock)
+      : undefined;
     const generalShock = !isRelease && !isReview
       ? clamp(score / subtypeProfile.divisor, subtypeProfile.minShock, subtypeProfile.maxShock)
       : undefined;
@@ -258,13 +271,81 @@ function buildPriceModifiers(scoredEvents: ScoredMarketEvent[]): MarketSignalMod
     }
 
     modifiers.push({
-      reason: `${event.event.eventType}${event.eventSubtype === event.event.eventType ? "" : `/${event.eventSubtype}`}: ${event.event.title}`,
+      reason: getEventModifierReason(event),
       priceShock,
-      score
+      score,
+      reasonPriority: getEventReasonPriority(event.eventSubtype)
     });
   }
 
   return modifiers;
+}
+
+function suppressTrackLevelReleaseModifiers(scoredEvents: ScoredMarketEvent[]) {
+  return scoredEvents.filter((event) => {
+    if (event.eventSubtype !== "track_audio_release" && event.eventSubtype !== "single_video_release") {
+      return true;
+    }
+
+    if (event.shockWeightedImpact <= 0) {
+      return true;
+    }
+
+    return !scoredEvents.some((candidate) => {
+      if (candidate === event || candidate.eventSubtype !== "project_release" || candidate.shockWeightedImpact <= 0) {
+        return false;
+      }
+
+      return Math.abs(daysBetween(candidate.event.eventDate, event.event.eventDate)) <= 3;
+    });
+  });
+}
+
+function getEventModifierReason(event: ScoredMarketEvent) {
+  const title = event.event.title;
+  const labels: Record<string, string> = {
+    project_release: "project release",
+    single_video_release: "single/video release",
+    track_audio_release: "track upload",
+    tracklist_reaction: "tracklist reaction",
+    feature: "feature/cosign",
+    performance: "live performance",
+    chart: "chart momentum",
+    snippet: "snippet",
+    controversy: "controversy",
+    decline: "decline chatter",
+    review: "review/reception",
+    release: "release",
+    viral: "viral moment",
+    news: "news",
+    award: "award",
+    tour: "tour"
+  };
+
+  return `${labels[event.eventSubtype] ?? event.event.eventType}: ${title}`;
+}
+
+function getEventReasonPriority(subtype: string) {
+  const priorities: Record<string, number> = {
+    project_release: 12,
+    review: 11,
+    feature: 10,
+    performance: 9,
+    chart: 8,
+    tracklist_reaction: 8,
+    controversy: 8,
+    decline: 8,
+    single_video_release: 5,
+    snippet: 4,
+    viral: 4,
+    release: 4,
+    news: 3,
+    award: 3,
+    tour: 2,
+    track_audio_release: 1
+  };
+
+  return priorities[subtype] ?? 0;
 }
 
 function scoreEvent(event: MarketEvent, runDate: string) {
@@ -275,12 +356,12 @@ function scoreEvent(event: MarketEvent, runDate: string) {
   const impact = event.impactScore || sentiment;
   const weightedImpact = clamp((impact * 0.65 + sentiment * 0.35) * event.confidence * typeWeight * decay, -100, 100);
 
-    return {
-      event,
-      ageDays,
-      decay,
-      weightedImpact
-    };
+  return {
+    event,
+    ageDays,
+    decay,
+    weightedImpact
+  };
 }
 
 function applyEventClusterCaps(scoredEvents: Array<ReturnType<typeof scoreEvent>>): ScoredMarketEvent[] {
@@ -310,7 +391,7 @@ function applyEventClusterCaps(scoredEvents: Array<ReturnType<typeof scoreEvent>
     }
   }
 
-  return scoredEvents.map((event) => {
+  const clusteredEvents = scoredEvents.map((event) => {
     const cluster = multipliers.get(event) ?? {
       key: "unclustered",
       multiplier: 1,
@@ -334,11 +415,137 @@ function applyEventClusterCaps(scoredEvents: Array<ReturnType<typeof scoreEvent>
       clusterConfirmationMultiplier: cluster.confirmationMultiplier,
       eventSubtype,
       shockDecayMultiplier,
+      releaseCycleAnchorTitle: null,
+      releaseCycleSourceCount: 1,
+      releaseCycleRelatedCount: 0,
+      releaseCycleReceptionImpact: 0,
+      releaseCycleMultiplier: 1,
       uncappedWeightedImpact: event.weightedImpact,
       shockWeightedImpact: clamp(weightedImpact * shockDecayMultiplier, -100, 100),
       weightedImpact
     };
   });
+
+  return applyReleaseCycleContext(clusteredEvents);
+}
+
+function applyReleaseCycleContext(scoredEvents: ScoredMarketEvent[]): ScoredMarketEvent[] {
+  const projectReleases = scoredEvents.filter((event) => event.eventSubtype === "project_release");
+
+  if (!projectReleases.length) {
+    return scoredEvents;
+  }
+
+  return scoredEvents.map((event) => {
+    const project = findNearestProjectRelease(event, projectReleases);
+
+    if (!project) {
+      return event;
+    }
+
+    const relatedEvents = scoredEvents.filter(
+      (candidate) =>
+        candidate !== project &&
+        candidate.eventSubtype !== "project_release" &&
+        isReleaseCycleRelated(candidate) &&
+        Math.abs(daysBetween(project.event.eventDate, candidate.event.eventDate)) <= getReleaseCycleWindowDays(candidate)
+    );
+    const sourceCount = countDistinctScoredSources([project, ...relatedEvents]);
+    const receptionImpact = relatedEvents
+      .filter((candidate) => candidate.eventSubtype === "tracklist_reaction" || candidate.eventSubtype === "review")
+      .reduce((total, candidate) => total + candidate.weightedImpact, 0);
+    const relatedPositiveCount = relatedEvents.filter((candidate) => candidate.weightedImpact > 0).length;
+    const cycleMultiplier = clamp(
+      1 + Math.min(0.14, relatedPositiveCount * 0.025) + clamp(receptionImpact / 900, -0.12, 0.1),
+      0.82,
+      1.18
+    );
+
+    if (event === project) {
+      return {
+        ...event,
+        releaseCycleAnchorTitle: project.event.title,
+        releaseCycleSourceCount: sourceCount,
+        releaseCycleRelatedCount: relatedEvents.length,
+        releaseCycleReceptionImpact: clamp(receptionImpact, -100, 100),
+        releaseCycleMultiplier: cycleMultiplier,
+        weightedImpact: clamp(
+          event.weightedImpact * cycleMultiplier + clamp(receptionImpact * 0.22, -18, 14),
+          -100,
+          100
+        ),
+        shockWeightedImpact: clamp(
+          event.shockWeightedImpact * cycleMultiplier + clamp(receptionImpact * 0.18, -14, 10),
+          -100,
+          100
+        )
+      };
+    }
+
+    if (event.eventSubtype === "track_audio_release" || event.eventSubtype === "single_video_release") {
+      const reductionMultiplier = event.eventSubtype === "track_audio_release" ? 0.18 : 0.38;
+
+      return {
+        ...event,
+        releaseCycleAnchorTitle: project.event.title,
+        releaseCycleSourceCount: sourceCount,
+        releaseCycleRelatedCount: relatedEvents.length,
+        releaseCycleReceptionImpact: clamp(receptionImpact, -100, 100),
+        releaseCycleMultiplier: reductionMultiplier,
+        weightedImpact: clamp(event.weightedImpact * reductionMultiplier, -100, 100),
+        shockWeightedImpact: clamp(event.shockWeightedImpact * reductionMultiplier, -100, 100)
+      };
+    }
+
+    return {
+      ...event,
+      releaseCycleAnchorTitle: project.event.title,
+      releaseCycleSourceCount: sourceCount,
+      releaseCycleRelatedCount: relatedEvents.length,
+      releaseCycleReceptionImpact: clamp(receptionImpact, -100, 100),
+      releaseCycleMultiplier: 1
+    };
+  });
+}
+
+function findNearestProjectRelease(event: ScoredMarketEvent, projectReleases: ScoredMarketEvent[]) {
+  const candidates = projectReleases
+    .map((project) => ({
+      project,
+      distance: Math.abs(daysBetween(project.event.eventDate, event.event.eventDate))
+    }))
+    .filter(({ distance }) => distance <= getReleaseCycleWindowDays(event))
+    .sort((a, b) => a.distance - b.distance);
+
+  return candidates[0]?.project ?? null;
+}
+
+function isReleaseCycleRelated(event: ScoredMarketEvent) {
+  return [
+    "single_video_release",
+    "track_audio_release",
+    "tracklist_reaction",
+    "review",
+    "snippet",
+    "feature",
+    "chart"
+  ].includes(event.eventSubtype);
+}
+
+function getReleaseCycleWindowDays(event: ScoredMarketEvent) {
+  if (event.eventSubtype === "tracklist_reaction" || event.eventSubtype === "snippet") {
+    return 14;
+  }
+
+  if (event.eventSubtype === "review" || event.eventSubtype === "chart") {
+    return 10;
+  }
+
+  return 5;
+}
+
+function countDistinctScoredSources(events: ScoredMarketEvent[]) {
+  return countDistinctEventSources(events);
 }
 
 function countDistinctEventSources(events: Array<ReturnType<typeof scoreEvent>>) {
@@ -434,8 +641,22 @@ function getEventSubtype(event: MarketEvent) {
   }
 
   if (event.eventType === "release") {
+    const releaseKind = getRawString(event.rawPayload.releaseKind);
+
+    if (releaseKind && hasAnyTerm(releaseKind, ["album", "ep", "mixtape"])) {
+      return "project_release";
+    }
+
+    if (releaseKind === "single") {
+      return "single_video_release";
+    }
+
     if (hasAnyTerm(text, ["album", "project", "mixtape", "ep", "deluxe", "tracklist"])) {
       return "project_release";
+    }
+
+    if (hasAnyTerm(text, ["track audio upload title", "official audio", " audio"])) {
+      return "track_audio_release";
     }
 
     if (hasAnyTerm(text, ["official video", "music video", "visualizer", "single", "song"])) {
@@ -513,6 +734,13 @@ function getEventSubtype(event: MarketEvent) {
 
   if (
     event.eventType === "news" &&
+    hasAnyTerm(text, ["tracklist", "cover art", "features list", "features"])
+  ) {
+    return "tracklist_reaction";
+  }
+
+  if (
+    event.eventType === "news" &&
     hasAnyTerm(text, [
       "dead crowd",
       "decline",
@@ -539,6 +767,10 @@ function getEventSubtype(event: MarketEvent) {
 
 function getEventSubtypePriceProfile(subtype: string) {
   const profiles: Record<string, { divisor: number; minShock: number; maxShock: number }> = {
+    project_release: { divisor: 1550, minShock: -0.02, maxShock: 0.052 },
+    single_video_release: { divisor: 1900, minShock: -0.018, maxShock: 0.035 },
+    track_audio_release: { divisor: 3500, minShock: -0.008, maxShock: 0.012 },
+    tracklist_reaction: { divisor: 2100, minShock: -0.028, maxShock: 0.024 },
     feature: { divisor: 1450, minShock: -0.025, maxShock: 0.055 },
     performance: { divisor: 1550, minShock: -0.034, maxShock: 0.05 },
     chart: { divisor: 1550, minShock: -0.022, maxShock: 0.05 },
@@ -597,6 +829,8 @@ function getEventShockDecayMultiplier({
   const subtypeHalfLives: Record<string, number> = {
     project_release: 4.5,
     single_video_release: 3,
+    track_audio_release: 1.5,
+    tracklist_reaction: 2.5,
     feature: 3,
     performance: 2.5,
     chart: 4,

@@ -11,7 +11,7 @@ import {
   resetGame,
   simulateDailyUpdate
 } from "@/lib/market";
-import { estimateTradeTotal } from "@/lib/trading";
+import { estimateMarketMakerQuote } from "@/lib/trading";
 import type { Artist, GameState, HoldingView, LeaderboardEntry, TradeResult } from "@/lib/types";
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 
@@ -303,8 +303,14 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
         return { ok: false, message: "Enter a positive share amount." };
       }
 
-      const cost = shares * artist.currentPrice;
-      const totalCost = estimateTradeTotal(cost, shares);
+      const quoteEstimate = estimateMarketMakerQuote({
+        side: "buy",
+        midPrice: artist.currentPrice,
+        shares,
+        volatility: artist.volatility
+      });
+      const cost = quoteEstimate.orderValue;
+      const totalCost = quoteEstimate.totalCost;
       const holding = getHolding(artistId);
       const remainingPositionValue = Math.max(0, portfolioValue * 0.25 - (holding?.currentValue ?? 0));
 
@@ -523,13 +529,14 @@ async function submitServerTrade({
 
   return {
     ok: true,
-    message: formatTradeMessage({
-      side,
-      shares,
-      ticker: payload.trade?.ticker,
-      commission: payload.trade?.commission,
-      marketEligible: payload.trade?.market_eligible ?? payload.trade?.marketEligible
-    })
+      message: formatTradeMessage({
+        side,
+        shares,
+        ticker: payload.trade?.ticker,
+        executionPrice: payload.trade?.execution_price ?? payload.trade?.executionPrice,
+        commission: payload.trade?.commission,
+        marketEligible: payload.trade?.market_eligible ?? payload.trade?.marketEligible
+      })
   };
 }
 
@@ -537,22 +544,28 @@ function formatTradeMessage({
   side,
   shares,
   ticker,
+  executionPrice,
   commission,
   marketEligible
 }: {
   side: "buy" | "sell";
   shares: number;
   ticker?: string;
+  executionPrice?: number;
   commission?: number;
   marketEligible?: boolean;
 }) {
+  const executionText =
+    typeof executionPrice === "number" && Number.isFinite(executionPrice)
+      ? ` at ${new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(executionPrice)}`
+      : "";
   const commissionText =
     typeof commission === "number" && Number.isFinite(commission)
       ? ` Commission ${new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(commission)}.`
       : "";
   const testingText = marketEligible === false ? " Test/admin trade: no market impact." : "";
 
-  return `${side === "buy" ? "Bought" : "Sold"} ${shares} ${ticker ?? "shares"}.${commissionText}${testingText}`;
+  return `${side === "buy" ? "Bought" : "Sold"} ${shares} ${ticker ?? "shares"}${executionText}.${commissionText}${testingText}`;
 }
 
 function markCurrentLeaderboardUser(entries: LeaderboardEntry[], currentUserId?: string) {

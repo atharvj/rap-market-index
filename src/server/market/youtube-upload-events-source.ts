@@ -273,6 +273,8 @@ function classifyYoutubeUploadTitle(title: string): YoutubeUploadClassification 
   const hasAlbumSignal = hasAny(normalized, ALBUM_ANNOUNCEMENT_TERMS);
   const hasSingleSignal = hasAny(normalized, SINGLE_RELEASE_TERMS);
   const hasOfficialVideoSignal = hasAny(normalized, OFFICIAL_VIDEO_TERMS);
+  const hasTrackAudioSignal = hasAny(normalized, TRACK_AUDIO_TERMS);
+  const hasVideoReleaseSignal = hasAny(normalized, VIDEO_RELEASE_TERMS);
   const hasSnippetSignal = hasAny(normalized, SNIPPET_TERMS);
   const hasTourSignal = hasAny(normalized, TOUR_TERMS);
   const hasPerformanceSignal = hasAny(normalized, PERFORMANCE_TERMS);
@@ -304,6 +306,16 @@ function classifyYoutubeUploadTitle(title: string): YoutubeUploadClassification 
   }
 
   if (hasSingleSignal || hasOfficialVideoSignal) {
+    if (hasTrackAudioSignal && !hasSingleSignal && !hasVideoReleaseSignal) {
+      return {
+        eventType: "release",
+        sentimentScore: 10,
+        impactScore: 16,
+        confidence: 0.46,
+        reason: "track_audio_upload_title"
+      };
+    }
+
     return {
       eventType: "release",
       sentimentScore: 26,
@@ -670,6 +682,19 @@ const OFFICIAL_VIDEO_TERMS = [
   "lyric video",
   "music video",
   "official audio",
+  "official lyric video",
+  "official video",
+  "visualizer"
+];
+
+const TRACK_AUDIO_TERMS = [
+  "audio",
+  "official audio"
+];
+
+const VIDEO_RELEASE_TERMS = [
+  "lyric video",
+  "music video",
   "official lyric video",
   "official video",
   "visualizer"

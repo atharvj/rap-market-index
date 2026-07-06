@@ -43,6 +43,7 @@ export type MarketSignalModifier = {
   priceMultiplier?: number;
   priceShock?: number;
   score?: number;
+  reasonPriority?: number;
 };
 
 export type AdapterSignal = {

@@ -356,6 +356,8 @@ function buildRedditSignal({
         score: post.score,
         comments: post.comments,
         engagement: post.engagement,
+        viralityTier: getEngagementTier(post.engagement),
+        subredditTier: getSubredditTier(post.subreddit),
         matchConfidence: post.matchConfidence,
         sentimentScore: classification.sentimentScore,
         impactScore: classification.impactScore,
@@ -507,6 +509,8 @@ function buildRedditEvents({
       score: post.score,
       comments: post.comments,
       engagement: post.engagement,
+      viralityTier: getEngagementTier(post.engagement),
+      subredditTier: getSubredditTier(post.subreddit),
       upvoteRatio: post.upvoteRatio,
       matchConfidence: post.matchConfidence,
       classificationReason: classification.reason
@@ -522,11 +526,13 @@ function classifyRedditPost(post: RedditPost): RedditPostClassification {
   const hasPerformance = hasAny(text, PERFORMANCE_TERMS);
   const hasFeature = hasAny(text, FEATURE_TERMS);
   const hasRelease = hasAny(text, RELEASE_TERMS);
+  const hasProjectRelease = hasAny(text, PROJECT_RELEASE_TERMS);
   const hasReview = hasAny(text, REVIEW_TERMS);
   const hasControversy = hasAny(text, CONTROVERSY_TERMS);
   const hasChart = hasAny(text, CHART_TERMS);
   const hasViral = hasAny(text, VIRAL_TERMS);
   const hasDecline = hasAny(text, DECLINE_TERMS);
+  const hasTracklistReaction = hasAny(text, TRACKLIST_REACTION_TERMS);
   const hype = hasSnippet || hasPerformance || hasFeature || hasRelease || hasChart || hasViral || positiveMatches > 0;
   const negative = negativeMatches > positiveMatches || hasDecline || hasControversy;
   const sentimentScore = clamp((positiveMatches - negativeMatches) * 14 + (hype ? 10 : 0) - (hasDecline ? 18 : 0), -80, 80);
@@ -558,6 +564,19 @@ function classifyRedditPost(post: RedditPost): RedditPostClassification {
     };
   }
 
+  if (hasTracklistReaction && (positiveMatches > 0 || negativeMatches > 0)) {
+    return {
+      eventType: "news",
+      sentimentScore: clamp(sentimentScore, -78, 78),
+      impactScore: clamp(sentimentScore + (sentimentScore >= 0 ? engagementImpact * 0.45 : -engagementImpact * 0.45), -78, 78),
+      confidence: 0.56,
+      reason: "tracklist_reaction_terms",
+      catalyst: true,
+      negative,
+      hype: sentimentScore > 0
+    };
+  }
+
   if (hasDecline && negative) {
     return {
       eventType: "news",
@@ -577,7 +596,7 @@ function classifyRedditPost(post: RedditPost): RedditPostClassification {
       sentimentScore: clamp(22 + sentimentScore * 0.6, -45, 82),
       impactScore: clamp(32 + engagementImpact + sentimentScore * 0.35, -35, 88),
       confidence: 0.66,
-      reason: "release_terms",
+      reason: hasProjectRelease ? "project_release_terms" : "release_terms",
       catalyst: true,
       negative,
       hype: true
@@ -1002,6 +1021,22 @@ function getSubredditTier(subreddit: string) {
   return 0;
 }
 
+function getEngagementTier(engagement: number) {
+  if (engagement >= 5000) {
+    return "breakout";
+  }
+
+  if (engagement >= 1500) {
+    return "major";
+  }
+
+  if (engagement >= 350) {
+    return "notable";
+  }
+
+  return "small";
+}
+
 function getNumber(value: unknown) {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
 }
@@ -1082,6 +1117,20 @@ const RELEASE_TERMS = [
   "video"
 ];
 
+const PROJECT_RELEASE_TERMS = [
+  "album",
+  "album out",
+  "deluxe",
+  "deluxe out",
+  "ep",
+  "mixtape",
+  "new album",
+  "new ep",
+  "new project",
+  "project",
+  "tracklist"
+];
+
 const SNIPPET_TERMS = [
   "first listen",
   "grail",
@@ -1151,6 +1200,16 @@ const CHART_TERMS = [
   "spotify chart",
   "streaming record",
   "top 10"
+];
+
+const TRACKLIST_REACTION_TERMS = [
+  "cover art",
+  "feature list",
+  "features list",
+  "no features",
+  "track list",
+  "tracklist",
+  "tracklist reaction"
 ];
 
 const VIRAL_TERMS = [

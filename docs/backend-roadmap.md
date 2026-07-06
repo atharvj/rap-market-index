@@ -19,8 +19,9 @@ This app still runs in development with unsaved demo data, but the backend found
 13. Run `supabase/migrations/012_artist_text_source_defaults.sql`.
 14. Run `supabase/migrations/013_price_ticks.sql`.
 15. Run `supabase/migrations/014_market_economy_guardrails.sql`.
-16. Run `supabase/seed.sql` for the starter artists.
-17. Create `.env.local` in the project root and fill in:
+16. Run `supabase/migrations/015_market_maker_quotes.sql`.
+17. Run `supabase/seed.sql` for the starter artists.
+18. Create `.env.local` in the project root and fill in:
    - `NEXT_PUBLIC_SUPABASE_URL`
    - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
    - `SUPABASE_SERVICE_ROLE_KEY`
@@ -36,7 +37,7 @@ This app still runs in development with unsaved demo data, but the backend found
    - `MARKET_YOUTUBE_COMMENT_VIDEOS=0`
    - `MARKET_YOUTUBE_COMMENT_LIMIT=25`
    - `ADMIN_EMAILS=<comma-separated admin emails>`
-   - `MARKET_MODEL_VERSION=rmi-core-v7`
+   - `MARKET_MODEL_VERSION=rmi-core-v8`
    - `LASTFM_API_KEY` for optional Last.fm listener/playcount signals
    - `SPOTIFY_CLIENT_ID` and `SPOTIFY_CLIENT_SECRET` for optional Spotify popularity/follower signals
    - `YOUTUBE_API_KEY` for optional YouTube channel view/subscriber/video-count and comment-reaction signals
@@ -166,6 +167,8 @@ After deployment, manually call `/api/cron/daily-market-update?dryRun=1` with `A
 
 `MARKET_MODEL_VERSION` is an internal audit label, not a prominent user-facing product label. It is saved on market runs, signal snapshots, and price-history rows so future algorithm changes can be traced without rewriting historical prices. Normal market pages should keep broad language such as audience momentum, market activity, release signals, and media movement. Admin/health/debug views can show the exact model version.
 
+`rmi-core-v8` improves catalyst attribution and broad-market realism. Full project releases now outrank nearby single-track uploads, and structured MusicBrainz release kinds such as album, EP, mixtape, and single are trusted even when the title does not say "album" or "single". The event layer builds release-cycle context so project drops can absorb related track uploads, reviews, chart signals, snippets, and tracklist/cover-art reception instead of letting one small upload become the headline reason. Price runs now store `catalystDiagnostics`, `modifierImpact`, and `sourceAttribution` in signal snapshots so admin/debug views can identify the main catalyst, opposing catalyst, source disagreement, and net event shock behind a move. Reddit events now tag project-release chatter and engagement tier, helping separate small fan hype from major community attention. Relative repricing also adds a small crowded-market pressure adjustment, so weak/no-signal names are less likely to drift up merely because the full market had positive inputs. Run summaries now include catalyst counts, mixed-catalyst counts, source-conflict counts, and average source spread so `/dev` can warn when a market run is difficult to trust.
+
 `rmi-core-v7` tightens price discovery for continuous markets. Audience snapshot sources such as Last.fm listeners/plays, Spotify followers/popularity, and YouTube channel totals compare against the latest prior observation instead of the 30-day average, then normalize by baseline age so multi-day accumulated growth is not mistaken for a one-day breakout. Snapshot adapters now lower confidence for stale baselines, impossible counter drops, extreme one-run jumps, and weak external artist-name matches before those values reach the blended model. Price-history context is also loaded from recent `price_history` rows, letting the model dampen overextended run-ups, respect weak downtrends, support confirmed reversals, and reduce noisy moves after high recent volatility. Old stored momentum decays toward neutral every run, and stale prior hype can create a small pullback when no fresh confirming signal appears. It also caps reliability for thin single-source moves, while allowing broader multi-source confirmation and event support to carry more weight. Source-level disagreement is now scored, so cases like streaming growth with negative reviews/news/community reaction are dampened instead of treated as clean bullish moves. Daily movement caps now scale down with low reliability, weak source quality, or source conflict. Same-day duplicate event detections are cluster-capped by event type so one release, snippet, or controversy cannot stack unlimited shocks from several sources; independent source confirmation can lift confidence inside that cap. Event shocks are subtype-aware, so features, viral performances, chart moments, snippets, reviews, controversies, and decline chatter use different price-shock limits. Feature, performance, snippet, and decline vocabulary is recognized across article events, Reddit posts, and official upload titles so early hype and falloff signals can be classified automatically. The event layer now separates longer-lived background event signal from short-lived direct price shock, preventing the same older release, review, or viral post from repricing the stock like a brand-new catalyst every day. Relative repricing is stronger so weak or missing momentum can drift lower when stronger artists are attracting the day's attention, and that relative pressure is dampened when a cron batch only covers part of the active roster. Run summaries now record up/down/flat counts, reliability bands, source-quality diagnostics, price-action guardrail usage, and market quality scores so `/dev` can warn when the market is one-sided, low-confidence, overextended, or low-quality.
 
 `rmi-core-v6` adds optional Reddit community-hype detection. It measures post volume, engagement, subreddit breadth, positive hype, negative/decline chatter, and catalyst phrases for snippets, features, viral performances, releases, charts, and controversies. It records aggregate observations, limits first-run movement without a baseline, caps short/common-name confidence, and only creates market events when the post looks like a real catalyst with enough engagement or source breadth.
@@ -180,6 +183,8 @@ After deployment, manually call `/api/cron/daily-market-update?dryRun=1` with `A
 
 User trades should contribute to the market, but they should not overpower the real artist-momentum model. The current backend uses layered controls:
 
+- The virtual market maker now quotes a synthetic bid/ask around the last price. Buys execute at the ask plus size-based slippage, sells execute at the bid minus size-based slippage, and the resulting public quote movement is capped separately.
+- Spreads and slippage widen for lower-priced, higher-volatility, and larger orders, making thin artist stocks harder to manipulate cheaply.
 - Immediate buy/sell impact is only a small quote nudge with capped same-direction movement.
 - Daily trade-flow demand is discounted when activity lacks trader breadth or is heavily concentrated.
 - Trading RPCs enforce position sizing, rolling buy limits, and same-artist order cooldowns.
@@ -349,6 +354,8 @@ The route skips duplicate same-day runs when a successful or running `core` run 
 The market event layer stores releases, reviews, news, controversies, awards, tour announcements, and viral moments. These events can adjust the final price movement after raw momentum is calculated, so a stream spike with weak reviews can still rise, but by less than a stream spike with strong reviews.
 
 Blended market runs use a confidence-weighted ensemble. Each adapter contributes most strongly to the stats it actually measures: Last.fm to streaming momentum, public-attention pageviews to search/media attention, YouTube channel stats to video momentum, YouTube comments and Reddit to fan/social reaction with different confidence caps, GDELT to news/search, Spotify to streaming/search proxies, trade flow to trading demand, and market events to release/news/social modifiers. This keeps the result from depending on adapter order and makes weak or indirect inputs less dominant.
+
+Release explanations should prefer the real catalyst level. Full projects, mixtapes, albums, deluxe releases, and album announcements outrank individual official-audio uploads from the same release window. Track-level uploads still count as activity, but they receive smaller shocks and are suppressed as the headline reason when a project release is also present. The event model also builds a release-cycle context: related track uploads become supporting evidence, while tracklist, cover-art, and review reception can boost or dampen the project release impact depending on detected sentiment.
 
 The admin event ingestion endpoint is:
 

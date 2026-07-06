@@ -24,6 +24,50 @@ type ResolvedMarketSignal = {
   reliabilityDetails: Record<string, unknown>;
 };
 
+type ModifierAudit = {
+  reason: string;
+  direction: "positive" | "negative" | "neutral";
+  priceShock: number;
+  priceMultiplier: number | null;
+  score: number | null;
+  reasonPriority: number;
+  sortScore: number;
+};
+
+type CatalystDiagnostics = {
+  modifierCount: number;
+  positiveCatalystCount: number;
+  negativeCatalystCount: number;
+  highPriorityCatalystCount: number;
+  positivePriceShock: number;
+  negativePriceShock: number;
+  netPriceShock: number;
+  primaryCatalyst: ModifierAudit | null;
+  counterCatalyst: ModifierAudit | null;
+  topCatalysts: ModifierAudit[];
+};
+
+type SourceAttributionItem = {
+  source: string;
+  label: string;
+  direction: "positive" | "negative" | "neutral";
+  score: number;
+  statCount: number;
+  totalWeight: number;
+  alignedWithMove: boolean;
+};
+
+type SourceAttribution = {
+  sourceCount: number;
+  positiveSourceCount: number;
+  negativeSourceCount: number;
+  neutralSourceCount: number;
+  leadingSource: SourceAttributionItem | null;
+  opposingSource: SourceAttributionItem | null;
+  sourceSpread: number;
+  sources: SourceAttributionItem[];
+};
+
 export type PriceTrendContext = {
   sampleCount: number;
   return7dPercent: number;
@@ -96,6 +140,14 @@ export type MarketUpdateSummary = {
   averageSourceQualityMultiplier: number;
   technicalAdjustmentCount: number;
   averageTechnicalAdjustment: number;
+  catalystArtistCount: number;
+  highPriorityCatalystArtistCount: number;
+  mixedCatalystArtistCount: number;
+  averageNetCatalystShock: number;
+  averageAbsCatalystShock: number;
+  sourceConflictArtistCount: number;
+  averageSourceDirectionSpread: number;
+  averageSourceCount: number;
   signalCoverageScore: number;
   reliabilityScore: number;
   movementBalanceScore: number;
@@ -144,6 +196,8 @@ export function calculateDailyMarketUpdates(input: MarketUpdateInput) {
   const flatMoveCount = updates.filter((update) => Math.abs(update.dailyChangePercent) <= 0.01).length;
   const sourceQuality = summarizeSourceQuality(updates);
   const technicals = summarizeTechnicalAdjustments(updates);
+  const catalysts = summarizeCatalystDiagnostics(updates);
+  const sourceAttribution = summarizeSourceAttribution(updates);
   const quality = calculateMarketRunQuality({
     artistCount: updates.length,
     momentumArtistCount,
@@ -178,6 +232,14 @@ export function calculateDailyMarketUpdates(input: MarketUpdateInput) {
       averageSourceQualityMultiplier: sourceQuality.averageMultiplier,
       technicalAdjustmentCount: technicals.adjustmentCount,
       averageTechnicalAdjustment: technicals.averageAdjustment,
+      catalystArtistCount: catalysts.catalystArtistCount,
+      highPriorityCatalystArtistCount: catalysts.highPriorityCatalystArtistCount,
+      mixedCatalystArtistCount: catalysts.mixedCatalystArtistCount,
+      averageNetCatalystShock: catalysts.averageNetCatalystShock,
+      averageAbsCatalystShock: catalysts.averageAbsCatalystShock,
+      sourceConflictArtistCount: sourceAttribution.sourceConflictArtistCount,
+      averageSourceDirectionSpread: sourceAttribution.averageSourceDirectionSpread,
+      averageSourceCount: sourceAttribution.averageSourceCount,
       signalCoverageScore: quality.signalCoverageScore,
       reliabilityScore: quality.reliabilityScore,
       movementBalanceScore: quality.movementBalanceScore,
@@ -246,6 +308,16 @@ function applyRelativePressure({
     marketAverageSignalDelta > 0 && marketSignalBreadth >= 0.75
       ? -clamp(marketAverageSignalDelta * 0.08 * marketContextConfidence, 0, 0.003)
       : 0;
+  const crowdedPositiveMarketPressure =
+    marketAverageSignalDelta > 0 &&
+    marketMedianSignalDelta > 0 &&
+    marketSignalBreadth >= 0.72
+      ? -clamp(
+          (marketAverageSignalDelta * 0.1 + marketMedianSignalDelta * 0.08) * marketContextConfidence,
+          0.0005,
+          signalStrengthRank <= 0.4 ? 0.006 : 0.003
+        )
+      : 0;
   const laggardRotationDrift =
     marketAverageSignalDelta > 0 &&
     marketMedianSignalDelta > 0 &&
@@ -267,6 +339,7 @@ function applyRelativePressure({
     update.signalDelta +
     marketRelativeAdjustment +
     broadMarketDampener +
+    crowdedPositiveMarketPressure +
     laggardRotationDrift +
     noSignalLiquidityDrift;
   const repriced = priceFromSignalDelta(update, adjustedSignalDelta);
@@ -293,6 +366,7 @@ function applyRelativePressure({
       marketContextConfidence,
       marketRelativeAdjustment,
       broadMarketDampener,
+      crowdedPositiveMarketPressure,
       laggardRotationDrift,
       noSignalLiquidityDrift,
       adjustedSignalDelta
@@ -401,6 +475,99 @@ function summarizeTechnicalAdjustments(updates: ArtistMarketUpdate[]) {
   return {
     adjustmentCount: summary.adjustmentCount,
     averageAdjustment: summary.adjustmentTotal / Math.max(1, updates.length)
+  };
+}
+
+function summarizeCatalystDiagnostics(updates: ArtistMarketUpdate[]) {
+  if (!updates.length) {
+    return {
+      catalystArtistCount: 0,
+      highPriorityCatalystArtistCount: 0,
+      mixedCatalystArtistCount: 0,
+      averageNetCatalystShock: 0,
+      averageAbsCatalystShock: 0
+    };
+  }
+
+  const summary = updates.reduce(
+    (memo, update) => {
+      const diagnostics = getObjectRecord(update.rawPayload.catalystDiagnostics);
+      const modifierCount = getNumber(diagnostics.modifierCount, 0);
+      const positiveCatalystCount = getNumber(diagnostics.positiveCatalystCount, 0);
+      const negativeCatalystCount = getNumber(diagnostics.negativeCatalystCount, 0);
+      const highPriorityCatalystCount = getNumber(diagnostics.highPriorityCatalystCount, 0);
+      const netPriceShock = getNumber(diagnostics.netPriceShock, 0);
+      const absPriceShock =
+        Math.abs(getNumber(diagnostics.positivePriceShock, 0)) + Math.abs(getNumber(diagnostics.negativePriceShock, 0));
+
+      if (modifierCount > 0) {
+        memo.catalystArtistCount += 1;
+      }
+
+      if (highPriorityCatalystCount > 0) {
+        memo.highPriorityCatalystArtistCount += 1;
+      }
+
+      if (positiveCatalystCount > 0 && negativeCatalystCount > 0) {
+        memo.mixedCatalystArtistCount += 1;
+      }
+
+      memo.netShockTotal += netPriceShock;
+      memo.absShockTotal += absPriceShock;
+      return memo;
+    },
+    {
+      catalystArtistCount: 0,
+      highPriorityCatalystArtistCount: 0,
+      mixedCatalystArtistCount: 0,
+      netShockTotal: 0,
+      absShockTotal: 0
+    }
+  );
+
+  return {
+    catalystArtistCount: summary.catalystArtistCount,
+    highPriorityCatalystArtistCount: summary.highPriorityCatalystArtistCount,
+    mixedCatalystArtistCount: summary.mixedCatalystArtistCount,
+    averageNetCatalystShock: summary.netShockTotal / Math.max(1, updates.length),
+    averageAbsCatalystShock: summary.absShockTotal / Math.max(1, updates.length)
+  };
+}
+
+function summarizeSourceAttribution(updates: ArtistMarketUpdate[]) {
+  if (!updates.length) {
+    return {
+      sourceConflictArtistCount: 0,
+      averageSourceDirectionSpread: 0,
+      averageSourceCount: 0
+    };
+  }
+
+  const summary = updates.reduce(
+    (memo, update) => {
+      const attribution = getObjectRecord(update.rawPayload.sourceAttribution);
+      const positiveSourceCount = getNumber(attribution.positiveSourceCount, 0);
+      const negativeSourceCount = getNumber(attribution.negativeSourceCount, 0);
+
+      if (positiveSourceCount > 0 && negativeSourceCount > 0) {
+        memo.sourceConflictArtistCount += 1;
+      }
+
+      memo.spreadTotal += getNumber(attribution.sourceSpread, 0);
+      memo.sourceCountTotal += getNumber(attribution.sourceCount, 0);
+      return memo;
+    },
+    {
+      sourceConflictArtistCount: 0,
+      spreadTotal: 0,
+      sourceCountTotal: 0
+    }
+  );
+
+  return {
+    sourceConflictArtistCount: summary.sourceConflictArtistCount,
+    averageSourceDirectionSpread: summary.spreadTotal / Math.max(1, updates.length),
+    averageSourceCount: summary.sourceCountTotal / Math.max(1, updates.length)
   };
 }
 
@@ -606,9 +773,10 @@ function calculateArtistUpdate({
     : staleMomentumDecayDelta * artist.volatility;
   const reliabilityMultiplier = signals.hasMomentumSignal ? getReliabilityPriceMultiplier(signals.reliability) : 0;
   const reliabilityAdjustedDelta = rawSignalDelta * reliabilityMultiplier;
-  const signalDeltaBeforeTechnicals = signals.hasMomentumSignal
+  const modifierImpact = signals.hasMomentumSignal
     ? applySignalModifiers(reliabilityAdjustedDelta * conflictMoveMultiplier, signals.modifiers, reliabilityMultiplier)
-    : rawSignalDelta;
+    : getEmptyModifierImpact(rawSignalDelta);
+  const signalDeltaBeforeTechnicals = modifierImpact.signalDelta;
   const technicalAdjustment = applyTechnicalPriceContext({
     signalDelta: signalDeltaBeforeTechnicals,
     priceTrend: artist.priceTrend,
@@ -634,6 +802,8 @@ function calculateArtistUpdate({
   const currentPrice = roundPrice(cappedPrice);
   const dailyChangePercent = getDailyChangePercent(currentPrice, previousClose);
   const hypeScore = calculateHypeScore(stats);
+  const catalystDiagnostics = buildCatalystDiagnostics(signals.modifiers, dailyChangePercent);
+  const sourceAttribution = buildSourceAttribution(signals.rawPayload, dailyChangePercent);
 
   return {
     artistId: artist.id,
@@ -645,7 +815,7 @@ function calculateArtistUpdate({
     hypeScore,
     stats,
     explanation: signals.hasMomentumSignal
-      ? explainMove(artist.ticker, stats, dailyChangePercent, signals.modifiers)
+      ? explainMove(artist.ticker, stats, dailyChangePercent, catalystDiagnostics)
       : explainNoSignalMove(artist.ticker, source, dailyChangePercent, staleMomentumDecayDelta),
     signalDelta,
     modelVersion,
@@ -661,8 +831,11 @@ function calculateArtistUpdate({
       staleMomentumDecayDelta,
       rawSignalDelta,
       reliabilityAdjustedDelta,
+      modifierImpact,
       signalDeltaBeforeTechnicals,
       technicalAdjustment,
+      catalystDiagnostics,
+      sourceAttribution,
       previousClose,
       previousCloseSource: artist.previousCloseSource ?? "artist",
       oldPrice: artist.currentPrice,
@@ -832,21 +1005,81 @@ function combinePartialStats(
 }
 
 function applySignalModifiers(signalDelta: number, modifiers: MarketSignalModifier[], reliabilityMultiplier = 1) {
+  const modifierAudits = buildModifierAudits(modifiers);
   const combinedMultiplier = modifiers.reduce(
     (value, modifier) =>
       typeof modifier.priceMultiplier === "number" ? value * modifier.priceMultiplier : value,
     1
   );
+  const positivePriceShock = modifiers.reduce(
+    (value, modifier) => value + Math.max(0, modifier.priceShock ?? 0) * reliabilityMultiplier,
+    0
+  );
+  const negativePriceShock = modifiers.reduce(
+    (value, modifier) => value + Math.min(0, modifier.priceShock ?? 0) * reliabilityMultiplier,
+    0
+  );
   const combinedShock = modifiers.reduce(
     (value, modifier) => value + (modifier.priceShock ?? 0) * reliabilityMultiplier,
     0
   );
-
-  return clamp(
+  const adjustedSignalDelta = clamp(
     (signalDelta + combinedShock) * combinedMultiplier,
     -0.75,
     0.75
   );
+
+  return {
+    signalDelta: adjustedSignalDelta,
+    baseSignalDelta: signalDelta,
+    combinedMultiplier,
+    combinedShock,
+    positivePriceShock,
+    negativePriceShock,
+    appliedDelta: adjustedSignalDelta - signalDelta,
+    modifierCount: modifiers.length,
+    topModifiers: modifierAudits.slice(0, 5)
+  };
+}
+
+function getEmptyModifierImpact(signalDelta: number) {
+  return {
+    signalDelta,
+    baseSignalDelta: signalDelta,
+    combinedMultiplier: 1,
+    combinedShock: 0,
+    positivePriceShock: 0,
+    negativePriceShock: 0,
+    appliedDelta: 0,
+    modifierCount: 0,
+    topModifiers: []
+  };
+}
+
+function buildModifierAudits(modifiers: MarketSignalModifier[]): ModifierAudit[] {
+  return modifiers
+    .map((modifier) => {
+      const priceShock = typeof modifier.priceShock === "number" && Number.isFinite(modifier.priceShock)
+        ? modifier.priceShock
+        : 0;
+      const score = typeof modifier.score === "number" && Number.isFinite(modifier.score)
+        ? modifier.score
+        : null;
+      const reasonPriority = clamp(modifier.reasonPriority ?? 0, 0, 20);
+
+      return {
+        reason: modifier.reason,
+        direction: priceShock > 0 ? "positive" : priceShock < 0 ? "negative" : "neutral",
+        priceShock,
+        priceMultiplier: typeof modifier.priceMultiplier === "number" && Number.isFinite(modifier.priceMultiplier)
+          ? modifier.priceMultiplier
+          : null,
+        score,
+        reasonPriority,
+        sortScore: getModifierSortScore(modifier)
+      } satisfies ModifierAudit;
+    })
+    .sort((a, b) => b.sortScore - a.sortScore);
 }
 
 export function mergeAdapterSignals(...sources: Array<AdapterSignals | undefined>) {
@@ -1298,6 +1531,73 @@ function getSourceDirectionalScores(rawPayload: Record<string, unknown>) {
   );
 }
 
+function buildSourceAttribution(
+  rawPayload: Record<string, unknown>,
+  dailyChangePercent: number
+): SourceAttribution {
+  const scores = getSourceDirectionalScores(rawPayload);
+  const sourceWeights = getSourceWeights(rawPayload) ?? {};
+  const moveDirection = dailyChangePercent >= 0 ? "positive" : "negative";
+  const sources = Object.entries(scores)
+    .map(([source, score]) => {
+      const weights = sourceWeights[source] ?? {};
+      const statCount = Object.keys(weights).length;
+      const totalWeight = Object.values(weights).reduce(
+        (total, value) => total + (typeof value === "number" && Number.isFinite(value) ? value : 0),
+        0
+      );
+      const direction = score >= 8 ? "positive" : score <= -8 ? "negative" : "neutral";
+
+      return {
+        source,
+        label: getSourceAttributionLabel(source),
+        direction,
+        score,
+        statCount,
+        totalWeight,
+        alignedWithMove: direction === moveDirection
+      } satisfies SourceAttributionItem;
+    })
+    .sort((a, b) => Math.abs(b.score) - Math.abs(a.score));
+  const positiveSources = sources.filter((source) => source.direction === "positive");
+  const negativeSources = sources.filter((source) => source.direction === "negative");
+  const neutralSources = sources.filter((source) => source.direction === "neutral");
+  const leadingSource = sources.find((source) => source.direction === moveDirection) ?? sources[0] ?? null;
+  const opposingSource = sources.find(
+    (source) => source.direction !== "neutral" && source.direction !== moveDirection
+  ) ?? null;
+  const values = sources.map((source) => source.score);
+
+  return {
+    sourceCount: sources.length,
+    positiveSourceCount: positiveSources.length,
+    negativeSourceCount: negativeSources.length,
+    neutralSourceCount: neutralSources.length,
+    leadingSource,
+    opposingSource,
+    sourceSpread: values.length >= 2 ? Math.max(...values) - Math.min(...values) : 0,
+    sources
+  };
+}
+
+function getSourceAttributionLabel(source: string) {
+  const labels: Record<string, string> = {
+    lastfm: "audience listening",
+    spotify: "streaming platform",
+    youtube: "video platform",
+    youtube_comments: "video comment sentiment",
+    youtube_uploads: "official upload activity",
+    reddit: "community discussion",
+    gdelt: "news coverage",
+    wikimedia: "public attention",
+    market_events: "release and news events",
+    trade_flow: "order flow",
+    manual: "manual signal"
+  };
+
+  return labels[source] ?? source.replace(/_/g, " ");
+}
+
 function getPayloadSourceName(rawPayload: Record<string, unknown>) {
   const source = rawPayload.source;
 
@@ -1386,7 +1686,7 @@ function explainMove(
   ticker: string,
   stats: HypeStats,
   dailyChangePercent: number,
-  modifiers: MarketSignalModifier[] = []
+  catalystDiagnostics: CatalystDiagnostics
 ) {
   const signals = [
     ["streaming momentum", stats.streamingGrowth],
@@ -1400,15 +1700,85 @@ function explainMove(
     Math.abs(current[1]) > Math.abs(best[1]) ? current : best
   );
   const direction = dailyChangePercent >= 0 ? "moved higher" : "pulled back";
-  const strongestModifier = modifiers
-    .filter((modifier) => typeof modifier.score === "number")
-    .sort((a, b) => Math.abs(b.score ?? 0) - Math.abs(a.score ?? 0))[0];
+  const primaryCatalyst = catalystDiagnostics.primaryCatalyst;
+  const counterCatalyst = catalystDiagnostics.counterCatalyst;
 
-  if (strongestModifier) {
-    return `${ticker} ${direction} after ${signalName} led the daily hype model, with ${strongestModifier.reason} adjusting the move.`;
+  if (primaryCatalyst) {
+    const counterClause = getCounterCatalystClause({
+      dailyChangePercent,
+      counterCatalyst
+    });
+
+    if (primaryCatalyst.reasonPriority >= 8) {
+      return `${ticker} ${direction} as ${primaryCatalyst.reason} led the daily hype model${counterClause}.`;
+    }
+
+    return `${ticker} ${direction} after ${signalName} led the daily hype model, with ${primaryCatalyst.reason} adjusting the move${counterClause}.`;
+  }
+
+  if (counterCatalyst?.reasonPriority && counterCatalyst.reasonPriority >= 8) {
+    return `${ticker} ${direction} after ${signalName} led the daily hype model, though ${counterCatalyst.reason} limited the move.`;
   }
 
   return `${ticker} ${direction} after ${signalName} led the daily hype model.`;
+}
+
+function buildCatalystDiagnostics(
+  modifiers: MarketSignalModifier[],
+  dailyChangePercent: number
+): CatalystDiagnostics {
+  const topCatalysts = buildModifierAudits(modifiers);
+  const positiveCatalysts = topCatalysts.filter((modifier) => modifier.direction === "positive");
+  const negativeCatalysts = topCatalysts.filter((modifier) => modifier.direction === "negative");
+  const primaryDirection = dailyChangePercent >= 0 ? "positive" : "negative";
+  const counterDirection = primaryDirection === "positive" ? "negative" : "positive";
+  const primaryCatalyst = topCatalysts.find((modifier) => modifier.direction === primaryDirection) ?? null;
+  const counterCatalyst = topCatalysts.find((modifier) => modifier.direction === counterDirection) ?? null;
+  const positivePriceShock = positiveCatalysts.reduce((total, modifier) => total + modifier.priceShock, 0);
+  const negativePriceShock = negativeCatalysts.reduce((total, modifier) => total + modifier.priceShock, 0);
+
+  return {
+    modifierCount: topCatalysts.length,
+    positiveCatalystCount: positiveCatalysts.length,
+    negativeCatalystCount: negativeCatalysts.length,
+    highPriorityCatalystCount: topCatalysts.filter((modifier) => modifier.reasonPriority >= 8).length,
+    positivePriceShock,
+    negativePriceShock,
+    netPriceShock: positivePriceShock + negativePriceShock,
+    primaryCatalyst,
+    counterCatalyst,
+    topCatalysts: topCatalysts.slice(0, 8)
+  };
+}
+
+function getCounterCatalystClause({
+  dailyChangePercent,
+  counterCatalyst
+}: {
+  dailyChangePercent: number;
+  counterCatalyst: ModifierAudit | null;
+}) {
+  if (!counterCatalyst || counterCatalyst.reasonPriority < 8 || Math.abs(counterCatalyst.priceShock) < 0.004) {
+    return "";
+  }
+
+  if (dailyChangePercent >= 0 && counterCatalyst.priceShock < 0) {
+    return `, though ${counterCatalyst.reason} limited the move`;
+  }
+
+  if (dailyChangePercent < 0 && counterCatalyst.priceShock > 0) {
+    return `, though ${counterCatalyst.reason} softened the pullback`;
+  }
+
+  return "";
+}
+
+function getModifierSortScore(modifier: MarketSignalModifier) {
+  const rawScore = Math.abs(modifier.score ?? 0);
+  const priority = clamp(modifier.reasonPriority ?? 0, 0, 20);
+  const priceShock = Math.abs(modifier.priceShock ?? 0);
+
+  return rawScore * (1 + priority / 8) + priceShock * 900 + priority * 2.5;
 }
 
 function explainNoSignalMove(

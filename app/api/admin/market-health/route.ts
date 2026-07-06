@@ -652,6 +652,20 @@ function buildWarnings({
     ) {
       warnings.push("Latest market run used price-action guardrails on many artists; review whether the market is overextended or unusually volatile.");
     }
+
+    if (
+      movementSummary.artistCount >= 10 &&
+      movementSummary.mixedCatalystArtistCount / Math.max(1, movementSummary.artistCount) >= 0.25
+    ) {
+      warnings.push("Latest market run had many mixed catalysts; prices should be interpreted with extra caution until reception resolves.");
+    }
+
+    if (
+      movementSummary.artistCount >= 10 &&
+      movementSummary.sourceConflictArtistCount / Math.max(1, movementSummary.artistCount) >= 0.35
+    ) {
+      warnings.push("Latest market run had broad source disagreement; streaming, community, media, or order-flow signals may be pulling in different directions.");
+    }
   }
 
   if (!config.cronSecretConfigured) {
@@ -711,7 +725,9 @@ function getMovementSummary(summary: MarketRunRow["summary"]) {
       sourceQualityAnomalyCount: 0,
       sourceQualityStaleCount: 0,
       averageSourceQualityMultiplier: 1,
-      technicalAdjustmentCount: 0
+      technicalAdjustmentCount: 0,
+      mixedCatalystArtistCount: 0,
+      sourceConflictArtistCount: 0
     };
   }
 
@@ -727,7 +743,9 @@ function getMovementSummary(summary: MarketRunRow["summary"]) {
     sourceQualityAnomalyCount: getSummaryNumber(value.sourceQualityAnomalyCount),
     sourceQualityStaleCount: getSummaryNumber(value.sourceQualityStaleCount),
     averageSourceQualityMultiplier: getSummaryNumber(value.averageSourceQualityMultiplier, 1),
-    technicalAdjustmentCount: getSummaryNumber(value.technicalAdjustmentCount)
+    technicalAdjustmentCount: getSummaryNumber(value.technicalAdjustmentCount),
+    mixedCatalystArtistCount: getSummaryNumber(value.mixedCatalystArtistCount),
+    sourceConflictArtistCount: getSummaryNumber(value.sourceConflictArtistCount)
   };
 }
 
@@ -782,7 +800,7 @@ function formatMarketHealthError(error: unknown) {
     normalized.includes("model_version") ||
     normalized.includes("schema cache")
   ) {
-    return "Market engine storage needs setup. Run the Supabase migrations through 013_price_ticks.sql.";
+    return "Market engine storage needs setup. Run the Supabase migrations through 015_market_maker_quotes.sql.";
   }
 
   return message;
