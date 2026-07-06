@@ -286,7 +286,22 @@ function buildPriceModifiers(scoredEvents: ScoredMarketEvent[]): MarketSignalMod
 }
 
 function suppressTrackLevelReleaseModifiers(scoredEvents: ScoredMarketEvent[]) {
+  const specificProjectReleases = scoredEvents.filter(
+    (event) => event.eventSubtype === "project_release" && isSpecificProjectReleaseTitle(event)
+  );
+
   return scoredEvents.filter((event) => {
+    if (
+      event.eventSubtype === "project_release" &&
+      event.shockWeightedImpact > 0 &&
+      isGenericProjectReleaseHeadline(event) &&
+      specificProjectReleases.some(
+        (candidate) => candidate !== event && Math.abs(daysBetween(candidate.event.eventDate, event.event.eventDate)) <= 3
+      )
+    ) {
+      return false;
+    }
+
     if (event.eventSubtype !== "track_audio_release" && event.eventSubtype !== "single_video_release") {
       return true;
     }
@@ -303,6 +318,32 @@ function suppressTrackLevelReleaseModifiers(scoredEvents: ScoredMarketEvent[]) {
       return Math.abs(daysBetween(candidate.event.eventDate, event.event.eventDate)) <= 3;
     });
   });
+}
+
+function isSpecificProjectReleaseTitle(event: ScoredMarketEvent) {
+  const inferredTitle = getRawString(event.event.rawPayload.inferredReleaseTitle);
+
+  if (inferredTitle) {
+    return true;
+  }
+
+  const title = event.event.title.trim();
+
+  return /^[^-]+ - [^-]+$/.test(title);
+}
+
+function isGenericProjectReleaseHeadline(event: ScoredMarketEvent) {
+  const title = normalizeEventText(event.event.title);
+
+  return hasAnyTerm(title, [
+    "new albums",
+    "albums you should listen",
+    "songs you should listen",
+    "and more",
+    "weekly roundup",
+    "best new music",
+    "project release cycle"
+  ]);
 }
 
 function getEventModifierReason(event: ScoredMarketEvent) {

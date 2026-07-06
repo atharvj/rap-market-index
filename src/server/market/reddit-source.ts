@@ -1,6 +1,7 @@
 import { clamp } from "@/lib/pricing";
 import type { MarketUpdateArtist } from "@/server/market/daily-update";
 import { buildDefaultGdeltQuery } from "@/server/market/artist-text-identifiers";
+import { buildCommunityEventTitle, getCommunityEventLabel } from "@/server/market/event-title";
 import type {
   AdapterSignal,
   AdapterSignals,
@@ -350,7 +351,7 @@ function buildRedditSignal({
       .sort((a, b) => b.post.engagement - a.post.engagement)
       .slice(0, 5)
       .map(({ post, classification }) => ({
-        title: post.title,
+        signalLabel: getCommunityEventLabel(classification.eventType, classification.reason),
         subreddit: post.subreddit,
         permalink: post.permalink,
         createdDate: post.createdDate,
@@ -498,7 +499,12 @@ function buildRedditEvents({
     artistId: artist.id,
     eventDate: post.createdDate || runDate,
     eventType: classification.eventType ?? "viral",
-    title: post.title.slice(0, 160),
+    title: buildCommunityEventTitle({
+      artistName: artist.name,
+      eventType: classification.eventType,
+      reason: classification.reason,
+      source: "reddit"
+    }),
     sourceName: `reddit/${post.subreddit}`,
     sourceUrl: post.permalink,
     sentimentScore: classification.sentimentScore,

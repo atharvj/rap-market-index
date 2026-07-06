@@ -63,7 +63,7 @@ const ARTICLE_COUNT = "article_count";
 const SOURCE_COUNT = "source_count";
 const CLASSIFIED_EVENT_COUNT = "classified_event_count";
 const REQUEST_ERROR = "request_error";
-const DEFAULT_LOOKBACK_DAYS = 10;
+const DEFAULT_LOOKBACK_DAYS = 30;
 const DEFAULT_MAX_ITEMS_PER_FEED = 40;
 const DEFAULT_MAX_EVENTS_PER_ARTIST = 4;
 const DEFAULT_DELAY_MS = 250;
@@ -204,7 +204,9 @@ function buildArtistEvents({
   const candidateEvents = matchedItems
     .map(({ item, titleMatchedArtist, textMatchedArtist }) => {
       const classificationText = `${item.title} ${item.summary}`.slice(0, 420);
-      const classification = classifyArticleEvent(classificationText, item.domain);
+      const classification = classifyArticleEvent(classificationText, item.domain, undefined, {
+        allowLowTierRelease: item.feedScope === "artist_search" && (titleMatchedArtist || textMatchedArtist)
+      });
 
       if (!classification) {
         return null;
@@ -236,30 +238,48 @@ function buildArtistEvents({
     .sort((first, second) => getEventRank(second) - getEventRank(first))
     .slice(0, maxEventsPerArtist);
 
-  const events = candidateEvents.map(({ item, titleMatchedArtist, textMatchedArtist, sourceTier, classification }) => ({
-    artistId: artist.id,
-    eventDate: item.publishedDate ?? runDate,
-    eventType: classification.eventType,
-    title: item.title.slice(0, 160),
-    sourceName: item.sourceName || item.domain,
-    sourceUrl: item.url,
-    sentimentScore: classification.sentimentScore,
-    impactScore: classification.impactScore,
-    confidence: classification.confidence,
-    rawPayload: {
-      source: "media_rss_item",
-      feedUrl: item.feedUrl,
-      feedScope: item.feedScope,
-      searchQuery: item.searchQuery ?? null,
-      domain: item.domain,
-      sourceTier,
+  const events = candidateEvents.map(({ item, titleMatchedArtist, textMatchedArtist, sourceTier, classification }) => {
+    const classificationText = `${item.title} ${item.summary}`.slice(0, 600);
+    const releaseDate = getReleaseEventDate({
+      text: classificationText,
+      runDate,
       publishedDate: item.publishedDate,
-      classificationReason: classification.reason,
-      releaseKind: classification.releaseKind ?? null,
-      titleMatchedArtist,
-      textMatchedArtist
-    }
-  }));
+      releaseKind: classification.releaseKind
+    });
+    const inferredTitle = getInferredReleaseTitle({
+      artistName: artist.name,
+      articleTitle: item.title,
+      text: classificationText,
+      releaseKind: classification.releaseKind
+    });
+
+    return {
+      artistId: artist.id,
+      eventDate: releaseDate ?? item.publishedDate ?? runDate,
+      eventType: classification.eventType,
+      title: (inferredTitle ?? item.title).slice(0, 160),
+      sourceName: item.sourceName || item.domain,
+      sourceUrl: item.url,
+      sentimentScore: classification.sentimentScore,
+      impactScore: classification.impactScore,
+      confidence: classification.confidence,
+      rawPayload: {
+        source: "media_rss_item",
+        feedUrl: item.feedUrl,
+        feedScope: item.feedScope,
+        searchQuery: item.searchQuery ?? null,
+        domain: item.domain,
+        sourceTier,
+        publishedDate: item.publishedDate,
+        releaseDate,
+        classificationReason: classification.reason,
+        releaseKind: classification.releaseKind ?? null,
+        inferredReleaseTitle: inferredTitle,
+        titleMatchedArtist,
+        textMatchedArtist
+      }
+    };
+  });
 
   const sourceCount = new Set(matchedItems.map(({ item }) => item.domain)).size;
   const rawPayload = {
@@ -691,6 +711,183 @@ function isWithinLookback(date: string, runDate: string, lookbackDays: number) {
   return distanceDays >= -1 && distanceDays <= lookbackDays;
 }
 
+function getReleaseEventDate({
+  text,
+  runDate,
+  publishedDate,
+  releaseKind
+}: {
+  text: string;
+  runDate: string;
+  publishedDate: string | null;
+  releaseKind?: string | null;
+}) {
+  if (!isProjectReleaseKind(releaseKind)) {
+    return null;
+  }
+
+  const inferredDate = extractExplicitReleaseDate(text, publishedDate ?? runDate);
+
+  if (!inferredDate) {
+    return null;
+  }
+
+  const runTime = getDateTime(runDate);
+  const inferredTime = getDateTime(inferredDate);
+  const publishedTime = getDateTime(publishedDate);
+
+  if (!Number.isFinite(runTime) || !Number.isFinite(inferredTime)) {
+    return null;
+  }
+
+  const daysFromRun = Math.round((inferredTime - runTime) / 86_400_000);
+  const daysAfterPublished = Number.isFinite(publishedTime)
+    ? Math.round((inferredTime - publishedTime) / 86_400_000)
+    : 0;
+
+  if (daysFromRun < -30 || daysFromRun > 30 || daysAfterPublished < -2 || daysAfterPublished > 90) {
+    return null;
+  }
+
+  return inferredDate;
+}
+
+function extractExplicitReleaseDate(text: string, referenceDate: string) {
+  const monthPattern = Object.keys(MONTH_NUMBERS).join("|");
+  const directMatch = text.match(
+    new RegExp(`\\b(${monthPattern})\\s+(\\d{1,2})(?:st|nd|rd|th)?(?:,\\s*(\\d{4}))?\\b`, "i")
+  );
+
+  if (directMatch?.[1] && directMatch[2]) {
+    const month = MONTH_NUMBERS[directMatch[1].toLowerCase()];
+    const day = Number.parseInt(directMatch[2], 10);
+    const year = directMatch[3] ? Number.parseInt(directMatch[3], 10) : inferReleaseYear(month, referenceDate);
+
+    return formatDateParts(year, month, day);
+  }
+
+  const numericMatch = text.match(/\b(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?\b/);
+
+  if (numericMatch?.[1] && numericMatch[2]) {
+    const month = Number.parseInt(numericMatch[1], 10);
+    const day = Number.parseInt(numericMatch[2], 10);
+    const year = numericMatch[3]
+      ? normalizeYear(Number.parseInt(numericMatch[3], 10))
+      : inferReleaseYear(month, referenceDate);
+
+    return formatDateParts(year, month, day);
+  }
+
+  return null;
+}
+
+function getInferredReleaseTitle({
+  artistName,
+  articleTitle,
+  text,
+  releaseKind
+}: {
+  artistName: string;
+  articleTitle: string;
+  text: string;
+  releaseKind?: string | null;
+}) {
+  if (!isProjectReleaseKind(releaseKind)) {
+    return null;
+  }
+
+  const title = extractProjectTitle(articleTitle) ?? extractProjectTitle(text);
+
+  if (!title) {
+    return null;
+  }
+
+  return `${artistName} - ${title}`;
+}
+
+function extractProjectTitle(value: string) {
+  const patterns = [
+    /\breturns with new (?:album|project|mixtape|ep)\s+["']?([^"'.,:;!?]+)["']?/i,
+    /\bannounces new (?:album|project|mixtape|ep)\s+["']?([^"'.,:;!?]+)["']?/i,
+    /\bshares new (?:album|project|mixtape|ep)\s+["']?([^"'.,:;!?]+)["']?/i,
+    /\breleases new (?:album|project|mixtape|ep)\s+["']?([^"'.,:;!?]+)["']?/i,
+    /\bdrops new (?:album|project|mixtape|ep)\s+["']?([^"'.,:;!?]+)["']?/i,
+    /\bnew (?:album|project|mixtape|ep)\s+["']?([^"'.,:;!?]+)["']?/i,
+    /\b(?:album|project|mixtape|ep)(?:,?\s+titled|\s+called)\s+["']?([^"'.,:;!?]+)["']?/i,
+    /\btitled\s+["']([^"']+)["']/i
+  ];
+
+  for (const pattern of patterns) {
+    const match = value.match(pattern);
+    const candidate = match?.[1] ? cleanProjectTitle(match[1]) : null;
+
+    if (candidate) {
+      return candidate;
+    }
+  }
+
+  return null;
+}
+
+function cleanProjectTitle(value: string) {
+  const cleaned = value
+    .replace(/\s+\b(?:arrives|arrive|coming|due|drops|out|on|via|through|from|featuring|with|will)\b[\s\S]*$/i, "")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  if (!cleaned || cleaned.length < 2 || cleaned.length > 80) {
+    return null;
+  }
+
+  return cleaned;
+}
+
+function isProjectReleaseKind(value: string | null | undefined) {
+  return value === "album" || value === "ep" || value === "mixtape";
+}
+
+function inferReleaseYear(month: number, referenceDate: string) {
+  const reference = new Date(`${referenceDate}T00:00:00.000Z`);
+  const referenceYear = Number.isFinite(reference.getTime()) ? reference.getUTCFullYear() : new Date().getUTCFullYear();
+  const referenceMonth = Number.isFinite(reference.getTime()) ? reference.getUTCMonth() + 1 : month;
+
+  if (month <= 2 && referenceMonth >= 11) {
+    return referenceYear + 1;
+  }
+
+  if (month >= 11 && referenceMonth <= 2) {
+    return referenceYear - 1;
+  }
+
+  return referenceYear;
+}
+
+function formatDateParts(year: number, month: number, day: number) {
+  if (year < 2000 || year > 2100 || month < 1 || month > 12 || day < 1 || day > 31) {
+    return null;
+  }
+
+  const date = new Date(Date.UTC(year, month - 1, day));
+
+  if (date.getUTCFullYear() !== year || date.getUTCMonth() + 1 !== month || date.getUTCDate() !== day) {
+    return null;
+  }
+
+  return date.toISOString().slice(0, 10);
+}
+
+function normalizeYear(value: number) {
+  return value < 100 ? 2000 + value : value;
+}
+
+function getDateTime(value: string | null | undefined) {
+  if (!value) {
+    return Number.NaN;
+  }
+
+  return new Date(`${value}T00:00:00.000Z`).getTime();
+}
+
 function quoteSearchPhrase(value: string) {
   return value.replace(/"/g, "").replace(/\s+/g, " ").trim();
 }
@@ -704,3 +901,30 @@ function sleep(ms: number) {
     setTimeout(resolve, ms);
   });
 }
+
+const MONTH_NUMBERS: Record<string, number> = {
+  january: 1,
+  jan: 1,
+  february: 2,
+  feb: 2,
+  march: 3,
+  mar: 3,
+  april: 4,
+  apr: 4,
+  may: 5,
+  june: 6,
+  jun: 6,
+  july: 7,
+  jul: 7,
+  august: 8,
+  aug: 8,
+  september: 9,
+  sep: 9,
+  sept: 9,
+  october: 10,
+  oct: 10,
+  november: 11,
+  nov: 11,
+  december: 12,
+  dec: 12
+};

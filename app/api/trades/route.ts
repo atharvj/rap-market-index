@@ -9,6 +9,14 @@ type TradeBody = {
   shares?: number;
 };
 
+type TradingStatusRow = {
+  trading_mode: string;
+  market_open: boolean;
+  market_impact_enabled: boolean;
+  artist_halted: boolean;
+  reason: string;
+};
+
 const MARKET_IMPACT_MIN_ACCOUNT_AGE_HOURS = 24;
 
 export async function POST(request: Request) {
@@ -79,6 +87,19 @@ export async function POST(request: Request) {
   const authUser = user.data.user;
   const email = (authUser.email ?? "").toLowerCase();
   const marketEligible = !isMarketImpactExemptEmail(email) && isAccountOldEnoughForMarketImpact(authUser.created_at);
+  const tradingStatus = await loadTradingStatus(supabase, artistId);
+
+  if (tradingStatus && !tradingStatus.market_open) {
+    return NextResponse.json(
+      {
+        ok: false,
+        error: tradingStatus.reason || "Trading is currently paused.",
+        marketStatus: mapTradingStatus(tradingStatus)
+      },
+      { status: 423 }
+    );
+  }
+
   const functionName = body.side === "sell" ? "sell_artist_shares" : "buy_artist_shares";
   const { data, error } = await supabase.rpc(functionName, {
     p_artist_id: artistId,
@@ -99,6 +120,7 @@ export async function POST(request: Request) {
   return NextResponse.json({
     ok: true,
     trade: data?.[0] ?? null,
+    marketStatus: tradingStatus ? mapTradingStatus(tradingStatus) : null,
     marketEligibility: {
       eligible: marketEligible,
       reason: getMarketEligibilityReason({
@@ -107,6 +129,28 @@ export async function POST(request: Request) {
       })
     }
   });
+}
+
+async function loadTradingStatus(supabase: ReturnType<typeof createAnonServerClient>, artistId: string) {
+  const { data, error } = await supabase.rpc("get_market_trading_status", {
+    p_artist_id: artistId
+  });
+
+  if (error) {
+    return null;
+  }
+
+  return (data?.[0] ?? null) as TradingStatusRow | null;
+}
+
+function mapTradingStatus(status: TradingStatusRow) {
+  return {
+    tradingMode: status.trading_mode,
+    isOpen: status.market_open,
+    marketImpactEnabled: status.market_impact_enabled,
+    artistHalted: status.artist_halted,
+    statusNote: status.reason
+  };
 }
 
 function isMarketImpactExemptEmail(email: string) {

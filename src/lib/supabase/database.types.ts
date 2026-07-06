@@ -87,6 +87,52 @@ export type Database = {
         Update: Partial<Database["public"]["Tables"]["artist_external_ids"]["Insert"]>;
         Relationships: [];
       };
+      market_controls: {
+        Row: {
+          id: boolean;
+          trading_mode: "continuous" | "halted" | "maintenance";
+          allow_trading: boolean;
+          allow_market_impact: boolean;
+          status_note: string;
+          day_change_reset: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: boolean;
+          trading_mode?: "continuous" | "halted" | "maintenance";
+          allow_trading?: boolean;
+          allow_market_impact?: boolean;
+          status_note?: string;
+          day_change_reset?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["market_controls"]["Insert"]>;
+        Relationships: [];
+      };
+      artist_trading_halts: {
+        Row: {
+          artist_id: string;
+          is_halted: boolean;
+          reason: string;
+          starts_at: string;
+          ends_at: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          artist_id: string;
+          is_halted?: boolean;
+          reason?: string;
+          starts_at?: string;
+          ends_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["artist_trading_halts"]["Insert"]>;
+        Relationships: [];
+      };
       price_history: {
         Row: {
           id: string;
@@ -394,6 +440,18 @@ export type Database = {
           spread_percent: number;
           slippage_percent: number;
           liquidity_score: number;
+        }>;
+      };
+      get_market_trading_status: {
+        Args: {
+          p_artist_id?: string | null;
+        };
+        Returns: Array<{
+          trading_mode: "continuous" | "halted" | "maintenance";
+          market_open: boolean;
+          market_impact_enabled: boolean;
+          artist_halted: boolean;
+          reason: string;
         }>;
       };
       sell_artist_shares: {

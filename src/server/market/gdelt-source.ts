@@ -411,7 +411,8 @@ function isRelevantGdeltEvent({
 export function classifyArticleEvent(
   title: string,
   domain: string,
-  tone: unknown = undefined
+  tone: unknown = undefined,
+  options: { allowLowTierRelease?: boolean } = {}
 ): ArticleMarketClassification | null {
   const lowerTitle = title.toLowerCase();
   const sourceTier = getSourceTier(domain);
@@ -486,6 +487,18 @@ export function classifyArticleEvent(
     };
   }
 
+  const projectRelease = buildReleaseArticleClassification(
+    lowerTitle,
+    sourceTier,
+    toneScore,
+    true,
+    options.allowLowTierRelease
+  );
+
+  if (projectRelease) {
+    return projectRelease;
+  }
+
   if (hasAny(lowerTitle, MAJOR_FEATURE_TERMS)) {
     return {
       eventType: "viral" as const,
@@ -556,18 +569,8 @@ export function classifyArticleEvent(
     };
   }
 
-  if (hasAny(lowerTitle, RELEASE_TERMS) && sourceTier >= 1) {
-    const releaseKind = getArticleReleaseKind(lowerTitle);
-    const isProjectRelease = releaseKind === "album" || releaseKind === "ep" || releaseKind === "mixtape";
-
-    return {
-      eventType: "release" as const,
-      sentimentScore: clamp((isProjectRelease ? 34 : 28) + toneScore * 0.4, -35, 78),
-      impactScore: clamp((isProjectRelease ? 52 : 38) + Math.max(0, toneScore), -15, 88),
-      confidence: getArticleConfidence(sourceTier, isProjectRelease ? 0.68 : 0.62),
-      reason: "release_terms",
-      releaseKind: releaseKind ?? undefined
-    };
+  if (hasAny(lowerTitle, RELEASE_TERMS) && (sourceTier >= 1 || options.allowLowTierRelease)) {
+    return buildReleaseArticleClassification(lowerTitle, sourceTier, toneScore, false, options.allowLowTierRelease);
   }
 
   if (sourceTier >= 2 && Math.abs(toneScore) >= 18 && hasAny(lowerTitle, NEWS_TERMS)) {
@@ -581,6 +584,34 @@ export function classifyArticleEvent(
   }
 
   return null;
+}
+
+function buildReleaseArticleClassification(
+  title: string,
+  sourceTier: number,
+  toneScore: number,
+  projectOnly: boolean,
+  allowLowTierRelease = false
+): ArticleMarketClassification | null {
+  if ((sourceTier < 1 && !allowLowTierRelease) || !hasAny(title, RELEASE_TERMS)) {
+    return null;
+  }
+
+  const releaseKind = getArticleReleaseKind(title);
+  const isProjectRelease = releaseKind === "album" || releaseKind === "ep" || releaseKind === "mixtape";
+
+  if (projectOnly && !isProjectRelease) {
+    return null;
+  }
+
+  return {
+    eventType: "release" as const,
+    sentimentScore: clamp((isProjectRelease ? 34 : 28) + toneScore * 0.4, -35, 78),
+    impactScore: clamp((isProjectRelease ? 52 : 38) + Math.max(0, toneScore), -15, 88),
+    confidence: getArticleConfidence(sourceTier, isProjectRelease ? 0.68 : 0.62),
+    reason: "release_terms",
+    releaseKind: releaseKind ?? undefined
+  };
 }
 
 function getArticleReleaseKind(title: string): ArticleReleaseKind | null {

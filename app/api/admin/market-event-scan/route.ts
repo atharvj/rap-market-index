@@ -22,6 +22,7 @@ export const maxDuration = 180;
 type MarketEventScanBody = {
   dryRun?: boolean;
   runDate?: string;
+  artistIds?: string[];
   artistLimit?: number;
   maxRecords?: number;
   delayMs?: number;
@@ -38,7 +39,7 @@ const DEFAULT_MAX_RECORDS = 12;
 const MAX_GDELT_RECORDS = 50;
 const DEFAULT_DELAY_MS = 5200;
 const DEFAULT_TIMEOUT_MS = 12000;
-const DEFAULT_RSS_LOOKBACK_DAYS = 10;
+const DEFAULT_RSS_LOOKBACK_DAYS = 30;
 const DEFAULT_RSS_MAX_ITEMS_PER_FEED = 40;
 
 export async function GET(request: Request) {
@@ -102,12 +103,19 @@ export async function POST(request: Request) {
         runDate
       })
     ]);
-    const artists = selectArtistsForEventScan({
-      artists: allArtists,
-      latestGdeltDates,
-      latestMediaRssDates,
-      limit: artistLimit
-    });
+    const requestedArtistIds = normalizeArtistIds(body.artistIds);
+    const artists = requestedArtistIds.length
+      ? selectRequestedArtists({
+          artists: allArtists,
+          requestedArtistIds,
+          limit: artistLimit
+        })
+      : selectArtistsForEventScan({
+          artists: allArtists,
+          latestGdeltDates,
+          latestMediaRssDates,
+          limit: artistLimit
+        });
     const selectedArtistIds = artists.map((artist) => artist.id);
     const [externalIds, baselines] = await Promise.all([
       loadArtistExternalIds(supabase, selectedArtistIds),
@@ -212,6 +220,20 @@ async function parseBody(request: Request): Promise<MarketEventScanBody> {
   }
 }
 
+function selectRequestedArtists({
+  artists,
+  requestedArtistIds,
+  limit
+}: {
+  artists: MarketUpdateArtist[];
+  requestedArtistIds: string[];
+  limit: number;
+}) {
+  const requested = new Set(requestedArtistIds);
+
+  return artists.filter((artist) => requested.has(artist.id)).slice(0, limit);
+}
+
 function selectArtistsForEventScan({
   artists,
   latestGdeltDates,
@@ -250,6 +272,21 @@ function normalizeInteger(value: unknown, fallback: number, min: number, max: nu
   }
 
   return Math.min(max, Math.max(min, value));
+}
+
+function normalizeArtistIds(value: unknown) {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return Array.from(
+    new Set(
+      value
+        .filter((artistId): artistId is string => typeof artistId === "string")
+        .map((artistId) => artistId.trim().toLowerCase())
+        .filter((artistId) => /^[a-z0-9-]+$/.test(artistId))
+    )
+  );
 }
 
 function getEnvInteger(name: string, fallback: number, min: number, max: number) {

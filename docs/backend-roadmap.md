@@ -273,11 +273,11 @@ When enabled, the YouTube comments path samples recent comments from each artist
 
 Raw comment text is not saved. The first run is treated as a baseline; later runs move the social/news/search parts of the model from changes in sentiment, likes, and net positive-vs-negative share. This prevents every naturally positive fan comment section from pushing a stock up every day.
 
-The YouTube upload event path is separate from comment sentiment. It uses official channel upload playlists for artists with `youtube_channel_id`, classifies recent upload titles such as official videos, new singles, album trailers, deluxe/tracklist announcements, snippets, teasers, freestyles, performances, and tour announcements, and stores those matches as `market_events`. It does not use YouTube search, so it is much cheaper and less ambiguous than searching all of YouTube for an artist name. Defaults are `MARKET_YOUTUBE_UPLOAD_EVENT_VIDEOS=5` and `MARKET_YOUTUBE_UPLOAD_EVENT_DAYS=14`.
+The YouTube upload event path is separate from comment sentiment. It uses official channel upload playlists for artists with `youtube_channel_id`, classifies recent upload titles such as official videos, new singles, album trailers, deluxe/tracklist announcements, snippets, teasers, freestyles, performances, and tour announcements, and stores those matches as `market_events`. When several official-audio tracks appear together, the engine adds a project-release-cycle event and suppresses the individual track uploads as headline reasons. It does not use YouTube search, so it is much cheaper and less ambiguous than searching all of YouTube for an artist name. Defaults are `MARKET_YOUTUBE_UPLOAD_EVENT_VIDEOS=5` and `MARKET_YOUTUBE_UPLOAD_EVENT_DAYS=14`.
 
 The Bluesky path is an early social-catalyst adapter. It searches recent public posts for each artist, stores aggregate observations only, and classifies snippet hype, album announcements, release dates, tracklists, viral clips, performance reaction, feature/cosign chatter, backlash, controversy, and decline terms. It can catch moments that may not have reached article coverage yet, but its source weight is intentionally below audience/video/release/news sources. Defaults are `MARKET_BLUESKY_POST_LIMIT=20`, `MARKET_BLUESKY_LOOKBACK_DAYS=7`, and `MARKET_BLUESKY_DELAY_MS=250`.
 
-The media RSS path is an automatic news/review adapter used by the scheduled event scan. It fetches a built-in list of free music/media feeds and optional Google News RSS searches for the selected artists, stores `media_rss:article_count`, `media_rss:source_count`, and `media_rss:classified_event_count` observations, then classifies release announcements, reviews, tracklists, snippets, major features, viral performance coverage, controversies, and decline/falloff articles into `market_events`. Defaults are `MARKET_RSS_GOOGLE_NEWS=true`, `MARKET_RSS_LOOKBACK_DAYS=10`, and `MARKET_RSS_MAX_ITEMS_PER_FEED=40`; `MARKET_RSS_FEEDS` can override the built-in comma-separated feed list.
+The media RSS path is an automatic news/review adapter used by the scheduled event scan. It fetches a built-in list of free music/media feeds and optional Google News RSS searches for the selected artists, stores `media_rss:article_count`, `media_rss:source_count`, and `media_rss:classified_event_count` observations, then classifies release announcements, reviews, tracklists, snippets, major features, viral performance coverage, controversies, and decline/falloff articles into `market_events`. Project-release articles can also infer a release date from article text, so an album announcement published before release week can still anchor the release event when the project drops. Defaults are `MARKET_RSS_GOOGLE_NEWS=true`, `MARKET_RSS_LOOKBACK_DAYS=30`, and `MARKET_RSS_MAX_ITEMS_PER_FEED=40`; `MARKET_RSS_FEEDS` can override the built-in comma-separated feed list.
 
 The Reddit path is a community-hype adapter, not a pure sentiment adapter. It searches configured music subreddits for each artist, stores aggregate observations only, and looks for broad attention plus catalyst language such as snippets, features, viral performances, release news, chart movement, controversies, or decline terms. It fetches both new and top weekly search results so high-engagement posts are not missed just because they are no longer the newest result. Defaults are `MARKET_REDDIT_POST_LIMIT=25`, `MARKET_REDDIT_LOOKBACK_DAYS=7`, and `MARKET_REDDIT_SUBREDDITS=hiphopheads,rap,trap,undergroundhiphop,playboicarti,soundcloud`. If Reddit credentials are missing, the rest of the `core` engine still runs.
 
@@ -356,7 +356,7 @@ Vercel schedules cron in UTC, so this runs around 2 AM Pacific during daylight s
 - `eventScanLimit`: `MARKET_EVENT_SCAN_LIMIT`, default `20`
 - `eventScanMaxRecords`: `MARKET_EVENT_SCAN_MAX_RECORDS`, default `12`
 - `mediaRssGoogleNews`: `MARKET_RSS_GOOGLE_NEWS`, default `true`
-- `mediaRssLookbackDays`: `MARKET_RSS_LOOKBACK_DAYS`, default `10`
+- `mediaRssLookbackDays`: `MARKET_RSS_LOOKBACK_DAYS`, default `30`
 - `mediaRssMaxItemsPerFeed`: `MARKET_RSS_MAX_ITEMS_PER_FEED`, default `40`
 - `youtubeUploadEventVideos`: `MARKET_YOUTUBE_UPLOAD_EVENT_VIDEOS`, default `5`
 - `redditPostLimit`: `MARKET_REDDIT_POST_LIMIT`, default `25`
@@ -372,7 +372,7 @@ The market event layer stores releases, reviews, news, controversies, awards, to
 
 Blended market runs use a confidence-weighted ensemble. Each adapter contributes most strongly to the stats it actually measures: Last.fm to streaming momentum, public-attention pageviews to search/media attention, YouTube channel stats to video momentum, YouTube comments and Reddit to fan/social reaction with different confidence caps, GDELT to news/search, Spotify to streaming/search proxies, trade flow to trading demand, and market events to release/news/social modifiers. This keeps the result from depending on adapter order and makes weak or indirect inputs less dominant.
 
-Release explanations should prefer the real catalyst level. Full projects, mixtapes, albums, deluxe releases, and album announcements outrank individual official-audio uploads from the same release window. Track-level uploads still count as activity, but they receive smaller shocks and are suppressed as the headline reason when a project release is also present. The event model also builds a release-cycle context: related track uploads become supporting evidence, while tracklist, cover-art, and review reception can boost or dampen the project release impact depending on detected sentiment.
+Release explanations should prefer the real catalyst level. Full projects, mixtapes, albums, deluxe releases, and album announcements outrank individual official-audio uploads from the same release window. If the official channel posts a batch of official-audio tracks but no external source has named the project yet, the engine treats that batch as a project-release cycle instead of attributing the move to one random track. Track-level uploads still count as activity, but they receive smaller shocks and are suppressed as the headline reason when a project release is also present. The event model also builds a release-cycle context: related track uploads become supporting evidence, while tracklist, cover-art, and review reception can boost or dampen the project release impact depending on detected sentiment.
 
 The admin event ingestion endpoint is:
 
@@ -486,6 +486,16 @@ Historical backfill depends on the source:
 
 For launch, the honest product behavior should be "since listing" until enough real observations have accumulated. Intraday movement should come from real trades, persisted market runs, or clearly labeled synthetic liquidity/tick jobs. If we generate pre-launch history, it should be labeled as backfilled/model-estimated rather than pretending it was live market data.
 
+## Market mechanics decision
+
+Rap Market Index should follow an HSX-style virtual specialist model instead of a real brokerage schedule:
+
+- Trading is continuous while the market is open. There is no stock-market-style 9:30 AM to 4:00 PM session for the first version.
+- The daily source run creates the previous-close anchor and resets the daily change around midnight Pacific time.
+- Eligible user trades can move the live quote intraday, but only inside capped quote/liquidity limits.
+- Market notes are catalyst summaries, not proof of exact causation. Finance sites and HSX-style markets show news, events, and ticker context; they do not prove a single cause for every tick.
+- Shorting should stay disabled until collateral, cover orders, exposure limits, and liquidation checks exist.
+
 ## Signal adapters
 
 - GDELT news coverage adapter.
@@ -534,6 +544,25 @@ It expects a Supabase-authenticated `Authorization` header and a body like:
 ```
 
 The database function handles the important atomic work: cash balance, holdings, average buy price, transaction record, commission, trading demand, and small market-maker price impact. Trades charge a 1% commission with a minimum of 2 cents per share. `market_eligible=false` is used for admin/test trades so the order still executes but does not move public prices or feed the trade-flow market signal.
+
+Migration `017_market_operation_controls.sql` adds the market-operations layer:
+
+- `public.market_controls` stores global trading mode, global trading pause, and market-impact pause.
+- `public.artist_trading_halts` stores active per-artist halts.
+- `public.get_market_trading_status(artist_id)` returns the current open/halted/impact status.
+- The transaction eligibility trigger rejects trades while the market or artist is halted.
+- `public.apply_artist_trade_impact` refuses price impact when impact is paused or the account is ineligible.
+
+The app-facing status/control routes are:
+
+```txt
+GET /api/market/status
+GET /api/market/status?artistId=ken-carson
+GET /api/admin/market-controls
+PATCH /api/admin/market-controls
+```
+
+Admin control writes require admin auth or the market update secret. This makes halts and market-impact pauses available before launch without exposing them to normal users.
 
 ## Frontend bridge
 

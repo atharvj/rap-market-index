@@ -1,0 +1,84 @@
+import type { MarketEventType } from "@/server/market/market-data";
+
+export function buildCommunityEventTitle({
+  artistName,
+  eventType,
+  reason,
+  source
+}: {
+  artistName: string;
+  eventType: MarketEventType | null;
+  reason: string;
+  source: "reddit" | "bluesky";
+}) {
+  const label = getCommunityEventLabel(eventType, reason);
+  const sourceLabel = source === "reddit" ? "Reddit" : "social";
+
+  return `${artistName} ${label} on ${sourceLabel}`.slice(0, 160);
+}
+
+export function getCommunityEventLabel(eventType: MarketEventType | null, reason: string) {
+  const normalized = reason.toLowerCase();
+
+  if (normalized.includes("album_announcement")) {
+    return "album announcement reaction";
+  }
+
+  if (normalized.includes("project_release")) {
+    return "project release reaction";
+  }
+
+  if (normalized.includes("release")) {
+    return "release reaction";
+  }
+
+  if (normalized.includes("tracklist")) {
+    return "tracklist reaction";
+  }
+
+  if (normalized.includes("snippet")) {
+    return "snippet hype";
+  }
+
+  if (normalized.includes("performance")) {
+    return "performance reaction";
+  }
+
+  if (normalized.includes("feature")) {
+    return "feature/cosign reaction";
+  }
+
+  if (normalized.includes("chart")) {
+    return "chart momentum reaction";
+  }
+
+  if (normalized.includes("backlash") || normalized.includes("controversy")) {
+    return "backlash reaction";
+  }
+
+  if (normalized.includes("decline")) {
+    return "decline discussion";
+  }
+
+  if (normalized.includes("review")) {
+    return "review reaction";
+  }
+
+  if (normalized.includes("viral")) {
+    return "viral discussion";
+  }
+
+  if (eventType === "controversy") {
+    return "backlash reaction";
+  }
+
+  if (eventType === "review") {
+    return "review reaction";
+  }
+
+  if (eventType === "release") {
+    return "release reaction";
+  }
+
+  return "fan discussion";
+}

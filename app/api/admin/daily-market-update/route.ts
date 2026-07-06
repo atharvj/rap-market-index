@@ -291,7 +291,7 @@ async function loadArtistBatch({
 }): Promise<ArtistBatch> {
   const request = normalizeArtistBatchRequest({ source, dryRun, artistLimit, artistOffset });
 
-  if (dryRun || !supabase) {
+  if (!supabase || source === "mock" || (dryRun && !isRealExternalSource(source))) {
     const allArtists = getMockMarketArtists();
     const artists = sliceArtistBatch(allArtists, request.offset, request.limit);
 

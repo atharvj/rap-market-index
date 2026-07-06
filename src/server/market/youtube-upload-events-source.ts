@@ -74,13 +74,15 @@ const EVENT_VIDEO_COUNT = "event_video_count";
 const LATEST_UPLOAD_AGE_DAYS = "latest_upload_age_days";
 const REQUEST_ERROR = "request_error";
 const MAX_CHANNELS_PER_REQUEST = 50;
+const DEFAULT_MAX_VIDEOS_PER_ARTIST = 5;
+const OFFICIAL_AUDIO_CLUSTER_MIN_UPLOADS = 2;
 
 export async function collectYoutubeUploadEvents({
   artists,
   runDate,
   apiKey,
   externalIds = {},
-  maxVideosPerArtist = 2,
+  maxVideosPerArtist = DEFAULT_MAX_VIDEOS_PER_ARTIST,
   lookbackDays = 14,
   delayMs = 250,
   timeoutMs = 10000,
@@ -262,7 +264,142 @@ function buildYoutubeUploadEvents({
     });
   }
 
-  return events;
+  return addOfficialAudioReleaseClusterEvent({
+    artist,
+    runDate,
+    channelId,
+    events
+  });
+}
+
+function addOfficialAudioReleaseClusterEvent({
+  artist,
+  runDate,
+  channelId,
+  events
+}: {
+  artist: MarketUpdateArtist;
+  runDate: string;
+  channelId: string;
+  events: MarketEvent[];
+}) {
+  const cluster = findOfficialAudioReleaseCluster(events);
+
+  if (!cluster) {
+    return events;
+  }
+
+  const hasProjectRelease = events.some((event) => {
+    if (event.eventType !== "release") {
+      return false;
+    }
+
+    const releaseKind = typeof event.rawPayload.releaseKind === "string" ? event.rawPayload.releaseKind : "";
+    const reason =
+      typeof event.rawPayload.classificationReason === "string" ? event.rawPayload.classificationReason : "";
+
+    return (
+      (["album", "ep", "mixtape"].includes(releaseKind) || reason === "album_announcement_upload_title") &&
+      Math.abs(daysBetween(event.eventDate, cluster.eventDate)) <= 1
+    );
+  });
+
+  if (hasProjectRelease) {
+    return events;
+  }
+
+  const confidence = cluster.events.length >= 3 ? 0.76 : 0.68;
+  const impactScore = cluster.events.length >= 3 ? 58 : 46;
+  const sentimentScore = cluster.events.length >= 3 ? 34 : 28;
+  const relatedTitles = cluster.events.map((event) => event.title);
+  const firstVideoId = cluster.events
+    .map((event) => event.rawPayload.videoId)
+    .find((videoId): videoId is string => typeof videoId === "string" && videoId.length > 0);
+
+  const clusterEvent: MarketEvent = {
+    artistId: artist.id,
+    eventDate: cluster.eventDate,
+    eventType: "release",
+    title: `${artist.name} project release cycle`.slice(0, 160),
+    sourceName: "YouTube",
+    sourceUrl: firstVideoId ? `https://www.youtube.com/watch?v=${firstVideoId}` : undefined,
+    sentimentScore,
+    impactScore,
+    confidence,
+    rawPayload: {
+      source: "youtube_upload_event",
+      channelId,
+      videoId: firstVideoId ?? null,
+      publishedAt: cluster.publishedAt,
+      classificationReason: "official_audio_release_cluster",
+      releaseKind: "project",
+      relatedUploadCount: cluster.events.length,
+      relatedUploadTitles: relatedTitles,
+      relatedVideoIds: cluster.events
+        .map((event) => event.rawPayload.videoId)
+        .filter((videoId): videoId is string => typeof videoId === "string" && videoId.length > 0)
+    }
+  };
+
+  return [clusterEvent, ...events];
+}
+
+function findOfficialAudioReleaseCluster(events: MarketEvent[]) {
+  const trackAudioEvents = events.filter((event) => event.rawPayload.classificationReason === "track_audio_upload_title");
+
+  if (trackAudioEvents.length < OFFICIAL_AUDIO_CLUSTER_MIN_UPLOADS) {
+    return null;
+  }
+
+  const groupedByDate = new Map<string, MarketEvent[]>();
+
+  for (const event of trackAudioEvents) {
+    const group = groupedByDate.get(event.eventDate) ?? [];
+    group.push(event);
+    groupedByDate.set(event.eventDate, group);
+  }
+
+  const sameDateCluster = [...groupedByDate.entries()]
+    .filter(([, group]) => group.length >= OFFICIAL_AUDIO_CLUSTER_MIN_UPLOADS)
+    .sort((a, b) => {
+      if (b[1].length !== a[1].length) {
+        return b[1].length - a[1].length;
+      }
+
+      return b[0].localeCompare(a[0]);
+    })[0];
+
+  if (sameDateCluster) {
+    return {
+      eventDate: sameDateCluster[0],
+      publishedAt: getLatestPublishedAt(sameDateCluster[1]),
+      events: sameDateCluster[1]
+    };
+  }
+
+  const sorted = [...trackAudioEvents].sort((a, b) => a.eventDate.localeCompare(b.eventDate));
+  const earliest = sorted[0];
+  const latest = sorted[sorted.length - 1];
+
+  if (!earliest || !latest || daysBetween(earliest.eventDate, latest.eventDate) > 1) {
+    return null;
+  }
+
+  return {
+    eventDate: latest.eventDate,
+    publishedAt: getLatestPublishedAt(sorted),
+    events: sorted
+  };
+}
+
+function getLatestPublishedAt(events: MarketEvent[]) {
+  return (
+    events
+      .map((event) => event.rawPayload.publishedAt)
+      .filter((value): value is string => typeof value === "string" && value.length > 0)
+      .sort()
+      .at(-1) ?? null
+  );
 }
 
 function classifyYoutubeUploadTitle(title: string): YoutubeUploadClassification | null {

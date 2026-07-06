@@ -1755,17 +1755,17 @@ function explainMove(
     });
 
     if (primaryCatalyst.reasonPriority >= 8) {
-      return `${ticker} ${direction} as ${primaryCatalyst.reason} led the daily hype model${counterClause}.`;
+      return `${ticker} ${direction} with ${primaryCatalyst.reason} as the strongest detected catalyst${counterClause}.`;
     }
 
-    return `${ticker} ${direction} after ${signalName} led the daily hype model, with ${primaryCatalyst.reason} adjusting the move${counterClause}.`;
+    return `${ticker} ${direction} as ${signalName} led the daily model, with ${primaryCatalyst.reason} also affecting the move${counterClause}.`;
   }
 
   if (counterCatalyst?.reasonPriority && counterCatalyst.reasonPriority >= 8) {
-    return `${ticker} ${direction} after ${signalName} led the daily hype model, though ${counterCatalyst.reason} limited the move.`;
+    return `${ticker} ${direction} as ${signalName} led the daily model, though ${counterCatalyst.reason} limited the move.`;
   }
 
-  return `${ticker} ${direction} after ${signalName} led the daily hype model.`;
+  return `${ticker} ${direction} as ${signalName} led the daily model.`;
 }
 
 function buildCatalystDiagnostics(

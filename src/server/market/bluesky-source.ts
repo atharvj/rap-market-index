@@ -1,6 +1,7 @@
 import { clamp } from "@/lib/pricing";
 import type { MarketUpdateArtist } from "@/server/market/daily-update";
 import { buildDefaultGdeltQuery } from "@/server/market/artist-text-identifiers";
+import { buildCommunityEventTitle, getCommunityEventLabel } from "@/server/market/event-title";
 import type {
   AdapterSignal,
   AdapterSignals,
@@ -286,7 +287,7 @@ function buildBlueskySignal({
       .sort((a, b) => b.post.engagement - a.post.engagement)
       .slice(0, 5)
       .map(({ post, classification }) => ({
-        text: post.text.slice(0, 220),
+        signalLabel: getCommunityEventLabel(classification.eventType, classification.reason),
         sourceUrl: post.sourceUrl,
         authorHandle: post.authorHandle,
         createdDate: post.createdDate,
@@ -427,7 +428,12 @@ function buildBlueskyEvents({
     artistId: artist.id,
     eventDate: post.createdDate || runDate,
     eventType: classification.eventType ?? "viral",
-    title: post.text.slice(0, 160),
+    title: buildCommunityEventTitle({
+      artistName: artist.name,
+      eventType: classification.eventType,
+      reason: classification.reason,
+      source: "bluesky"
+    }),
     sourceName: "Bluesky",
     sourceUrl: post.sourceUrl,
     sentimentScore: classification.sentimentScore,
