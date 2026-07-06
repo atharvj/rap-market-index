@@ -8,18 +8,18 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        ink: "#101316",
-        panel: "#171b1e",
-        panelSoft: "#20262a",
-        line: "#2d3438",
-        paper: "#f3efe6",
-        brass: "#c99a45",
-        mint: "#4ccf94",
-        ember: "#ed6a4a",
-        cyan: "#51b8d9"
+        ink: "#f5f7f9",
+        panel: "#ffffff",
+        panelSoft: "#eef2f5",
+        line: "#d9e0e7",
+        paper: "#1f2933",
+        brass: "#6fa131",
+        mint: "#00856f",
+        ember: "#d93025",
+        cyan: "#2364c8"
       },
       boxShadow: {
-        market: "0 14px 34px rgba(0, 0, 0, 0.22)"
+        market: "0 10px 28px rgba(31, 41, 51, 0.08)"
       }
     }
   },

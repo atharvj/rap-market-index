@@ -9,7 +9,7 @@ export function ArtistAvatar({ artist, size = "md" }: { artist: Artist; size?: "
 
   return (
     <div
-      className={`${sizeClass} grid shrink-0 place-items-center rounded-md border border-paper/12 bg-gradient-to-br ${artist.accent} font-black text-ink shadow-market saturate-[0.82]`}
+      className={`${sizeClass} grid shrink-0 place-items-center rounded border border-paper/12 bg-gradient-to-br ${artist.accent} font-black text-paper shadow-market saturate-[0.82]`}
       aria-hidden="true"
     >
       {artist.ticker.slice(0, 2)}

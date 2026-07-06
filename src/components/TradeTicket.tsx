@@ -75,112 +75,119 @@ export function TradeTicket({
   }
 
   return (
-    <section className="rounded-md border border-line bg-panel/90 p-4 shadow-market">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <p className="text-xs font-bold uppercase tracking-wide text-paper/50">Order ticket</p>
-          <h2 className="mt-1 text-xl font-black">{artist.ticker}</h2>
+    <section className="rounded border border-line bg-panel shadow-market">
+      <div className="border-b border-line bg-panelSoft px-4 py-3">
+        <p className="text-sm font-black">Trade {artist.ticker}</p>
+      </div>
+      <div className="p-4">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-wide text-paper/50">Last price</p>
+            <h2 className="mt-1 text-2xl font-black number-tabular">{formatCurrency(artist.currentPrice)}</h2>
+          </div>
+          <p className="rounded border border-line bg-panel px-3 py-1 text-sm font-bold number-tabular text-paper/70">
+            {artist.name}
+          </p>
         </div>
-        <p className="rounded-md bg-black/30 px-3 py-1 text-sm font-bold number-tabular text-paper/80">
-          {formatCurrency(artist.currentPrice)}
-        </p>
-      </div>
 
-      <div className="mt-4 grid grid-cols-2 gap-2 rounded-md bg-black/25 p-1">
+        <div className="mt-4 grid grid-cols-2 gap-1 rounded border border-line bg-panelSoft p-1">
+          <button
+            type="button"
+            className={`rounded px-3 py-2 text-sm font-black transition ${
+              side === "buy" ? "bg-mint text-white" : "text-paper/60 hover:bg-panel hover:text-paper"
+            }`}
+            onClick={() => setSide("buy")}
+          >
+            Buy
+          </button>
+          <button
+            type="button"
+            className={`rounded px-3 py-2 text-sm font-black transition ${
+              side === "sell" ? "bg-ember text-white" : "text-paper/60 hover:bg-panel hover:text-paper"
+            }`}
+            onClick={() => setSide("sell")}
+          >
+            Sell
+          </button>
+        </div>
+
+        <label className="mt-4 block text-xs font-bold uppercase tracking-wide text-paper/50" htmlFor="shares">
+          Shares
+        </label>
+        <div className="mt-2 flex min-h-12 items-center overflow-hidden rounded border border-line bg-panel">
+          <button
+            type="button"
+            className="grid h-12 w-12 place-items-center border-r border-line text-paper/50 hover:bg-panelSoft hover:text-paper"
+            onClick={() => setShares(String(Math.max(1, Math.floor((Number(shares) || 1) - 1))))}
+            aria-label="Decrease shares"
+          >
+            <Minus className="h-4 w-4" />
+          </button>
+          <input
+            id="shares"
+            className="h-12 min-w-0 flex-1 bg-transparent px-3 text-center text-lg font-black outline-none number-tabular"
+            inputMode="decimal"
+            value={shares}
+            onChange={(event) => setShares(event.target.value)}
+          />
+          <button
+            type="button"
+            className="grid h-12 w-12 place-items-center border-l border-line text-paper/50 hover:bg-panelSoft hover:text-paper"
+            onClick={() => setShares(String(Math.floor((Number(shares) || 0) + 1)))}
+            aria-label="Increase shares"
+          >
+            <Plus className="h-4 w-4" />
+          </button>
+        </div>
+
+        <div className="mt-3 flex items-center justify-between gap-3 text-sm">
+          <span className="text-paper/60">{helper}</span>
+          <span className="font-black number-tabular">{formatCurrency(estimatedValue || 0)}</span>
+        </div>
+        <div className="mt-3 border-t border-line pt-3">
+          <div className="flex items-center justify-between gap-3 text-xs font-bold text-paper/50">
+            <span>Estimated execution</span>
+            <span className="number-tabular">{formatCurrency(quoteEstimate.executionPrice)}</span>
+          </div>
+          <div className="mt-1 flex items-center justify-between gap-3 text-xs font-bold text-paper/50">
+            <span>Spread / slippage</span>
+            <span className="number-tabular">
+              {quoteEstimate.spreadPercent.toFixed(2)}% / {quoteEstimate.slippagePercent.toFixed(2)}%
+            </span>
+          </div>
+          <div className="mt-2 flex items-center justify-between gap-3 text-xs font-bold text-paper/50">
+            <span>Commission</span>
+            <span className="number-tabular">{formatCurrency(estimatedCommission || 0)}</span>
+          </div>
+          <div className="mt-1 flex items-center justify-between gap-3 text-xs font-bold text-paper/50">
+            <span>{side === "buy" ? "Total cost" : "Estimated proceeds"}</span>
+            <span className="number-tabular">
+              {side === "buy" ? formatCurrency(estimatedCashImpact || 0) : formatCurrency(quoteEstimate.netProceeds)}
+            </span>
+          </div>
+        </div>
+
         <button
           type="button"
-          className={`rounded px-3 py-2 text-sm font-black transition ${
-            side === "buy" ? "bg-mint/90 text-ink" : "text-paper/55 hover:text-paper"
-          }`}
-          onClick={() => setSide("buy")}
+          disabled={disabled}
+          onClick={submitTrade}
+          className={`mt-4 flex min-h-11 w-full items-center justify-center rounded px-4 text-sm font-black transition ${
+            side === "buy"
+              ? "bg-mint text-white hover:bg-mint/90"
+              : "bg-ember text-white hover:bg-ember/90"
+          } disabled:cursor-not-allowed disabled:bg-paper/10 disabled:text-paper/40`}
         >
-          Buy
+          {submitting
+            ? "Sending order"
+            : tradeUnavailableReason
+              ? tradeUnavailableReason
+              : side === "buy"
+                ? "Submit buy order"
+                : "Submit sell order"}
         </button>
-        <button
-          type="button"
-          className={`rounded px-3 py-2 text-sm font-black transition ${
-            side === "sell" ? "bg-ember/90 text-white" : "text-paper/55 hover:text-paper"
-          }`}
-          onClick={() => setSide("sell")}
-        >
-          Sell
-        </button>
-      </div>
 
-      <label className="mt-4 block text-xs font-bold uppercase tracking-wide text-paper/50" htmlFor="shares">
-        Shares
-      </label>
-      <div className="mt-2 flex min-h-12 items-center overflow-hidden rounded-md border border-line bg-black/25">
-        <button
-          type="button"
-          className="grid h-12 w-12 place-items-center border-r border-line text-paper/60 hover:text-paper"
-          onClick={() => setShares(String(Math.max(1, Math.floor((Number(shares) || 1) - 1))))}
-          aria-label="Decrease shares"
-        >
-          <Minus className="h-4 w-4" />
-        </button>
-        <input
-          id="shares"
-          className="h-12 min-w-0 flex-1 bg-transparent px-3 text-center text-lg font-black outline-none number-tabular"
-          inputMode="decimal"
-          value={shares}
-          onChange={(event) => setShares(event.target.value)}
-        />
-        <button
-          type="button"
-          className="grid h-12 w-12 place-items-center border-l border-line text-paper/60 hover:text-paper"
-          onClick={() => setShares(String(Math.floor((Number(shares) || 0) + 1)))}
-          aria-label="Increase shares"
-        >
-          <Plus className="h-4 w-4" />
-        </button>
+        {message ? <p className="mt-3 min-h-5 text-sm text-paper/60">{message}</p> : <p className="mt-3 min-h-5" />}
       </div>
-
-      <div className="mt-3 flex items-center justify-between gap-3 text-sm">
-        <span className="text-paper/55">{helper}</span>
-        <span className="font-black number-tabular">{formatCurrency(estimatedValue || 0)}</span>
-      </div>
-      <div className="mt-2 flex items-center justify-between gap-3 text-xs font-bold text-paper/45">
-        <span>Estimated execution</span>
-        <span className="number-tabular">{formatCurrency(quoteEstimate.executionPrice)}</span>
-      </div>
-      <div className="mt-1 flex items-center justify-between gap-3 text-xs font-bold text-paper/45">
-        <span>Spread / slippage</span>
-        <span className="number-tabular">
-          {quoteEstimate.spreadPercent.toFixed(2)}% / {quoteEstimate.slippagePercent.toFixed(2)}%
-        </span>
-      </div>
-      <div className="mt-2 flex items-center justify-between gap-3 text-xs font-bold text-paper/45">
-        <span>Commission</span>
-        <span className="number-tabular">{formatCurrency(estimatedCommission || 0)}</span>
-      </div>
-      <div className="mt-1 flex items-center justify-between gap-3 text-xs font-bold text-paper/45">
-        <span>{side === "buy" ? "Total cost" : "Estimated proceeds"}</span>
-        <span className="number-tabular">
-          {side === "buy" ? formatCurrency(estimatedCashImpact || 0) : formatCurrency(quoteEstimate.netProceeds)}
-        </span>
-      </div>
-
-      <button
-        type="button"
-        disabled={disabled}
-        onClick={submitTrade}
-        className={`mt-4 flex min-h-11 w-full items-center justify-center rounded-md px-4 text-sm font-black transition ${
-          side === "buy"
-            ? "bg-mint/90 text-ink hover:bg-mint"
-            : "bg-ember/90 text-white hover:bg-ember"
-        } disabled:cursor-not-allowed disabled:bg-paper/12 disabled:text-paper/35`}
-      >
-        {submitting
-          ? "Sending order"
-          : tradeUnavailableReason
-            ? tradeUnavailableReason
-            : side === "buy"
-              ? "Submit buy order"
-              : "Submit sell order"}
-      </button>
-
-      {message ? <p className="mt-3 min-h-5 text-sm text-paper/60">{message}</p> : <p className="mt-3 min-h-5" />}
     </section>
   );
 }

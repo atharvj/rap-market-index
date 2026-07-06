@@ -25,10 +25,10 @@ export function MetricCard({
     <section className="rounded-md border border-line bg-panel/82 p-4 shadow-market">
       <div className="flex items-center justify-between gap-3">
         <p className="text-xs font-bold uppercase tracking-wide text-paper/50">{label}</p>
-        <div className="text-paper/45">{icon}</div>
+        <div className="text-paper/50">{icon}</div>
       </div>
       <p className={`mt-3 text-2xl font-black number-tabular ${toneClass}`}>{value}</p>
-      {detail ? <p className="mt-1 text-sm text-paper/55">{detail}</p> : null}
+      {detail ? <p className="mt-1 text-sm text-paper/50">{detail}</p> : null}
     </section>
   );
 }

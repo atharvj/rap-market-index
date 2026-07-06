@@ -54,14 +54,14 @@ export default function WatchlistPage() {
       </section>
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
-        <section className="rounded-md border border-line bg-panel/86 shadow-market">
+        <section className="rounded border border-line bg-panel shadow-market">
           <div className="border-b border-line p-4">
             <h2 className="text-xl font-black">Watchlist board</h2>
           </div>
           <div className="overflow-x-auto scrollbar-thin">
             <table className="w-full min-w-[660px] border-collapse">
               <thead>
-                <tr className="border-b border-line text-left text-xs font-bold uppercase tracking-wide text-paper/42">
+                <tr className="border-b border-line text-left text-xs font-bold uppercase tracking-wide text-paper/40">
                   <th className="px-4 py-3">Artist</th>
                   <th className="px-4 py-3 text-right">Price</th>
                   <th className="px-4 py-3 text-right">Daily</th>
@@ -72,7 +72,7 @@ export default function WatchlistPage() {
               <tbody>
                 {watchlistArtists.length ? (
                   watchlistArtists.map((artist) => (
-                    <tr key={artist.id} className="border-b border-line/70 last:border-0 hover:bg-white/[0.028]">
+                    <tr key={artist.id} className="border-b border-line last:border-0 hover:bg-panelSoft/70">
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-3">
                           <WatchlistButton artistId={artist.id} />
@@ -80,7 +80,7 @@ export default function WatchlistPage() {
                             <ArtistAvatar artist={artist} />
                             <span className="min-w-0">
                               <span className="block truncate font-black">{artist.name}</span>
-                              <span className="text-sm font-bold text-paper/45">{artist.ticker}</span>
+                              <span className="text-sm font-bold text-paper/50">{artist.ticker}</span>
                             </span>
                           </Link>
                         </div>
@@ -96,7 +96,7 @@ export default function WatchlistPage() {
                         <button
                           type="button"
                           onClick={() => setSelectedArtistId(artist.id)}
-                          className="inline-flex min-h-9 items-center gap-2 rounded-md border border-brass/35 bg-brass/10 px-3 text-sm font-black text-brass hover:bg-brass/15"
+                          className="inline-flex min-h-9 items-center gap-2 rounded border border-brass/35 bg-brass/10 px-3 text-sm font-black text-brass hover:bg-brass/[0.15]"
                         >
                           <BarChart3 className="h-4 w-4" />
                           Select
@@ -106,7 +106,7 @@ export default function WatchlistPage() {
                   ))
                 ) : (
                   <tr>
-                    <td className="px-4 py-10 text-center text-paper/45" colSpan={5}>
+                    <td className="px-4 py-10 text-center text-paper/50" colSpan={5}>
                       No watched listings yet. Add artists from the market board.
                     </td>
                   </tr>
@@ -120,7 +120,7 @@ export default function WatchlistPage() {
           {selectedArtist ? (
             <TradeTicket artist={selectedArtist} />
           ) : (
-            <section className="rounded-md border border-line bg-panel/86 p-4 text-sm font-bold text-paper/48 shadow-market">
+            <section className="rounded border border-line bg-panel p-4 text-sm font-bold text-paper/50 shadow-market">
               Select watched artists from the market board to build a tracking list.
             </section>
           )}

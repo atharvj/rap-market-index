@@ -78,13 +78,13 @@ export function ArtistPriceHistoryPanel({
   }, [hasRealHistory, history, status]);
 
   return (
-    <section className="rounded-md border border-line bg-panel/86 p-4 shadow-market sm:p-5">
+    <section className="rounded border border-line bg-panel p-4 shadow-market sm:p-5">
       <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h2 className="text-xl font-black">Price history</h2>
-          <p className="mt-1 text-sm font-bold text-paper/45">{subtitle}</p>
+          <h2 className="text-xl font-black">Chart</h2>
+          <p className="mt-1 text-sm font-bold text-paper/50">{subtitle}</p>
         </div>
-        <div className="inline-flex rounded-md border border-line bg-black/20 p-1">
+        <div className="inline-flex rounded border border-line bg-panelSoft p-1">
           {ranges.map((candidate) => (
             <button
               key={candidate}
@@ -93,8 +93,8 @@ export function ArtistPriceHistoryPanel({
               className={clsx(
                 "h-8 min-w-11 rounded px-2 text-xs font-black transition",
                 range === candidate
-                  ? "bg-brass text-ink"
-                  : "text-paper/55 hover:bg-white/[0.04] hover:text-paper"
+                  ? "bg-cyan text-white"
+                  : "text-paper/50 hover:bg-panel hover:text-paper"
               )}
             >
               {candidate}

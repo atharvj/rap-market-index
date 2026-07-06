@@ -42,11 +42,11 @@ export default function LeaderboardPage() {
         />
       </section>
 
-      <section className="rounded-md border border-line bg-panel/86 shadow-market">
+      <section className="rounded border border-line bg-panel shadow-market">
         <div className="overflow-x-auto scrollbar-thin">
           <table className="w-full min-w-[720px] border-collapse">
             <thead>
-              <tr className="border-b border-line text-left text-xs font-bold uppercase tracking-wide text-paper/42">
+              <tr className="border-b border-line text-left text-xs font-bold uppercase tracking-wide text-paper/40">
                 <th className="px-4 py-3">Rank</th>
                 <th className="px-4 py-3">Trader</th>
                 <th className="px-4 py-3 text-right">Portfolio value</th>
@@ -60,14 +60,14 @@ export default function LeaderboardPage() {
                   key={entry.id}
                   className={clsx(
                     "border-b border-line/70 last:border-0",
-                    entry.isCurrentUser ? "bg-brass/10" : "hover:bg-white/[0.035]"
+                    entry.isCurrentUser ? "bg-brass/10" : "hover:bg-panelSoft/70"
                   )}
                 >
                   <td className="px-4 py-4">
                     <span
                       className={clsx(
                         "grid h-9 w-9 place-items-center rounded-md font-black",
-                        index === 0 ? "bg-brass text-ink" : "border border-line bg-black/20 text-paper/68"
+                        index === 0 ? "bg-brass text-white" : "border border-line bg-panelSoft text-paper/70"
                       )}
                     >
                       {index + 1}
@@ -80,7 +80,7 @@ export default function LeaderboardPage() {
                   <td className="px-4 py-4 text-right font-black number-tabular">
                     {formatCurrency(entry.portfolioValue)}
                   </td>
-                  <td className="px-4 py-4 text-right number-tabular text-paper/62">
+                  <td className="px-4 py-4 text-right number-tabular text-paper/60">
                     {formatCurrency(entry.cashBalance)}
                   </td>
                   <td

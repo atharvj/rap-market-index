@@ -680,10 +680,10 @@ function getRedditEventProvenance(event: MarketEvent) {
 function getBlueskyEventProvenance(event: MarketEvent) {
   const viralityTier = getRawString(event.rawPayload.viralityTier) ?? "small";
   const tierProfiles: Record<string, { impact: number; confidence: number }> = {
-    small: { impact: 0.5, confidence: 0.76 },
-    notable: { impact: 0.86, confidence: 0.94 },
-    major: { impact: 1.05, confidence: 1.03 },
-    breakout: { impact: 1.22, confidence: 1.1 }
+    small: { impact: 0.28, confidence: 0.62 },
+    notable: { impact: 0.55, confidence: 0.78 },
+    major: { impact: 0.74, confidence: 0.9 },
+    breakout: { impact: 0.9, confidence: 0.98 }
   };
   const profile = tierProfiles[viralityTier] ?? tierProfiles.small;
 
@@ -697,7 +697,7 @@ function getBlueskyEventProvenance(event: MarketEvent) {
 function getGdeltEventProvenance(event: MarketEvent) {
   const sourceTier = getRawNumber(event.rawPayload.sourceTier, 0);
   const tierProfiles: Record<number, { impact: number; confidence: number }> = {
-    0: { impact: 0.74, confidence: 0.9 },
+    0: { impact: 0.52, confidence: 0.82 },
     1: { impact: 0.92, confidence: 0.98 },
     2: { impact: 1.05, confidence: 1.05 },
     3: { impact: 1.15, confidence: 1.1 }
@@ -715,18 +715,18 @@ function getMediaRssEventProvenance(event: MarketEvent) {
   const sourceTier = getRawNumber(event.rawPayload.sourceTier, 0);
   const feedScope = getRawString(event.rawPayload.feedScope);
   const tierProfiles: Record<number, { impact: number; confidence: number }> = {
-    0: { impact: 0.7, confidence: 0.88 },
+    0: { impact: 0.48, confidence: 0.78 },
     1: { impact: 0.9, confidence: 0.98 },
     2: { impact: 1.03, confidence: 1.05 },
     3: { impact: 1.12, confidence: 1.1 }
   };
   const profile = tierProfiles[sourceTier] ?? tierProfiles[0];
-  const searchMultiplier = feedScope === "artist_search" ? 0.96 : 1;
+  const searchMultiplier = feedScope === "artist_search" ? 0.88 : 1;
 
   return {
     label: `media-rss-tier-${sourceTier}`,
-    impactMultiplier: clamp(profile.impact * searchMultiplier, 0.65, 1.16),
-    confidenceMultiplier: clamp(profile.confidence * searchMultiplier, 0.82, 1.12)
+    impactMultiplier: clamp(profile.impact * searchMultiplier, 0.42, 1.16),
+    confidenceMultiplier: clamp(profile.confidence * searchMultiplier, 0.68, 1.12)
   };
 }
 
@@ -882,10 +882,17 @@ function getReactionConsensusAdjustment({
     };
   }
 
-  if ((sourceClass === "community" || sourceClass === "social") && confirmingSourceCount === 0 && event.clusterSourceCount <= 1) {
+  if (sourceClass === "social" && confirmingSourceCount === 0 && event.clusterSourceCount <= 1) {
     return {
       label: "social_reaction_unconfirmed",
-      multiplier: 0.82
+      multiplier: 0.58
+    };
+  }
+
+  if (sourceClass === "community" && confirmingSourceCount === 0 && event.clusterSourceCount <= 1) {
+    return {
+      label: "community_reaction_unconfirmed",
+      multiplier: 0.72
     };
   }
 
