@@ -47,10 +47,31 @@ type YoutubePlaylistItemsResponse = {
   };
 };
 
+type YoutubeVideosListResponse = {
+  items?: Array<{
+    id?: string;
+    contentDetails?: {
+      duration?: string;
+    };
+    statistics?: {
+      viewCount?: string;
+      likeCount?: string;
+      commentCount?: string;
+    };
+  }>;
+  error?: {
+    message?: string;
+  };
+};
+
 type YoutubeVideo = {
   id: string;
   title: string;
   publishedAt?: string;
+  durationSeconds?: number | null;
+  viewCount?: number | null;
+  likeCount?: number | null;
+  commentCount?: number | null;
 };
 
 type YoutubeUploadClassification = {
@@ -60,6 +81,8 @@ type YoutubeUploadClassification = {
   confidence: number;
   reason: string;
   releaseKind?: "album" | "ep" | "mixtape" | "single";
+  qualityLabel?: string;
+  qualityMultiplier?: number;
 };
 
 export type YoutubeUploadEventSignals = {
@@ -237,7 +260,7 @@ function buildYoutubeUploadEvents({
   const events: MarketEvent[] = [];
 
   for (const video of videos) {
-    const classification = classifyYoutubeUploadTitle(video.title);
+    const classification = classifyYoutubeUploadTitle(video.title, video);
 
     if (!classification) {
       continue;
@@ -258,6 +281,12 @@ function buildYoutubeUploadEvents({
         channelId,
         videoId: video.id,
         publishedAt: video.publishedAt ?? null,
+        durationSeconds: video.durationSeconds ?? null,
+        viewCount: video.viewCount ?? null,
+        likeCount: video.likeCount ?? null,
+        commentCount: video.commentCount ?? null,
+        uploadQualityLabel: classification.qualityLabel ?? null,
+        uploadQualityMultiplier: classification.qualityMultiplier ?? 1,
         classificationReason: classification.reason,
         releaseKind: classification.releaseKind ?? null
       }
@@ -402,109 +431,232 @@ function getLatestPublishedAt(events: MarketEvent[]) {
   );
 }
 
-function classifyYoutubeUploadTitle(title: string): YoutubeUploadClassification | null {
+function classifyYoutubeUploadTitle(title: string, video?: YoutubeVideo): YoutubeUploadClassification | null {
   const normalized = normalizeTitle(title);
 
   if (!normalized) {
     return null;
   }
 
-  const hasAlbumSignal = hasAny(normalized, ALBUM_ANNOUNCEMENT_TERMS);
-  const hasSingleSignal = hasAny(normalized, SINGLE_RELEASE_TERMS);
-  const hasOfficialVideoSignal = hasAny(normalized, OFFICIAL_VIDEO_TERMS);
-  const hasTrackAudioSignal = hasAny(normalized, TRACK_AUDIO_TERMS);
-  const hasVideoReleaseSignal = hasAny(normalized, VIDEO_RELEASE_TERMS);
-  const hasMajorFeatureSignal = hasAny(normalized, MAJOR_FEATURE_TERMS);
-  const hasSnippetSignal = hasAny(normalized, SNIPPET_TERMS);
-  const hasTourSignal = hasAny(normalized, TOUR_TERMS);
-  const hasPerformanceSignal = hasAny(normalized, PERFORMANCE_TERMS);
-  const hasStrongMusicSignal =
-    hasAlbumSignal ||
-    hasSingleSignal ||
-    hasOfficialVideoSignal ||
-    hasMajorFeatureSignal ||
-    hasSnippetSignal ||
-    hasPerformanceSignal;
+  const hasAlbumSignal = hasAnyTerm(normalized, ALBUM_ANNOUNCEMENT_TERMS);
+  const hasSingleSignal = hasAnyTerm(normalized, SINGLE_RELEASE_TERMS);
+  const hasOfficialVideoSignal = hasAnyTerm(normalized, OFFICIAL_VIDEO_TERMS);
+  const hasTrackAudioSignal = hasAnyTerm(normalized, TRACK_AUDIO_TERMS);
+  const hasVideoReleaseSignal = hasAnyTerm(normalized, VIDEO_RELEASE_TERMS);
+  const hasMajorFeatureSignal = hasAnyTerm(normalized, MAJOR_FEATURE_TERMS);
+  const hasSnippetSignal = hasAnyTerm(normalized, SNIPPET_TERMS);
+  const hasTourSignal = hasAnyTerm(normalized, TOUR_TERMS);
+  const hasPerformanceSignal = hasAnyTerm(normalized, PERFORMANCE_TERMS);
+  const hasExplicitReleaseSignal =
+    hasAlbumSignal || hasSingleSignal || hasOfficialVideoSignal || hasVideoReleaseSignal || hasMajorFeatureSignal;
 
-  if (hasAny(normalized, LOW_SIGNAL_TERMS) && !hasStrongMusicSignal) {
+  if ((hasLowSignalUploadTitle(title, normalized) || isPromoHashtagTitle(title, normalized)) && !hasExplicitReleaseSignal) {
     return null;
   }
 
   if (hasTourSignal) {
-    return {
+    return applyUploadQuality({
       eventType: "tour",
       sentimentScore: 25,
       impactScore: 32,
       confidence: 0.72,
       reason: "tour_upload_title"
-    };
+    }, title, normalized, video);
   }
 
   if (hasAlbumSignal) {
     const releaseKind = getYoutubeProjectReleaseKind(normalized);
 
-    return {
+    return applyUploadQuality({
       eventType: "release",
       sentimentScore: 32,
       impactScore: 55,
       confidence: 0.78,
       reason: "album_announcement_upload_title",
       releaseKind
-    };
+    }, title, normalized, video);
   }
 
   if (hasMajorFeatureSignal && (hasSingleSignal || hasOfficialVideoSignal || hasTrackAudioSignal)) {
-    return {
+    return applyUploadQuality({
       eventType: "viral",
       sentimentScore: 38,
       impactScore: 58,
       confidence: 0.78,
       reason: "major_feature_upload_title"
-    };
+    }, title, normalized, video);
   }
 
   if (hasSingleSignal || hasOfficialVideoSignal) {
     if (hasTrackAudioSignal && !hasSingleSignal && !hasVideoReleaseSignal) {
-      return {
+      return applyUploadQuality({
         eventType: "release",
         sentimentScore: 10,
         impactScore: 16,
         confidence: 0.46,
         reason: "track_audio_upload_title"
-      };
+      }, title, normalized, video);
     }
 
-    return {
+    return applyUploadQuality({
       eventType: "release",
       sentimentScore: 26,
       impactScore: hasOfficialVideoSignal ? 44 : 38,
       confidence: 0.74,
       reason: hasOfficialVideoSignal ? "official_video_upload_title" : "single_upload_title",
       releaseKind: "single"
-    };
+    }, title, normalized, video);
   }
 
   if (hasSnippetSignal) {
-    return {
+    return applyUploadQuality({
       eventType: "viral",
       sentimentScore: 18,
       impactScore: 28,
       confidence: 0.6,
       reason: "snippet_upload_title"
-    };
+    }, title, normalized, video);
   }
 
   if (hasPerformanceSignal) {
-    return {
+    return applyUploadQuality({
       eventType: "viral",
       sentimentScore: 16,
       impactScore: 24,
       confidence: 0.58,
       reason: "performance_upload_title"
-    };
+    }, title, normalized, video);
   }
 
   return null;
+}
+
+function applyUploadQuality(
+  classification: YoutubeUploadClassification,
+  rawTitle: string,
+  normalizedTitle: string,
+  video?: YoutubeVideo
+): YoutubeUploadClassification | null {
+  const quality = getUploadQuality(classification, rawTitle, normalizedTitle, video);
+
+  if (!quality.accepted) {
+    return null;
+  }
+
+  return {
+    ...classification,
+    sentimentScore: Math.round(classification.sentimentScore * quality.multiplier),
+    impactScore: Math.round(classification.impactScore * quality.multiplier),
+    confidence: Number(Math.max(0.25, classification.confidence * quality.multiplier).toFixed(3)),
+    qualityLabel: quality.label,
+    qualityMultiplier: quality.multiplier
+  };
+}
+
+function getUploadQuality(
+  classification: YoutubeUploadClassification,
+  rawTitle: string,
+  normalizedTitle: string,
+  video?: YoutubeVideo
+) {
+  const isShortForm = isShortFormUpload(rawTitle, normalizedTitle, video);
+  const viewCount = video?.viewCount;
+  const lowReach = typeof viewCount === "number" && viewCount < 15_000;
+  const modestReach = typeof viewCount === "number" && viewCount < 35_000;
+  const weakCatalyst =
+    classification.reason === "snippet_upload_title" ||
+    classification.reason === "performance_upload_title" ||
+    classification.reason === "track_audio_upload_title" ||
+    classification.reason === "tour_upload_title";
+
+  if ((isShortForm || lowReach) && weakCatalyst) {
+    return {
+      accepted: false,
+      label: isShortForm ? "short_form_weak_catalyst" : "low_reach_weak_catalyst",
+      multiplier: 0
+    };
+  }
+
+  if (isShortForm && !hasExplicitReleaseLanguage(normalizedTitle)) {
+    return {
+      accepted: false,
+      label: "short_form_without_release_language",
+      multiplier: 0
+    };
+  }
+
+  if (isShortForm && modestReach) {
+    return {
+      accepted: true,
+      label: "short_form_dampened",
+      multiplier: 0.58
+    };
+  }
+
+  if (lowReach) {
+    return {
+      accepted: true,
+      label: "low_reach_dampened",
+      multiplier: 0.68
+    };
+  }
+
+  if (modestReach) {
+    return {
+      accepted: true,
+      label: "modest_reach_dampened",
+      multiplier: 0.84
+    };
+  }
+
+  return {
+    accepted: true,
+    label: "accepted",
+    multiplier: 1
+  };
+}
+
+function hasLowSignalUploadTitle(rawTitle: string, normalizedTitle: string) {
+  return (
+    hasAnyTerm(normalizedTitle, LOW_SIGNAL_TERMS) ||
+    /#(?:shorts?|ytshorts|fyp|foryou|explore|explorepage)\b/i.test(rawTitle)
+  );
+}
+
+function isPromoHashtagTitle(rawTitle: string, normalizedTitle: string) {
+  const hashtagCount = rawTitle.match(/#[a-z0-9_]+/gi)?.length ?? 0;
+  const wordCount = normalizedTitle ? normalizedTitle.split(/\s+/).length : 0;
+
+  return hashtagCount >= 2 && wordCount <= 8;
+}
+
+function isShortFormUpload(rawTitle: string, normalizedTitle: string, video?: YoutubeVideo) {
+  const durationSeconds = video?.durationSeconds;
+
+  return (
+    (typeof durationSeconds === "number" && durationSeconds > 0 && durationSeconds <= 75) ||
+    hasLowSignalUploadTitle(rawTitle, normalizedTitle)
+  );
+}
+
+function hasExplicitReleaseLanguage(normalizedTitle: string) {
+  return hasAnyTerm(normalizedTitle, [
+    "album",
+    "album trailer",
+    "deluxe",
+    "ep",
+    "mixtape",
+    "music video",
+    "new single",
+    "new song",
+    "official audio",
+    "official video",
+    "out now",
+    "project",
+    "single",
+    "tracklist",
+    "visualizer"
+  ]);
 }
 
 function getYoutubeProjectReleaseKind(title: string): "album" | "ep" | "mixtape" {
@@ -512,7 +664,7 @@ function getYoutubeProjectReleaseKind(title: string): "album" | "ep" | "mixtape"
     return "ep";
   }
 
-  if (hasAny(title, ["mixtape", "tape"])) {
+  if (hasAnyTerm(title, ["mixtape", "tape"])) {
     return "mixtape";
   }
 
@@ -611,8 +763,65 @@ async function fetchRecentUploadedVideos({
 
   return {
     ok: true,
-    videos
+    videos: await hydrateYoutubeVideoDetails({
+      apiKey,
+      videos,
+      timeoutMs,
+      fetchImpl
+    })
   };
+}
+
+async function hydrateYoutubeVideoDetails({
+  apiKey,
+  videos,
+  timeoutMs,
+  fetchImpl
+}: {
+  apiKey: string;
+  videos: YoutubeVideo[];
+  timeoutMs: number;
+  fetchImpl: typeof fetch;
+}) {
+  if (!videos.length) {
+    return videos;
+  }
+
+  const url = new URL("https://www.googleapis.com/youtube/v3/videos");
+
+  url.searchParams.set("part", "contentDetails,statistics");
+  url.searchParams.set("id", videos.map((video) => video.id).join(","));
+  url.searchParams.set("key", apiKey);
+
+  const result = await fetchJson({
+    url: url.toString(),
+    timeoutMs,
+    fetchImpl
+  });
+
+  if (!result.ok) {
+    return videos;
+  }
+
+  const parsed = result.value as YoutubeVideosListResponse;
+  const detailsById = new Map(
+    (parsed.items ?? [])
+      .filter((item) => item.id)
+      .map((item) => [
+        item.id as string,
+        {
+          durationSeconds: parseIsoDurationSeconds(item.contentDetails?.duration),
+          viewCount: parseOptionalInteger(item.statistics?.viewCount),
+          likeCount: parseOptionalInteger(item.statistics?.likeCount),
+          commentCount: parseOptionalInteger(item.statistics?.commentCount)
+        }
+      ])
+  );
+
+  return videos.map((video) => ({
+    ...video,
+    ...(detailsById.get(video.id) ?? {})
+  }));
 }
 
 async function fetchJson({
@@ -760,12 +969,52 @@ function daysBetween(start: string, end: string) {
   return Math.round((endDate - startDate) / 86400000);
 }
 
-function hasAny(value: string, terms: string[]) {
-  return terms.some((term) => value.includes(term));
+function hasAnyTerm(value: string, terms: string[]) {
+  return terms.some((term) => hasTerm(value, term));
+}
+
+function hasTerm(value: string, term: string) {
+  const normalizedTerm = normalizeTitle(term);
+
+  if (!value || !normalizedTerm) {
+    return false;
+  }
+
+  const pattern = normalizedTerm.split(/\s+/).map(escapeRegExp).join("\\s+");
+
+  return new RegExp(`(^|\\s)${pattern}(?=$|\\s)`).test(value);
 }
 
 function clampInteger(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, Math.trunc(value)));
+}
+
+function parseOptionalInteger(value: string | undefined) {
+  const parsed = Number.parseInt(value ?? "", 10);
+
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function parseIsoDurationSeconds(value: string | undefined) {
+  if (!value) {
+    return null;
+  }
+
+  const match = value.match(/^PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?$/);
+
+  if (!match) {
+    return null;
+  }
+
+  const hours = Number.parseInt(match[1] ?? "0", 10);
+  const minutes = Number.parseInt(match[2] ?? "0", 10);
+  const seconds = Number.parseInt(match[3] ?? "0", 10);
+
+  return hours * 3600 + minutes * 60 + seconds;
+}
+
+function escapeRegExp(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 function tryParseJson(value: string) {
@@ -798,6 +1047,10 @@ const LOW_SIGNAL_TERMS = [
   "day in the life",
   "documentary",
   "episode",
+  "explore",
+  "explorepage",
+  "foryou",
+  "fyp",
   "full interview",
   "gaming",
   "interview",
@@ -806,6 +1059,8 @@ const LOW_SIGNAL_TERMS = [
   "recap",
   "stream highlights",
   "tour vlog",
+  "youtube shorts",
+  "yt shorts",
   "shorts",
   "vlog"
 ];

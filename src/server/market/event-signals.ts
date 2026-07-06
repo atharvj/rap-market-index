@@ -485,11 +485,7 @@ function getEventProvenance(event: MarketEvent) {
   }
 
   if (normalizedSource === "youtube_upload_event") {
-    return {
-      label: "official-upload",
-      impactMultiplier: 1.03,
-      confidenceMultiplier: 1
-    };
+    return getYoutubeUploadEventProvenance(event);
   }
 
   if (normalizedSource === "manual_event") {
@@ -505,6 +501,161 @@ function getEventProvenance(event: MarketEvent) {
     impactMultiplier: 1,
     confidenceMultiplier: 1
   };
+}
+
+function getYoutubeUploadEventProvenance(event: MarketEvent) {
+  const quality = getYoutubeUploadEventQuality(event);
+
+  if (!quality.accepted) {
+    return {
+      label: `official-upload-${quality.label}`,
+      impactMultiplier: 0,
+      confidenceMultiplier: 0.25
+    };
+  }
+
+  const storedMultiplier = getRawOptionalNumber(event.rawPayload.uploadQualityMultiplier);
+  const multiplier = clamp(Math.min(storedMultiplier ?? 1, quality.multiplier), 0, 1);
+
+  return {
+    label: multiplier < 1 ? `official-upload-${quality.label}` : "official-upload",
+    impactMultiplier: 1.03 * multiplier,
+    confidenceMultiplier: clamp(0.72 + multiplier * 0.28, 0.35, 1)
+  };
+}
+
+function getYoutubeUploadEventQuality(event: MarketEvent) {
+  const normalizedTitle = normalizeEventText(event.title);
+  const reason =
+    getRawString(event.rawPayload.classificationReason) ??
+    getRawString(event.rawPayload.reason) ??
+    getRawString(event.rawPayload.eventReason) ??
+    "";
+  const viewCount = getRawOptionalNumber(event.rawPayload.viewCount);
+  const durationSeconds = getRawOptionalNumber(event.rawPayload.durationSeconds);
+  const hasLowSignalTitle = hasLowSignalYoutubeUploadTitle(event.title, normalizedTitle);
+  const isPromoTitle = isPromoHashtagYoutubeUploadTitle(event.title, normalizedTitle);
+  const isShortForm =
+    (typeof durationSeconds === "number" && durationSeconds > 0 && durationSeconds <= 75) || hasLowSignalTitle;
+  const lowReach = typeof viewCount === "number" && viewCount < 15_000;
+  const modestReach = typeof viewCount === "number" && viewCount < 35_000;
+  const weakCatalyst = [
+    "snippet_upload_title",
+    "performance_upload_title",
+    "track_audio_upload_title",
+    "tour_upload_title"
+  ].includes(reason);
+  const hasExplicitRelease = hasExplicitYoutubeReleaseLanguage(normalizedTitle);
+
+  if ((hasLowSignalTitle || isPromoTitle) && !hasExplicitRelease) {
+    return {
+      accepted: false,
+      label: "low-signal-title",
+      multiplier: 0
+    };
+  }
+
+  if ((isShortForm || lowReach) && weakCatalyst) {
+    return {
+      accepted: false,
+      label: isShortForm ? "short-form-weak-catalyst" : "low-reach-weak-catalyst",
+      multiplier: 0
+    };
+  }
+
+  if (isShortForm && !hasExplicitRelease) {
+    return {
+      accepted: false,
+      label: "short-form-without-release-language",
+      multiplier: 0
+    };
+  }
+
+  if (isShortForm && modestReach) {
+    return {
+      accepted: true,
+      label: "short-form-dampened",
+      multiplier: 0.58
+    };
+  }
+
+  if (lowReach) {
+    return {
+      accepted: true,
+      label: "low-reach-dampened",
+      multiplier: 0.68
+    };
+  }
+
+  if (modestReach) {
+    return {
+      accepted: true,
+      label: "modest-reach-dampened",
+      multiplier: 0.84
+    };
+  }
+
+  return {
+    accepted: true,
+    label: "accepted",
+    multiplier: 1
+  };
+}
+
+function hasLowSignalYoutubeUploadTitle(rawTitle: string, normalizedTitle: string) {
+  return (
+    hasAnyWholeEventTerm(normalizedTitle, [
+      "behind the scenes",
+      "day in the life",
+      "documentary",
+      "episode",
+      "explore",
+      "explorepage",
+      "for you",
+      "foryou",
+      "fyp",
+      "full interview",
+      "gaming",
+      "interview",
+      "podcast",
+      "reaction",
+      "recap",
+      "shorts",
+      "stream highlights",
+      "tour vlog",
+      "vlog",
+      "youtube shorts",
+      "yt shorts"
+    ]) ||
+    /#(?:shorts?|ytshorts|fyp|foryou|explore|explorepage)\b/i.test(rawTitle)
+  );
+}
+
+function isPromoHashtagYoutubeUploadTitle(rawTitle: string, normalizedTitle: string) {
+  const hashtagCount = rawTitle.match(/#[a-z0-9_]+/gi)?.length ?? 0;
+  const wordCount = normalizedTitle ? normalizedTitle.split(/\s+/).length : 0;
+
+  return hashtagCount >= 2 && wordCount <= 8;
+}
+
+function hasExplicitYoutubeReleaseLanguage(normalizedTitle: string) {
+  return hasAnyWholeEventTerm(normalizedTitle, [
+    "album",
+    "album trailer",
+    "deluxe",
+    "ep",
+    "mixtape",
+    "music video",
+    "new single",
+    "new song",
+    "official audio",
+    "official video",
+    "out now",
+    "project",
+    "single",
+    "tracklist",
+    "visualizer"
+  ]);
 }
 
 function getRedditEventProvenance(event: MarketEvent) {
@@ -1339,12 +1490,44 @@ function hasAnyTerm(value: string, terms: string[]) {
   return terms.some((term) => value.includes(term));
 }
 
+function hasAnyWholeEventTerm(value: string, terms: string[]) {
+  return terms.some((term) => {
+    const normalizedTerm = normalizeEventText(term);
+
+    if (!value || !normalizedTerm) {
+      return false;
+    }
+
+    const pattern = normalizedTerm.split(/\s+/).map(escapeRegExp).join("\\s+");
+
+    return new RegExp(`(^|\\s)${pattern}(?=$|\\s)`).test(value);
+  });
+}
+
 function getRawString(value: unknown) {
   return typeof value === "string" && value.trim() ? value.trim() : null;
 }
 
 function getRawNumber(value: unknown, fallback = 0) {
   return typeof value === "number" && Number.isFinite(value) ? value : fallback;
+}
+
+function getRawOptionalNumber(value: unknown) {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value;
+  }
+
+  if (typeof value === "string" && value.trim()) {
+    const parsed = Number(value);
+
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+
+  return null;
+}
+
+function escapeRegExp(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 function getEventDecay(eventType: MarketEvent["eventType"], ageDays: number) {
