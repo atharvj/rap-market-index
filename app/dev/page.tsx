@@ -439,6 +439,8 @@ type MarketHealth = {
   observationHealth: Array<{
     key: string;
     label: string;
+    source: string;
+    metric: string;
     latestDate: string | null;
     freshArtistCount: number;
     missingArtistCount: number;
@@ -474,6 +476,11 @@ type MarketHealth = {
     eventFreshnessDays: number;
     typeCounts: Record<string, number>;
     freshTypeCounts: Record<string, number>;
+  };
+  integrityGuardrails: {
+    ready: boolean;
+    checkedAt: string;
+    error: string | null;
   };
   marketOperations: {
     ready: boolean;
@@ -1398,7 +1405,8 @@ export default function DevPage() {
         },
         body: JSON.stringify({
           name: preview.record.name,
-          dryRun: false
+          dryRun: false,
+          sourceIds: preview.sourceIds
         })
       });
       const payload = await readJsonResponse(response);
@@ -2096,6 +2104,8 @@ function MarketHealthPanel({ data }: { data: MarketHealth }) {
         />
       </div>
 
+      <LaunchReadinessPanel data={data} />
+
       {data.warnings.length ? (
         <div className="rounded-md border border-brass/35 bg-brass/10 p-3">
           <div className="flex items-center gap-2 text-sm font-black text-brass">
@@ -2253,6 +2263,183 @@ function MarketHealthPanel({ data }: { data: MarketHealth }) {
       ]} />
     </div>
   );
+}
+
+type LaunchReadinessCheck = {
+  id: string;
+  label: string;
+  detail: string;
+  ok: boolean;
+  severity: "blocker" | "warning";
+};
+
+function LaunchReadinessPanel({ data }: { data: MarketHealth }) {
+  const checks = buildLaunchReadinessChecks(data);
+  const blockers = checks.filter((check) => !check.ok && check.severity === "blocker");
+  const warnings = checks.filter((check) => !check.ok && check.severity === "warning");
+  const score = Math.round((checks.filter((check) => check.ok).length / Math.max(1, checks.length)) * 100);
+  const statusText = blockers.length ? "Not public-ready" : warnings.length ? "Ready for private review" : "Public-ready";
+  const statusClassName = blockers.length ? "text-ember" : warnings.length ? "text-brass" : "text-mint";
+
+  return (
+    <div className="rounded-md border border-line bg-black/20 p-4">
+      <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+        <div>
+          <p className="text-xs font-black uppercase tracking-wide text-paper/45">Launch gate</p>
+          <h3 className={`mt-1 text-xl font-black ${statusClassName}`}>{statusText}</h3>
+          <p className="mt-1 text-sm font-bold leading-6 text-paper/50">
+            {blockers.length
+              ? `${blockers.length} blocker${blockers.length === 1 ? "" : "s"} before public launch.`
+              : warnings.length
+                ? `${warnings.length} warning${warnings.length === 1 ? "" : "s"} to review before launch.`
+                : "Core market, integrity, source coverage, and event systems meet the current launch gate."}
+          </p>
+        </div>
+        <div className="rounded border border-line bg-panel/70 px-3 py-2 text-right">
+          <p className="text-[10px] font-black uppercase tracking-wide text-paper/42">Readiness</p>
+          <p className={`mt-1 text-2xl font-black number-tabular ${statusClassName}`}>{score}/100</p>
+        </div>
+      </div>
+
+      <div className="mt-4 grid gap-2 lg:grid-cols-2">
+        {checks.map((check) => (
+          <div key={check.id} className="flex gap-3 rounded border border-line bg-panel/55 p-3">
+            {check.ok ? (
+              <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-mint" />
+            ) : check.severity === "blocker" ? (
+              <XCircle className="mt-0.5 h-4 w-4 shrink-0 text-ember" />
+            ) : (
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-brass" />
+            )}
+            <div className="min-w-0">
+              <p className="text-sm font-black">{check.label}</p>
+              <p className="mt-1 text-xs font-bold leading-5 text-paper/48">{check.detail}</p>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function buildLaunchReadinessChecks(data: MarketHealth): LaunchReadinessCheck[] {
+  const latestRunSucceeded = data.latestRun?.status === "succeeded";
+  const audienceCoverage = getCoveragePercent(data, "lastfmName");
+  const newsCoverage = getCoveragePercent(data, "gdeltQuery");
+  const youtubeCoverage = getCoveragePercent(data, "youtubeChannelId");
+  const musicbrainzCoverage = getCoveragePercent(data, "musicbrainzId");
+  const redditCoverage = getObservationFreshness(data, "reddit", "post_count");
+  const socialCoverage = Math.max(
+    redditCoverage,
+    getObservationFreshness(data, "bluesky", "post_count")
+  );
+  const marketQualityScore = data.latestRun?.summary?.marketQualityScore ?? 0;
+  const downMoveCount = data.latestRun?.summary?.downMoveCount ?? 0;
+  const latestArtistCount = data.latestRun?.summary?.artistCount ?? 0;
+
+  return [
+    {
+      id: "model-current",
+      label: "Latest market run uses current model",
+      ok: latestRunSucceeded && data.latestModelVersion === data.configuredModelVersion,
+      severity: "blocker",
+      detail: latestRunSucceeded
+        ? `Latest run ${data.latestModelVersion ?? "unknown"}; configured ${data.configuredModelVersion}.`
+        : "Run the market once successfully after code or model changes."
+    },
+    {
+      id: "history",
+      label: "Charts have fresh history",
+      ok: data.priceHistoryHealth.freshCoveragePercent >= 90,
+      severity: "blocker",
+      detail: `${formatPercent(data.priceHistoryHealth.freshCoveragePercent)} of active artists have fresh daily price history.`
+    },
+    {
+      id: "quotes",
+      label: "Intraday quote ticks are recording",
+      ok: data.priceTickHealth.tickCount > 0 && data.priceTickHealth.freshCoveragePercent >= 80,
+      severity: "warning",
+      detail: `${data.priceTickHealth.tickCount} ticks; ${formatPercent(data.priceTickHealth.freshCoveragePercent)} fresh coverage.`
+    },
+    {
+      id: "source-ids",
+      label: "Core source IDs are covered",
+      ok: audienceCoverage >= 95 && newsCoverage >= 95 && youtubeCoverage >= 90 && musicbrainzCoverage >= 90,
+      severity: "blocker",
+      detail: `Audience ${formatPercent(audienceCoverage)}, news ${formatPercent(newsCoverage)}, YouTube ${formatPercent(youtubeCoverage)}, releases ${formatPercent(musicbrainzCoverage)}.`
+    },
+    {
+      id: "events",
+      label: "Event/news layer is producing catalysts",
+      ok: data.eventHealth.eventCount > 0 && Object.keys(data.eventHealth.typeCounts).length >= 2,
+      severity: "blocker",
+      detail: `${data.eventHealth.eventCount} recent events across ${Object.keys(data.eventHealth.typeCounts).length} event types.`
+    },
+    {
+      id: "community",
+      label: "Community signal is connected",
+      ok: redditCoverage > 0,
+      severity: "blocker",
+      detail:
+        redditCoverage > 0
+          ? `Reddit/community coverage is ${formatPercent(redditCoverage)}.`
+          : "Reddit API is still missing; do not launch underground-heavy coverage without it."
+    },
+    {
+      id: "social",
+      label: "Social discovery signal is active",
+      ok: socialCoverage > 0,
+      severity: "warning",
+      detail: `Fresh public social/community coverage is ${formatPercent(socialCoverage)}.`
+    },
+    {
+      id: "market-quality",
+      label: "Latest run quality is defensible",
+      ok: marketQualityScore >= 55,
+      severity: "warning",
+      detail: `Latest market quality score is ${Math.round(marketQualityScore)}/100.`
+    },
+    {
+      id: "movement-balance",
+      label: "Price moves include decliners",
+      ok: latestArtistCount < 10 || downMoveCount > 0,
+      severity: "warning",
+      detail: latestArtistCount
+        ? `${downMoveCount} decliner${downMoveCount === 1 ? "" : "s"} in the latest ${latestArtistCount}-artist run.`
+        : "No latest run summary yet."
+    },
+    {
+      id: "integrity",
+      label: "Anti-manipulation guardrails are installed",
+      ok: data.integrityGuardrails.ready,
+      severity: "blocker",
+      detail: data.integrityGuardrails.error ?? "Integrity tables and checks are reachable."
+    },
+    {
+      id: "operations",
+      label: "Trading controls are ready",
+      ok: data.marketOperations.ready && data.marketOperations.marketOpen && data.marketOperations.marketImpactEnabled,
+      severity: "blocker",
+      detail: data.marketOperations.ready
+        ? `${data.marketOperations.tradingMode ?? "unknown"} trading; market impact ${data.marketOperations.marketImpactEnabled ? "enabled" : "paused"}.`
+        : data.marketOperations.error ?? "Market operation controls are missing."
+    },
+    {
+      id: "shorting",
+      label: "Shorting base is installed",
+      ok: data.shortingFoundation.ready,
+      severity: "warning",
+      detail: data.shortingFoundation.error ?? "Short/cover storage exists; UI can stay disabled until you are ready."
+    }
+  ];
+}
+
+function getCoveragePercent(data: MarketHealth, key: string) {
+  return data.sourceCoverage.find((item) => item.key === key)?.coveragePercent ?? 0;
+}
+
+function getObservationFreshness(data: MarketHealth, source: string, metric: string) {
+  return data.observationHealth.find((item) => item.source === source && item.metric === metric)?.freshCoveragePercent ?? 0;
 }
 
 function MarketControlsPanel({
@@ -3475,10 +3662,18 @@ function AutoArtistPreviewCard({
   const sourceIds = preview.sourceIds;
   const savedSources = manualSourceIdFields
     .map((field) => ({
+      key: field.key,
       label: field.label,
       value: sourceIds?.[field.key]
     }))
-    .filter((source): source is { label: string; value: string } => Boolean(source.value));
+    .filter((source): source is { key: keyof Omit<ManualSourceIdForm, "artistId">; label: string; value: string } =>
+      Boolean(source.value)
+    );
+  const verifiedSources = savedSources.filter((source) =>
+    source.key === "spotifyId" || source.key === "youtubeChannelId" || source.key === "musicbrainzId"
+  );
+  const textLookupSources = savedSources.filter((source) => source.key === "lastfmName" || source.key === "gdeltQuery");
+  const sourceQuality = getAutoArtistSourceQuality(verifiedSources.length, textLookupSources.length);
   const candidates = preview.suggestions.flatMap((suggestion) =>
     Object.entries(suggestion.candidates).flatMap(([source, sourceCandidates]) =>
       (sourceCandidates ?? []).slice(0, 2).map((candidate) => ({
@@ -3497,8 +3692,13 @@ function AutoArtistPreviewCard({
             {preview.record.name} <span className="text-paper/45">{preview.record.ticker}</span>
           </h3>
           <p className="mt-2 max-w-2xl text-sm font-bold leading-6 text-paper/55">
-            Review the generated listing and source matches. Save creates the public roster row and source IDs together.
+            Review the generated listing and source matches. Save only after the verified IDs look like the real artist.
           </p>
+          <div
+            className={`mt-3 inline-flex rounded border px-3 py-1.5 text-xs font-black uppercase tracking-wide ${sourceQuality.className}`}
+          >
+            {sourceQuality.label}
+          </div>
         </div>
         <button
           type="button"
@@ -3507,9 +3707,15 @@ function AutoArtistPreviewCard({
           className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md border border-mint/45 bg-mint/10 px-4 text-sm font-black text-mint disabled:cursor-wait disabled:opacity-55"
         >
           <CheckCircle2 className="h-4 w-4" />
-          {saving ? "Saving artist and source IDs" : "Save artist and source IDs"}
+          {saving ? "Saving artist and source IDs" : sourceQuality.saveLabel}
         </button>
       </div>
+
+      {sourceQuality.warning ? (
+        <div className="mt-4 rounded-md border border-brass/35 bg-brass/10 p-3 text-sm font-bold leading-6 text-paper/65">
+          {sourceQuality.warning}
+        </div>
+      ) : null}
 
       <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <PreviewMetric label="Ticker" value={preview.record.ticker} />
@@ -3521,6 +3727,16 @@ function AutoArtistPreviewCard({
       <div className="mt-4 grid gap-3 lg:grid-cols-2">
         <div className="rounded-md border border-line bg-ink/70 p-3">
           <p className="text-xs font-black uppercase tracking-wide text-paper/45">Source IDs to save</p>
+          <p className="mt-1 text-xs font-bold leading-5 text-paper/45">
+            {verifiedSources.length
+              ? `Verified platform/release IDs: ${verifiedSources.map((source) => source.label).join(", ")}.`
+              : "No verified Spotify, YouTube, or MusicBrainz ID was found. This listing will rely on text lookups until exact IDs are added."}
+          </p>
+          {textLookupSources.length ? (
+            <p className="mt-1 text-xs font-bold leading-5 text-paper/38">
+              Text lookups: {textLookupSources.map((source) => source.label).join(", ")}.
+            </p>
+          ) : null}
           <div className="mt-3 grid gap-2 text-xs font-bold">
             {savedSources.length ? (
               savedSources.map((source) => (
@@ -3571,6 +3787,45 @@ function AutoArtistPreviewCard({
       ) : null}
     </div>
   );
+}
+
+function getAutoArtistSourceQuality(verifiedSourceCount: number, textLookupSourceCount: number) {
+  if (verifiedSourceCount >= 2) {
+    return {
+      label: "High-confidence listing",
+      saveLabel: "Save verified listing",
+      className: "border-mint/40 bg-mint/10 text-mint",
+      warning: null
+    };
+  }
+
+  if (verifiedSourceCount === 1) {
+    return {
+      label: "Needs quick review",
+      saveLabel: "Save after review",
+      className: "border-brass/40 bg-brass/10 text-brass",
+      warning:
+        "Only one exact platform/release ID was found. This can be okay, but check the candidate manually before trusting market data."
+    };
+  }
+
+  if (textLookupSourceCount > 0) {
+    return {
+      label: "Text-only match",
+      saveLabel: "Save text-only listing",
+      className: "border-brass/40 bg-brass/10 text-brass",
+      warning:
+        "This preview found only text lookups, not exact Spotify, YouTube, or MusicBrainz IDs. Save only if you plan to add exact IDs immediately."
+    };
+  }
+
+  return {
+    label: "Low-confidence listing",
+    saveLabel: "Save without IDs",
+    className: "border-ember/40 bg-ember/10 text-ember",
+    warning:
+      "No reliable source IDs were found. Do not use this artist in the public market until exact source IDs are added."
+  };
 }
 
 function ManualSourceIdEditor({

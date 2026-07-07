@@ -4,9 +4,33 @@ import { AuthProvider } from "@/components/AuthProvider";
 import { GameProvider } from "@/components/GameProvider";
 import { Shell } from "@/components/Shell";
 
+const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://rap-market-index.vercel.app";
+const publicIndexingEnabled = process.env.NEXT_PUBLIC_RMI_PUBLIC_INDEXING === "true";
+
 export const metadata: Metadata = {
-  title: "Rap Market Index",
-  description: "A simulated artist-share market for rap and hip-hop."
+  metadataBase: new URL(siteUrl),
+  applicationName: "Rap Market Index",
+  title: {
+    default: "Rap Market Index",
+    template: "%s | Rap Market Index"
+  },
+  description: "Virtual rap exchange with artist prices, market news, portfolios, and fantasy cash.",
+  openGraph: {
+    title: "Rap Market Index",
+    description: "Virtual rap exchange with artist prices, market news, portfolios, and fantasy cash.",
+    url: siteUrl,
+    siteName: "Rap Market Index",
+    type: "website"
+  },
+  twitter: {
+    card: "summary",
+    title: "Rap Market Index",
+    description: "Virtual rap exchange with artist prices, market news, portfolios, and fantasy cash."
+  },
+  robots: {
+    index: publicIndexingEnabled,
+    follow: publicIndexingEnabled
+  }
 };
 
 const themeScript = `

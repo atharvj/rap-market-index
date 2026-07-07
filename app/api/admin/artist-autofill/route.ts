@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { formatArtistDisplayName, getArtistTickerOverride } from "@/lib/artist-display-name";
 import { calculateHypeScore, getDailyChangePercent } from "@/lib/pricing";
 import { createServiceRoleClient, getSupabaseConfigStatus } from "@/lib/supabase/server";
 import type { Database } from "@/lib/supabase/database.types";
@@ -15,6 +16,15 @@ type ArtistRow = Database["public"]["Tables"]["artists"]["Row"];
 type ArtistAutofillBody = {
   name?: string;
   dryRun?: boolean;
+  sourceIds?: ArtistAutofillSourceIdsInput | null;
+};
+
+type ArtistAutofillSourceIdsInput = {
+  spotifyId?: unknown;
+  youtubeChannelId?: unknown;
+  musicbrainzId?: unknown;
+  lastfmName?: unknown;
+  gdeltQuery?: unknown;
 };
 
 const DEFAULT_STATS: HypeStats = {
@@ -121,6 +131,7 @@ export async function POST(request: Request) {
     };
     let finalArtist = mapMarketArtist(valuedArtist);
     let savedSourceIds: Awaited<ReturnType<typeof upsertArtistExternalIds>> = {};
+    const previewSourceIds = dryRun ? null : normalizePreviewSourceIds(body.sourceIds, artist.id);
 
     if (!dryRun) {
       if (valuation.source === "default") {
@@ -130,9 +141,9 @@ export async function POST(request: Request) {
         finalArtist = mapArtistRow(await updateStarterValuation(supabase, valuedArtist));
       }
 
-      savedSourceIds = resolverResult.records.length
-        ? await upsertArtistExternalIds(supabase, resolverResult.records)
-        : {};
+      const sourceRecords = previewSourceIds ? [previewSourceIds] : resolverResult.records;
+
+      savedSourceIds = sourceRecords.length ? await upsertArtistExternalIds(supabase, sourceRecords) : {};
     }
 
     return NextResponse.json({
@@ -171,6 +182,29 @@ async function parseBody(request: Request): Promise<ArtistAutofillBody> {
   } catch {
     return {};
   }
+}
+
+function normalizePreviewSourceIds(input: ArtistAutofillBody["sourceIds"], artistId: string) {
+  if (!input || typeof input !== "object") {
+    return null;
+  }
+
+  const record = {
+    artistId,
+    spotifyId: normalizeOptionalText(input.spotifyId, 120),
+    youtubeChannelId: normalizeOptionalText(input.youtubeChannelId, 180),
+    musicbrainzId: normalizeOptionalText(input.musicbrainzId, 80),
+    lastfmName: normalizeOptionalText(input.lastfmName, 120),
+    gdeltQuery: normalizeOptionalText(input.gdeltQuery, 320)
+  };
+
+  return record.spotifyId || record.youtubeChannelId || record.musicbrainzId || record.lastfmName || record.gdeltQuery
+    ? record
+    : null;
+}
+
+function normalizeOptionalText(value: unknown, maxLength: number) {
+  return typeof value === "string" ? value.trim().replace(/\s+/g, " ").slice(0, maxLength) || undefined : undefined;
 }
 
 async function loadArtistRows(supabase: ReturnType<typeof createServiceRoleClient>) {
@@ -408,7 +442,8 @@ function getUniqueArtistId(baseId: string, existingRows: ArtistRow[]) {
 
 function getUniqueTicker(name: string, existingRows: ArtistRow[]) {
   const used = new Set(existingRows.map((row) => row.ticker));
-  const candidates = getTickerCandidates(name);
+  const override = getArtistTickerOverride(name);
+  const candidates = override ? [override, ...getTickerCandidates(name)] : getTickerCandidates(name);
 
   for (const candidate of candidates) {
     if (!used.has(candidate)) {
@@ -455,7 +490,7 @@ function tokenizeArtistName(value: string) {
 }
 
 function normalizeArtistName(value: unknown) {
-  return typeof value === "string" ? value.trim().replace(/\s+/g, " ").slice(0, 120) : "";
+  return formatArtistDisplayName(value);
 }
 
 function slugifyArtistName(value: string) {

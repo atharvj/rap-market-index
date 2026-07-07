@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { formatArtistDisplayName } from "@/lib/artist-display-name";
 import { calculateHypeScore, getDailyChangePercent } from "@/lib/pricing";
 import { createServiceRoleClient, getSupabaseConfigStatus } from "@/lib/supabase/server";
 import type { Database } from "@/lib/supabase/database.types";
@@ -371,7 +372,7 @@ function normalizeArtistInput(
   input: ArtistRosterInput,
   existing: ArtistRow | null
 ): Database["public"]["Tables"]["artists"]["Insert"] {
-  const name = input.name?.trim();
+  const name = formatArtistDisplayName(input.name);
   const id = getArtistInputId(input);
   const ticker = normalizeOptionalTicker(input.ticker);
   const currentPrice = getPositiveNumber(input.currentPrice, "currentPrice");

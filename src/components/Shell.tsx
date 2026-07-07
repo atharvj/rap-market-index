@@ -162,27 +162,33 @@ export function Shell({ children }: { children: React.ReactNode }) {
                     ) : null}
                   </div>
                   <div className="grid gap-2 sm:grid-cols-2">
-                    {searchSuggestions.map((artist) => (
-                      <Link
-                        key={artist.id}
-                        href={`/artists/${artist.id}`}
-                        onClick={() => setSearchFocused(false)}
-                        className="flex min-w-0 items-center justify-between gap-3 rounded-full bg-panelSoft px-3 py-1.5 text-sm hover:bg-brass/10"
-                      >
-                        <span className="min-w-0">
-                          <span className="font-black text-cyan">{artist.ticker}</span>{" "}
-                          <span className="font-semibold text-paper">{artist.name}</span>
-                        </span>
-                        <span
-                          className={clsx(
-                            "shrink-0 text-xs font-black number-tabular",
-                            artist.dailyChangePercent >= 0 ? "text-mint" : "text-ember"
-                          )}
+                    {searchSuggestions.length ? (
+                      searchSuggestions.map((artist) => (
+                        <Link
+                          key={artist.id}
+                          href={`/artists/${artist.id}`}
+                          onClick={() => setSearchFocused(false)}
+                          className="flex min-w-0 items-center justify-between gap-3 rounded-full bg-panelSoft px-3 py-1.5 text-sm hover:bg-brass/10"
                         >
-                          {formatPercent(artist.dailyChangePercent)}
-                        </span>
-                      </Link>
-                    ))}
+                          <span className="min-w-0">
+                            <span className="font-black text-cyan">{artist.ticker}</span>{" "}
+                            <span className="font-semibold text-paper">{artist.name}</span>
+                          </span>
+                          <span
+                            className={clsx(
+                              "shrink-0 text-xs font-black number-tabular",
+                              artist.dailyChangePercent >= 0 ? "text-mint" : "text-ember"
+                            )}
+                          >
+                            {formatPercent(artist.dailyChangePercent)}
+                          </span>
+                        </Link>
+                      ))
+                    ) : (
+                      <p className="rounded border border-line bg-panelSoft px-3 py-2 text-sm font-bold text-paper/50 sm:col-span-2">
+                        No matching artists. Add the artist from the admin console if they belong on the market.
+                      </p>
+                    )}
                   </div>
                 </div>
               ) : null}
