@@ -5,28 +5,27 @@ import { useAuth } from "@/components/AuthProvider";
 import { useGame } from "@/components/GameProvider";
 import { UserAvatar } from "@/components/UserAvatar";
 import { formatCurrency } from "@/lib/formatters";
-import { applyThemePreference, getStoredThemePreference, type ThemePreference } from "@/lib/theme";
+import { getBrowserSupabaseClient } from "@/lib/supabase/client";
 import clsx from "clsx";
 import {
   BarChart3,
   CalendarDays,
+  Camera,
   Clock3,
   DollarSign,
+  ImagePlus,
   LockKeyhole,
   LogOut,
   Mail,
-  Monitor,
-  Moon,
   Save,
   Server,
-  Sun,
   Trophy,
   UserCircle,
   UserPlus,
   WalletCards
 } from "lucide-react";
 import Link from "next/link";
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { ChangeEvent, FormEvent, useEffect, useMemo, useRef, useState } from "react";
 
 type ProfileDetailsResponse = {
   ok: boolean;
@@ -46,18 +45,16 @@ export default function AccountPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [username, setUsername] = useState("");
-  const [updatedUsername, setUpdatedUsername] = useState("");
   const [message, setMessage] = useState("");
-  const [settingsMessage, setSettingsMessage] = useState("");
   const [profileBio, setProfileBio] = useState("");
   const [avatarUrl, setAvatarUrl] = useState("");
   const [favoriteArtistIds, setFavoriteArtistIds] = useState<string[]>([]);
   const [profileDetailsMessage, setProfileDetailsMessage] = useState("");
   const [submitting, setSubmitting] = useState(false);
-  const [settingsSubmitting, setSettingsSubmitting] = useState(false);
   const [profileDetailsSubmitting, setProfileDetailsSubmitting] = useState(false);
-  const [themePreference, setThemePreference] = useState<ThemePreference>("system");
-  const [resolvedTheme, setResolvedTheme] = useState<"light" | "dark">("light");
+  const [avatarUploading, setAvatarUploading] = useState(false);
+  const avatarInputRef = useRef<HTMLInputElement | null>(null);
+  const cameraInputRef = useRef<HTMLInputElement | null>(null);
   const profileName = session && state.username !== "Demo Guest" ? state.username : user?.email?.split("@")[0] ?? "Not signed in";
   const favoriteArtists = useMemo(
     () =>
@@ -83,21 +80,10 @@ export default function AccountPage() {
   }, []);
 
   useEffect(() => {
-    const preference = getStoredThemePreference();
-    setThemePreference(preference);
-    setResolvedTheme(applyThemePreference(preference));
-  }, []);
-
-  useEffect(() => {
-    if (session && profileName !== "Not signed in") {
-      setUpdatedUsername(profileName);
-    }
-  }, [profileName, session]);
-
-  useEffect(() => {
     if (!configured || !session) {
       setProfileBio("");
       setFavoriteArtistIds([]);
+      setAvatarUrl("");
       return;
     }
 
@@ -145,28 +131,14 @@ export default function AccountPage() {
     }
   }
 
-  async function updateUsername(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-
-    const nextUsername = updatedUsername.trim();
-    if (nextUsername.length < 2) {
-      setSettingsMessage("Username must be at least 2 characters.");
-      return;
-    }
-
-    setSettingsSubmitting(true);
-    const ok = await refreshServerState(nextUsername);
-    setSettingsSubmitting(false);
-    setSettingsMessage(ok ? "Username updated." : "Could not update username.");
-  }
-
-  async function saveProfileDetails() {
+  async function saveProfileDetails(overrides: { nextAvatarUrl?: string } = {}) {
     if (!session) {
       return;
     }
 
     setProfileDetailsSubmitting(true);
     setProfileDetailsMessage("");
+    const nextAvatarUrl = overrides.nextAvatarUrl ?? avatarUrl;
 
     try {
       const response = await fetch("/api/profile/bootstrap", {
@@ -177,7 +149,7 @@ export default function AccountPage() {
         },
         body: JSON.stringify({
           profileBio,
-          avatarUrl,
+          avatarUrl: nextAvatarUrl,
           favoriteArtistIds
         })
       });
@@ -188,7 +160,7 @@ export default function AccountPage() {
       }
 
       setProfileBio(payload.profile?.bio ?? profileBio);
-      setAvatarUrl(payload.profile?.avatarUrl ?? avatarUrl);
+      setAvatarUrl(payload.profile?.avatarUrl ?? nextAvatarUrl);
       setFavoriteArtistIds(payload.profile?.favoriteArtistIds ?? favoriteArtistIds);
       setProfileDetailsMessage("Profile details saved.");
       await refreshServerState();
@@ -196,6 +168,57 @@ export default function AccountPage() {
       setProfileDetailsMessage(error instanceof Error ? error.message : "Could not save profile details.");
     } finally {
       setProfileDetailsSubmitting(false);
+    }
+  }
+
+  async function uploadAvatar(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.currentTarget.files?.[0] ?? null;
+    event.currentTarget.value = "";
+
+    if (!file || !session) {
+      return;
+    }
+
+    if (!file.type.startsWith("image/")) {
+      setProfileDetailsMessage("Choose an image file.");
+      return;
+    }
+
+    if (file.size > 3 * 1024 * 1024) {
+      setProfileDetailsMessage("Profile images must be 3 MB or smaller.");
+      return;
+    }
+
+    setAvatarUploading(true);
+    setProfileDetailsMessage("");
+
+    try {
+      const supabase = getBrowserSupabaseClient();
+      const extension = getAvatarFileExtension(file);
+      const filePath = `${session.user.id}/${Date.now()}.${extension}`;
+      const { error } = await supabase.storage.from("profile-avatars").upload(filePath, file, {
+        cacheControl: "3600",
+        contentType: file.type,
+        upsert: false
+      });
+
+      if (error) {
+        throw new Error(error.message);
+      }
+
+      const { data } = supabase.storage.from("profile-avatars").getPublicUrl(filePath);
+      const publicUrl = data.publicUrl;
+
+      setAvatarUrl(publicUrl);
+      await saveProfileDetails({ nextAvatarUrl: publicUrl });
+    } catch (error) {
+      setProfileDetailsMessage(
+        error instanceof Error
+          ? `Could not upload profile picture: ${error.message}`
+          : "Could not upload profile picture."
+      );
+    } finally {
+      setAvatarUploading(false);
     }
   }
 
@@ -209,11 +232,6 @@ export default function AccountPage() {
 
   function removeFavoriteArtist(artistId: string) {
     setFavoriteArtistIds((current) => current.filter((currentArtistId) => currentArtistId !== artistId));
-  }
-
-  function chooseTheme(preference: ThemePreference) {
-    setThemePreference(preference);
-    setResolvedTheme(applyThemePreference(preference));
   }
 
   if (configured && !session) {
@@ -348,7 +366,52 @@ export default function AccountPage() {
           <section className="rounded border border-line bg-panel p-5 shadow-market">
             <div className="grid gap-6 md:grid-cols-[170px_minmax(0,1fr)]">
               <div>
-                <UserAvatar avatarUrl={avatarUrl || syncedAvatarUrl} label={profileName} size="lg" />
+                <input
+                  ref={avatarInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={uploadAvatar}
+                />
+                <input
+                  ref={cameraInputRef}
+                  type="file"
+                  accept="image/*"
+                  capture="user"
+                  className="hidden"
+                  onChange={uploadAvatar}
+                />
+                <button
+                  type="button"
+                  onClick={() => avatarInputRef.current?.click()}
+                  className="group relative block rounded border border-transparent text-left focus:outline-none focus:ring-2 focus:ring-cyan"
+                  aria-label="Change profile picture"
+                >
+                  <UserAvatar avatarUrl={avatarUrl || syncedAvatarUrl} label={profileName} size="lg" />
+                  <span className="absolute inset-x-0 bottom-0 hidden bg-black/65 px-2 py-1 text-center text-[11px] font-black uppercase tracking-wide text-white group-hover:block">
+                    Change
+                  </span>
+                </button>
+                <div className="mt-3 grid gap-2">
+                  <button
+                    type="button"
+                    onClick={() => avatarInputRef.current?.click()}
+                    disabled={avatarUploading}
+                    className="inline-flex min-h-8 items-center justify-center gap-2 rounded border border-line bg-panelSoft px-3 text-xs font-black hover:border-cyan disabled:cursor-wait disabled:opacity-60"
+                  >
+                    <ImagePlus className="h-3.5 w-3.5" />
+                    {avatarUploading ? "Uploading" : "Upload image"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => cameraInputRef.current?.click()}
+                    disabled={avatarUploading}
+                    className="inline-flex min-h-8 items-center justify-center gap-2 rounded border border-line bg-panelSoft px-3 text-xs font-black hover:border-cyan disabled:cursor-wait disabled:opacity-60"
+                  >
+                    <Camera className="h-3.5 w-3.5" />
+                    Take photo
+                  </button>
+                </div>
               </div>
               <div className="min-w-0">
                 <div className="flex min-w-0 flex-wrap items-center gap-2">
@@ -386,15 +449,26 @@ export default function AccountPage() {
 
           <section className="grid gap-5 md:grid-cols-3">
             <ProfilePanel title="A little about me">
-              <label className="mb-4 block">
-                <span className="text-xs font-black uppercase tracking-wide text-paper/45">Profile picture URL</span>
-                <input
-                  value={avatarUrl}
-                  onChange={(event) => setAvatarUrl(event.target.value)}
-                  placeholder="https://..."
-                  className="mt-2 h-10 w-full rounded border border-line bg-panelSoft px-3 text-sm font-bold outline-none placeholder:text-paper/35 focus:border-cyan"
-                />
-              </label>
+              <div className="mb-4 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => avatarInputRef.current?.click()}
+                  disabled={avatarUploading}
+                  className="inline-flex min-h-9 items-center justify-center gap-2 rounded border border-line bg-panelSoft px-3 text-xs font-black hover:border-cyan disabled:cursor-wait disabled:opacity-60"
+                >
+                  <ImagePlus className="h-4 w-4" />
+                  Upload image
+                </button>
+                <button
+                  type="button"
+                  onClick={() => cameraInputRef.current?.click()}
+                  disabled={avatarUploading}
+                  className="inline-flex min-h-9 items-center justify-center gap-2 rounded border border-line bg-panelSoft px-3 text-xs font-black hover:border-cyan disabled:cursor-wait disabled:opacity-60"
+                >
+                  <Camera className="h-4 w-4" />
+                  Take photo
+                </button>
+              </div>
               <label className="block">
                 <span className="sr-only">Profile bio</span>
                 <textarea
@@ -438,7 +512,7 @@ export default function AccountPage() {
               </div>
               <button
                 type="button"
-                onClick={saveProfileDetails}
+                onClick={() => saveProfileDetails()}
                 disabled={profileDetailsSubmitting}
                 className="mt-4 inline-flex min-h-9 items-center justify-center gap-2 rounded bg-cyan px-4 text-sm font-black text-white disabled:cursor-wait disabled:opacity-60"
               >
@@ -452,47 +526,6 @@ export default function AccountPage() {
             </ProfilePanel>
           </section>
         </>
-      ) : null}
-
-      {session ? (
-        <section className="grid gap-5 md:grid-cols-[minmax(0,1fr)_340px]">
-          <div className="rounded border border-line bg-panel p-5 shadow-market">
-            <h2 className="text-xl font-black">Account settings</h2>
-            <form className="mt-5 max-w-md space-y-4" onSubmit={updateUsername}>
-              <label className="block">
-                <span className="text-xs font-bold uppercase tracking-wide text-paper/50">Change username</span>
-                <input
-                  className="mt-2 h-10 w-full rounded border border-line bg-panelSoft px-3 text-sm outline-none focus:border-cyan"
-                  value={updatedUsername}
-                  onChange={(event) => setUpdatedUsername(event.target.value)}
-                  minLength={2}
-                  maxLength={32}
-                  required
-                />
-              </label>
-              <button
-                type="submit"
-                disabled={settingsSubmitting}
-                className="inline-flex min-h-9 items-center justify-center gap-2 rounded bg-cyan px-4 text-sm font-black text-white disabled:cursor-wait disabled:opacity-60"
-              >
-                <Save className="h-4 w-4" />
-                Apply changes
-              </button>
-              {settingsMessage ? <p className="text-sm font-bold text-paper/60">{settingsMessage}</p> : null}
-            </form>
-          </div>
-
-          <div className="rounded border border-line bg-panel p-5 shadow-market">
-            <div className="flex items-center justify-between gap-3">
-              <h2 className="text-xl font-black">Site preferences</h2>
-              <span className="text-xs font-black uppercase text-paper/40">{themePreference}</span>
-            </div>
-            <p className="mt-2 text-sm font-medium leading-6 text-paper/60">
-              Choose how RMI looks on this device.
-            </p>
-            <ThemeButtons current={themePreference} resolvedTheme={resolvedTheme} onChange={chooseTheme} />
-          </div>
-        </section>
       ) : null}
     </div>
   );
@@ -517,42 +550,24 @@ function ProfilePanel({ title, children }: { title: string; children: React.Reac
   );
 }
 
-function ThemeButtons({
-  current,
-  resolvedTheme,
-  onChange
-}: {
-  current: ThemePreference;
-  resolvedTheme: "light" | "dark";
-  onChange: (preference: ThemePreference) => void;
-}) {
-  const options: Array<{ value: ThemePreference; label: string; icon: React.ReactNode }> = [
-    { value: "light", label: "Light", icon: <Sun className="h-4 w-4" /> },
-    { value: "dark", label: "Dark", icon: <Moon className="h-4 w-4" /> },
-    { value: "system", label: `System (${resolvedTheme})`, icon: <Monitor className="h-4 w-4" /> }
-  ];
+function getAvatarFileExtension(file: File) {
+  const fromName = file.name.split(".").pop()?.toLowerCase().replace(/[^a-z0-9]/g, "");
 
-  return (
-    <div className="mt-5 grid gap-2">
-      {options.map((option) => (
-        <button
-          key={option.value}
-          type="button"
-          onClick={() => onChange(option.value)}
-          className={clsx(
-            "flex min-h-10 items-center justify-between rounded border px-3 text-sm font-black",
-            current === option.value
-              ? "border-cyan bg-cyan/10 text-cyan"
-              : "border-line bg-panelSoft text-paper/70 hover:border-cyan"
-          )}
-        >
-          <span className="inline-flex items-center gap-2">
-            {option.icon}
-            {option.label}
-          </span>
-          {current === option.value ? <span className="text-xs uppercase">Selected</span> : null}
-        </button>
-      ))}
-    </div>
-  );
+  if (fromName === "jpg" || fromName === "jpeg" || fromName === "png" || fromName === "webp" || fromName === "gif") {
+    return fromName === "jpeg" ? "jpg" : fromName;
+  }
+
+  if (file.type === "image/png") {
+    return "png";
+  }
+
+  if (file.type === "image/webp") {
+    return "webp";
+  }
+
+  if (file.type === "image/gif") {
+    return "gif";
+  }
+
+  return "jpg";
 }

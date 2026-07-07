@@ -2,6 +2,7 @@
 
 import { AdminBadge } from "@/components/AdminBadge";
 import { ArtistAvatar } from "@/components/ArtistAvatar";
+import { useAuth } from "@/components/AuthProvider";
 import { useGame } from "@/components/GameProvider";
 import { MarketNewsFeed } from "@/components/MarketNewsFeed";
 import { MiniSparkline } from "@/components/MiniSparkline";
@@ -24,6 +25,7 @@ import Link from "next/link";
 import { useMemo, type ReactNode } from "react";
 
 export default function HomePage() {
+  const { session } = useAuth();
   const { state, leaderboard, watchlistArtists, portfolioValue, gainPercent } = useGame();
   const topGainers = useMemo(
     () => [...state.artists].sort((a, b) => b.dailyChangePercent - a.dailyChangePercent).slice(0, 6),
@@ -79,7 +81,7 @@ export default function HomePage() {
         </div>
 
         <aside className="space-y-5">
-          <SignUpPromo portfolioValue={portfolioValue} gainPercent={gainPercent} />
+          {!session ? <SignUpPromo portfolioValue={portfolioValue} gainPercent={gainPercent} /> : null}
           <section className="rounded border border-line bg-panel shadow-market">
             <SectionHeader title="Market Pulse" icon={<Activity className="h-4 w-4" aria-hidden="true" />} />
             <div className="divide-y divide-line">
@@ -121,12 +123,12 @@ export default function HomePage() {
                 </Link>
               }
             />
-            <div className="grid gap-0 divide-y divide-line md:grid-cols-2 md:divide-x md:divide-y-0">
+            <div className="grid gap-3 p-3 md:grid-cols-2">
               {marketMovers.slice(0, 4).map((artist) => (
                 <MarketMoverTile key={artist.id} artist={artist} />
               ))}
             </div>
-            <div className="grid gap-0 border-t border-line md:grid-cols-2 xl:grid-cols-4">
+            <div className="grid gap-2 border-t border-line p-3 md:grid-cols-2 xl:grid-cols-4">
               {marketMovers.slice(4, 8).map((artist) => (
                 <CompactMoverTile key={artist.id} artist={artist} />
               ))}
@@ -135,7 +137,7 @@ export default function HomePage() {
 
           <section className="rounded border border-line bg-panel shadow-market">
             <SectionHeader title="Artists to Watch" action={<ScoreInfo />} icon={<Star className="h-4 w-4" aria-hidden="true" />} />
-            <div className="grid divide-y divide-line md:grid-cols-2 md:divide-x md:divide-y-0 lg:grid-cols-3">
+            <div className="grid gap-3 p-3 md:grid-cols-2 lg:grid-cols-3">
               {hotArtists.slice(0, 6).map((artist) => (
                 <PopularArtistCard key={artist.id} artist={artist} />
               ))}
@@ -304,7 +306,10 @@ function MarketMoverTile({ artist }: { artist: Artist }) {
   const positive = artist.dailyChangePercent >= 0;
 
   return (
-    <Link href={`/artists/${artist.id}`} className="grid min-h-[180px] gap-4 p-4 hover:bg-panelSoft/70">
+    <Link
+      href={`/artists/${artist.id}`}
+      className="grid min-h-[172px] gap-3 rounded border border-line bg-panel p-4 hover:border-cyan hover:bg-panelSoft/70"
+    >
       <div className="flex items-start justify-between gap-3">
         <span className="flex min-w-0 items-center gap-3">
           <ArtistAvatar artist={artist} size="md" />
@@ -319,9 +324,9 @@ function MarketMoverTile({ artist }: { artist: Artist }) {
           {formatPercent(artist.dailyChangePercent)}
         </span>
       </div>
-      <div className="self-end">
-        <MiniSparkline data={artist.priceHistory} positive={positive} width={220} height={44} />
-        <p className="mt-2 text-[11px] font-black uppercase tracking-wide text-paper/40">{artist.hypeScore}/100 RMI score</p>
+      <div className="self-end rounded border border-line bg-panelSoft/45 px-3 py-2">
+        <MiniSparkline data={artist.priceHistory} positive={positive} width={220} height={38} />
+        <p className="mt-1 text-[10px] font-black uppercase tracking-wide text-paper/40">{artist.hypeScore}/100 RMI score</p>
       </div>
     </Link>
   );
@@ -331,7 +336,10 @@ function CompactMoverTile({ artist }: { artist: Artist }) {
   const positive = artist.dailyChangePercent >= 0;
 
   return (
-    <Link href={`/artists/${artist.id}`} className="flex min-w-0 items-center justify-between gap-3 border-b border-line px-4 py-3 hover:bg-panelSoft/70 md:border-r md:last:border-r-0 xl:border-b-0">
+    <Link
+      href={`/artists/${artist.id}`}
+      className="flex min-w-0 items-center justify-between gap-3 rounded border border-line bg-panel px-3 py-3 hover:border-cyan hover:bg-panelSoft/70"
+    >
       <span className="min-w-0">
         <span className="block truncate text-sm font-black">{artist.name}</span>
         <span className="text-xs font-bold text-paper/50">{artist.ticker}</span>
@@ -371,7 +379,10 @@ function PopularArtistCard({ artist }: { artist: Artist }) {
   const positive = artist.dailyChangePercent >= 0;
 
   return (
-    <Link href={`/artists/${artist.id}`} className="grid gap-3 px-4 py-4 hover:bg-panelSoft/70">
+    <Link
+      href={`/artists/${artist.id}`}
+      className="grid gap-3 rounded border border-line bg-panel px-4 py-4 hover:border-cyan hover:bg-panelSoft/70"
+    >
       <span className="flex min-w-0 items-center gap-3">
         <ArtistAvatar artist={artist} size="sm" />
         <span className="min-w-0">
@@ -381,8 +392,10 @@ function PopularArtistCard({ artist }: { artist: Artist }) {
           </span>
         </span>
       </span>
-      <span className="grid grid-cols-[1fr_auto] items-end gap-3">
-        <MiniSparkline data={artist.priceHistory} positive={positive} width={190} height={34} />
+      <span className="grid grid-cols-[minmax(0,1fr)_58px] items-end gap-3">
+        <span className="rounded border border-line bg-panelSoft/45 px-2 py-1">
+          <MiniSparkline data={artist.priceHistory} positive={positive} width={170} height={30} />
+        </span>
         <span className="text-right text-xs font-black number-tabular">
           <span className={positive ? "block text-mint" : "block text-ember"}>
             {formatPercent(artist.dailyChangePercent)}

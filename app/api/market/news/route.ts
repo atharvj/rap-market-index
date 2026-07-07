@@ -511,6 +511,7 @@ function isPublicYoutubeUploadEvent(
   const isGenericCluster = classificationReason === "official_audio_release_cluster" && !hasNamedProject;
   const isMusicVideo = title.includes("official video") || title.includes("music video");
   const isTrackAudio = title.includes("official audio") || title.includes("audio");
+  const isStandaloneTrackAudio = rawPayload.standaloneTrackAudio === true;
   const isMajorProjectRelease = ["album", "ep", "mixtape"].includes(releaseKind) || hasNamedProject;
   const minimumViews = isMajorProjectRelease || isMusicVideo || isProjectCluster ? 25_000 : isTrackAudio ? 90_000 : 60_000;
   const engagementScore = likeCount * 8 + commentCount * 20;
@@ -526,13 +527,14 @@ function isPublicYoutubeUploadEvent(
       ? hasMeaningfulProjectReach || isMajorProjectRelease
       : viewCount >= minimumViews || clusterTotalViews >= 85_000 || (viewCount >= 15_000 && hasStrongEngagement);
 
-  if (classificationReason === "track_audio_upload_title") {
+  if (classificationReason === "track_audio_upload_title" || (isTrackAudio && !isProjectCluster && !isMajorProjectRelease)) {
     return (
+      isStandaloneTrackAudio &&
       !hasLowSignalYoutubeTitle(title) &&
       typeof viewCount === "number" &&
-      viewCount >= 250_000 &&
-      impactScore >= 40 &&
-      confidence >= 0.64
+      viewCount >= 500_000 &&
+      impactScore >= 48 &&
+      confidence >= 0.7
     );
   }
 

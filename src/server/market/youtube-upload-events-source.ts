@@ -305,7 +305,8 @@ function buildYoutubeUploadEvents({
         uploadQualityLabel: classification.qualityLabel ?? null,
         uploadQualityMultiplier: classification.qualityMultiplier ?? 1,
         classificationReason: classification.reason,
-        releaseKind: classification.releaseKind ?? null
+        releaseKind: classification.releaseKind ?? null,
+        standaloneTrackAudio: classification.reason === "track_audio_upload_title"
       }
     });
   }

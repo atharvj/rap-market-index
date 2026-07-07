@@ -234,7 +234,9 @@ export function Shell({ children }: { children: React.ReactNode }) {
                   aria-haspopup="menu"
                 >
                   {session ? (
-                    <UserAvatar avatarUrl={avatarUrl} label={accountLabel} size="sm" />
+                    <span className="pointer-events-none">
+                      <UserAvatar avatarUrl={avatarUrl} label={accountLabel} size="sm" />
+                    </span>
                   ) : (
                     <UserCircle className="h-5 w-5 text-paper/60" aria-hidden="true" />
                   )}
@@ -271,11 +273,11 @@ export function Shell({ children }: { children: React.ReactNode }) {
                             Manage account
                           </Link>
                           <Link
-                            href={`/users/${state.userId}`}
+                            href="/settings"
                             onClick={() => setAccountOpen(false)}
                             className="rounded px-2 py-2 hover:bg-panelSoft"
                           >
-                            Public profile
+                            Settings
                           </Link>
                           <Link
                             href="/watchlist"
@@ -338,7 +340,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
         </div>
 
         <div className="border-b border-line bg-panel">
-          <nav className="mx-auto flex max-w-[1440px] gap-1 overflow-x-auto px-4 py-2 sm:px-6 lg:px-8" aria-label="Primary">
+          <nav className="mx-auto flex max-w-[1440px] gap-1 overflow-x-auto px-3 py-2 sm:px-5 lg:px-6" aria-label="Primary">
             {navItems.map((item) => {
               const active = pathname === item.href;
               const Icon = item.icon;
@@ -430,6 +432,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
           <FooterColumn title="Account">
             <Link href="/portfolio">Portfolio</Link>
             <Link href="/account">Profile</Link>
+            <Link href="/settings">Settings</Link>
             <Link href="/account?mode=signup">Create account</Link>
           </FooterColumn>
 
