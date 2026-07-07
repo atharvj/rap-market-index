@@ -233,11 +233,15 @@ function isPublicMarketNewsEvent(event: MarketEventRow) {
     return impactScore >= 18 && confidence >= 0.45;
   }
 
-  if (title.includes("reaction on social")) {
+  if (title.includes("reaction on social") && !isPublicSocialCatalystEvent(event, rawPayload, impactScore, confidence)) {
     return false;
   }
 
   if (source === "bluesky_post") {
+    if (isPublicSocialCatalystEvent(event, rawPayload, impactScore, confidence)) {
+      return true;
+    }
+
     return (
       event.event_type === "controversy" &&
       impactScore >= 65 &&
@@ -247,6 +251,10 @@ function isPublicMarketNewsEvent(event: MarketEventRow) {
   }
 
   if (source === "reddit_post") {
+    if (isPublicSocialCatalystEvent(event, rawPayload, impactScore, confidence)) {
+      return true;
+    }
+
     return impactScore >= 45 && confidence >= 0.7 && !isLowSignalSocialTitle(title);
   }
 
@@ -272,6 +280,31 @@ function isPublicMarketNewsEvent(event: MarketEventRow) {
   }
 
   return impactScore >= 35 && confidence >= 0.65 && !isLowSignalSocialTitle(title);
+}
+
+function isPublicSocialCatalystEvent(
+  event: MarketEventRow,
+  rawPayload: Record<string, unknown>,
+  impactScore: number,
+  confidence: number
+) {
+  const catalystKind = getRawString(rawPayload.socialCatalystKind);
+  const engagement = getRawNumber(rawPayload.engagement);
+  const viralityTier = getRawString(rawPayload.viralityTier);
+  const isMeaningfulCatalyst =
+    catalystKind === "conflict" ||
+    catalystKind === "backlash" ||
+    catalystKind === "late_reception" ||
+    catalystKind === "critic_reaction" ||
+    event.event_type === "controversy";
+  const hasEnoughPublicSignal =
+    viralityTier === "notable" ||
+    viralityTier === "major" ||
+    viralityTier === "breakout" ||
+    Math.abs(impactScore) >= 34 ||
+    (typeof engagement === "number" && engagement >= 30);
+
+  return isMeaningfulCatalyst && hasEnoughPublicSignal && Math.abs(impactScore) >= 24 && confidence >= 0.52;
 }
 
 function getNewsImportanceScore(event: MarketEventRow, runDate: string) {

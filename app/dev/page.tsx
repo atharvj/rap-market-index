@@ -3497,7 +3497,7 @@ function AutoArtistPreviewCard({
             {preview.record.name} <span className="text-paper/45">{preview.record.ticker}</span>
           </h3>
           <p className="mt-2 max-w-2xl text-sm font-bold leading-6 text-paper/55">
-            Review the generated listing and source matches. Nothing is added to the public roster until you save it.
+            Review the generated listing and source matches. Save creates the public roster row and source IDs together.
           </p>
         </div>
         <button
@@ -3507,7 +3507,7 @@ function AutoArtistPreviewCard({
           className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md border border-mint/45 bg-mint/10 px-4 text-sm font-black text-mint disabled:cursor-wait disabled:opacity-55"
         >
           <CheckCircle2 className="h-4 w-4" />
-          {saving ? "Saving verified artist" : "Save verified artist"}
+          {saving ? "Saving artist and source IDs" : "Save artist and source IDs"}
         </button>
       </div>
 

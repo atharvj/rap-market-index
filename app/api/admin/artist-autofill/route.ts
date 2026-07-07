@@ -111,9 +111,6 @@ export async function POST(request: Request) {
       minConfidence: 0.88,
       delayMs: 0
     });
-    const savedSourceIds = !dryRun && resolverResult.records.length
-      ? await upsertArtistExternalIds(supabase, resolverResult.records)
-      : {};
     const valuation = estimateStarterValuation(resolverResult.suggestions[0]?.candidates ?? {}, starter);
     const valuedArtist = {
       ...artist,
@@ -123,14 +120,19 @@ export async function POST(request: Request) {
       category: valuation.category
     };
     let finalArtist = mapMarketArtist(valuedArtist);
+    let savedSourceIds: Awaited<ReturnType<typeof upsertArtistExternalIds>> = {};
 
     if (!dryRun) {
       if (valuation.source === "default") {
-        finalArtist = mapArtistRow(await upsertArtist(supabase, artist));
+        finalArtist = mapArtistRow(await upsertArtist(supabase, valuedArtist));
       } else {
         await upsertArtist(supabase, valuedArtist);
         finalArtist = mapArtistRow(await updateStarterValuation(supabase, valuedArtist));
       }
+
+      savedSourceIds = resolverResult.records.length
+        ? await upsertArtistExternalIds(supabase, resolverResult.records)
+        : {};
     }
 
     return NextResponse.json({

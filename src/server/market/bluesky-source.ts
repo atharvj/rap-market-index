@@ -78,6 +78,9 @@ type BlueskyPostClassification = {
   catalyst: boolean;
   negative: boolean;
   hype: boolean;
+  socialCatalystKind?: string;
+  receptionPhase?: string;
+  criticReactionDetected?: boolean;
   statusSubtype?: ArtistStatusSubtype;
   statusSeverity?: ArtistStatusSeverity;
   statusHaltRecommended?: boolean;
@@ -160,6 +163,8 @@ export async function collectBlueskyMarketSignals({
       runDate,
       posts: result.posts,
       externalIds: externalIds[artist.id],
+      allArtists: artists,
+      allExternalIds: externalIds,
       baseline: baselines[artist.id] ?? {},
       lookbackDays
     });
@@ -167,15 +172,16 @@ export async function collectBlueskyMarketSignals({
     signals[artist.id] = signal.signal;
     observations.push(...signal.observations);
 
-    if (signal.events.length) {
-      eventsByArtist[artist.id] = signal.events;
+    for (const event of signal.events) {
+      eventsByArtist[event.artistId] ??= [];
+      eventsByArtist[event.artistId].push(event);
     }
   }
 
   return {
     signals,
     observations,
-    eventsByArtist,
+    eventsByArtist: dedupeEventsByArtist(eventsByArtist),
     warnings
   };
 }
@@ -186,6 +192,8 @@ function buildBlueskySignal({
   runDate,
   posts,
   externalIds,
+  allArtists,
+  allExternalIds,
   baseline,
   lookbackDays
 }: {
@@ -194,6 +202,8 @@ function buildBlueskySignal({
   runDate: string;
   posts: BlueskyPostData[];
   externalIds?: ArtistExternalIds;
+  allArtists: MarketUpdateArtist[];
+  allExternalIds: Record<string, ArtistExternalIds>;
   baseline: Record<string, number>;
   lookbackDays: number;
 }): {
@@ -330,10 +340,38 @@ function buildBlueskySignal({
     ],
     events: buildBlueskyEvents({
       artist,
+      allArtists,
+      allExternalIds,
       runDate,
       classifiedPosts
     })
   };
+}
+
+function dedupeEventsByArtist(eventsByArtist: Record<string, MarketEvent[]>) {
+  return Object.fromEntries(
+    Object.entries(eventsByArtist).map(([artistId, events]) => {
+      const seen = new Set<string>();
+      const deduped = events.filter((event) => {
+        const key = [
+          event.artistId,
+          event.eventType,
+          event.eventDate,
+          event.title.toLowerCase(),
+          event.sourceUrl ?? ""
+        ].join(":");
+
+        if (seen.has(key)) {
+          return false;
+        }
+
+        seen.add(key);
+        return true;
+      });
+
+      return [artistId, deduped];
+    })
+  );
 }
 
 function buildStatsFromBluesky({
@@ -401,10 +439,14 @@ function buildStatsFromBluesky({
 
 function buildBlueskyEvents({
   artist,
+  allArtists,
+  allExternalIds,
   runDate,
   classifiedPosts
 }: {
   artist: MarketUpdateArtist;
+  allArtists: MarketUpdateArtist[];
+  allExternalIds: Record<string, ArtistExternalIds>;
   runDate: string;
   classifiedPosts: Array<{ post: BlueskyPost; classification: BlueskyPostClassification }>;
 }) {
@@ -432,22 +474,18 @@ function buildBlueskyEvents({
     .sort((a, b) => Math.abs(b.impactScore) - Math.abs(a.impactScore))
     .slice(0, 3);
 
-  return candidates.map(({ post, classification, impactScore, confidence }) => ({
-    artistId: artist.id,
-    eventDate: post.createdDate || runDate,
-    eventType: classification.eventType ?? "viral",
-    title: buildCommunityEventTitle({
-      artistName: artist.name,
-      eventType: classification.eventType,
-      reason: classification.reason,
-      source: "bluesky"
-    }),
-    sourceName: "Bluesky",
-    sourceUrl: post.sourceUrl,
-    sentimentScore: classification.sentimentScore,
-    impactScore,
-    confidence: clamp(confidence * post.matchConfidence, 0.32, 0.82),
-    rawPayload: {
+  return candidates.flatMap(({ post, classification, impactScore, confidence }) => {
+    const relatedArtists =
+      classification.socialCatalystKind === "conflict"
+        ? detectMentionedTrackedArtists(post.text, {
+            currentArtistId: artist.id,
+            artists: allArtists,
+            externalIds: allExternalIds,
+            requireCatalystContext: true
+          })
+        : [];
+    const baseConfidence = clamp(confidence * post.matchConfidence, 0.32, 0.82);
+    const baseRawPayload = {
       source: "bluesky_post",
       authorHandle: post.authorHandle,
       authorDisplayName: post.authorDisplayName,
@@ -459,11 +497,53 @@ function buildBlueskyEvents({
       viralityTier: getEngagementTier(post.engagement),
       matchConfidence: post.matchConfidence,
       classificationReason: classification.reason,
+      socialCatalystKind: classification.socialCatalystKind ?? null,
+      receptionPhase: classification.receptionPhase ?? null,
+      criticReactionDetected: classification.criticReactionDetected ?? false,
+      relatedArtistIds: relatedArtists.map((related) => related.id),
+      relatedArtistTickers: relatedArtists.map((related) => related.ticker),
+      relatedArtistNames: relatedArtists.map((related) => related.name),
       statusSubtype: classification.statusSubtype ?? null,
       statusSeverity: classification.statusSeverity ?? null,
       statusHaltRecommended: classification.statusHaltRecommended ?? false
-    }
-  }));
+    };
+    const primaryEvent: MarketEvent = {
+      artistId: artist.id,
+      eventDate: post.createdDate || runDate,
+      eventType: classification.eventType ?? "viral",
+      title: buildCommunityEventTitle({
+        artistName: artist.name,
+        eventType: classification.eventType,
+        reason: classification.reason,
+        source: "bluesky"
+      }),
+      sourceName: "Bluesky",
+      sourceUrl: post.sourceUrl,
+      sentimentScore: classification.sentimentScore,
+      impactScore,
+      confidence: baseConfidence,
+      rawPayload: baseRawPayload
+    };
+    const relatedEvents = relatedArtists.map((related) => ({
+      ...primaryEvent,
+      artistId: related.id,
+      title: buildCommunityEventTitle({
+        artistName: related.name,
+        eventType: classification.eventType,
+        reason: classification.reason,
+        source: "bluesky"
+      }),
+      impactScore: clamp(impactScore * 0.72, -84, 84),
+      confidence: clamp(baseConfidence * 0.72, 0.28, 0.7),
+      rawPayload: {
+        ...baseRawPayload,
+        linkedFromArtistId: artist.id,
+        linkedFromArtistTicker: artist.ticker
+      }
+    }));
+
+    return [primaryEvent, ...relatedEvents];
+  });
 }
 
 function classifyBlueskyPost(post: BlueskyPost): BlueskyPostClassification {
@@ -479,10 +559,20 @@ function classifyBlueskyPost(post: BlueskyPost): BlueskyPostClassification {
   const hasReview = hasAny(text, REVIEW_TERMS);
   const hasBacklash = hasAny(text, BACKLASH_TERMS);
   const hasControversy = hasAny(text, CONTROVERSY_TERMS);
+  const hasSocialConflict = hasAny(text, SOCIAL_CONFLICT_TERMS);
+  const hasCriticReaction = hasAny(text, CRITIC_REACTION_TERMS);
+  const hasLatePositiveReception = hasAny(text, LATE_RECEPTION_POSITIVE_TERMS);
+  const hasLateNegativeReception = hasAny(text, LATE_RECEPTION_NEGATIVE_TERMS);
   const hasDecline = hasAny(text, DECLINE_TERMS);
   const hasViral = hasAny(text, VIRAL_TERMS);
   const hasChart = hasAny(text, CHART_TERMS);
-  const negative = negativeMatches > positiveMatches || hasDecline || hasBacklash || hasControversy;
+  const negative =
+    negativeMatches > positiveMatches ||
+    hasDecline ||
+    hasBacklash ||
+    hasControversy ||
+    hasSocialConflict ||
+    hasLateNegativeReception;
   const hype =
     hasAlbumAnnouncement ||
     hasTracklist ||
@@ -492,8 +582,14 @@ function classifyBlueskyPost(post: BlueskyPost): BlueskyPostClassification {
     hasRelease ||
     hasChart ||
     hasViral ||
+    hasLatePositiveReception ||
     positiveMatches > 0;
-  const sentimentScore = clamp((positiveMatches - negativeMatches) * 15 + (hype ? 10 : 0) - (negative ? 22 : 0), -90, 86);
+  const receptionShift = (hasLatePositiveReception ? 22 : 0) - (hasLateNegativeReception ? 26 : 0);
+  const sentimentScore = clamp(
+    (positiveMatches - negativeMatches) * 15 + (hype ? 10 : 0) - (negative ? 22 : 0) + receptionShift,
+    -90,
+    86
+  );
   const engagementImpact = clamp(Math.log10(post.engagement + 1) * 8, 0, 32);
   const status = classifyArtistStatusText(text, { engagementImpact });
 
@@ -509,7 +605,39 @@ function classifyBlueskyPost(post: BlueskyPost): BlueskyPostClassification {
       hype: status.impactScore > 0,
       statusSubtype: status.statusSubtype,
       statusSeverity: status.statusSeverity,
-      statusHaltRecommended: status.statusHaltRecommended
+      statusHaltRecommended: status.statusHaltRecommended,
+      criticReactionDetected: hasCriticReaction
+    };
+  }
+
+  if (hasSocialConflict) {
+    return {
+      eventType: "controversy",
+      sentimentScore: clamp(Math.min(-16, sentimentScore - 10), -92, 18),
+      impactScore: clamp(Math.min(-18, sentimentScore - 8) - engagementImpact * 0.58, -92, 18),
+      confidence: 0.66,
+      reason: "social_conflict_terms",
+      catalyst: true,
+      negative: true,
+      hype,
+      socialCatalystKind: "conflict",
+      criticReactionDetected: hasCriticReaction
+    };
+  }
+
+  if (hasLatePositiveReception || hasLateNegativeReception) {
+    return {
+      eventType: "review",
+      sentimentScore,
+      impactScore: clamp(sentimentScore + (sentimentScore >= 0 ? engagementImpact * 0.75 : -engagementImpact * 0.75), -88, 88),
+      confidence: 0.64,
+      reason: hasLatePositiveReception ? "late_reception_positive_terms" : "late_reception_negative_terms",
+      catalyst: true,
+      negative: hasLateNegativeReception || negative,
+      hype: hasLatePositiveReception && sentimentScore > 0,
+      socialCatalystKind: "late_reception",
+      receptionPhase: "late",
+      criticReactionDetected: hasCriticReaction
     };
   }
 
@@ -522,20 +650,25 @@ function classifyBlueskyPost(post: BlueskyPost): BlueskyPostClassification {
       reason: hasBacklash ? "backlash_terms" : "controversy_terms",
       catalyst: true,
       negative: true,
-      hype
+      hype,
+      socialCatalystKind: hasBacklash ? "backlash" : "controversy",
+      criticReactionDetected: hasCriticReaction
     };
   }
 
-  if (hasReview) {
+  if (hasReview || hasCriticReaction) {
     return {
       eventType: "review",
       sentimentScore,
       impactScore: clamp(sentimentScore + (sentimentScore >= 0 ? engagementImpact : -engagementImpact), -90, 90),
-      confidence: 0.58,
-      reason: "review_terms",
+      confidence: hasCriticReaction ? 0.62 : 0.58,
+      reason: hasCriticReaction ? "critic_reaction_terms" : "review_terms",
       catalyst: true,
       negative,
-      hype
+      hype,
+      socialCatalystKind: hasCriticReaction ? "critic_reaction" : "review",
+      receptionPhase: hasRelease || hasAlbumAnnouncement ? "early" : undefined,
+      criticReactionDetected: hasCriticReaction
     };
   }
 
@@ -548,7 +681,9 @@ function classifyBlueskyPost(post: BlueskyPost): BlueskyPostClassification {
       reason: "tracklist_terms",
       catalyst: true,
       negative,
-      hype: sentimentScore >= 0
+      hype: sentimentScore >= 0,
+      socialCatalystKind: "tracklist_reaction",
+      criticReactionDetected: hasCriticReaction
     };
   }
 
@@ -561,7 +696,10 @@ function classifyBlueskyPost(post: BlueskyPost): BlueskyPostClassification {
       reason: hasAlbumAnnouncement ? "album_announcement_terms" : "release_terms",
       catalyst: true,
       negative,
-      hype: true
+      hype: true,
+      socialCatalystKind: hasAlbumAnnouncement ? "album_announcement" : "release",
+      receptionPhase: "early",
+      criticReactionDetected: hasCriticReaction
     };
   }
 
@@ -574,7 +712,9 @@ function classifyBlueskyPost(post: BlueskyPost): BlueskyPostClassification {
       reason: "decline_terms",
       catalyst: true,
       negative: true,
-      hype: false
+      hype: false,
+      socialCatalystKind: "decline",
+      criticReactionDetected: hasCriticReaction
     };
   }
 
@@ -598,7 +738,9 @@ function classifyBlueskyPost(post: BlueskyPost): BlueskyPostClassification {
       reason,
       catalyst: true,
       negative,
-      hype: true
+      hype: true,
+      socialCatalystKind: hasPerformance ? "performance_hype" : hasSnippet ? "snippet_hype" : hasFeature ? "feature_hype" : hasChart ? "chart" : "viral",
+      criticReactionDetected: hasCriticReaction
     };
   }
 
@@ -611,7 +753,8 @@ function classifyBlueskyPost(post: BlueskyPost): BlueskyPostClassification {
       reason: "negative_terms",
       catalyst: false,
       negative: true,
-      hype: false
+      hype: false,
+      criticReactionDetected: hasCriticReaction
     };
   }
 
@@ -623,7 +766,8 @@ function classifyBlueskyPost(post: BlueskyPost): BlueskyPostClassification {
     reason: positiveMatches > 0 ? "positive_terms" : "discussion",
     catalyst: false,
     negative: false,
-    hype
+    hype,
+    criticReactionDetected: hasCriticReaction
   };
 }
 
@@ -799,10 +943,40 @@ function buildArtistNameCandidates(artist: MarketUpdateArtist, externalIds?: Art
   return Array.from(new Set(names.map((value) => value.trim())));
 }
 
+function detectMentionedTrackedArtists(
+  textValue: string,
+  {
+    currentArtistId,
+    artists,
+    externalIds,
+    requireCatalystContext = false
+  }: {
+    currentArtistId: string;
+    artists: MarketUpdateArtist[];
+    externalIds: Record<string, ArtistExternalIds>;
+    requireCatalystContext?: boolean;
+  }
+) {
+  const text = normalizeText(textValue);
+
+  if (requireCatalystContext && !hasSocialCatalystContext(text)) {
+    return [];
+  }
+
+  return artists
+    .filter((artist) => artist.id !== currentArtistId)
+    .filter((artist) => getTextMentionConfidence(text, buildArtistNameCandidates(artist, externalIds[artist.id]), true) > 0)
+    .slice(0, 4);
+}
+
 function getArtistMentionConfidence(post: BlueskyPost, names: string[]) {
   const text = normalizeText(post.text);
+  return getTextMentionConfidence(text, names, false);
+}
+
+function getTextMentionConfidence(text: string, names: string[], catalystContextOverride: boolean) {
   const compactText = text.replace(/\s+/g, "");
-  const musicContext = hasMusicContext(text);
+  const musicContext = hasMusicContext(text) || (catalystContextOverride && hasSocialCatalystContext(text));
 
   for (const name of names) {
     const normalizedName = normalizeText(name);
@@ -973,6 +1147,10 @@ function hasMusicContext(text: string) {
   return hasAny(text, MUSIC_CONTEXT_TERMS);
 }
 
+function hasSocialCatalystContext(text: string) {
+  return hasAny(text, SOCIAL_CATALYST_CONTEXT_TERMS);
+}
+
 function countMatches(value: string, terms: string[]) {
   return terms.reduce((count, term) => count + (value.includes(term) ? 1 : 0), 0);
 }
@@ -1045,6 +1223,24 @@ const MUSIC_CONTEXT_TERMS = [
   "track",
   "tracklist",
   "video"
+];
+
+const SOCIAL_CATALYST_CONTEXT_TERMS = [
+  "album",
+  "backlash",
+  "beef",
+  "controversy",
+  "diss",
+  "fight",
+  "fought",
+  "music",
+  "rapper",
+  "reaction",
+  "release",
+  "snippet",
+  "song",
+  "track",
+  "viral"
 ];
 
 const ALBUM_ANNOUNCEMENT_TERMS = [
@@ -1154,10 +1350,33 @@ const FEATURE_TERMS = [
 const REVIEW_TERMS = [
   "album review",
   "best new music",
+  "first listen",
+  "live reaction",
   "review",
   "reviewed",
+  "reacted to",
+  "reaction",
+  "reacts to",
   "song review",
   "track review"
+];
+
+const CRITIC_REACTION_TERMS = [
+  "anthony fantano",
+  "chat hated",
+  "chat loved",
+  "fantano",
+  "first listen",
+  "hivemind",
+  "live reaction",
+  "needledrop",
+  "reacted to",
+  "reacting to",
+  "reaction stream",
+  "reviewer",
+  "streamer",
+  "the needle drop",
+  "theneedledrop"
 ];
 
 const CHART_TERMS = [
@@ -1231,6 +1450,27 @@ const CONTROVERSY_TERMS = [
   "weird"
 ];
 
+const SOCIAL_CONFLICT_TERMS = [
+  "altercation",
+  "argued",
+  "arguing",
+  "beef",
+  "beefing",
+  "confronted",
+  "diss",
+  "dissed",
+  "dissing",
+  "fight",
+  "fighting",
+  "fought",
+  "got into it",
+  "jumped",
+  "pressed",
+  "punched",
+  "scrapped",
+  "swinging"
+];
+
 const DECLINE_TERMS = [
   "dead crowd",
   "decline",
@@ -1250,6 +1490,33 @@ const DECLINE_TERMS = [
   "underperformed",
   "underperforming",
   "washed"
+];
+
+const LATE_RECEPTION_POSITIVE_TERMS = [
+  "aged well",
+  "aging well",
+  "better with time",
+  "clicked for me",
+  "gets better",
+  "grew on me",
+  "growing on me",
+  "overhated",
+  "replay value",
+  "still playing",
+  "underrated now"
+];
+
+const LATE_RECEPTION_NEGATIVE_TERMS = [
+  "aged badly",
+  "aged like milk",
+  "already forgot",
+  "came and went",
+  "did not age well",
+  "does not hold up",
+  "no replay value",
+  "not holding up",
+  "stopped listening",
+  "worse with time"
 ];
 
 const POSITIVE_TERMS = [

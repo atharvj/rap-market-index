@@ -64,6 +64,22 @@ export function getCommunityEventLabel(eventType: MarketEventType | null, reason
     return "tracklist reaction";
   }
 
+  if (normalized.includes("social_conflict")) {
+    return "fight/beef reaction";
+  }
+
+  if (normalized.includes("late_reception_positive")) {
+    return "late reception improving";
+  }
+
+  if (normalized.includes("late_reception_negative")) {
+    return "late reception cooling";
+  }
+
+  if (normalized.includes("critic_reaction")) {
+    return "critic and listener reaction";
+  }
+
   if (normalized.includes("snippet")) {
     return "snippet hype";
   }

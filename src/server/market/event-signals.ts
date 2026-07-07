@@ -369,6 +369,8 @@ function getEventModifierReason(event: ScoredMarketEvent) {
     feature: "feature/cosign",
     major_feature: "major feature/cosign",
     performance: "live performance",
+    social_conflict: "social conflict",
+    late_reception: "late reception",
     public_reaction: "public reaction",
     status_death: "artist status",
     status_legal_arrest: "legal status",
@@ -409,8 +411,10 @@ function getEventReasonPriority(subtype: string) {
     status_legal_charge: 9,
     status_legal_arrest: 9,
     performance: 9,
+    social_conflict: 9,
     status_injury: 8,
     chart: 8,
+    late_reception: 8,
     tracklist_reaction: 8,
     public_reaction: 8,
     controversy: 8,
@@ -674,6 +678,7 @@ function hasExplicitYoutubeReleaseLanguage(normalizedTitle: string) {
 function getRedditEventProvenance(event: MarketEvent, artist: MarketUpdateArtist) {
   const viralityTier = getRawString(event.rawPayload.viralityTier) ?? "small";
   const subredditTier = getRawNumber(event.rawPayload.subredditTier, 0);
+  const socialCatalystKind = getRawString(event.rawPayload.socialCatalystKind);
   const audienceMultiplier = getCommunityAudienceMultiplier(artist);
   const tierProfiles: Record<string, { impact: number; confidence: number }> = {
     small: { impact: 0.58, confidence: 0.82 },
@@ -683,16 +688,31 @@ function getRedditEventProvenance(event: MarketEvent, artist: MarketUpdateArtist
   };
   const profile = tierProfiles[viralityTier] ?? tierProfiles.small;
   const subredditLift = clamp(1 + subredditTier * 0.045, 1, 1.1);
+  const catalystMultiplier =
+    socialCatalystKind === "conflict" || socialCatalystKind === "backlash" || socialCatalystKind === "late_reception"
+      ? { impact: 1.12, confidence: 1.06 }
+      : socialCatalystKind === "snippet_hype" || socialCatalystKind === "performance_hype"
+        ? { impact: 1.06, confidence: 1.03 }
+        : { impact: 1, confidence: 1 };
 
   return {
     label: `reddit-${viralityTier}`,
-    impactMultiplier: clamp(profile.impact * subredditLift * audienceMultiplier.impact, 0.5, 1.52),
-    confidenceMultiplier: clamp(profile.confidence * subredditLift * audienceMultiplier.confidence, 0.75, 1.22)
+    impactMultiplier: clamp(
+      profile.impact * subredditLift * audienceMultiplier.impact * catalystMultiplier.impact,
+      0.5,
+      1.58
+    ),
+    confidenceMultiplier: clamp(
+      profile.confidence * subredditLift * audienceMultiplier.confidence * catalystMultiplier.confidence,
+      0.75,
+      1.26
+    )
   };
 }
 
 function getBlueskyEventProvenance(event: MarketEvent, artist: MarketUpdateArtist) {
   const viralityTier = getRawString(event.rawPayload.viralityTier) ?? "small";
+  const socialCatalystKind = getRawString(event.rawPayload.socialCatalystKind);
   const audienceMultiplier = getCommunityAudienceMultiplier(artist);
   const tierProfiles: Record<string, { impact: number; confidence: number }> = {
     small: { impact: 0.28, confidence: 0.62 },
@@ -701,11 +721,21 @@ function getBlueskyEventProvenance(event: MarketEvent, artist: MarketUpdateArtis
     breakout: { impact: 0.9, confidence: 0.98 }
   };
   const profile = tierProfiles[viralityTier] ?? tierProfiles.small;
+  const catalystMultiplier =
+    socialCatalystKind === "conflict" || socialCatalystKind === "backlash" || socialCatalystKind === "late_reception"
+      ? { impact: 1.18, confidence: 1.08 }
+      : socialCatalystKind === "snippet_hype" || socialCatalystKind === "performance_hype"
+        ? { impact: 1.08, confidence: 1.04 }
+        : { impact: 1, confidence: 1 };
 
   return {
     label: `bluesky-${viralityTier}`,
-    impactMultiplier: clamp(profile.impact * audienceMultiplier.impact, 0.22, 1.02),
-    confidenceMultiplier: clamp(profile.confidence * audienceMultiplier.confidence, 0.55, 1.06)
+    impactMultiplier: clamp(profile.impact * audienceMultiplier.impact * catalystMultiplier.impact, 0.22, 1.08),
+    confidenceMultiplier: clamp(
+      profile.confidence * audienceMultiplier.confidence * catalystMultiplier.confidence,
+      0.55,
+      1.1
+    )
   };
 }
 
@@ -964,12 +994,19 @@ function isReactionConsensusRelated(event: ScoredMarketEvent, candidate: ScoredM
 
   return (
     event.eventSubtype === "project_release" &&
-    ["review", "tracklist_reaction", "public_reaction", "viral", "performance"].includes(candidate.eventSubtype)
+    ["review", "late_reception", "tracklist_reaction", "public_reaction", "viral", "performance"].includes(
+      candidate.eventSubtype
+    )
   );
 }
 
 function getReactionConsensusWindowDays(event: ScoredMarketEvent, candidate: ScoredMarketEvent) {
-  if (event.eventSubtype === "review" || candidate.eventSubtype === "review") {
+  if (
+    event.eventSubtype === "review" ||
+    candidate.eventSubtype === "review" ||
+    event.eventSubtype === "late_reception" ||
+    candidate.eventSubtype === "late_reception"
+  ) {
     return 10;
   }
 
@@ -989,6 +1026,8 @@ function isReactionSensitiveEvent(event: ScoredMarketEvent) {
     "snippet",
     "viral",
     "controversy",
+    "social_conflict",
+    "late_reception",
     "decline"
   ].includes(event.eventSubtype);
 }
@@ -1167,6 +1206,7 @@ function isReleaseCycleRelated(event: ScoredMarketEvent) {
     "single_video_release",
     "track_audio_release",
     "tracklist_reaction",
+    "late_reception",
     "public_reaction",
     "review",
     "snippet",
@@ -1179,6 +1219,10 @@ function isReleaseCycleRelated(event: ScoredMarketEvent) {
 function getReleaseCycleWindowDays(event: ScoredMarketEvent) {
   if (event.eventSubtype === "tracklist_reaction" || event.eventSubtype === "snippet") {
     return 14;
+  }
+
+  if (event.eventSubtype === "late_reception") {
+    return 28;
   }
 
   if (event.eventSubtype === "review" || event.eventSubtype === "public_reaction" || event.eventSubtype === "chart") {
@@ -1290,10 +1334,29 @@ function getEventSubtype(event: MarketEvent) {
   }
 
   if (event.eventType === "review") {
+    const receptionPhase = getRawString(event.rawPayload.receptionPhase);
+
+    if (receptionPhase === "late" || hasAnyTerm(text, ["late reception", "grew on me", "aged well", "aged badly"])) {
+      return "late_reception";
+    }
+
+    if (hasAnyTerm(text, ["critic reaction", "live reaction", "reviewer", "streamer", "fantano", "needle drop"])) {
+      return "public_reaction";
+    }
+
     return "review";
   }
 
   if (event.eventType === "controversy") {
+    const socialCatalystKind = getRawString(event.rawPayload.socialCatalystKind);
+
+    if (
+      socialCatalystKind === "conflict" ||
+      hasAnyTerm(text, ["social conflict", "fight", "fought", "beef", "diss", "pressed", "jumped"])
+    ) {
+      return "social_conflict";
+    }
+
     return "controversy";
   }
 
@@ -1504,6 +1567,8 @@ function getEventSubtypePriceProfile(subtype: string) {
     performance: { divisor: 1550, minShock: -0.034, maxShock: 0.05 },
     chart: { divisor: 1550, minShock: -0.022, maxShock: 0.05 },
     snippet: { divisor: 2350, minShock: -0.015, maxShock: 0.026 },
+    social_conflict: { divisor: 1650, minShock: -0.048, maxShock: 0.014 },
+    late_reception: { divisor: 1950, minShock: -0.034, maxShock: 0.035 },
     viral: { divisor: 2200, minShock: -0.022, maxShock: 0.034 },
     controversy: { divisor: 1750, minShock: -0.052, maxShock: 0.018 },
     decline: { divisor: 1850, minShock: -0.045, maxShock: 0.012 },
@@ -1597,6 +1662,8 @@ function getEventShockDecayMultiplier({
     track_audio_release: 1.5,
     tracklist_reaction: 2.5,
     public_reaction: 2.5,
+    social_conflict: 2.8,
+    late_reception: 5,
     status_death: 5.5,
     status_legal_arrest: 3.5,
     status_legal_charge: 4,
