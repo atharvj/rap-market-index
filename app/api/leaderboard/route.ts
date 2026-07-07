@@ -6,6 +6,7 @@ import {
 } from "@/lib/supabase/server";
 import type { Database } from "@/lib/supabase/database.types";
 import type { LeaderboardEntry } from "@/lib/types";
+import { getAdminEmails } from "@/server/admin-auth";
 
 export const dynamic = "force-dynamic";
 
@@ -35,11 +36,16 @@ export async function GET() {
       throw new Error(`Could not load leaderboard: ${error.message}`);
     }
 
+    const adminUserIds =
+      config.serviceRoleConfigured && "auth" in supabase
+        ? await loadAdminUserIds(supabase as ReturnType<typeof createServiceRoleClient>)
+        : new Set<string>();
+
     return NextResponse.json({
       ok: true,
       source: "supabase",
       config,
-      leaderboard: ((data ?? []) as LeaderboardRow[]).map(mapLeaderboardEntry)
+      leaderboard: ((data ?? []) as LeaderboardRow[]).map((row) => mapLeaderboardEntry(row, adminUserIds))
     });
   } catch (error) {
     return NextResponse.json(
@@ -54,12 +60,41 @@ export async function GET() {
   }
 }
 
-function mapLeaderboardEntry(row: LeaderboardRow): LeaderboardEntry {
+async function loadAdminUserIds(supabase: ReturnType<typeof createServiceRoleClient>) {
+  const adminEmails = new Set(getAdminEmails());
+  const adminUserIds = new Set<string>();
+
+  if (!adminEmails.size) {
+    return adminUserIds;
+  }
+
+  const { data, error } = await supabase.auth.admin.listUsers({
+    page: 1,
+    perPage: 1000
+  });
+
+  if (error) {
+    return adminUserIds;
+  }
+
+  for (const user of data.users) {
+    const email = user.email?.trim().toLowerCase();
+
+    if (email && adminEmails.has(email)) {
+      adminUserIds.add(user.id);
+    }
+  }
+
+  return adminUserIds;
+}
+
+function mapLeaderboardEntry(row: LeaderboardRow, adminUserIds: Set<string>): LeaderboardEntry {
   return {
     id: row.user_id,
     username: row.username,
     portfolioValue: Number(row.portfolio_value),
     cashBalance: Number(row.cash_balance),
-    gainPercent: Number(row.gain_percent)
+    gainPercent: Number(row.gain_percent),
+    isAdmin: adminUserIds.has(row.user_id)
   };
 }

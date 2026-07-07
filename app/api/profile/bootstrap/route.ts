@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createAnonServerClient, getSupabaseConfigStatus } from "@/lib/supabase/server";
 import type { Database } from "@/lib/supabase/database.types";
 import type { Holding, ShortPosition, Transaction } from "@/lib/types";
+import { isAdminEmail } from "@/server/admin-auth";
 
 export const dynamic = "force-dynamic";
 
@@ -78,7 +79,8 @@ export async function POST(request: Request) {
         username: profile.username,
         cashBalance: Number(profile.cash_balance),
         bio: getProfileBio(profile),
-        favoriteArtistIds: getFavoriteArtistIds(profile)
+        favoriteArtistIds: getFavoriteArtistIds(profile),
+        isAdmin: isAdminEmail(userData.user.email)
       },
       holdings,
       shortPositions,

@@ -466,16 +466,43 @@ function getUniqueTicker(name: string, existingRows: ArtistRow[]) {
 
 function getTickerCandidates(name: string) {
   const tokens = tokenizeArtistName(name);
-  const importantTokens = tokens.filter((token) => !["LIL", "YOUNG", "YUNG", "THE", "DJ", "MC"].includes(token));
+  const ignoredPrefixes = ["LIL", "YOUNG", "YUNG", "THE", "DJ", "MC", "NBA", "YNW"];
+  const importantTokens = tokens.filter((token) => !ignoredPrefixes.includes(token));
   const importantCompact = importantTokens.join("");
   const fullCompact = tokens.join("");
   const initials = (importantTokens.length ? importantTokens : tokens).map((token) => token[0]).join("");
-  const rawCandidates = [importantCompact, fullCompact, initials, fullCompact.slice(0, 8), `${initials}${fullCompact}`];
+  const shortNameCandidates = getShortNameTickerCandidates(tokens, importantTokens);
+  const rawCandidates = [...shortNameCandidates, importantCompact, fullCompact, initials, fullCompact.slice(0, 8), `${initials}${fullCompact}`];
   const candidates = rawCandidates
     .map((candidate) => candidate.replace(/[^A-Z0-9]/g, "").slice(0, 8))
     .filter((candidate) => /^[A-Z0-9]{2,8}$/.test(candidate));
 
   return Array.from(new Set(candidates.length ? candidates : ["ARTIST"]));
+}
+
+function getShortNameTickerCandidates(tokens: string[], importantTokens: string[]) {
+  const candidates: string[] = [];
+  const primary = importantTokens[0] ?? tokens[0];
+
+  if (primary && primary.length >= 3 && primary.length <= 6) {
+    candidates.push(primary);
+  }
+
+  if (importantTokens.length >= 2) {
+    const initials = importantTokens.map((token) => token[0]).join("");
+
+    if (initials.length >= 2) {
+      candidates.push(initials);
+    }
+  }
+
+  const lastImportantToken = importantTokens.at(-1);
+
+  if (lastImportantToken && lastImportantToken !== primary && lastImportantToken.length >= 3 && lastImportantToken.length <= 6) {
+    candidates.push(lastImportantToken);
+  }
+
+  return candidates;
 }
 
 function tokenizeArtistName(value: string) {

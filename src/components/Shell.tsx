@@ -1,5 +1,6 @@
 "use client";
 
+import { AdminBadge } from "@/components/AdminBadge";
 import { useAuth } from "@/components/AuthProvider";
 import { useGame } from "@/components/GameProvider";
 import { formatCurrency, formatPercent } from "@/lib/formatters";
@@ -39,7 +40,7 @@ const navItems = [
 export function Shell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { portfolioValue, state, gainPercent } = useGame();
+  const { portfolioValue, state, gainPercent, isAdminUser } = useGame();
   const { session, user, signOut } = useAuth();
   const [search, setSearch] = useState("");
   const [searchFocused, setSearchFocused] = useState(false);
@@ -240,7 +241,10 @@ export function Shell({ children }: { children: React.ReactNode }) {
                         {session ? accountInitial : <UserCircle className="h-7 w-7 text-paper/55" aria-hidden="true" />}
                       </div>
                       <div className="min-w-0">
-                        <p className="truncate text-base font-black">{accountLabel}</p>
+                        <div className="flex min-w-0 items-center gap-2">
+                          <p className="truncate text-base font-black">{accountLabel}</p>
+                          {isAdminUser ? <AdminBadge compact /> : null}
+                        </div>
                         <p className="truncate text-xs font-bold text-paper/50">
                           {session ? user?.email : "Sign in to trade and save watchlists"}
                         </p>
@@ -262,6 +266,13 @@ export function Shell({ children }: { children: React.ReactNode }) {
                             className="rounded px-2 py-2 hover:bg-panelSoft"
                           >
                             Manage account
+                          </Link>
+                          <Link
+                            href={`/users/${state.userId}`}
+                            onClick={() => setAccountOpen(false)}
+                            className="rounded px-2 py-2 hover:bg-panelSoft"
+                          >
+                            Public profile
                           </Link>
                           <Link
                             href="/watchlist"
@@ -411,10 +422,10 @@ export function Shell({ children }: { children: React.ReactNode }) {
             <Link href="/portfolio">Portfolio</Link>
             <Link href="/account">Profile</Link>
             <Link href="/account?mode=signup">Create account</Link>
-            <Link href="/dev">Admin console</Link>
           </FooterColumn>
 
           <FooterColumn title="About">
+            <Link href="/about">About RMI</Link>
             <span>RMI Score: 1-99 artist market signal</span>
             <span>Fantasy trading only</span>
             <span>Data may update daily or during admin runs</span>

@@ -105,6 +105,7 @@ export type LeaderboardEntry = {
   cashBalance: number;
   gainPercent: number;
   isCurrentUser?: boolean;
+  isAdmin?: boolean;
 };
 
 export type TradeResult = {

@@ -2,7 +2,7 @@
 
 import { formatDate } from "@/lib/formatters";
 import clsx from "clsx";
-import { ExternalLink } from "lucide-react";
+import { ArrowRight, ExternalLink } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
@@ -100,31 +100,161 @@ export function MarketNewsFeed({
     );
   }
 
+  if (resolvedVariant === "home") {
+    return <HomeMarketNewsLayout items={items} />;
+  }
+
   return (
-    <div className={resolvedVariant === "home" ? "grid gap-3" : "divide-y divide-line"}>
+    <div className="divide-y divide-line">
       {items.map((item, index) => (
         <MarketNewsArticle
           key={item.id}
           item={item}
           variant={resolvedVariant}
           featured={resolvedVariant === "full" && index === 0}
-          homeLead={resolvedVariant === "home" && index === 0}
         />
       ))}
     </div>
   );
 }
 
+function HomeMarketNewsLayout({ items }: { items: MarketNewsItem[] }) {
+  const [lead, ...rest] = items;
+  const secondary = rest.slice(0, 3);
+  const briefs = rest.slice(3, 7);
+
+  return (
+    <div className="grid gap-4">
+      <HomeLeadStory item={lead} />
+
+      {secondary.length ? (
+        <div className="grid gap-3 lg:grid-cols-3">
+          {secondary.map((item) => (
+            <HomeStoryCard key={item.id} item={item} />
+          ))}
+        </div>
+      ) : null}
+
+      {briefs.length ? (
+        <div className="grid gap-2 md:grid-cols-2">
+          {briefs.map((item) => (
+            <HomeBrief key={item.id} item={item} />
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function HomeLeadStory({ item }: { item: MarketNewsItem }) {
+  const positive = item.sentimentScore >= 0;
+  const source = item.sourceName || item.sourceDomain || "RMI Market Wire";
+
+  return (
+    <article className="overflow-hidden rounded border border-line bg-panel shadow-market">
+      <div className="grid gap-0 lg:grid-cols-[minmax(260px,0.88fr)_minmax(0,1fr)]">
+        <NewsThumbnail item={item} size="hero" />
+        <div className="grid content-between gap-5 p-5 sm:p-6">
+          <div>
+            <div className="flex flex-wrap items-center gap-2 text-xs font-black text-paper/55">
+              <Link
+                href={`/artists/${item.artistId}`}
+                className="rounded bg-cyan/10 px-2 py-1 text-cyan hover:bg-cyan/15"
+              >
+                {item.ticker}
+              </Link>
+              <EventBadge item={item} positive={positive} />
+              <span>{formatDate(item.eventDate)}</span>
+              <SourceMeta item={item} />
+            </div>
+            <h2 className="mt-3 text-xl font-black leading-tight text-paper sm:text-2xl">
+              {trimTitle(item.title, 132)}
+            </h2>
+            <p className="mt-3 text-sm font-bold leading-6 text-paper/58">
+              {source} catalyst ranked by impact, confidence, and recency for {item.artistName}.
+            </p>
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-[1fr_auto] sm:items-end">
+            <div className="grid grid-cols-2 gap-3 text-xs font-black uppercase tracking-wide text-paper/45">
+              <ImpactGauge label="Impact" value={item.impactScore} positive={positive} />
+              <ImpactGauge label="Confidence" value={item.confidence * 100} positive />
+            </div>
+            <div className="flex items-center gap-3">
+              <Link
+                href={`/artists/${item.artistId}`}
+                className="inline-flex min-h-9 items-center gap-2 rounded bg-paper px-3 text-xs font-black text-ink hover:bg-paper/90"
+              >
+                View quote
+                <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
+              </Link>
+              <SourceLink item={item} />
+            </div>
+          </div>
+        </div>
+      </div>
+    </article>
+  );
+}
+
+function HomeStoryCard({ item }: { item: MarketNewsItem }) {
+  const positive = item.sentimentScore >= 0;
+
+  return (
+    <article className="overflow-hidden rounded border border-line bg-panel shadow-sm hover:border-cyan/50">
+      <NewsThumbnail item={item} size="card" />
+      <div className="grid gap-3 p-3.5">
+        <div className="flex flex-wrap items-center gap-2 text-[11px] font-black text-paper/50">
+          <Link href={`/artists/${item.artistId}`} className="rounded bg-panelSoft px-2 py-1 text-cyan hover:bg-cyan/10">
+            {item.ticker}
+          </Link>
+          <EventBadge item={item} positive={positive} />
+          <span>{formatDate(item.eventDate)}</span>
+        </div>
+        <h3 className="min-h-[3.2rem] text-sm font-black leading-snug text-paper">
+          {trimTitle(item.title, 88)}
+        </h3>
+        <div className="flex items-center justify-between gap-3 border-t border-line pt-3">
+          <SourceMeta item={item} />
+          <SourceLink item={item} />
+        </div>
+      </div>
+    </article>
+  );
+}
+
+function HomeBrief({ item }: { item: MarketNewsItem }) {
+  const positive = item.sentimentScore >= 0;
+
+  return (
+    <article className="rounded border border-line bg-panel px-3 py-3 hover:bg-panelSoft/60">
+      <div className="grid grid-cols-[46px_minmax(0,1fr)_18px] items-start gap-3">
+        <NewsThumbnail item={item} size="small" />
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2 text-[11px] font-black text-paper/50">
+            <span>{formatDate(item.eventDate)}</span>
+            <EventBadge item={item} positive={positive} />
+            <SourceMeta item={item} />
+          </div>
+          <h3 className="mt-1 truncate text-sm font-black text-paper">{item.title}</h3>
+          <Link href={`/artists/${item.artistId}`} className="mt-1 inline-flex text-xs font-black text-cyan hover:text-cyan/75">
+            {item.ticker}
+          </Link>
+        </div>
+        <SourceLink item={item} />
+      </div>
+    </article>
+  );
+}
+
 function MarketNewsArticle({
   item,
   variant,
-  featured,
-  homeLead
+  featured
 }: {
   item: MarketNewsItem;
   variant: MarketNewsVariant;
   featured: boolean;
-  homeLead: boolean;
 }) {
   const positive = item.sentimentScore >= 0;
   const compact = variant === "compact";
@@ -144,24 +274,6 @@ function MarketNewsArticle({
       <SourceMeta item={item} />
     </div>
   );
-
-  if (homeLead) {
-    return (
-      <article className="rounded border border-line bg-panelSoft px-3 py-3">
-        <div className="grid grid-cols-[74px_minmax(0,1fr)_18px] items-start gap-3">
-          <NewsThumbnail item={item} size="home" />
-          <div className="min-w-0">
-            {meta}
-            <h3 className="mt-1 text-base font-black leading-snug text-paper">{title}</h3>
-            <Link href={`/artists/${item.artistId}`} className="mt-1 inline-flex text-xs font-black text-cyan hover:text-cyan/75">
-              {item.artistName} · {item.ticker}
-            </Link>
-          </div>
-          <SourceLink item={item} />
-        </div>
-      </article>
-    );
-  }
 
   if (featured) {
     return (
@@ -190,19 +302,15 @@ function MarketNewsArticle({
   }
 
   return (
-    <article className={clsx("py-3", compact ? "px-0" : variant === "home" ? "rounded border border-line px-3 hover:bg-panelSoft/60" : "px-1")}>
-      <div className={clsx("grid items-start gap-3", compact ? "grid-cols-[minmax(0,1fr)_18px]" : variant === "home" ? "grid-cols-[54px_minmax(0,1fr)_18px]" : "grid-cols-[86px_minmax(0,1fr)_18px]")}>
-        {compact ? null : <NewsThumbnail item={item} size={variant === "home" ? "small" : "row"} />}
+    <article className={clsx("py-3", compact ? "px-0" : "px-1")}>
+      <div className={clsx("grid items-start gap-3", compact ? "grid-cols-[minmax(0,1fr)_18px]" : "grid-cols-[86px_minmax(0,1fr)_18px]")}>
+        {compact ? null : <NewsThumbnail item={item} size="row" />}
         <div className="min-w-0">
           {meta}
           <h3 className="mt-1 text-sm font-black leading-snug text-paper">{title}</h3>
-          {!compact && variant !== "home" ? (
+          {!compact ? (
             <Link href={`/artists/${item.artistId}`} className="mt-2 inline-flex text-xs font-black text-cyan hover:text-cyan/75">
               {item.artistName} · {item.ticker}
-            </Link>
-          ) : variant === "home" ? (
-            <Link href={`/artists/${item.artistId}`} className="mt-1 inline-flex text-xs font-black text-cyan hover:text-cyan/75">
-              {item.ticker}
             </Link>
           ) : null}
         </div>
@@ -212,14 +320,15 @@ function MarketNewsArticle({
   );
 }
 
-function NewsThumbnail({ item, size = "row" }: { item: MarketNewsItem; size?: "featured" | "home" | "row" | "small" }) {
+function NewsThumbnail({ item, size = "row" }: { item: MarketNewsItem; size?: "hero" | "featured" | "card" | "row" | "small" }) {
   const hasThumbnail = Boolean(item.thumbnailUrl);
   const fallbackIcon = item.sourceIconUrl;
   const dimensions = {
+    hero: "h-48 w-full lg:h-full lg:min-h-[250px]",
     featured: "h-24 w-full sm:h-28",
-    home: "h-16 w-[74px]",
+    card: "h-32 w-full",
     row: "h-14 w-[86px]",
-    small: "h-12 w-[54px]"
+    small: "h-11 w-[46px]"
   }[size];
 
   return (
@@ -233,17 +342,20 @@ function NewsThumbnail({ item, size = "row" }: { item: MarketNewsItem; size?: "f
     >
       <span className="absolute inset-0 grid place-items-center bg-gradient-to-br from-cyan/10 via-brass/10 to-mint/12 text-sm font-black text-paper/75">
         {fallbackIcon && !hasThumbnail ? (
-          <img
-            src={fallbackIcon}
-            alt=""
-            className="h-6 w-6 rounded object-contain"
-            loading="lazy"
-            onError={(event) => {
-              event.currentTarget.style.display = "none";
-            }}
-          />
+          <span className="grid place-items-center gap-2">
+            <img
+              src={fallbackIcon}
+              alt=""
+              className={clsx(size === "hero" ? "h-10 w-10" : "h-6 w-6", "rounded object-contain")}
+              loading="lazy"
+              onError={(event) => {
+                event.currentTarget.style.display = "none";
+              }}
+            />
+            {size === "hero" ? <span className="text-4xl">{item.ticker}</span> : null}
+          </span>
         ) : (
-          item.ticker
+          <span className={clsx(size === "hero" ? "text-5xl" : size === "card" ? "text-2xl" : "text-sm")}>{item.ticker}</span>
         )}
       </span>
       {item.thumbnailUrl ? (
@@ -257,11 +369,59 @@ function NewsThumbnail({ item, size = "row" }: { item: MarketNewsItem; size?: "f
           }}
         />
       ) : null}
-      <span className="absolute bottom-1 left-1 rounded bg-white/90 px-1.5 py-0.5 text-[10px] font-black text-paper shadow-sm">
-        {item.ticker}
-      </span>
+      {size === "hero" ? (
+        <span className="absolute inset-x-0 bottom-0 bg-black/55 px-4 py-3 text-sm font-black text-white">
+          {item.artistName} · {item.ticker}
+        </span>
+      ) : (
+        <span className="absolute bottom-1 left-1 rounded bg-white/90 px-1.5 py-0.5 text-[10px] font-black text-paper shadow-sm">
+          {item.ticker}
+        </span>
+      )}
     </Link>
   );
+}
+
+function EventBadge({ item, positive }: { item: MarketNewsItem; positive: boolean }) {
+  return (
+    <span
+      className={clsx(
+        "rounded px-1.5 py-0.5",
+        item.eventType === "controversy"
+          ? "bg-ember/[0.09] text-ember"
+          : item.eventType === "review"
+            ? "bg-cyan/[0.09] text-cyan"
+            : positive
+              ? "bg-mint/[0.08] text-mint"
+              : "bg-ember/[0.08] text-ember"
+      )}
+    >
+      {eventLabels[item.eventType] ?? item.eventType}
+    </span>
+  );
+}
+
+function ImpactGauge({ label, value, positive }: { label: string; value: number; positive: boolean }) {
+  const safeValue = Math.max(0, Math.min(100, Math.round(value)));
+
+  return (
+    <div>
+      <div className="flex items-center justify-between gap-2">
+        <span>{label}</span>
+        <span className="text-paper/70">{safeValue}</span>
+      </div>
+      <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-panelSoft">
+        <div
+          className={clsx("h-full rounded-full", positive ? "bg-mint" : "bg-ember")}
+          style={{ width: `${safeValue}%` }}
+        />
+      </div>
+    </div>
+  );
+}
+
+function trimTitle(title: string, limit: number) {
+  return title.length > limit ? `${title.slice(0, limit - 3)}...` : title;
 }
 
 function SourceMeta({ item }: { item: MarketNewsItem }) {

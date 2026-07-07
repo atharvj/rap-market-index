@@ -1,0 +1,176 @@
+"use client";
+
+import { AdminBadge } from "@/components/AdminBadge";
+import { formatCurrency, formatPercent } from "@/lib/formatters";
+import clsx from "clsx";
+import { CalendarDays, Star, Trophy, UserCircle, WalletCards } from "lucide-react";
+import Link from "next/link";
+import { useParams } from "next/navigation";
+import { useEffect, useState } from "react";
+
+type PublicFavoriteArtist = {
+  id: string;
+  name: string;
+  ticker: string;
+  currentPrice: number;
+  dailyChangePercent: number;
+  hypeScore: number;
+  accent: string;
+};
+
+type PublicProfile = {
+  id: string;
+  username: string;
+  bio: string;
+  createdAt: string;
+  favoriteArtists: PublicFavoriteArtist[];
+  isAdmin: boolean;
+  portfolioValue: number;
+  cashBalance: number;
+  gainPercent: number;
+};
+
+type PublicProfileResponse = {
+  ok: boolean;
+  error?: string;
+  profile?: PublicProfile;
+};
+
+export default function PublicUserProfilePage() {
+  const params = useParams<{ id: string }>();
+  const [profile, setProfile] = useState<PublicProfile | null>(null);
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let active = true;
+    setLoading(true);
+    setError("");
+
+    fetch(`/api/public/users/${params.id}`)
+      .then((response) => response.json() as Promise<PublicProfileResponse>)
+      .then((payload) => {
+        if (!active) {
+          return;
+        }
+
+        if (!payload.ok || !payload.profile) {
+          throw new Error(payload.error ?? "Could not load profile.");
+        }
+
+        setProfile(payload.profile);
+      })
+      .catch((profileError) => {
+        if (active) {
+          setError(profileError instanceof Error ? profileError.message : "Could not load profile.");
+          setProfile(null);
+        }
+      })
+      .finally(() => {
+        if (active) {
+          setLoading(false);
+        }
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [params.id]);
+
+  if (loading) {
+    return <StatusCard text="Loading profile..." />;
+  }
+
+  if (error || !profile) {
+    return <StatusCard text={error || "Profile not found."} />;
+  }
+
+  const memberSince = new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric"
+  }).format(new Date(profile.createdAt));
+
+  return (
+    <div className="mx-auto max-w-5xl space-y-5">
+      <section className="rounded border border-line bg-panel p-5 shadow-market">
+        <div className="grid gap-5 md:grid-cols-[130px_minmax(0,1fr)]">
+          <div className="grid h-28 w-28 place-items-center rounded bg-panelSoft">
+            <UserCircle className="h-16 w-16 text-paper/45" aria-hidden="true" />
+          </div>
+          <div className="min-w-0">
+            <div className="flex min-w-0 flex-wrap items-center gap-2">
+              <h1 className="truncate text-3xl font-black">{profile.username}</h1>
+              {profile.isAdmin ? <AdminBadge /> : null}
+            </div>
+            <div className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
+              <ProfileMetric icon={<CalendarDays className="h-4 w-4" />} label="Member since" value={memberSince} />
+              <ProfileMetric icon={<Trophy className="h-4 w-4" />} label="Rank" value="Public standings" />
+              <ProfileMetric icon={<WalletCards className="h-4 w-4" />} label="Net worth" value={formatCurrency(profile.portfolioValue)} />
+              <ProfileMetric icon={<WalletCards className="h-4 w-4" />} label="Cash" value={formatCurrency(profile.cashBalance)} />
+            </div>
+            <p className="mt-5 max-w-3xl text-sm font-bold leading-6 text-paper/58">
+              {profile.bio || "This trader has not added a bio yet."}
+            </p>
+            <p className={clsx("mt-3 text-sm font-black number-tabular", profile.gainPercent >= 0 ? "text-mint" : "text-ember")}>
+              {formatPercent(profile.gainPercent)} all-time
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section className="rounded border border-line bg-panel shadow-market">
+        <div className="flex min-h-11 items-center gap-2 border-b border-line bg-panelSoft px-4">
+          <span className="h-5 w-1 rounded bg-brass" />
+          <Star className="h-4 w-4 text-brass" aria-hidden="true" />
+          <h2 className="text-xs font-black uppercase tracking-wide">Favorite artists</h2>
+        </div>
+        <div className="grid divide-y divide-line sm:grid-cols-2 sm:divide-x sm:divide-y-0 lg:grid-cols-3">
+          {profile.favoriteArtists.length ? (
+            profile.favoriteArtists.map((artist) => (
+              <Link key={artist.id} href={`/artists/${artist.id}`} className="grid gap-3 p-4 hover:bg-panelSoft/70">
+                <span className="flex items-center gap-3">
+                  <span className={`grid h-10 w-10 place-items-center rounded bg-gradient-to-br ${artist.accent} text-sm font-black text-paper`}>
+                    {artist.ticker.slice(0, 2)}
+                  </span>
+                  <span className="min-w-0">
+                    <span className="block truncate text-sm font-black">{artist.name}</span>
+                    <span className="text-xs font-bold text-paper/50">
+                      {artist.ticker} · {formatCurrency(artist.currentPrice)}
+                    </span>
+                  </span>
+                </span>
+                <span className="flex items-center justify-between text-xs font-black number-tabular">
+                  <span className={artist.dailyChangePercent >= 0 ? "text-mint" : "text-ember"}>
+                    {formatPercent(artist.dailyChangePercent)}
+                  </span>
+                  <span className="text-paper/45">{artist.hypeScore}/100 score</span>
+                </span>
+              </Link>
+            ))
+          ) : (
+            <p className="p-4 text-sm font-bold text-paper/50">No favorite artists listed yet.</p>
+          )}
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function ProfileMetric({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
+  return (
+    <div className="grid grid-cols-[18px_104px_minmax(0,1fr)] items-center gap-2">
+      <span className="text-paper/35">{icon}</span>
+      <span className="text-paper/45">{label}:</span>
+      <span className="min-w-0 truncate font-black number-tabular">{value}</span>
+    </div>
+  );
+}
+
+function StatusCard({ text }: { text: string }) {
+  return (
+    <section className="mx-auto max-w-xl rounded border border-line bg-panel p-5 text-sm font-bold text-paper/55 shadow-market">
+      {text}
+    </section>
+  );
+}

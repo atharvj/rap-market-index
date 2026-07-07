@@ -1,10 +1,12 @@
 "use client";
 
+import { AdminBadge } from "@/components/AdminBadge";
 import { useGame } from "@/components/GameProvider";
 import { MetricCard } from "@/components/MetricCard";
 import { formatCurrency, formatPercent } from "@/lib/formatters";
 import clsx from "clsx";
 import { Medal, Trophy, UsersRound } from "lucide-react";
+import Link from "next/link";
 
 export default function LeaderboardPage() {
   const { leaderboard } = useGame();
@@ -76,7 +78,12 @@ export default function LeaderboardPage() {
                       </span>
                     </td>
                     <td className="px-4 py-4">
-                      <div className="font-black">{entry.username}</div>
+                      <div className="flex min-w-0 flex-wrap items-center gap-2">
+                        <Link href={`/users/${entry.id}`} className="font-black text-cyan hover:text-cyan/75">
+                          {entry.username}
+                        </Link>
+                        {entry.isAdmin ? <AdminBadge compact /> : null}
+                      </div>
                       {entry.isCurrentUser ? <div className="text-sm font-bold text-brass">Current user</div> : null}
                     </td>
                     <td className="px-4 py-4 text-right font-black number-tabular">

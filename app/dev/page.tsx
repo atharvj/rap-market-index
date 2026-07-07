@@ -609,32 +609,38 @@ type MarketIntegrity = {
 const plannedPowers = [
   {
     title: "User management",
-    detail: "View accounts, freeze suspicious users, grant admin access, and reset a test account when needed.",
+    detail: "Admin access is environment-controlled and leaderboard/admin badges are visible. User freeze/reset tools are next.",
+    status: "Partial",
     icon: Users
   },
   {
     title: "Market operations",
-    detail: "Run dry previews, rerun failed batches, pause trading, and halt one artist during bad data.",
+    detail: "Run dry previews, force market runs, pause trading, pause price impact, and halt one artist during bad data.",
+    status: "Live",
     icon: ServerCog
   },
   {
     title: "Integrity monitoring",
-    detail: "Flag concentrated order flow, rapid account creation, duplicate behavior, and unusual portfolio jumps.",
+    detail: "Review concentrated order flow, rapid trading, largest traders, and admin/test trades excluded from market impact.",
+    status: "Live",
     icon: ShieldCheck
   },
   {
     title: "Data quality",
-    detail: "See missing artist IDs, stale source coverage, API failures, and review/event queues.",
+    detail: "See source coverage, preview missing IDs, save verified IDs, and add artists through the guided resolver.",
+    status: "Live",
     icon: Database
   },
   {
     title: "Trade support",
-    detail: "Inspect a user's trades, reverse a broken order, and audit cash/holding changes.",
+    detail: "Trade audit is visible through integrity views. One-click order reversal still needs a dedicated support flow.",
+    status: "Partial",
     icon: FileWarning
   },
   {
     title: "Shorting readiness",
-    detail: "Add collateral, cover orders, short exposure limits, and liquidation checks before enabling shorts.",
+    detail: "Short position storage and cover logic exist. Public short trading stays off until UX and liquidation checks are ready.",
+    status: "Foundation",
     icon: SlidersHorizontal
   }
 ];
@@ -1904,8 +1910,8 @@ export default function DevPage() {
 
       <section className="rounded-md border border-line bg-panel/88 p-5 shadow-market">
         <div>
-          <p className="text-xs font-bold uppercase tracking-wide text-paper/45">Admin roadmap</p>
-          <h2 className="mt-1 text-2xl font-black">Powers to add before scale</h2>
+          <p className="text-xs font-bold uppercase tracking-wide text-paper/45">Operator controls</p>
+          <h2 className="mt-1 text-2xl font-black">Prelaunch admin powers</h2>
         </div>
         <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
           {plannedPowers.map((item) => {
@@ -1913,9 +1919,14 @@ export default function DevPage() {
 
             return (
               <div key={item.title} className="rounded-md border border-line bg-black/20 p-4">
-                <div className="flex items-center gap-2 text-sm font-black">
-                  <Icon className="h-4 w-4 text-brass" />
-                  {item.title}
+                <div className="flex items-center justify-between gap-3 text-sm font-black">
+                  <span className="inline-flex min-w-0 items-center gap-2">
+                    <Icon className="h-4 w-4 shrink-0 text-brass" />
+                    {item.title}
+                  </span>
+                  <span className="rounded border border-line bg-ink px-2 py-0.5 text-[10px] uppercase tracking-wide text-paper/50">
+                    {item.status}
+                  </span>
                 </div>
                 <p className="mt-2 text-sm leading-6 text-paper/55">{item.detail}</p>
               </div>

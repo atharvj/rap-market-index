@@ -238,16 +238,7 @@ function isPublicMarketNewsEvent(event: MarketEventRow) {
   }
 
   if (source === "bluesky_post") {
-    if (isPublicSocialCatalystEvent(event, rawPayload, impactScore, confidence)) {
-      return true;
-    }
-
-    return (
-      event.event_type === "controversy" &&
-      impactScore >= 65 &&
-      confidence >= 0.85 &&
-      !isLowSignalSocialTitle(title)
-    );
+    return false;
   }
 
   if (source === "reddit_post") {
@@ -345,7 +336,7 @@ function getSourceWeight(source: string) {
   }
 
   if (source === "bluesky_post") {
-    return 4;
+    return -12;
   }
 
   if (source === "youtube_upload_event") {

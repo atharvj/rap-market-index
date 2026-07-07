@@ -1265,7 +1265,7 @@ function getDefaultSignalConfidence(sourceName: string) {
     youtube: 0.84,
     youtube_comments: 0.68,
     reddit: 0.64,
-    bluesky: 0.44,
+    bluesky: 0.28,
     spotify: 0.7,
     gdelt: 0.58,
     wikimedia: 0.62,
@@ -1307,9 +1307,9 @@ function getStatSourceWeight(key: keyof HypeStats, sourceName: string) {
       newsScore: 0.48
     },
     bluesky: {
-      socialGrowth: 0.38,
-      searchGrowth: 0.24,
-      newsScore: 0.15
+      socialGrowth: 0.12,
+      searchGrowth: 0.08,
+      newsScore: 0.05
     },
     gdelt: {
       searchGrowth: 0.75,

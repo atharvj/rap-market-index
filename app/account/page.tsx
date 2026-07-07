@@ -1,5 +1,6 @@
 "use client";
 
+import { AdminBadge } from "@/components/AdminBadge";
 import { useAuth } from "@/components/AuthProvider";
 import { useGame } from "@/components/GameProvider";
 import { formatCurrency } from "@/lib/formatters";
@@ -23,6 +24,7 @@ import {
   UserPlus,
   WalletCards
 } from "lucide-react";
+import Link from "next/link";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 
 type ProfileDetailsResponse = {
@@ -31,12 +33,13 @@ type ProfileDetailsResponse = {
   profile?: {
     bio?: string;
     favoriteArtistIds?: string[];
+    isAdmin?: boolean;
   };
 };
 
 export default function AccountPage() {
   const { configured, loading, session, user, signIn, signOut, signUp } = useAuth();
-  const { state, portfolioValue, holdings, refreshServerState } = useGame();
+  const { state, portfolioValue, holdings, isAdminUser, refreshServerState } = useGame();
   const [mode, setMode] = useState<"signin" | "signup">("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -343,7 +346,10 @@ export default function AccountPage() {
                 </div>
               </div>
               <div className="min-w-0">
-                <h2 className="truncate text-3xl font-black">{profileName}</h2>
+                <div className="flex min-w-0 flex-wrap items-center gap-2">
+                  <h2 className="truncate text-3xl font-black">{profileName}</h2>
+                  {isAdminUser ? <AdminBadge /> : null}
+                </div>
                 <p className="mt-1 truncate text-sm font-bold text-paper/50">{user?.email}</p>
                 <div className="mt-5 grid gap-3 text-sm sm:grid-cols-2">
                   <ProfileMetric icon={<CalendarDays className="h-4 w-4" />} label="Member since" value={memberSince} />
@@ -362,6 +368,12 @@ export default function AccountPage() {
                     <LogOut className="h-4 w-4" />
                     Sign out
                   </button>
+                  <Link
+                    href={`/users/${state.userId}`}
+                    className="inline-flex min-h-9 items-center justify-center rounded border border-line bg-panelSoft px-4 text-sm font-black text-paper/70 hover:border-cyan hover:text-cyan"
+                  >
+                    View public profile
+                  </Link>
                 </div>
               </div>
             </div>
