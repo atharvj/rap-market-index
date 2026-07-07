@@ -10,6 +10,7 @@ type BootstrapBody = {
   username?: string;
   profileBio?: string;
   favoriteArtistIds?: string[];
+  avatarUrl?: string;
 };
 
 type ProfileRow = Database["public"]["Tables"]["profiles"]["Row"];
@@ -65,7 +66,8 @@ export async function POST(request: Request) {
         email: userData.user.email,
         username: body.username ?? userData.user.user_metadata?.username,
         profileBio: body.profileBio,
-        favoriteArtistIds: body.favoriteArtistIds
+        favoriteArtistIds: body.favoriteArtistIds,
+        avatarUrl: body.avatarUrl
       }),
       loadHoldings(supabase, userData.user.id),
       loadShortPositions(supabase, userData.user.id),
@@ -80,6 +82,7 @@ export async function POST(request: Request) {
         cashBalance: Number(profile.cash_balance),
         bio: getProfileBio(profile),
         favoriteArtistIds: getFavoriteArtistIds(profile),
+        avatarUrl: getAvatarUrl(profile),
         isAdmin: isAdminEmail(userData.user.email)
       },
       holdings,
@@ -105,7 +108,8 @@ async function getOrCreateProfile({
   email,
   username,
   profileBio,
-  favoriteArtistIds
+  favoriteArtistIds,
+  avatarUrl
 }: {
   supabase: ReturnType<typeof createAnonServerClient>;
   userId: string;
@@ -113,6 +117,7 @@ async function getOrCreateProfile({
   username?: string;
   profileBio?: string;
   favoriteArtistIds?: string[];
+  avatarUrl?: string;
 }) {
   const existing = await supabase.from("profiles").select("*").eq("id", userId).maybeSingle();
 
@@ -138,6 +143,10 @@ async function getOrCreateProfile({
       update.favorite_artist_ids = normalizeFavoriteArtistIds(favoriteArtistIds);
     }
 
+    if (typeof avatarUrl === "string") {
+      update.avatar_url = normalizeAvatarUrl(avatarUrl);
+    }
+
     if (Object.keys(update).length) {
       const updated = await supabase.from("profiles").update(update).eq("id", userId).select("*").single();
 
@@ -158,7 +167,8 @@ async function getOrCreateProfile({
       id: userId,
       username: safeUsername,
       bio: typeof profileBio === "string" ? normalizeBio(profileBio) : undefined,
-      favorite_artist_ids: Array.isArray(favoriteArtistIds) ? normalizeFavoriteArtistIds(favoriteArtistIds) : undefined
+      favorite_artist_ids: Array.isArray(favoriteArtistIds) ? normalizeFavoriteArtistIds(favoriteArtistIds) : undefined,
+      avatar_url: typeof avatarUrl === "string" ? normalizeAvatarUrl(avatarUrl) : undefined
     })
     .select("*")
     .single();
@@ -259,6 +269,10 @@ function formatProfileWriteError(message: string) {
     return "That username is already taken.";
   }
 
+  if (message.toLowerCase().includes("avatar_url")) {
+    return "Profile pictures are not ready yet. Run Supabase migration 020_profile_avatar.sql first.";
+  }
+
   if (message.toLowerCase().includes("bio") || message.toLowerCase().includes("favorite_artist_ids")) {
     return "Profile details are not ready yet. Run Supabase migration 019_profile_details.sql first.";
   }
@@ -281,6 +295,26 @@ function normalizeFavoriteArtistIds(value: string[]) {
   ).slice(0, 12);
 }
 
+function normalizeAvatarUrl(value: string) {
+  const trimmed = value.trim().slice(0, 1000);
+
+  if (!trimmed) {
+    return "";
+  }
+
+  try {
+    const url = new URL(trimmed);
+
+    if (url.protocol !== "https:" && url.protocol !== "http:") {
+      return "";
+    }
+
+    return url.toString();
+  } catch {
+    return "";
+  }
+}
+
 function getProfileBio(profile: ProfileRow) {
   return typeof profile.bio === "string" ? profile.bio : "";
 }
@@ -289,4 +323,8 @@ function getFavoriteArtistIds(profile: ProfileRow) {
   return Array.isArray(profile.favorite_artist_ids)
     ? profile.favorite_artist_ids.filter((artistId): artistId is string => typeof artistId === "string")
     : [];
+}
+
+function getAvatarUrl(profile: ProfileRow) {
+  return typeof profile.avatar_url === "string" ? profile.avatar_url : "";
 }

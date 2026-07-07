@@ -614,24 +614,6 @@ const plannedPowers = [
     icon: Users
   },
   {
-    title: "Market operations",
-    detail: "Run dry previews, force market runs, pause trading, pause price impact, and halt one artist during bad data.",
-    status: "Live",
-    icon: ServerCog
-  },
-  {
-    title: "Integrity monitoring",
-    detail: "Review concentrated order flow, rapid trading, largest traders, and admin/test trades excluded from market impact.",
-    status: "Live",
-    icon: ShieldCheck
-  },
-  {
-    title: "Data quality",
-    detail: "See source coverage, preview missing IDs, save verified IDs, and add artists through the guided resolver.",
-    status: "Live",
-    icon: Database
-  },
-  {
     title: "Trade support",
     detail: "Trade audit is visible through integrity views. One-click order reversal still needs a dedicated support flow.",
     status: "Partial",
@@ -643,14 +625,6 @@ const plannedPowers = [
     status: "Foundation",
     icon: SlidersHorizontal
   }
-];
-
-const signalCategories = [
-  ["Audience", "Streaming and listener momentum"],
-  ["Video", "Views, subscribers, and activity"],
-  ["Discovery", "Search and social movement"],
-  ["Media", "News, reviews, and releases"],
-  ["Market", "Order-flow activity"]
 ];
 
 const emptyManualSourceIdForm: ManualSourceIdForm = {
@@ -1932,18 +1906,6 @@ export default function DevPage() {
               </div>
             );
           })}
-        </div>
-      </section>
-
-      <section className="rounded-md border border-line bg-panel/88 p-5 shadow-market">
-        <h2 className="text-xl font-black">Market signal coverage</h2>
-        <div className="mt-4 grid gap-3 sm:grid-cols-5">
-          {signalCategories.map(([label, value]) => (
-            <div key={label} className="rounded-md border border-line bg-black/20 p-4">
-              <p className="text-xs font-bold uppercase tracking-wide text-paper/45">{label}</p>
-              <p className="mt-2 text-sm font-bold leading-5 text-paper/62">{value}</p>
-            </div>
-          ))}
         </div>
       </section>
     </div>

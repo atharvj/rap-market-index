@@ -308,6 +308,7 @@ export type Database = {
           cash_balance: number;
           bio: string;
           favorite_artist_ids: string[];
+          avatar_url: string;
           created_at: string;
           updated_at: string;
         };
@@ -317,6 +318,7 @@ export type Database = {
           cash_balance?: number;
           bio?: string;
           favorite_artist_ids?: string[];
+          avatar_url?: string;
           created_at?: string;
           updated_at?: string;
         };

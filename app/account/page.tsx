@@ -3,6 +3,7 @@
 import { AdminBadge } from "@/components/AdminBadge";
 import { useAuth } from "@/components/AuthProvider";
 import { useGame } from "@/components/GameProvider";
+import { UserAvatar } from "@/components/UserAvatar";
 import { formatCurrency } from "@/lib/formatters";
 import { applyThemePreference, getStoredThemePreference, type ThemePreference } from "@/lib/theme";
 import clsx from "clsx";
@@ -33,13 +34,14 @@ type ProfileDetailsResponse = {
   profile?: {
     bio?: string;
     favoriteArtistIds?: string[];
+    avatarUrl?: string;
     isAdmin?: boolean;
   };
 };
 
 export default function AccountPage() {
   const { configured, loading, session, user, signIn, signOut, signUp } = useAuth();
-  const { state, portfolioValue, holdings, isAdminUser, refreshServerState } = useGame();
+  const { state, portfolioValue, holdings, isAdminUser, avatarUrl: syncedAvatarUrl, refreshServerState } = useGame();
   const [mode, setMode] = useState<"signin" | "signup">("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -48,6 +50,7 @@ export default function AccountPage() {
   const [message, setMessage] = useState("");
   const [settingsMessage, setSettingsMessage] = useState("");
   const [profileBio, setProfileBio] = useState("");
+  const [avatarUrl, setAvatarUrl] = useState("");
   const [favoriteArtistIds, setFavoriteArtistIds] = useState<string[]>([]);
   const [profileDetailsMessage, setProfileDetailsMessage] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -115,6 +118,7 @@ export default function AccountPage() {
         }
 
         setProfileBio(payload.profile.bio ?? "");
+        setAvatarUrl(payload.profile.avatarUrl ?? "");
         setFavoriteArtistIds(payload.profile.favoriteArtistIds ?? []);
       })
       .catch(() => {
@@ -173,6 +177,7 @@ export default function AccountPage() {
         },
         body: JSON.stringify({
           profileBio,
+          avatarUrl,
           favoriteArtistIds
         })
       });
@@ -183,8 +188,10 @@ export default function AccountPage() {
       }
 
       setProfileBio(payload.profile?.bio ?? profileBio);
+      setAvatarUrl(payload.profile?.avatarUrl ?? avatarUrl);
       setFavoriteArtistIds(payload.profile?.favoriteArtistIds ?? favoriteArtistIds);
       setProfileDetailsMessage("Profile details saved.");
+      await refreshServerState();
     } catch (error) {
       setProfileDetailsMessage(error instanceof Error ? error.message : "Could not save profile details.");
     } finally {
@@ -341,9 +348,7 @@ export default function AccountPage() {
           <section className="rounded border border-line bg-panel p-5 shadow-market">
             <div className="grid gap-6 md:grid-cols-[170px_minmax(0,1fr)]">
               <div>
-                <div className="grid h-28 w-28 place-items-center rounded bg-panelSoft text-5xl font-black text-paper/80">
-                  <UserCircle className="h-16 w-16 text-paper/45" aria-hidden="true" />
-                </div>
+                <UserAvatar avatarUrl={avatarUrl || syncedAvatarUrl} label={profileName} size="lg" />
               </div>
               <div className="min-w-0">
                 <div className="flex min-w-0 flex-wrap items-center gap-2">
@@ -381,6 +386,15 @@ export default function AccountPage() {
 
           <section className="grid gap-5 md:grid-cols-3">
             <ProfilePanel title="A little about me">
+              <label className="mb-4 block">
+                <span className="text-xs font-black uppercase tracking-wide text-paper/45">Profile picture URL</span>
+                <input
+                  value={avatarUrl}
+                  onChange={(event) => setAvatarUrl(event.target.value)}
+                  placeholder="https://..."
+                  className="mt-2 h-10 w-full rounded border border-line bg-panelSoft px-3 text-sm font-bold outline-none placeholder:text-paper/35 focus:border-cyan"
+                />
+              </label>
               <label className="block">
                 <span className="sr-only">Profile bio</span>
                 <textarea

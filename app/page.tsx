@@ -18,6 +18,7 @@ import {
   TrendingDown,
   TrendingUp,
   Trophy,
+  UserPlus,
 } from "lucide-react";
 import Link from "next/link";
 import { useMemo, type ReactNode } from "react";
@@ -50,78 +51,68 @@ export default function HomePage() {
 
   return (
     <div className="space-y-5">
-      <section className="overflow-hidden rounded border border-line bg-panel shadow-market">
-        <div className="grid lg:grid-cols-[minmax(0,1.1fr)_360px]">
-          <div className="border-b border-line bg-panelSoft p-4 lg:border-b-0 lg:border-r">
-            <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_190px] md:items-start">
-              <div className="min-w-0">
-                <p className="inline-flex items-center gap-2 text-[11px] font-black uppercase tracking-wide text-brass">
-                  <Activity className="h-4 w-4" aria-hidden="true" />
-                  RMI Today
-                </p>
-                <h1 className="mt-2 max-w-3xl text-2xl font-black leading-tight sm:text-3xl">
-                  Market news, lead movers, and artist price action.
-                </h1>
-                <p className="mt-2 max-w-2xl text-sm font-bold leading-5 text-paper/58">
-                  Daily quotes move on meaningful catalysts, audience momentum, and eligible order flow.
-                </p>
-              </div>
-              <div className="grid rounded border border-line bg-panel p-3 text-xs">
-                <span className="font-black uppercase tracking-wide text-paper/45">Portfolio</span>
-                <span className="mt-1 text-xl font-black number-tabular">{formatCurrency(portfolioValue)}</span>
-                <span className={clsx("mt-1 font-black number-tabular", gainPercent >= 0 ? "text-mint" : "text-ember")}>
-                  {formatPercent(gainPercent)}
-                </span>
-              </div>
+      <section className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_330px]">
+        <div className="rounded border border-line bg-panel shadow-market">
+          <div className="flex flex-col gap-3 border-b border-line bg-panelSoft px-4 py-4 sm:flex-row sm:items-end sm:justify-between">
+            <div className="min-w-0">
+              <p className="inline-flex items-center gap-2 text-[11px] font-black uppercase tracking-wide text-brass">
+                <Newspaper className="h-4 w-4" aria-hidden="true" />
+                RMI Today
+              </p>
+              <h1 className="mt-1 text-xl font-black leading-tight sm:text-2xl">
+                Market news and artist price action
+              </h1>
+              <p className="mt-1 max-w-2xl text-xs font-bold leading-5 text-paper/58">
+                Price-relevant releases, reviews, controversy, audience momentum, and market movement.
+              </p>
             </div>
-            <FeaturedMoverPanel artist={topGainer} />
+            <Link
+              href="/markets"
+              className="inline-flex min-h-9 shrink-0 items-center justify-center rounded border border-line bg-panel px-3 text-xs font-black hover:border-cyan"
+            >
+              View now trading
+            </Link>
           </div>
-
-          <div className="grid bg-panel sm:grid-cols-3 lg:grid-cols-1">
-            <PulseCard
-              label="Market Leader"
-              artist={topGainer}
-              icon={<TrendingUp className="h-4 w-4" aria-hidden="true" />}
-              tone="positive"
-            />
-            <PulseCard
-              label="Under Pressure"
-              artist={topLoser}
-              icon={<TrendingDown className="h-4 w-4" aria-hidden="true" />}
-              tone="negative"
-            />
-            <PulseCard
-              label="Signal Leader"
-              artist={signalLeader}
-              icon={<Flame className="h-4 w-4" aria-hidden="true" />}
-              tone="signal"
-              detail={`${signalLeader?.hypeScore ?? 0}/100 score`}
-            />
+          <div className="p-4 sm:p-5">
+            <MarketNewsFeed limit={11} variant="home" />
           </div>
         </div>
-      </section>
 
-      <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_340px]">
-        <main className="min-w-0 space-y-5">
+        <aside className="space-y-5">
+          <SignUpPromo portfolioValue={portfolioValue} gainPercent={gainPercent} />
           <section className="rounded border border-line bg-panel shadow-market">
-            <SectionHeader
-              title="Market News"
-              icon={<Newspaper className="h-4 w-4" aria-hidden="true" />}
-              action={
-                <Link href="/news" className="inline-flex items-center gap-1 text-cyan hover:text-cyan/75">
-                  More
-                  <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
-                </Link>
-              }
-            />
-            <div className="p-4 sm:p-5">
-              <MarketNewsFeed limit={11} variant="home" />
+            <SectionHeader title="Market Pulse" icon={<Activity className="h-4 w-4" aria-hidden="true" />} />
+            <div className="divide-y divide-line">
+              <PulseCard
+                label="Market Leader"
+                artist={topGainer}
+                icon={<TrendingUp className="h-4 w-4" aria-hidden="true" />}
+                tone="positive"
+              />
+              <PulseCard
+                label="Under Pressure"
+                artist={topLoser}
+                icon={<TrendingDown className="h-4 w-4" aria-hidden="true" />}
+                tone="negative"
+              />
+              <PulseCard
+                label="Signal Leader"
+                artist={signalLeader}
+                icon={<Flame className="h-4 w-4" aria-hidden="true" />}
+                tone="signal"
+                detail={`${signalLeader?.hypeScore ?? 0}/100 score`}
+              />
             </div>
           </section>
+        </aside>
+      </section>
+
+      <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_330px]">
+        <main className="min-w-0 space-y-5">
 
           <section className="rounded border border-line bg-panel shadow-market">
             <SectionHeader
-              title="Now Moving"
+              title="Now Trading"
               icon={<Activity className="h-4 w-4" aria-hidden="true" />}
               action={
                 <Link href="/markets" className="inline-flex items-center gap-1 text-cyan hover:text-cyan/75">
@@ -130,7 +121,7 @@ export default function HomePage() {
                 </Link>
               }
             />
-            <div className="grid gap-0 divide-y divide-line md:grid-cols-2 md:divide-x md:divide-y-0 xl:grid-cols-4">
+            <div className="grid gap-0 divide-y divide-line md:grid-cols-2 md:divide-x md:divide-y-0">
               {marketMovers.slice(0, 4).map((artist) => (
                 <MarketMoverTile key={artist.id} artist={artist} />
               ))}
@@ -208,6 +199,35 @@ export default function HomePage() {
   );
 }
 
+function SignUpPromo({ portfolioValue, gainPercent }: { portfolioValue: number; gainPercent: number }) {
+  return (
+    <section className="rounded border border-line bg-black text-white shadow-market">
+      <div className="border-b border-white/10 px-4 py-3">
+        <p className="inline-flex items-center gap-2 text-[11px] font-black uppercase tracking-wide text-brass">
+          <UserPlus className="h-4 w-4" aria-hidden="true" />
+          New traders
+        </p>
+        <h2 className="mt-1 text-lg font-black leading-tight">Start with $100,000 in fantasy cash.</h2>
+        <p className="mt-1 text-xs font-bold leading-5 text-white/58">
+          Build a portfolio, follow catalysts, and compete on the leaderboard. No real money.
+        </p>
+      </div>
+      <div className="grid grid-cols-2 divide-x divide-white/10 text-xs">
+        <div className="px-4 py-3">
+          <p className="font-black uppercase tracking-wide text-white/40">Portfolio</p>
+          <p className="mt-1 text-base font-black number-tabular">{formatCurrency(portfolioValue)}</p>
+        </div>
+        <div className="px-4 py-3">
+          <p className="font-black uppercase tracking-wide text-white/40">Today</p>
+          <p className={clsx("mt-1 text-base font-black number-tabular", gainPercent >= 0 ? "text-mint" : "text-ember")}>
+            {formatPercent(gainPercent)}
+          </p>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function SectionHeader({
   title,
   action,
@@ -226,36 +246,6 @@ function SectionHeader({
       </div>
       {action ? <span className="text-[11px] font-black uppercase tracking-wide text-paper/45">{action}</span> : null}
     </div>
-  );
-}
-
-function FeaturedMoverPanel({ artist }: { artist?: Artist }) {
-  if (!artist) {
-    return null;
-  }
-
-  const positive = artist.dailyChangePercent >= 0;
-
-  return (
-    <Link
-      href={`/artists/${artist.id}`}
-      className="mt-4 grid gap-4 rounded border border-line bg-panel p-4 hover:border-cyan/50 md:grid-cols-[minmax(0,1fr)_260px] md:items-center"
-    >
-      <div className="flex min-w-0 items-center gap-4">
-        <ArtistAvatar artist={artist} size="lg" />
-        <div className="min-w-0">
-          <p className="text-[11px] font-black uppercase tracking-wide text-paper/45">Featured mover</p>
-          <h2 className="mt-1 truncate text-xl font-black">{artist.name}</h2>
-          <p className="mt-1 text-xs font-bold text-paper/50">
-            {artist.ticker} · {formatCurrency(artist.currentPrice)} · {artist.hypeScore}/100 score
-          </p>
-          <p className={clsx("mt-2 text-sm font-black number-tabular", positive ? "text-mint" : "text-ember")}>
-            {formatPercent(artist.dailyChangePercent)} today
-          </p>
-        </div>
-      </div>
-      <MiniSparkline data={artist.priceHistory} positive={positive} width={260} height={46} />
-    </Link>
   );
 }
 

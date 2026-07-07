@@ -695,7 +695,7 @@ async function collectRealSignals({
       warnings.push(...youtube.warnings);
     }
 
-    const maxUploadEventVideos = getEnvInteger("MARKET_YOUTUBE_UPLOAD_EVENT_VIDEOS", 5, 0, 5);
+    const maxUploadEventVideos = getEnvInteger("MARKET_YOUTUBE_UPLOAD_EVENT_VIDEOS", 12, 0, 12);
 
     if (maxUploadEventVideos > 0) {
       const youtubeUploadEvents = await collectExternalSource("YouTube upload events", warnings, () =>

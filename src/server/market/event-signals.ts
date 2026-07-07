@@ -535,7 +535,11 @@ function getYoutubeUploadEventQuality(event: MarketEvent) {
     getRawString(event.rawPayload.reason) ??
     getRawString(event.rawPayload.eventReason) ??
     "";
-  const viewCount = getRawOptionalNumber(event.rawPayload.viewCount);
+  const storedMultiplier = getRawOptionalNumber(event.rawPayload.uploadQualityMultiplier);
+  const viewCount =
+    getRawOptionalNumber(event.rawPayload.viewCount) ??
+    getRawOptionalNumber(event.rawPayload.representativeViewCount) ??
+    getRawOptionalNumber(event.rawPayload.clusterMaxViews);
   const durationSeconds = getRawOptionalNumber(event.rawPayload.durationSeconds);
   const hasLowSignalTitle = hasLowSignalYoutubeUploadTitle(event.title, normalizedTitle);
   const isPromoTitle = isPromoHashtagYoutubeUploadTitle(event.title, normalizedTitle);
@@ -555,6 +559,17 @@ function getYoutubeUploadEventQuality(event: MarketEvent) {
     reason === "album_announcement_upload_title" ||
     reason === "major_feature_upload_title" ||
     ["album", "ep", "mixtape", "project"].includes(releaseKind);
+
+  if (reason === "official_audio_release_cluster") {
+    const label = getRawString(event.rawPayload.clusterReachLabel) ?? "release-cluster";
+    const fallbackMultiplier = normalizeEventText(event.title).includes("project release cycle") ? 0.42 : 0.82;
+
+    return {
+      accepted: true,
+      label,
+      multiplier: clamp(storedMultiplier ?? fallbackMultiplier, 0.25, 1.18)
+    };
+  }
 
   if ((hasLowSignalTitle || isPromoTitle) && !hasExplicitRelease) {
     return {

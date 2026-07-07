@@ -1,9 +1,10 @@
 "use client";
 
 import { AdminBadge } from "@/components/AdminBadge";
+import { UserAvatar } from "@/components/UserAvatar";
 import { formatCurrency, formatPercent } from "@/lib/formatters";
 import clsx from "clsx";
-import { CalendarDays, Star, Trophy, UserCircle, WalletCards } from "lucide-react";
+import { BarChart3, CalendarDays, Star, Trophy, WalletCards } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -22,12 +23,27 @@ type PublicProfile = {
   id: string;
   username: string;
   bio: string;
+  avatarUrl: string;
   createdAt: string;
   favoriteArtists: PublicFavoriteArtist[];
+  holdings: PublicHolding[];
   isAdmin: boolean;
   portfolioValue: number;
   cashBalance: number;
   gainPercent: number;
+};
+
+type PublicHolding = {
+  artistId: string;
+  name: string;
+  ticker: string;
+  accent: string;
+  shares: number;
+  currentPrice: number;
+  dailyChangePercent: number;
+  marketValue: number;
+  profitLoss: number;
+  profitLossPercent: number;
 };
 
 type PublicProfileResponse = {
@@ -95,9 +111,7 @@ export default function PublicUserProfilePage() {
     <div className="mx-auto max-w-5xl space-y-5">
       <section className="rounded border border-line bg-panel p-5 shadow-market">
         <div className="grid gap-5 md:grid-cols-[130px_minmax(0,1fr)]">
-          <div className="grid h-28 w-28 place-items-center rounded bg-panelSoft">
-            <UserCircle className="h-16 w-16 text-paper/45" aria-hidden="true" />
-          </div>
+          <UserAvatar avatarUrl={profile.avatarUrl} label={profile.username} size="lg" />
           <div className="min-w-0">
             <div className="flex min-w-0 flex-wrap items-center gap-2">
               <h1 className="truncate text-3xl font-black">{profile.username}</h1>
@@ -116,6 +130,51 @@ export default function PublicUserProfilePage() {
               {formatPercent(profile.gainPercent)} all-time
             </p>
           </div>
+        </div>
+      </section>
+
+      <section className="rounded border border-line bg-panel shadow-market">
+        <div className="flex min-h-11 items-center gap-2 border-b border-line bg-panelSoft px-4">
+          <span className="h-5 w-1 rounded bg-brass" />
+          <BarChart3 className="h-4 w-4 text-brass" aria-hidden="true" />
+          <h2 className="text-xs font-black uppercase tracking-wide">Public portfolio</h2>
+        </div>
+        <div className="divide-y divide-line">
+          {profile.holdings.length ? (
+            profile.holdings.map((holding) => (
+              <Link
+                key={holding.artistId}
+                href={`/artists/${holding.artistId}`}
+                className="grid gap-3 px-4 py-3 hover:bg-panelSoft/70 sm:grid-cols-[minmax(0,1fr)_120px_120px]"
+              >
+                <span className="flex items-center gap-3">
+                  <span className={`grid h-10 w-10 place-items-center rounded bg-gradient-to-br ${holding.accent} text-sm font-black text-paper`}>
+                    {holding.ticker.slice(0, 2)}
+                  </span>
+                  <span className="min-w-0">
+                    <span className="block truncate text-sm font-black">{holding.name}</span>
+                    <span className="text-xs font-bold text-paper/50">
+                      {holding.ticker} · {holding.shares.toLocaleString("en-US", { maximumFractionDigits: 2 })} shares
+                    </span>
+                  </span>
+                </span>
+                <span className="text-sm font-black number-tabular sm:text-right">
+                  <span className="block">{formatCurrency(holding.marketValue)}</span>
+                  <span className="text-xs text-paper/45">{formatCurrency(holding.currentPrice)}</span>
+                </span>
+                <span className="text-sm font-black number-tabular sm:text-right">
+                  <span className={holding.profitLoss >= 0 ? "block text-mint" : "block text-ember"}>
+                    {formatCurrency(holding.profitLoss)}
+                  </span>
+                  <span className={holding.profitLossPercent >= 0 ? "text-xs text-mint" : "text-xs text-ember"}>
+                    {formatPercent(holding.profitLossPercent)}
+                  </span>
+                </span>
+              </Link>
+            ))
+          ) : (
+            <p className="p-4 text-sm font-bold text-paper/50">No public holdings yet.</p>
+          )}
         </div>
       </section>
 

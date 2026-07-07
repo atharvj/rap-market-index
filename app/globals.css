@@ -66,3 +66,27 @@ select {
   scrollbar-color: #aab5c0 transparent;
   scrollbar-width: thin;
 }
+
+.market-tape-track {
+  animation: rmi-tape-scroll 42s linear infinite;
+}
+
+.market-tape-viewport:hover .market-tape-track {
+  animation-play-state: paused;
+}
+
+@keyframes rmi-tape-scroll {
+  from {
+    transform: translateX(0);
+  }
+
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .market-tape-track {
+    animation: none;
+  }
+}

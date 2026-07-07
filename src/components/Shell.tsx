@@ -3,6 +3,7 @@
 import { AdminBadge } from "@/components/AdminBadge";
 import { useAuth } from "@/components/AuthProvider";
 import { useGame } from "@/components/GameProvider";
+import { UserAvatar } from "@/components/UserAvatar";
 import { formatCurrency, formatPercent } from "@/lib/formatters";
 import { applyThemePreference, getStoredThemePreference, type ThemePreference } from "@/lib/theme";
 import clsx from "clsx";
@@ -40,7 +41,7 @@ const navItems = [
 export function Shell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { portfolioValue, state, gainPercent, isAdminUser } = useGame();
+  const { portfolioValue, state, gainPercent, isAdminUser, avatarUrl } = useGame();
   const { session, user, signOut } = useAuth();
   const [search, setSearch] = useState("");
   const [searchFocused, setSearchFocused] = useState(false);
@@ -55,6 +56,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
         .slice(0, 12),
     [state.artists]
   );
+  const tapeLoop = useMemo(() => [...tapeArtists, ...tapeArtists], [tapeArtists]);
   const searchSuggestions = useMemo(() => {
     const normalized = search.trim().toLowerCase();
 
@@ -131,8 +133,6 @@ export function Shell({ children }: { children: React.ReactNode }) {
 
   const accountLabel =
     session && state.username && state.username !== "Demo Guest" ? state.username : user?.email?.split("@")[0] ?? "Guest";
-  const accountInitial = (accountLabel.trim()[0] ?? "A").toUpperCase();
-
   return (
     <div className="min-h-screen bg-ink">
       <header className="sticky top-0 z-30 border-b border-line bg-panel">
@@ -224,22 +224,25 @@ export function Shell({ children }: { children: React.ReactNode }) {
                   </span>
                 </>
               ) : null}
-              <div className="relative">
+              <div className="relative z-[80]">
                 <button
                   type="button"
                   onClick={() => setAccountOpen((value) => !value)}
                   className="flex h-9 w-9 items-center justify-center rounded-full border border-line bg-panelSoft text-sm font-black hover:border-cyan"
                   aria-label="Open account menu"
                   aria-expanded={accountOpen}
+                  aria-haspopup="menu"
                 >
-                  {session ? accountInitial : <UserCircle className="h-5 w-5 text-paper/60" aria-hidden="true" />}
+                  {session ? (
+                    <UserAvatar avatarUrl={avatarUrl} label={accountLabel} size="sm" />
+                  ) : (
+                    <UserCircle className="h-5 w-5 text-paper/60" aria-hidden="true" />
+                  )}
                 </button>
                 {accountOpen ? (
-                  <div className="absolute right-0 top-11 w-80 rounded border border-line bg-panel p-4 shadow-2xl">
+                  <div className="absolute right-0 top-11 z-[90] w-80 rounded border border-line bg-panel p-4 shadow-2xl" role="menu">
                     <div className="flex items-center gap-3 border-b border-line pb-4">
-                      <div className="grid h-12 w-12 place-items-center rounded bg-panelSoft text-xl font-black">
-                        {session ? accountInitial : <UserCircle className="h-7 w-7 text-paper/55" aria-hidden="true" />}
-                      </div>
+                      <UserAvatar avatarUrl={session ? avatarUrl : ""} label={accountLabel} />
                       <div className="min-w-0">
                         <div className="flex min-w-0 items-center gap-2">
                           <p className="truncate text-base font-black">{accountLabel}</p>
@@ -365,10 +368,16 @@ export function Shell({ children }: { children: React.ReactNode }) {
               <Activity className="h-4 w-4 text-brass" aria-hidden="true" />
               RMI Markets
             </span>
-            <div className="min-w-0 flex-1 overflow-hidden">
-              <div className="flex items-center gap-5 overflow-x-auto px-3 py-2 scrollbar-thin">
-                {tapeArtists.map((artist) => (
-                  <Link key={artist.id} href={`/artists/${artist.id}`} className="flex shrink-0 items-center gap-2">
+            <div className="market-tape-viewport min-w-0 flex-1 overflow-hidden">
+              <div className="market-tape-track flex w-max items-center gap-5 px-3 py-2">
+                {tapeLoop.map((artist, index) => (
+                  <Link
+                    key={`${artist.id}-${index}`}
+                    href={`/artists/${artist.id}`}
+                    className="flex shrink-0 items-center gap-2"
+                    aria-hidden={index >= tapeArtists.length}
+                    tabIndex={index >= tapeArtists.length ? -1 : undefined}
+                  >
                     <span className="font-black text-cyan">{artist.ticker}</span>
                     <span className="number-tabular text-paper/70">{formatCurrency(artist.currentPrice)}</span>
                     <span className={clsx("font-black number-tabular", artist.dailyChangePercent >= 0 ? "text-mint" : "text-ember")}>

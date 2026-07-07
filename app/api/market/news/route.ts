@@ -303,8 +303,10 @@ function getNewsImportanceScore(event: MarketEventRow, runDate: string) {
   const confidence = Number(event.confidence);
   const ageDays = Math.max(0, daysBetween(event.event_date, runDate));
   const recency = Math.max(0, 28 - ageDays) * 1.85;
-  const source = getRawString(toRawPayload(event.raw_payload).source);
+  const rawPayload = toRawPayload(event.raw_payload);
+  const source = getRawString(rawPayload.source);
   const sourceWeight = getSourceWeight(source);
+  const reachScore = source === "youtube_upload_event" ? getYoutubeNewsReachScore(rawPayload) : 0;
   const typeWeight: Record<MarketNewsType, number> = {
     release: 16,
     review: 13,
@@ -315,7 +317,7 @@ function getNewsImportanceScore(event: MarketEventRow, runDate: string) {
     viral: 12
   };
 
-  return impactScore * 1.15 + confidence * 36 + recency + sourceWeight + (typeWeight[event.event_type] ?? 0);
+  return impactScore * 1.15 + confidence * 36 + recency + sourceWeight + reachScore + (typeWeight[event.event_type] ?? 0);
 }
 
 function getSourceWeight(source: string) {
@@ -496,7 +498,12 @@ function isPublicYoutubeUploadEvent(
   const classificationReason = getRawString(rawPayload.classificationReason);
   const qualityMultiplier = getRawNumber(rawPayload.uploadQualityMultiplier) ?? 1;
   const relatedUploadCount = getRawNumber(rawPayload.relatedUploadCount) ?? 0;
-  const viewCount = getRawNumber(rawPayload.viewCount);
+  const viewCount =
+    getRawNumber(rawPayload.viewCount) ??
+    getRawNumber(rawPayload.representativeViewCount) ??
+    getRawNumber(rawPayload.clusterMaxViews);
+  const clusterTotalViews = getRawNumber(rawPayload.clusterTotalViews) ?? 0;
+  const clusterReachRatio = getRawNumber(rawPayload.clusterReachRatio);
   const likeCount = getRawNumber(rawPayload.likeCount) ?? 0;
   const commentCount = getRawNumber(rawPayload.commentCount) ?? 0;
   const hasNamedProject = Boolean(getRawText(rawPayload.inferredReleaseTitle));
@@ -505,19 +512,39 @@ function isPublicYoutubeUploadEvent(
   const isMusicVideo = title.includes("official video") || title.includes("music video");
   const isTrackAudio = title.includes("official audio") || title.includes("audio");
   const isMajorProjectRelease = ["album", "ep", "mixtape"].includes(releaseKind) || hasNamedProject;
-  const minimumViews = isMajorProjectRelease || isMusicVideo ? 25_000 : isTrackAudio ? 90_000 : 60_000;
+  const minimumViews = isMajorProjectRelease || isMusicVideo || isProjectCluster ? 25_000 : isTrackAudio ? 90_000 : 60_000;
   const engagementScore = likeCount * 8 + commentCount * 20;
   const hasStrongEngagement = engagementScore >= 25_000;
+  const hasMeaningfulProjectReach =
+    isProjectCluster &&
+    (hasNamedProject || clusterTotalViews >= 120_000) &&
+    ((typeof viewCount === "number" && viewCount >= 25_000) ||
+      clusterTotalViews >= 85_000 ||
+      (typeof clusterReachRatio === "number" && clusterReachRatio >= 0.45));
   const hasEnoughReach =
     typeof viewCount !== "number"
-      ? isMajorProjectRelease
-      : viewCount >= minimumViews || (viewCount >= 15_000 && hasStrongEngagement);
+      ? hasMeaningfulProjectReach || isMajorProjectRelease
+      : viewCount >= minimumViews || clusterTotalViews >= 85_000 || (viewCount >= 15_000 && hasStrongEngagement);
 
-  if (isGenericCluster || title.includes("project release cycle")) {
+  if (classificationReason === "track_audio_upload_title") {
+    return (
+      !hasLowSignalYoutubeTitle(title) &&
+      typeof viewCount === "number" &&
+      viewCount >= 250_000 &&
+      impactScore >= 40 &&
+      confidence >= 0.64
+    );
+  }
+
+  if (title.includes("project release cycle")) {
     return false;
   }
 
   if (hasLowSignalYoutubeTitle(title)) {
+    return false;
+  }
+
+  if (isGenericCluster && !hasMeaningfulProjectReach) {
     return false;
   }
 
@@ -538,6 +565,21 @@ function isPublicYoutubeUploadEvent(
   }
 
   return impactScore >= 35 && confidence >= 0.65;
+}
+
+function getYoutubeNewsReachScore(rawPayload: Record<string, unknown>) {
+  const viewCount =
+    getRawNumber(rawPayload.clusterMaxViews) ??
+    getRawNumber(rawPayload.representativeViewCount) ??
+    getRawNumber(rawPayload.viewCount) ??
+    0;
+  const totalViews = getRawNumber(rawPayload.clusterTotalViews) ?? viewCount;
+  const reachRatio = getRawNumber(rawPayload.clusterReachRatio) ?? 0;
+  const viewLift = viewCount > 0 ? Math.log10(viewCount + 1) * 2.3 : 0;
+  const totalLift = totalViews > 0 ? Math.log10(totalViews + 1) * 1.15 : 0;
+  const ratioLift = reachRatio > 1 ? Math.min(7, reachRatio * 2.4) : reachRatio > 0 ? reachRatio * 2 : 0;
+
+  return Math.min(18, viewLift + totalLift + ratioLift);
 }
 
 function toRawPayload(value: unknown): Record<string, unknown> {

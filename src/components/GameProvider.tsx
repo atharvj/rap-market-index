@@ -33,6 +33,7 @@ type BootstrapResponse = {
     cashBalance: number;
     bio?: string;
     favoriteArtistIds?: string[];
+    avatarUrl?: string;
     isAdmin?: boolean;
   };
   holdings?: GameState["holdings"];
@@ -67,6 +68,7 @@ type GameContextValue = {
   watchlistArtistIds: string[];
   watchlistArtists: Artist[];
   isAdminUser: boolean;
+  avatarUrl: string;
   buyShares: (artistId: string, shares: number) => Promise<TradeResult>;
   sellShares: (artistId: string, shares: number) => Promise<TradeResult>;
   toggleWatchlist: (artistId: string) => Promise<TradeResult>;
@@ -91,6 +93,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
   const [serverLeaderboard, setServerLeaderboard] = useState<LeaderboardEntry[] | null>(null);
   const [watchlistArtistIds, setWatchlistArtistIds] = useState<string[]>([]);
   const [isAdminUser, setIsAdminUser] = useState(false);
+  const [avatarUrl, setAvatarUrl] = useState("");
 
   useEffect(() => {
     if (!hydrated || !authConfigured) {
@@ -232,6 +235,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
         setSyncStatus(authConfigured ? "Signed out; unsaved demo mode" : "Unsaved demo mode");
         setWatchlistArtistIds([]);
         setIsAdminUser(false);
+        setAvatarUrl("");
         if (authConfigured) {
           void refreshLeaderboard();
         } else {
@@ -265,6 +269,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
 
         const profileData = profile.profile;
         setIsAdminUser(Boolean(profileData.isAdmin));
+        setAvatarUrl(profileData.avatarUrl ?? "");
         void refreshLeaderboard(profileData.id);
         void refreshWatchlist(session.access_token);
 
@@ -308,6 +313,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     setSyncStatus(authConfigured ? "Signed out; unsaved demo mode" : "Unsaved demo mode");
     setWatchlistArtistIds([]);
     setIsAdminUser(false);
+    setAvatarUrl("");
     void refreshLeaderboard();
   }, [authConfigured, authLoading, hydrated, refreshLeaderboard, refreshServerState, session]);
 
@@ -479,6 +485,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       watchlistArtistIds,
       watchlistArtists,
       isAdminUser,
+      avatarUrl,
       buyShares,
       sellShares,
       toggleWatchlist,
@@ -505,6 +512,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       watchlistArtistIds,
       watchlistArtists,
       isAdminUser,
+      avatarUrl,
       buyShares,
       sellShares,
       toggleWatchlist,

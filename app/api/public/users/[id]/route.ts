@@ -7,6 +7,7 @@ export const dynamic = "force-dynamic";
 
 type ProfileRow = Database["public"]["Tables"]["profiles"]["Row"];
 type LeaderboardRow = Database["public"]["Views"]["market_leaderboard"]["Row"];
+type HoldingRow = Database["public"]["Tables"]["holdings"]["Row"];
 type ArtistRow = Pick<
   Database["public"]["Tables"]["artists"]["Row"],
   "id" | "name" | "ticker" | "current_price" | "daily_change_percent" | "hype_score" | "accent"
@@ -69,6 +70,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
       ? profileRow.favorite_artist_ids.filter((artistId): artistId is string => typeof artistId === "string")
       : [];
     const favoriteArtists = favoriteArtistIds.length ? await loadFavoriteArtists(supabase, favoriteArtistIds) : [];
+    const publicHoldings = await loadPublicHoldings(supabase, profileRow.id);
     const adminUserIds = await loadAdminUserIds(supabase);
 
     return NextResponse.json({
@@ -77,8 +79,10 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
         id: profileRow.id,
         username: profileRow.username,
         bio: profileRow.bio ?? "",
+        avatarUrl: profileRow.avatar_url ?? "",
         createdAt: profileRow.created_at,
         favoriteArtists,
+        holdings: publicHoldings,
         isAdmin: adminUserIds.has(profileRow.id),
         portfolioValue: leaderboardRow ? Number(leaderboardRow.portfolio_value) : Number(profileRow.cash_balance),
         cashBalance: leaderboardRow ? Number(leaderboardRow.cash_balance) : Number(profileRow.cash_balance),
@@ -94,6 +98,69 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
       { status: 500 }
     );
   }
+}
+
+async function loadPublicHoldings(supabase: ReturnType<typeof createServiceRoleClient>, userId: string) {
+  const { data: holdings, error: holdingsError } = await supabase
+    .from("holdings")
+    .select("artist_id,shares,average_buy_price")
+    .eq("user_id", userId)
+    .gt("shares", 0);
+
+  if (holdingsError) {
+    throw new Error(`Could not load public holdings: ${holdingsError.message}`);
+  }
+
+  const holdingRows = (holdings ?? []) as HoldingRow[];
+  const artistIds = holdingRows.map((holding) => holding.artist_id);
+
+  if (!artistIds.length) {
+    return [];
+  }
+
+  const { data: artists, error: artistsError } = await supabase
+    .from("artists")
+    .select("id,name,ticker,current_price,daily_change_percent,hype_score,accent")
+    .in("id", artistIds)
+    .eq("is_active", true);
+
+  if (artistsError) {
+    throw new Error(`Could not load holding artists: ${artistsError.message}`);
+  }
+
+  const artistsById = new Map(((artists ?? []) as ArtistRow[]).map((artist) => [artist.id, artist]));
+
+  return holdingRows
+    .map((holding) => {
+      const artist = artistsById.get(holding.artist_id);
+
+      if (!artist) {
+        return null;
+      }
+
+      const shares = Number(holding.shares);
+      const currentPrice = Number(artist.current_price);
+      const averageBuyPrice = Number(holding.average_buy_price);
+      const marketValue = shares * currentPrice;
+      const profitLoss = shares * (currentPrice - averageBuyPrice);
+      const profitLossPercent = averageBuyPrice > 0 ? ((currentPrice - averageBuyPrice) / averageBuyPrice) * 100 : 0;
+
+      return {
+        artistId: artist.id,
+        name: artist.name,
+        ticker: artist.ticker,
+        accent: artist.accent,
+        shares,
+        currentPrice,
+        dailyChangePercent: Number(artist.daily_change_percent),
+        marketValue,
+        profitLoss,
+        profitLossPercent
+      };
+    })
+    .filter((holding): holding is NonNullable<typeof holding> => Boolean(holding))
+    .sort((a, b) => b.marketValue - a.marketValue)
+    .slice(0, 12);
 }
 
 function isUuid(value: string) {

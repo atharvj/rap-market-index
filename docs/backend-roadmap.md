@@ -36,7 +36,7 @@ This app still runs in development with unsaved demo data, but the backend found
    - `MARKET_EVENT_SCAN_LIMIT=20`
    - `MARKET_EVENT_SCAN_MAX_RECORDS=12`
    - `MARKET_AUTO_HALT_DEATH_EVENTS=true`
-   - `MARKET_YOUTUBE_UPLOAD_EVENT_VIDEOS=5`
+   - `MARKET_YOUTUBE_UPLOAD_EVENT_VIDEOS=12`
    - `MARKET_YOUTUBE_UPLOAD_EVENT_DAYS=14`
    - `MARKET_YOUTUBE_COMMENT_VIDEOS=0`
    - `MARKET_YOUTUBE_COMMENT_LIMIT=25`
@@ -281,7 +281,7 @@ When enabled, the YouTube comments path samples recent comments from each artist
 
 Raw comment text is not saved. The first run is treated as a baseline; later runs move the social/news/search parts of the model from changes in sentiment, likes, and net positive-vs-negative share. This prevents every naturally positive fan comment section from pushing a stock up every day.
 
-The YouTube upload event path is separate from comment sentiment. It uses official channel upload playlists for artists with `youtube_channel_id`, classifies recent upload titles such as official videos, new singles, album trailers, deluxe/tracklist announcements, snippets, teasers, freestyles, performances, and tour announcements, and stores those matches as `market_events`. It fetches lightweight video duration/statistics for the sampled uploads so low-reach short-form clips and hashtag promo posts are ignored or dampened. When several official-audio tracks appear together, the engine adds a project-release-cycle event and suppresses the individual track uploads as headline reasons. It does not use YouTube search, so it is much cheaper and less ambiguous than searching all of YouTube for an artist name. Defaults are `MARKET_YOUTUBE_UPLOAD_EVENT_VIDEOS=5` and `MARKET_YOUTUBE_UPLOAD_EVENT_DAYS=14`.
+The YouTube upload event path is separate from comment sentiment. It uses official channel upload playlists for artists with `youtube_channel_id`, classifies recent upload titles such as official videos, new singles, album trailers, deluxe/tracklist announcements, snippets, teasers, freestyles, performances, and tour announcements, and stores those matches as `market_events`. It fetches lightweight video duration/statistics, thumbnails, and descriptions for the sampled uploads so low-reach short-form clips and hashtag promo posts are ignored or dampened. When several official-audio tracks appear together, the engine infers a project-level release from repeated upload descriptions when possible, ranks the strongest upload by reach, and suppresses the individual track uploads as headline reasons. It does not use YouTube search, so it is much cheaper and less ambiguous than searching all of YouTube for an artist name. Defaults are `MARKET_YOUTUBE_UPLOAD_EVENT_VIDEOS=12` and `MARKET_YOUTUBE_UPLOAD_EVENT_DAYS=14`.
 
 The Bluesky path is an early social-catalyst adapter. It searches recent public posts for each artist, stores aggregate observations only, and classifies snippet hype, album announcements, release dates, tracklists, viral clips, performance reaction, feature/cosign chatter, backlash, controversy, and decline terms. It can catch moments that may not have reached article coverage yet, but its source weight is intentionally below audience/video/release/news sources. Defaults are `MARKET_BLUESKY_POST_LIMIT=20`, `MARKET_BLUESKY_LOOKBACK_DAYS=7`, and `MARKET_BLUESKY_DELAY_MS=250`.
 
@@ -368,7 +368,7 @@ Vercel schedules cron in UTC, so this runs around 2 AM Pacific during daylight s
 - `mediaRssLookbackDays`: `MARKET_RSS_LOOKBACK_DAYS`, default `30`
 - `mediaRssMaxItemsPerFeed`: `MARKET_RSS_MAX_ITEMS_PER_FEED`, default `40`
 - `mediaReviewerFeeds`: `MARKET_REVIEWER_RSS_FEEDS`, optional additive comma-separated RSS feed list
-- `youtubeUploadEventVideos`: `MARKET_YOUTUBE_UPLOAD_EVENT_VIDEOS`, default `5`
+- `youtubeUploadEventVideos`: `MARKET_YOUTUBE_UPLOAD_EVENT_VIDEOS`, default `12`
 - `redditPostLimit`: `MARKET_REDDIT_POST_LIMIT`, default `25`
 - YouTube comments are quota-guarded separately. `MARKET_YOUTUBE_COMMENT_VIDEOS=0` keeps comment sentiment off; set it to `1` for limited comment sampling.
 

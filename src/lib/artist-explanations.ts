@@ -33,5 +33,5 @@ export function sanitizeMoveExplanation(ticker: string, explanation: string | nu
 }
 
 function getFallbackMoveExplanation(ticker: string) {
-  return `${ticker} moved as audience momentum, release activity, public attention, and trading demand shifted.`;
+  return `${ticker} moved with the latest market signal mix across audience momentum, public attention, release activity, and eligible trading demand.`;
 }

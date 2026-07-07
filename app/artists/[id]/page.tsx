@@ -114,9 +114,12 @@ export default function ArtistDetailPage() {
         </section>
 
         <section className="rounded border border-line bg-panel shadow-market">
-          <SectionHeader title={`What's happening with ${artist.ticker}`} icon={<BarChart3 className="h-4 w-4" />} />
-          <div className="p-5">
-            <p className="text-base font-black leading-snug">{moveExplanation}</p>
+          <SectionHeader title="Market note" icon={<BarChart3 className="h-4 w-4" />} />
+          <div className="p-4">
+            <p className="text-sm font-bold leading-6 text-paper/65">{moveExplanation}</p>
+            <p className="mt-2 text-[11px] font-bold uppercase tracking-wide text-paper/40">
+              Generated signal summary. Price movement may reflect multiple inputs, not a single confirmed cause.
+            </p>
           </div>
         </section>
 

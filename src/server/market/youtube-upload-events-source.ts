@@ -33,7 +33,9 @@ type YoutubePlaylistItemsResponse = {
   items?: Array<{
     snippet?: {
       title?: string;
+      description?: string;
       publishedAt?: string;
+      thumbnails?: YoutubeThumbnails;
       resourceId?: {
         videoId?: string;
       };
@@ -50,6 +52,12 @@ type YoutubePlaylistItemsResponse = {
 type YoutubeVideosListResponse = {
   items?: Array<{
     id?: string;
+    snippet?: {
+      title?: string;
+      description?: string;
+      publishedAt?: string;
+      thumbnails?: YoutubeThumbnails;
+    };
     contentDetails?: {
       duration?: string;
     };
@@ -64,9 +72,13 @@ type YoutubeVideosListResponse = {
   };
 };
 
+type YoutubeThumbnails = Record<string, { url?: string; width?: number; height?: number } | undefined>;
+
 type YoutubeVideo = {
   id: string;
   title: string;
+  description?: string | null;
+  thumbnailUrl?: string | null;
   publishedAt?: string;
   durationSeconds?: number | null;
   viewCount?: number | null;
@@ -97,7 +109,7 @@ const EVENT_VIDEO_COUNT = "event_video_count";
 const LATEST_UPLOAD_AGE_DAYS = "latest_upload_age_days";
 const REQUEST_ERROR = "request_error";
 const MAX_CHANNELS_PER_REQUEST = 50;
-const DEFAULT_MAX_VIDEOS_PER_ARTIST = 5;
+const DEFAULT_MAX_VIDEOS_PER_ARTIST = 12;
 const OFFICIAL_AUDIO_CLUSTER_MIN_UPLOADS = 2;
 
 export async function collectYoutubeUploadEvents({
@@ -285,6 +297,11 @@ function buildYoutubeUploadEvents({
         viewCount: video.viewCount ?? null,
         likeCount: video.likeCount ?? null,
         commentCount: video.commentCount ?? null,
+        descriptionProjectName: inferProjectTitleFromDescription(video.description, artist.name),
+        thumbnailUrl: video.thumbnailUrl ?? null,
+        artistCategory: artist.category,
+        artistCurrentPrice: artist.currentPrice,
+        artistHypeScore: artist.hypeScore,
         uploadQualityLabel: classification.qualityLabel ?? null,
         uploadQualityMultiplier: classification.qualityMultiplier ?? 1,
         classificationReason: classification.reason,
@@ -297,6 +314,7 @@ function buildYoutubeUploadEvents({
     artist,
     runDate,
     channelId,
+    videos,
     events
   });
 }
@@ -305,11 +323,13 @@ function addOfficialAudioReleaseClusterEvent({
   artist,
   runDate,
   channelId,
+  videos,
   events
 }: {
   artist: MarketUpdateArtist;
   runDate: string;
   channelId: string;
+  videos: YoutubeVideo[];
   events: MarketEvent[];
 }) {
   const cluster = findOfficialAudioReleaseCluster(events);
@@ -334,43 +354,75 @@ function addOfficialAudioReleaseClusterEvent({
   });
 
   if (hasProjectRelease) {
-    return events;
+    return suppressClusterTrackEvents(events, cluster);
   }
 
-  const confidence = cluster.events.length >= 3 ? 0.76 : 0.68;
-  const impactScore = cluster.events.length >= 3 ? 58 : 46;
-  const sentimentScore = cluster.events.length >= 3 ? 34 : 28;
+  const projectName = inferProjectTitleFromCluster(artist, cluster.events);
+  const representativeEvent = getRepresentativeClusterEvent(cluster.events);
+  const representativeVideoId = getRawString(representativeEvent.rawPayload.videoId);
+  const representativeTitle = representativeEvent.title;
+  const representativeViewCount = getRawNumber(representativeEvent.rawPayload.viewCount);
+  const representativeLikeCount = getRawNumber(representativeEvent.rawPayload.likeCount);
+  const representativeCommentCount = getRawNumber(representativeEvent.rawPayload.commentCount);
+  const thumbnailUrl = getRawString(representativeEvent.rawPayload.thumbnailUrl) ?? null;
+  const clusterProfile = getOfficialAudioClusterProfile({
+    artist,
+    clusterEvents: cluster.events,
+    allVideos: videos,
+    eventDate: cluster.eventDate,
+    runDate
+  });
+  const confidence = Number((clusterProfile.confidence).toFixed(3));
+  const impactScore = Math.round(clusterProfile.impactScore);
+  const sentimentScore = Math.round(clusterProfile.sentimentScore);
   const relatedTitles = cluster.events.map((event) => event.title);
-  const firstVideoId = cluster.events
-    .map((event) => event.rawPayload.videoId)
-    .find((videoId): videoId is string => typeof videoId === "string" && videoId.length > 0);
+  const relatedVideoIds = cluster.events
+    .map((event) => getRawString(event.rawPayload.videoId))
+    .filter((videoId): videoId is string => Boolean(videoId));
+  const title = projectName
+    ? `${artist.name} - ${projectName}`.slice(0, 160)
+    : `${artist.name} multi-track release`.slice(0, 160);
 
   const clusterEvent: MarketEvent = {
     artistId: artist.id,
     eventDate: cluster.eventDate,
     eventType: "release",
-    title: `${artist.name} project release cycle`.slice(0, 160),
+    title,
     sourceName: "YouTube",
-    sourceUrl: undefined,
+    sourceUrl: representativeVideoId ? `https://www.youtube.com/watch?v=${representativeVideoId}` : undefined,
     sentimentScore,
     impactScore,
     confidence,
     rawPayload: {
       source: "youtube_upload_event",
       channelId,
-      videoId: firstVideoId ?? null,
+      videoId: representativeVideoId ?? null,
       publishedAt: cluster.publishedAt,
       classificationReason: "official_audio_release_cluster",
       releaseKind: "project",
+      inferredReleaseTitle: projectName,
+      representativeVideoId,
+      representativeVideoTitle: representativeTitle,
+      representativeViewCount,
+      representativeLikeCount,
+      representativeCommentCount,
+      thumbnailUrl,
+      clusterTotalViews: clusterProfile.totalViews,
+      clusterMaxViews: clusterProfile.maxViews,
+      clusterMedianViews: clusterProfile.medianViews,
+      clusterBaselineViews: clusterProfile.baselineViews,
+      clusterReachRatio: clusterProfile.reachRatio,
+      clusterReachLabel: clusterProfile.reachLabel,
+      clusterReleaseAgeDays: clusterProfile.releaseAgeDays,
+      uploadQualityLabel: clusterProfile.reachLabel,
+      uploadQualityMultiplier: clusterProfile.qualityMultiplier,
       relatedUploadCount: cluster.events.length,
       relatedUploadTitles: relatedTitles,
-      relatedVideoIds: cluster.events
-        .map((event) => event.rawPayload.videoId)
-        .filter((videoId): videoId is string => typeof videoId === "string" && videoId.length > 0)
+      relatedVideoIds
     }
   };
 
-  return [clusterEvent, ...events];
+  return [clusterEvent, ...suppressClusterTrackEvents(events, cluster)];
 }
 
 function findOfficialAudioReleaseCluster(events: MarketEvent[]) {
@@ -429,6 +481,265 @@ function getLatestPublishedAt(events: MarketEvent[]) {
       .sort()
       .at(-1) ?? null
   );
+}
+
+function suppressClusterTrackEvents(events: MarketEvent[], cluster: { events: MarketEvent[] }) {
+  const clusterVideoIds = new Set(
+    cluster.events.map((event) => getRawString(event.rawPayload.videoId)).filter((videoId): videoId is string => Boolean(videoId))
+  );
+
+  return events.filter((event) => {
+    if (event.rawPayload.classificationReason !== "track_audio_upload_title") {
+      return true;
+    }
+
+    const videoId = getRawString(event.rawPayload.videoId);
+
+    return !videoId || !clusterVideoIds.has(videoId);
+  });
+}
+
+function getRepresentativeClusterEvent(events: MarketEvent[]) {
+  return [...events].sort((first, second) => getEventReachValue(second) - getEventReachValue(first))[0] ?? events[0];
+}
+
+function getEventReachValue(event: MarketEvent) {
+  const viewCount = getRawNumber(event.rawPayload.viewCount) ?? 0;
+  const likeCount = getRawNumber(event.rawPayload.likeCount) ?? 0;
+  const commentCount = getRawNumber(event.rawPayload.commentCount) ?? 0;
+
+  return viewCount + likeCount * 8 + commentCount * 20;
+}
+
+function inferProjectTitleFromCluster(artist: MarketUpdateArtist, events: MarketEvent[]) {
+  const candidates = events
+    .map((event) => getRawString(event.rawPayload.descriptionProjectName))
+    .filter((value): value is string => Boolean(value));
+
+  if (!candidates.length) {
+    return null;
+  }
+
+  const counts = new Map<string, { value: string; count: number }>();
+
+  for (const candidate of candidates) {
+    const key = normalizeTitle(candidate);
+
+    if (!key || key === normalizeTitle(artist.name)) {
+      continue;
+    }
+
+    const existing = counts.get(key);
+    counts.set(key, {
+      value: existing?.value ?? candidate,
+      count: (existing?.count ?? 0) + 1
+    });
+  }
+
+  return (
+    [...counts.values()]
+      .sort((first, second) => {
+        if (second.count !== first.count) {
+          return second.count - first.count;
+        }
+
+        return first.value.length - second.value.length;
+      })[0]?.value ?? null
+  );
+}
+
+function inferProjectTitleFromDescription(description: string | null | undefined, artistName: string) {
+  const text = description?.replace(/\s+/g, " ").trim();
+
+  if (!text) {
+    return null;
+  }
+
+  const patterns = [
+    /\bstream\s+(?:the\s+)?(?:new\s+)?(?:album|project|mixtape|tape|ep)?\s*["“”']?([a-z0-9][a-z0-9 &'’.,!?-]{1,70}?)["“”']?\s*:/i,
+    /\blisten\s+(?:to\s+)?(?:the\s+)?(?:new\s+)?(?:album|project|mixtape|tape|ep)?\s*["“”']?([a-z0-9][a-z0-9 &'’.,!?-]{1,70}?)["“”']?\s*:/i,
+    /\b(?:album|project|mixtape|tape|ep)\s*[:\-]\s*["“”']?([a-z0-9][a-z0-9 &'’.,!?-]{1,70}?)(?:["“”']|\s{2,}|$)/i
+  ];
+
+  for (const pattern of patterns) {
+    const match = text.match(pattern);
+    const cleaned = cleanInferredProjectTitle(match?.[1], artistName);
+
+    if (cleaned) {
+      return cleaned;
+    }
+  }
+
+  return null;
+}
+
+function cleanInferredProjectTitle(value: string | undefined, artistName: string) {
+  const cleaned = value
+    ?.replace(/https?:\/\/\S+/gi, "")
+    .replace(/\b(?:on|out now|available|everywhere|all platforms|here|below|link in bio)\b.*$/i, "")
+    .replace(/^[\s"'“”‘’.,:;-]+|[\s"'“”‘’.,:;-]+$/g, "")
+    .trim();
+
+  if (!cleaned) {
+    return null;
+  }
+
+  const normalized = normalizeTitle(cleaned);
+  const blocked = new Set([
+    "album",
+    "all platforms",
+    "everywhere",
+    "here",
+    "music",
+    "new album",
+    "new music",
+    "new project",
+    "now",
+    "project",
+    normalizeTitle(artistName)
+  ]);
+
+  if (blocked.has(normalized) || normalized.length < 2 || normalized.length > 60) {
+    return null;
+  }
+
+  if (cleaned.split(/\s+/).length > 8) {
+    return null;
+  }
+
+  return cleaned;
+}
+
+function getOfficialAudioClusterProfile({
+  artist,
+  clusterEvents,
+  allVideos,
+  eventDate,
+  runDate
+}: {
+  artist: MarketUpdateArtist;
+  clusterEvents: MarketEvent[];
+  allVideos: YoutubeVideo[];
+  eventDate: string;
+  runDate: string;
+}) {
+  const viewCounts = clusterEvents.map((event) => getRawNumber(event.rawPayload.viewCount) ?? 0).filter((value) => value > 0);
+  const totalViews = viewCounts.reduce((sum, value) => sum + value, 0);
+  const maxViews = Math.max(0, ...viewCounts);
+  const medianViews = getMedian(viewCounts) ?? 0;
+  const releaseAgeDays = Math.max(0, daysBetween(eventDate, runDate));
+  const baselineViews = getRecentUploadBaselineViews(allVideos, clusterEvents);
+  const expectedViews = getExpectedProjectViews(artist);
+  const ageFactor = clampNumber(releaseAgeDays / 7, 0.35, 1);
+  const effectiveBaseline = Math.max(expectedViews * ageFactor, (baselineViews ?? 0) * ageFactor);
+  const reachRatio =
+    effectiveBaseline > 0 ? Math.max(maxViews / effectiveBaseline, totalViews / (effectiveBaseline * 2.45)) : 1;
+  const profile = getClusterReachProfile({ maxViews, totalViews, reachRatio });
+  const countLift = clusterEvents.length >= 6 ? 8 : clusterEvents.length >= 3 ? 5 : 0;
+  const baseImpact = 40 + countLift;
+  const baseSentiment = 22 + Math.min(8, clusterEvents.length * 2);
+  const hasProjectName = Boolean(inferProjectTitleFromCluster(artist, clusterEvents));
+
+  return {
+    totalViews,
+    maxViews,
+    medianViews,
+    baselineViews: baselineViews ?? null,
+    reachRatio: Number(reachRatio.toFixed(3)),
+    releaseAgeDays,
+    reachLabel: profile.label,
+    qualityMultiplier: profile.multiplier,
+    impactScore: clampNumber(baseImpact * profile.multiplier, 8, 68),
+    sentimentScore: clampNumber(baseSentiment * profile.multiplier, 4, 48),
+    confidence: clampNumber((clusterEvents.length >= 3 ? 0.72 : 0.64) * profile.confidenceMultiplier + (hasProjectName ? 0.04 : 0), 0.42, 0.86)
+  };
+}
+
+function getClusterReachProfile({
+  maxViews,
+  totalViews,
+  reachRatio
+}: {
+  maxViews: number;
+  totalViews: number;
+  reachRatio: number;
+}) {
+  if (maxViews < 15_000 && totalViews < 45_000) {
+    return { label: "weak_project_reach", multiplier: 0.42, confidenceMultiplier: 0.68 };
+  }
+
+  if (reachRatio < 0.22) {
+    return { label: "well_below_artist_baseline", multiplier: 0.54, confidenceMultiplier: 0.76 };
+  }
+
+  if (reachRatio < 0.45) {
+    return { label: "below_artist_baseline", multiplier: 0.68, confidenceMultiplier: 0.84 };
+  }
+
+  if (reachRatio < 0.8) {
+    return { label: "near_artist_baseline", multiplier: 0.9, confidenceMultiplier: 0.95 };
+  }
+
+  if (reachRatio > 2.1) {
+    return { label: "breakout_project_reach", multiplier: 1.18, confidenceMultiplier: 1.08 };
+  }
+
+  if (reachRatio > 1.25) {
+    return { label: "above_artist_baseline", multiplier: 1.08, confidenceMultiplier: 1.04 };
+  }
+
+  return { label: "artist_baseline_project_reach", multiplier: 1, confidenceMultiplier: 1 };
+}
+
+function getRecentUploadBaselineViews(videos: YoutubeVideo[], clusterEvents: MarketEvent[]) {
+  const clusterVideoIds = new Set(
+    clusterEvents.map((event) => getRawString(event.rawPayload.videoId)).filter((videoId): videoId is string => Boolean(videoId))
+  );
+  const candidates = videos
+    .filter((video) => !clusterVideoIds.has(video.id))
+    .filter((video) => !isShortFormUpload(video.title, normalizeTitle(video.title), video))
+    .map((video) => video.viewCount ?? 0)
+    .filter((value) => value >= 5_000);
+
+  return getMedian(candidates);
+}
+
+function getExpectedProjectViews(artist: MarketUpdateArtist) {
+  const categoryBase: Record<MarketUpdateArtist["category"], number> = {
+    underground: 25_000,
+    rising: 65_000,
+    mainstream: 150_000,
+    superstar: 350_000
+  };
+  const price = Number.isFinite(artist.currentPrice) ? artist.currentPrice : 0;
+  const priceBase =
+    price >= 100 ? 350_000 : price >= 70 ? 180_000 : price >= 35 ? 85_000 : price >= 15 ? 45_000 : 22_000;
+
+  return Math.max(categoryBase[artist.category] ?? 35_000, priceBase);
+}
+
+function getMedian(values: number[]) {
+  const sorted = values.filter((value) => Number.isFinite(value)).sort((a, b) => a - b);
+
+  if (!sorted.length) {
+    return null;
+  }
+
+  const middle = Math.floor(sorted.length / 2);
+
+  return sorted.length % 2 === 0 ? (sorted[middle - 1] + sorted[middle]) / 2 : sorted[middle];
+}
+
+function getRawString(value: unknown) {
+  return typeof value === "string" && value.trim() ? value.trim() : null;
+}
+
+function getRawNumber(value: unknown) {
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+function clampNumber(value: number, min: number, max: number) {
+  return Math.min(max, Math.max(min, value));
 }
 
 function classifyYoutubeUploadTitle(title: string, video?: YoutubeVideo): YoutubeUploadClassification | null {
@@ -753,7 +1064,7 @@ async function fetchRecentUploadedVideos({
 
   url.searchParams.set("part", "snippet,contentDetails");
   url.searchParams.set("playlistId", playlistId);
-  url.searchParams.set("maxResults", String(clampInteger(maxResults, 1, 5)));
+  url.searchParams.set("maxResults", String(clampInteger(maxResults, 1, 12)));
   url.searchParams.set("key", apiKey);
 
   const result = await fetchJson({
@@ -771,6 +1082,8 @@ async function fetchRecentUploadedVideos({
     .map((item) => ({
       id: item.contentDetails?.videoId ?? item.snippet?.resourceId?.videoId ?? "",
       title: item.snippet?.title?.trim() ?? "",
+      description: item.snippet?.description ?? null,
+      thumbnailUrl: getYoutubeThumbnailUrl(item.snippet?.thumbnails),
       publishedAt: item.snippet?.publishedAt
     }))
     .filter((video) => Boolean(video.id && video.title));
@@ -803,7 +1116,7 @@ async function hydrateYoutubeVideoDetails({
 
   const url = new URL("https://www.googleapis.com/youtube/v3/videos");
 
-  url.searchParams.set("part", "contentDetails,statistics");
+  url.searchParams.set("part", "snippet,contentDetails,statistics");
   url.searchParams.set("id", videos.map((video) => video.id).join(","));
   url.searchParams.set("key", apiKey);
 
@@ -824,6 +1137,10 @@ async function hydrateYoutubeVideoDetails({
       .map((item) => [
         item.id as string,
         {
+          title: item.snippet?.title?.trim() || undefined,
+          description: item.snippet?.description ?? null,
+          thumbnailUrl: getYoutubeThumbnailUrl(item.snippet?.thumbnails),
+          publishedAt: item.snippet?.publishedAt,
           durationSeconds: parseIsoDurationSeconds(item.contentDetails?.duration),
           viewCount: parseOptionalInteger(item.statistics?.viewCount),
           likeCount: parseOptionalInteger(item.statistics?.likeCount),
@@ -832,10 +1149,22 @@ async function hydrateYoutubeVideoDetails({
       ])
   );
 
-  return videos.map((video) => ({
-    ...video,
-    ...(detailsById.get(video.id) ?? {})
-  }));
+  return videos.map((video) => {
+    const details = detailsById.get(video.id);
+
+    if (!details) {
+      return video;
+    }
+
+    return {
+      ...video,
+      ...details,
+      title: details.title ?? video.title,
+      description: details.description ?? video.description,
+      thumbnailUrl: details.thumbnailUrl ?? video.thumbnailUrl,
+      publishedAt: details.publishedAt ?? video.publishedAt
+    };
+  });
 }
 
 async function fetchJson({
@@ -1025,6 +1354,17 @@ function parseIsoDurationSeconds(value: string | undefined) {
   const seconds = Number.parseInt(match[3] ?? "0", 10);
 
   return hours * 3600 + minutes * 60 + seconds;
+}
+
+function getYoutubeThumbnailUrl(thumbnails: YoutubeThumbnails | undefined) {
+  return (
+    thumbnails?.maxres?.url ??
+    thumbnails?.standard?.url ??
+    thumbnails?.high?.url ??
+    thumbnails?.medium?.url ??
+    thumbnails?.default?.url ??
+    null
+  );
 }
 
 function escapeRegExp(value: string) {
