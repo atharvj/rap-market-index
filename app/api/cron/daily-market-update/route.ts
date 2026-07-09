@@ -32,6 +32,10 @@ type MarketEventScanResponse = {
   scannedArtistCount?: number;
   observationCount?: number;
   eventCount?: number;
+  gdeltEventCount?: number;
+  mediaRssEventCount?: number;
+  aiResearchEnabled?: boolean;
+  aiResearchEventCount?: number;
   eventTypeCounts?: Record<string, number>;
 };
 

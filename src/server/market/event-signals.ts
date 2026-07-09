@@ -480,6 +480,10 @@ function getEventProvenance(event: MarketEvent, artist: MarketUpdateArtist) {
     return getMediaRssEventProvenance(event);
   }
 
+  if (normalizedSource === "ai_research_event") {
+    return getAiResearchEventProvenance(event, artist);
+  }
+
   if (normalizedSource === "musicbrainz_release_group") {
     return {
       label: "release-database",
@@ -806,6 +810,58 @@ function getMediaRssEventProvenance(event: MarketEvent) {
   };
 }
 
+function getAiResearchEventProvenance(event: MarketEvent, artist: MarketUpdateArtist) {
+  const sourceTier = getRawNumber(event.rawPayload.sourceTier, 0);
+  const evidenceLevel = getRawString(event.rawPayload.evidenceLevel) ?? "reported";
+  const sourceType = getRawString(event.rawPayload.sourceType) ?? "";
+  const reachScope = getRawString(event.rawPayload.reachScope) ?? "";
+  const audienceMultiplier = getCommunityAudienceMultiplier(artist);
+  const tierProfiles: Record<number, { impact: number; confidence: number }> = {
+    0: { impact: 0.74, confidence: 0.88 },
+    1: { impact: 0.98, confidence: 1.02 },
+    2: { impact: 1.1, confidence: 1.1 },
+    3: { impact: 1.18, confidence: 1.16 }
+  };
+  const evidenceProfiles: Record<string, { impact: number; confidence: number }> = {
+    confirmed: { impact: 1.08, confidence: 1.08 },
+    reported: { impact: 1, confidence: 1 },
+    rumor: { impact: 0.56, confidence: 0.72 },
+    low_signal: { impact: 0.22, confidence: 0.35 }
+  };
+  const sourceTypeProfiles: Record<string, { impact: number; confidence: number }> = {
+    review: { impact: 1.12, confidence: 1.1 },
+    official: { impact: 1.08, confidence: 1.08 },
+    mainstream_news: { impact: 1.05, confidence: 1.08 },
+    music_publication: { impact: 1.04, confidence: 1.06 },
+    community: { impact: 0.9, confidence: 0.94 },
+    social: { impact: 0.78, confidence: 0.86 },
+    video: { impact: 0.82, confidence: 0.9 }
+  };
+  const reachProfiles: Record<string, { impact: number; confidence: number }> = {
+    mainstream: { impact: 1.12, confidence: 1.04 },
+    broad: { impact: 1.08, confidence: 1.03 },
+    scene: { impact: 1.02, confidence: 1 },
+    underground: { impact: 1.02, confidence: 0.98 }
+  };
+  const tier = tierProfiles[sourceTier] ?? tierProfiles[0];
+  const evidence = evidenceProfiles[evidenceLevel] ?? evidenceProfiles.reported;
+  const source = sourceTypeProfiles[sourceType] ?? { impact: 1, confidence: 1 };
+  const reach = reachProfiles[reachScope] ?? { impact: 1, confidence: 1 };
+  const communityLift = sourceType === "community" || reachScope === "underground" || reachScope === "scene"
+    ? audienceMultiplier
+    : { impact: 1, confidence: 1 };
+
+  return {
+    label: `ai-research-${sourceType || "source"}-${evidenceLevel}`,
+    impactMultiplier: clamp(tier.impact * evidence.impact * source.impact * reach.impact * communityLift.impact, 0.32, 1.28),
+    confidenceMultiplier: clamp(
+      tier.confidence * evidence.confidence * source.confidence * reach.confidence * communityLift.confidence,
+      0.5,
+      1.2
+    )
+  };
+}
+
 function applyEventClusterCaps(scoredEvents: Array<ReturnType<typeof scoreEvent>>): ScoredMarketEvent[] {
   const groups = scoredEvents.reduce<Record<string, Array<ReturnType<typeof scoreEvent>>>>((memo, event) => {
     const sign = event.weightedImpact < 0 ? "negative" : "positive";
@@ -1068,6 +1124,28 @@ function getReactionSourceClass(event: ScoredMarketEvent) {
     return "release_database";
   }
 
+  if (source === "ai_research_event") {
+    const sourceType = getRawString(event.event.rawPayload.sourceType) ?? "";
+
+    if (sourceType === "community") {
+      return "community";
+    }
+
+    if (sourceType === "social") {
+      return "social";
+    }
+
+    if (sourceType === "review" || event.eventSubtype === "review") {
+      return "critic";
+    }
+
+    if (sourceType === "official") {
+      return "official";
+    }
+
+    return "media";
+  }
+
   if (event.eventSubtype === "review" || event.eventSubtype === "public_reaction") {
     if (isReviewerLikeSource(sourceName) || isReviewerLikeSource(domain)) {
       return "critic";
@@ -1282,6 +1360,10 @@ function normalizeEventSource(value: string) {
 
   if (normalized.includes("rss") || normalized.includes("news.google.com")) {
     return "media-rss";
+  }
+
+  if (normalized.includes("ai-research") || normalized.includes("ai_research")) {
+    return "ai-research";
   }
 
   try {

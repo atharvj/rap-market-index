@@ -71,6 +71,10 @@ const DEFAULT_TIMEOUT_MS = 12000;
 const GOOGLE_NEWS_BASE_URL = "https://news.google.com/rss/search";
 
 const DEFAULT_FEED_URLS = [
+  "https://www.hotnewhiphop.com/feed/",
+  "https://hiphopdx.com/feed",
+  "https://allhiphop.com/feed/",
+  "https://www.rap-up.com/feed/",
   "https://pitchfork.com/feed/feed-news/rss",
   "https://pitchfork.com/feed/feed-album-reviews/rss",
   "https://www.xxlmag.com/feed/",

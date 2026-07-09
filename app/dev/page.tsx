@@ -113,6 +113,10 @@ type EventScanState =
       totalArtistCount: number;
       observationCount: number;
       eventCount: number;
+      gdeltEventCount?: number;
+      mediaRssEventCount?: number;
+      aiResearchEventCount?: number;
+      aiResearchEnabled?: boolean;
       eventTypeCounts: Record<string, number>;
       artists: Array<{
         id: string;
@@ -397,6 +401,10 @@ type CloudStatus = {
 };
 
 type MarketHealth = {
+  config: {
+    aiResearchConfigured?: boolean;
+    redditCredentialsConfigured?: boolean;
+  };
   runDate: string;
   activeArtistCount: number;
   configuredModelVersion: string;
@@ -1180,6 +1188,10 @@ export default function DevPage() {
         totalArtistCount: payload.totalArtistCount ?? 0,
         observationCount: payload.observationCount ?? 0,
         eventCount: payload.eventCount ?? 0,
+        gdeltEventCount: payload.gdeltEventCount ?? 0,
+        mediaRssEventCount: payload.mediaRssEventCount ?? 0,
+        aiResearchEventCount: payload.aiResearchEventCount ?? 0,
+        aiResearchEnabled: Boolean(payload.aiResearchEnabled),
         eventTypeCounts: payload.eventTypeCounts ?? {},
         artists: payload.artists ?? [],
         topEvents: payload.topEvents ?? []
@@ -2030,9 +2042,11 @@ function CloudStatusPanel({ data }: { data: CloudStatus }) {
 }
 
 function MarketHealthPanel({ data }: { data: MarketHealth }) {
+  const aiResearchCoverage = getObservationFreshness(data, "ai_research", "event_count");
+
   return (
     <div className="space-y-4">
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-7">
         <ReadinessTile
           label="Price history"
           ready={data.priceHistoryHealth.freshCoveragePercent >= 80}
@@ -2067,6 +2081,13 @@ function MarketHealthPanel({ data }: { data: MarketHealth }) {
           readyText={`${data.eventHealth.freshEventCount} fresh`}
           pendingText="Idle"
           icon={<FileWarning className="h-4 w-4" />}
+        />
+        <ReadinessTile
+          label="AI research"
+          ready={data.config.aiResearchConfigured === true && aiResearchCoverage > 0}
+          readyText={`${formatPercent(aiResearchCoverage)} fresh`}
+          pendingText={data.config.aiResearchConfigured ? "No events" : "No key"}
+          icon={<ServerCog className="h-4 w-4" />}
         />
         <ReadinessTile
           label="Shorting"
@@ -2302,9 +2323,13 @@ function buildLaunchReadinessChecks(data: MarketHealth): LaunchReadinessCheck[] 
   const youtubeCoverage = getCoveragePercent(data, "youtubeChannelId");
   const musicbrainzCoverage = getCoveragePercent(data, "musicbrainzId");
   const redditCoverage = getObservationFreshness(data, "reddit", "post_count");
+  const aiResearchCoverage = getObservationFreshness(data, "ai_research", "event_count");
+  const aiHighConfidenceCoverage = getObservationFreshness(data, "ai_research", "high_confidence_event_count");
+  const mediaEventCoverage = getObservationFreshness(data, "media_rss", "classified_event_count");
   const socialCoverage = Math.max(
     redditCoverage,
-    getObservationFreshness(data, "bluesky", "post_count")
+    getObservationFreshness(data, "bluesky", "post_count"),
+    aiResearchCoverage
   );
   const marketQualityScore = data.latestRun?.summary?.marketQualityScore ?? 0;
   const downMoveCount = data.latestRun?.summary?.downMoveCount ?? 0;
@@ -2350,20 +2375,29 @@ function buildLaunchReadinessChecks(data: MarketHealth): LaunchReadinessCheck[] 
     },
     {
       id: "community",
-      label: "Community signal is connected",
-      ok: redditCoverage > 0,
+      label: "Underground event discovery is connected",
+      ok: redditCoverage > 0 || aiResearchCoverage > 0,
       severity: "blocker",
       detail:
-        redditCoverage > 0
-          ? `Reddit/community coverage is ${formatPercent(redditCoverage)}.`
-          : "Reddit API is still missing; do not launch underground-heavy coverage without it."
+        redditCoverage > 0 || aiResearchCoverage > 0
+          ? `Reddit ${formatPercent(redditCoverage)}, AI source-backed ${formatPercent(aiResearchCoverage)}.`
+          : "Connect Reddit or GROQ_API_KEY before launching underground-heavy coverage."
+    },
+    {
+      id: "ai-research",
+      label: "AI source-backed research is producing usable catalysts",
+      ok: data.config.aiResearchConfigured === true && (aiResearchCoverage > 0 || aiHighConfidenceCoverage > 0),
+      severity: "blocker",
+      detail: data.config.aiResearchConfigured
+        ? `AI event coverage ${formatPercent(aiResearchCoverage)}, high-confidence ${formatPercent(aiHighConfidenceCoverage)}.`
+        : "GROQ_API_KEY is missing, so the AI research layer is disabled."
     },
     {
       id: "social",
-      label: "Social discovery signal is active",
-      ok: socialCoverage > 0,
+      label: "External discovery signal is active",
+      ok: socialCoverage > 0 || mediaEventCoverage > 0,
       severity: "warning",
-      detail: `Fresh public social/community coverage is ${formatPercent(socialCoverage)}.`
+      detail: `Fresh public social/community/AI coverage is ${formatPercent(socialCoverage)}; media event coverage is ${formatPercent(mediaEventCoverage)}.`
     },
     {
       id: "market-quality",
@@ -3093,6 +3127,12 @@ function EventScanResult({ scan }: { scan: EventScanState }) {
         <PreviewMetric label="Observations" value={String(scan.observationCount)} />
         <PreviewMetric label="Events" value={String(scan.eventCount)} />
         <PreviewMetric label="Run date" value={formatDate(scan.runDate)} />
+      </div>
+      <div className="grid gap-3 text-sm sm:grid-cols-4">
+        <PreviewMetric label="GDELT" value={String(scan.gdeltEventCount ?? 0)} />
+        <PreviewMetric label="RSS/media" value={String(scan.mediaRssEventCount ?? 0)} />
+        <PreviewMetric label="AI research" value={scan.aiResearchEnabled ? String(scan.aiResearchEventCount ?? 0) : "Off"} />
+        <PreviewMetric label="Sources" value={scan.aiResearchEnabled ? "AI + feeds" : "Feeds only"} />
       </div>
 
       <div className="grid gap-3 lg:grid-cols-2">

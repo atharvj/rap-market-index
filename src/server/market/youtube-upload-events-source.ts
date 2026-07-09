@@ -110,7 +110,7 @@ const LATEST_UPLOAD_AGE_DAYS = "latest_upload_age_days";
 const REQUEST_ERROR = "request_error";
 const MAX_CHANNELS_PER_REQUEST = 50;
 const DEFAULT_MAX_VIDEOS_PER_ARTIST = 12;
-const OFFICIAL_AUDIO_CLUSTER_MIN_UPLOADS = 2;
+const OFFICIAL_AUDIO_CLUSTER_MIN_UPLOADS = 3;
 
 export async function collectYoutubeUploadEvents({
   artists,
@@ -373,6 +373,11 @@ function addOfficialAudioReleaseClusterEvent({
     eventDate: cluster.eventDate,
     runDate
   });
+
+  if (!projectName && cluster.events.length < 4 && clusterProfile.reachRatio < 0.8) {
+    return suppressClusterTrackEvents(events, cluster);
+  }
+
   const confidence = Number((clusterProfile.confidence).toFixed(3));
   const impactScore = Math.round(clusterProfile.impactScore);
   const sentimentScore = Math.round(clusterProfile.sentimentScore);
@@ -557,6 +562,8 @@ function inferProjectTitleFromDescription(description: string | null | undefined
   }
 
   const patterns = [
+    /\bstream\s+["“”']?([a-z0-9][a-z0-9 &'’.,!?-]{1,70}?)["“”']?\s*(?:[:\-]\s*)?(?:https?:\/\/|link\b|out now\b)/i,
+    /\blisten\s+["“”']?([a-z0-9][a-z0-9 &'’.,!?-]{1,70}?)["“”']?\s*(?:[:\-]\s*)?(?:https?:\/\/|link\b|out now\b)/i,
     /\bstream\s+(?:the\s+)?(?:new\s+)?(?:album|project|mixtape|tape|ep)?\s*["“”']?([a-z0-9][a-z0-9 &'’.,!?-]{1,70}?)["“”']?\s*:/i,
     /\blisten\s+(?:to\s+)?(?:the\s+)?(?:new\s+)?(?:album|project|mixtape|tape|ep)?\s*["“”']?([a-z0-9][a-z0-9 &'’.,!?-]{1,70}?)["“”']?\s*:/i,
     /\b(?:album|project|mixtape|tape|ep)\s*[:\-]\s*["“”']?([a-z0-9][a-z0-9 &'’.,!?-]{1,70}?)(?:["“”']|\s{2,}|$)/i

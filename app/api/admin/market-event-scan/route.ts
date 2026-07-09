@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createServiceRoleClient, getSupabaseConfigStatus } from "@/lib/supabase/server";
 import { requireAdminRequest } from "@/server/admin-auth";
 import { flattenEvents, mergeEvents } from "@/server/market/event-signals";
+import { collectAiResearchMarketEvents } from "@/server/market/ai-research-source";
 import { collectGdeltMarketSignals } from "@/server/market/gdelt-source";
 import { collectMediaRssMarketEvents, getDefaultMediaRssFeedUrls } from "@/server/market/media-rss-source";
 import { getPacificMarketDate } from "@/server/market/market-date";
@@ -32,6 +33,9 @@ type MarketEventScanBody = {
   rssLookbackDays?: number;
   rssMaxItemsPerFeed?: number;
   includeGoogleNews?: boolean;
+  includeAiResearch?: boolean;
+  aiResearchLookbackDays?: number;
+  aiResearchMaxEventsPerArtist?: number;
 };
 
 type StatusHaltCandidate = {
@@ -53,6 +57,8 @@ const DEFAULT_DELAY_MS = 5200;
 const DEFAULT_TIMEOUT_MS = 12000;
 const DEFAULT_RSS_LOOKBACK_DAYS = 30;
 const DEFAULT_RSS_MAX_ITEMS_PER_FEED = 40;
+const DEFAULT_AI_RESEARCH_LOOKBACK_DAYS = 14;
+const DEFAULT_AI_RESEARCH_EVENTS_PER_ARTIST = 3;
 
 export async function GET(request: Request) {
   const auth = await requireAdminRequest(request);
@@ -99,7 +105,7 @@ export async function POST(request: Request) {
     const supabase = createServiceRoleClient();
     const allArtists = await loadActiveArtists(supabase);
     const artistIds = allArtists.map((artist) => artist.id);
-    const [latestGdeltDates, latestMediaRssDates] = await Promise.all([
+    const [latestGdeltDates, latestMediaRssDates, latestAiResearchDates] = await Promise.all([
       loadLatestObservationDates({
         supabase,
         artistIds,
@@ -112,6 +118,13 @@ export async function POST(request: Request) {
         artistIds,
         source: "media_rss",
         metric: "article_count",
+        runDate
+      }),
+      loadLatestObservationDates({
+        supabase,
+        artistIds,
+        source: "ai_research",
+        metric: "event_count",
         runDate
       })
     ]);
@@ -126,6 +139,7 @@ export async function POST(request: Request) {
           artists: allArtists,
           latestGdeltDates,
           latestMediaRssDates,
+          latestAiResearchDates,
           limit: artistLimit
         });
     const selectedArtistIds = artists.map((artist) => artist.id);
@@ -170,9 +184,42 @@ export async function POST(request: Request) {
       delayMs: Math.min(delayMs, 1000),
       timeoutMs
     });
-    const mergedEventsByArtist = mergeEvents(result.eventsByArtist, mediaRss.eventsByArtist);
+    const aiResearchEnabled = body.includeAiResearch ?? getEnvBoolean("MARKET_AI_RESEARCH_ENABLED", config.aiResearchConfigured);
+    const aiResearch = aiResearchEnabled
+      ? await collectAiResearchMarketEvents({
+          artists,
+          runDate,
+          externalIds,
+          apiKey: process.env.GROQ_API_KEY,
+          model: process.env.MARKET_AI_RESEARCH_MODEL,
+          lookbackDays: normalizeInteger(
+            body.aiResearchLookbackDays,
+            getEnvInteger("MARKET_AI_RESEARCH_LOOKBACK_DAYS", DEFAULT_AI_RESEARCH_LOOKBACK_DAYS, 1, 30),
+            1,
+            30
+          ),
+          maxEventsPerArtist: normalizeInteger(
+            body.aiResearchMaxEventsPerArtist,
+            getEnvInteger("MARKET_AI_RESEARCH_EVENTS_PER_ARTIST", DEFAULT_AI_RESEARCH_EVENTS_PER_ARTIST, 1, 5),
+            1,
+            5
+          ),
+          delayMs: getEnvInteger("MARKET_AI_RESEARCH_DELAY_MS", 500, 0, 5000),
+          timeoutMs
+        })
+      : {
+          observations: [],
+          eventsByArtist: {},
+          warnings: config.aiResearchConfigured
+            ? []
+            : ["AI research key is missing; source-backed AI market discovery was skipped."]
+        };
+    const mergedEventsByArtist = mergeEvents(
+      mergeEvents(result.eventsByArtist, mediaRss.eventsByArtist),
+      aiResearch.eventsByArtist
+    );
     const events = flattenEvents(mergedEventsByArtist);
-    const observations = [...result.observations, ...mediaRss.observations];
+    const observations = [...result.observations, ...mediaRss.observations, ...aiResearch.observations];
     const statusHaltCandidates = buildStatusHaltCandidates(events, artists);
     const autoHaltStatusEvents = getEnvBoolean("MARKET_AUTO_HALT_DEATH_EVENTS", true);
 
@@ -197,8 +244,10 @@ export async function POST(request: Request) {
       eventCount: events.length,
       gdeltEventCount: flattenEvents(result.eventsByArtist).length,
       mediaRssEventCount: flattenEvents(mediaRss.eventsByArtist).length,
+      aiResearchEnabled,
+      aiResearchEventCount: flattenEvents(aiResearch.eventsByArtist).length,
       mediaRssScannedFeedCount: mediaRss.scannedFeedCount,
-      warnings: mediaRss.warnings,
+      warnings: [...mediaRss.warnings, ...aiResearch.warnings],
       autoHaltStatusEvents,
       statusHaltCandidateCount: statusHaltCandidates.length,
       statusHaltCandidates,
@@ -207,7 +256,11 @@ export async function POST(request: Request) {
         id: artist.id,
         ticker: artist.ticker,
         name: artist.name,
-        latestNewsScanDate: getOldestScanDate(latestGdeltDates[artist.id], latestMediaRssDates[artist.id])
+        latestNewsScanDate: getOldestScanDate(
+          latestGdeltDates[artist.id],
+          latestMediaRssDates[artist.id],
+          latestAiResearchDates[artist.id]
+        )
       })),
       topEvents: events.slice(0, 8).map((event) => ({
         artistId: event.artistId,
@@ -259,17 +312,29 @@ function selectArtistsForEventScan({
   artists,
   latestGdeltDates,
   latestMediaRssDates,
+  latestAiResearchDates,
   limit
 }: {
   artists: MarketUpdateArtist[];
   latestGdeltDates: Record<string, string>;
   latestMediaRssDates: Record<string, string>;
+  latestAiResearchDates: Record<string, string>;
   limit: number;
 }) {
   return [...artists]
     .sort((first, second) => {
-      const firstDate = getOldestScanDate(latestGdeltDates[first.id], latestMediaRssDates[first.id]) ?? "";
-      const secondDate = getOldestScanDate(latestGdeltDates[second.id], latestMediaRssDates[second.id]) ?? "";
+      const firstDate =
+        getOldestScanDate(
+          latestGdeltDates[first.id],
+          latestMediaRssDates[first.id],
+          latestAiResearchDates[first.id]
+        ) ?? "";
+      const secondDate =
+        getOldestScanDate(
+          latestGdeltDates[second.id],
+          latestMediaRssDates[second.id],
+          latestAiResearchDates[second.id]
+        ) ?? "";
 
       if (firstDate !== secondDate) {
         return firstDate.localeCompare(secondDate);
@@ -425,12 +490,10 @@ function normalizeFeedUrls(values: unknown) {
   return urls.length ? urls : undefined;
 }
 
-function getOldestScanDate(first?: string, second?: string) {
-  if (first && second) {
-    return first < second ? first : second;
-  }
+function getOldestScanDate(...dates: Array<string | undefined>) {
+  const presentDates = dates.filter((date): date is string => Boolean(date));
 
-  return first ?? second ?? null;
+  return presentDates.sort()[0] ?? null;
 }
 
 function normalizeDate(value: unknown) {

@@ -475,7 +475,8 @@ async function collectRealSignals({
   const useYoutube = source === "youtube" || source === "core" || source === "blended";
   const useWikimedia = source === "wikimedia" || source === "core" || source === "blended";
   const useReddit = source === "reddit" || ((source === "core" || source === "blended") && hasRedditCredentials());
-  const useBluesky = source === "bluesky" || source === "core" || source === "blended";
+  const useBluesky =
+    source === "bluesky" || ((source === "core" || source === "blended") && getEnvBoolean("MARKET_BLUESKY_ENABLED", false));
   const useTradeFlow = Boolean(supabase) && isRealExternalSource(source);
   const warnings: string[] = [];
 
@@ -863,6 +864,24 @@ function getEnvInteger(name: string, fallback: number, min: number, max: number)
   return Math.min(max, Math.max(min, parsed));
 }
 
+function getEnvBoolean(name: string, fallback: boolean) {
+  const value = process.env[name]?.trim().toLowerCase();
+
+  if (!value) {
+    return fallback;
+  }
+
+  if (["1", "true", "yes", "on"].includes(value)) {
+    return true;
+  }
+
+  if (["0", "false", "no", "off"].includes(value)) {
+    return false;
+  }
+
+  return fallback;
+}
+
 function getEnvList(name: string) {
   const values = (process.env[name] ?? "")
     .split(",")
@@ -912,6 +931,7 @@ async function collectEventSignals({
         runDate,
         lookbackDays: 30
       });
+      storedEvents = filterStoredEventsForSourcePolicy(storedEvents, source);
     } catch (error) {
       if (!dryRun) {
         throw error;
@@ -949,4 +969,29 @@ async function collectEventSignals({
     warnings,
     submittedEventsByArtist
   };
+}
+
+function filterStoredEventsForSourcePolicy(
+  eventsByArtist: Record<string, MarketEvent[]>,
+  source: MarketUpdateSource
+) {
+  const allowBluesky =
+    source === "bluesky" || ((source === "core" || source === "blended") && getEnvBoolean("MARKET_BLUESKY_ENABLED", false));
+
+  if (allowBluesky) {
+    return eventsByArtist;
+  }
+
+  return Object.fromEntries(
+    Object.entries(eventsByArtist)
+      .map(([artistId, events]) => [
+        artistId,
+        events.filter((event) => {
+          const eventSource = typeof event.rawPayload.source === "string" ? event.rawPayload.source : "";
+
+          return eventSource !== "bluesky_post";
+        })
+      ])
+      .filter(([, events]) => events.length > 0)
+  );
 }

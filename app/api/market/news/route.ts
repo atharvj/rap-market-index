@@ -27,6 +27,9 @@ type MarketNewsItem = {
   sourceDomain: string | null;
   sourceIconUrl: string | null;
   thumbnailUrl: string | null;
+  mediaUrl: string | null;
+  mediaType: string | null;
+  mediaLabel: string | null;
   sentimentScore: number;
   impactScore: number;
   confidence: number;
@@ -103,15 +106,22 @@ export async function GET(request: Request) {
     }
 
     const rankedEvents = ((data ?? []) as MarketEventRow[])
-      .filter((event) => artistById.has(event.artist_id) && isPublicMarketNewsEvent(event))
+      .filter(
+        (event) =>
+          artistById.has(event.artist_id) &&
+          isPublicMarketNewsEvent(event, {
+            feedMode: selectedArtistId ? "artist" : feedMode
+          })
+      )
       .sort((first, second) => getNewsImportanceScore(second, runDate) - getNewsImportanceScore(first, runDate));
     const eventNews = diversifyMarketNewsEvents(rankedEvents, {
       feedMode: selectedArtistId ? "artist" : feedMode,
       limit
     }).map((event) => mapMarketEventToNewsItem(event, artistById));
-    const news = selectedArtistId
-      ? eventNews
-      : fillWithMarketPulseNews(eventNews, artists, {
+    const news =
+      selectedArtistId || feedMode !== "home"
+        ? eventNews.slice(0, limit)
+        : fillWithMarketPulseNews(eventNews, artists, {
           feedMode,
           limit,
           runDate
@@ -174,6 +184,9 @@ function mapMarketEventToNewsItem(
     sourceDomain,
     sourceIconUrl: getSourceIconUrl(sourceDomain, sourceName),
     thumbnailUrl: getEventThumbnailUrl(rawPayload),
+    mediaUrl: getSupportingMediaUrl(rawPayload),
+    mediaType: getSupportingMediaType(rawPayload),
+    mediaLabel: getSupportingMediaLabel(rawPayload),
     sentimentScore: Number(event.sentiment_score),
     impactScore: Number(event.impact_score),
     confidence: Number(event.confidence),
@@ -217,7 +230,14 @@ function getInteger(value: string | null, fallback: number, min: number, max: nu
   return Math.min(max, Math.max(min, parsed));
 }
 
-function isPublicMarketNewsEvent(event: MarketEventRow) {
+function isPublicMarketNewsEvent(
+  event: MarketEventRow,
+  {
+    feedMode
+  }: {
+    feedMode: NewsFeedMode;
+  }
+) {
   const rawPayload = toRawPayload(event.raw_payload);
   const source = getRawString(rawPayload.source);
   const title = event.title.toLowerCase();
@@ -250,11 +270,15 @@ function isPublicMarketNewsEvent(event: MarketEventRow) {
   }
 
   if (source === "youtube_upload_event") {
-    return isPublicYoutubeUploadEvent(event, rawPayload, title, impactScore, confidence);
+    return isPublicYoutubeUploadEvent(event, rawPayload, title, impactScore, confidence, feedMode);
   }
 
   if (source === "musicbrainz_release_group") {
     return event.event_type === "release" && impactScore >= 25 && confidence >= 0.55;
+  }
+
+  if (source === "ai_research_event") {
+    return isPublicAiResearchEvent(event, rawPayload, title, impactScore, confidence);
   }
 
   if (source === "gdelt_article" || source === "media_rss_item") {
@@ -298,6 +322,42 @@ function isPublicSocialCatalystEvent(
   return isMeaningfulCatalyst && hasEnoughPublicSignal && Math.abs(impactScore) >= 24 && confidence >= 0.52;
 }
 
+function isPublicAiResearchEvent(
+  event: MarketEventRow,
+  rawPayload: Record<string, unknown>,
+  title: string,
+  impactScore: number,
+  confidence: number
+) {
+  const evidenceLevel = getRawString(rawPayload.evidenceLevel);
+  const sourceType = getRawString(rawPayload.sourceType);
+  const sourceTier = getRawNumber(rawPayload.sourceTier) ?? 0;
+  const sourceWasFoundBySearch = rawPayload.sourceWasFoundBySearch === true;
+  const sourceUrl = event.source_url ?? (getRawText(rawPayload.sourceUrl) || getRawText(rawPayload.url));
+
+  if (evidenceLevel === "low_signal" || isLowSignalSocialTitle(title) || isLowValueArticleTitle(title)) {
+    return false;
+  }
+
+  if (!sourceUrl || !isSafeHttpUrl(sourceUrl)) {
+    return false;
+  }
+
+  if (evidenceLevel === "rumor") {
+    return Math.abs(impactScore) >= 50 && confidence >= 0.82;
+  }
+
+  if (sourceType === "social" || sourceType === "community") {
+    return sourceWasFoundBySearch && Math.abs(impactScore) >= 36 && confidence >= 0.72;
+  }
+
+  if (sourceTier <= 0) {
+    return sourceWasFoundBySearch && Math.abs(impactScore) >= 36 && confidence >= 0.68;
+  }
+
+  return Math.abs(impactScore) >= 22 && confidence >= 0.58;
+}
+
 function getNewsImportanceScore(event: MarketEventRow, runDate: string) {
   const impactScore = Math.abs(Number(event.impact_score));
   const confidence = Number(event.confidence);
@@ -327,6 +387,10 @@ function getSourceWeight(source: string) {
 
   if (source === "gdelt_article" || source === "media_rss_item") {
     return 14;
+  }
+
+  if (source === "ai_research_event") {
+    return 24;
   }
 
   if (source === "reddit_post") {
@@ -411,10 +475,6 @@ function getMinimumFeedRows(feedMode: NewsFeedMode, limit: number) {
     return Math.min(limit, 5);
   }
 
-  if (feedMode === "news") {
-    return Math.min(limit, 14);
-  }
-
   return 0;
 }
 
@@ -455,6 +515,9 @@ function createMarketPulseNewsItem(artist: ArtistRow, runDate: string): MarketNe
     sourceDomain: null,
     sourceIconUrl: "/logo.svg",
     thumbnailUrl: null,
+    mediaUrl: null,
+    mediaType: null,
+    mediaLabel: null,
     sentimentScore: positive ? 18 : -18,
     impactScore: Math.round(absMove * 12 + hypeScore * 0.75),
     confidence: 0.72,
@@ -492,7 +555,8 @@ function isPublicYoutubeUploadEvent(
   rawPayload: Record<string, unknown>,
   title: string,
   impactScore: number,
-  confidence: number
+  confidence: number,
+  feedMode: NewsFeedMode
 ) {
   const releaseKind = getRawString(rawPayload.releaseKind);
   const classificationReason = getRawString(rawPayload.classificationReason);
@@ -512,6 +576,7 @@ function isPublicYoutubeUploadEvent(
   const isMusicVideo = title.includes("official video") || title.includes("music video");
   const isTrackAudio = title.includes("official audio") || title.includes("audio");
   const isStandaloneTrackAudio = rawPayload.standaloneTrackAudio === true;
+  const isMainFeed = feedMode === "home" || feedMode === "news";
   const isMajorProjectRelease = ["album", "ep", "mixtape"].includes(releaseKind) || hasNamedProject;
   const minimumViews = isMajorProjectRelease || isMusicVideo || isProjectCluster ? 25_000 : isTrackAudio ? 90_000 : 60_000;
   const engagementScore = likeCount * 8 + commentCount * 20;
@@ -528,13 +593,17 @@ function isPublicYoutubeUploadEvent(
       : viewCount >= minimumViews || clusterTotalViews >= 85_000 || (viewCount >= 15_000 && hasStrongEngagement);
 
   if (classificationReason === "track_audio_upload_title" || (isTrackAudio && !isProjectCluster && !isMajorProjectRelease)) {
+    const mainFeedMinimumViews = 1_000_000;
+    const artistFeedMinimumViews = 500_000;
+
     return (
       isStandaloneTrackAudio &&
       !hasLowSignalYoutubeTitle(title) &&
       typeof viewCount === "number" &&
-      viewCount >= 500_000 &&
-      impactScore >= 48 &&
-      confidence >= 0.7
+      viewCount >= (isMainFeed ? mainFeedMinimumViews : artistFeedMinimumViews) &&
+      (isMainFeed ? hasStrongEngagement || viewCount >= 2_500_000 : true) &&
+      impactScore >= (isMainFeed ? 58 : 48) &&
+      confidence >= (isMainFeed ? 0.76 : 0.7)
     );
   }
 
@@ -550,6 +619,10 @@ function isPublicYoutubeUploadEvent(
     return false;
   }
 
+  if (isMainFeed && isGenericCluster && clusterTotalViews < 350_000) {
+    return false;
+  }
+
   if (qualityMultiplier < 0.75 && !isProjectCluster) {
     return false;
   }
@@ -559,7 +632,7 @@ function isPublicYoutubeUploadEvent(
   }
 
   if (event.event_type === "release") {
-    return impactScore >= 32 && confidence >= 0.58;
+    return impactScore >= (isMainFeed ? 42 : 32) && confidence >= (isMainFeed ? 0.66 : 0.58);
   }
 
   if (event.event_type === "viral" || event.event_type === "controversy") {
@@ -598,6 +671,40 @@ function getRawText(value: unknown) {
 
 function getRawNumber(value: unknown) {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+function getSupportingMediaUrl(rawPayload: Record<string, unknown>) {
+  const url = getRawText(rawPayload.supportingMediaUrl);
+
+  return isSafeHttpUrl(url) ? url : null;
+}
+
+function getSupportingMediaType(rawPayload: Record<string, unknown>) {
+  const type = getRawString(rawPayload.supportingMediaType);
+
+  if (type === "youtube" || type === "spotify" || type === "other") {
+    return type;
+  }
+
+  return null;
+}
+
+function getSupportingMediaLabel(rawPayload: Record<string, unknown>) {
+  const type = getSupportingMediaType(rawPayload);
+
+  if (type === "youtube") {
+    return "Watch";
+  }
+
+  if (type === "spotify") {
+    return "Listen";
+  }
+
+  if (type === "other") {
+    return "Open";
+  }
+
+  return null;
 }
 
 function getEventThumbnailUrl(rawPayload: Record<string, unknown>) {

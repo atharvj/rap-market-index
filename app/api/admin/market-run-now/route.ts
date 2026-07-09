@@ -27,6 +27,8 @@ type MarketEventScanResponse = {
   eventCount?: number;
   gdeltEventCount?: number;
   mediaRssEventCount?: number;
+  aiResearchEnabled?: boolean;
+  aiResearchEventCount?: number;
   mediaRssScannedFeedCount?: number;
   warnings?: string[];
   eventTypeCounts?: Record<string, number>;

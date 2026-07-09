@@ -2,7 +2,7 @@
 
 import { formatDate } from "@/lib/formatters";
 import clsx from "clsx";
-import { ArrowRight, ExternalLink } from "lucide-react";
+import { ArrowRight, ExternalLink, Headphones, PlayCircle } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
@@ -19,6 +19,9 @@ type MarketNewsItem = {
   sourceDomain?: string | null;
   sourceIconUrl?: string | null;
   thumbnailUrl?: string | null;
+  mediaUrl?: string | null;
+  mediaType?: string | null;
+  mediaLabel?: string | null;
   sentimentScore: number;
   impactScore: number;
   confidence: number;
@@ -181,6 +184,7 @@ function HomeLeadStory({ item }: { item: MarketNewsItem }) {
               <ImpactGauge label="Confidence" value={item.confidence * 100} positive />
             </div>
             <div className="flex items-center gap-3">
+              <MediaLink item={item} />
               <Link
                 href={`/artists/${item.artistId}`}
                 className="inline-flex min-h-9 items-center gap-2 rounded bg-paper px-3 text-xs font-black text-ink hover:bg-paper/90"
@@ -216,7 +220,10 @@ function HomeStoryCard({ item }: { item: MarketNewsItem }) {
         </h3>
         <div className="flex items-center justify-between gap-3 border-t border-line pt-3">
           <SourceMeta item={item} />
-          <SourceLink item={item} />
+          <div className="flex items-center gap-2">
+            <MediaLink item={item} compact />
+            <SourceLink item={item} />
+          </div>
         </div>
       </div>
     </article>
@@ -288,7 +295,10 @@ function MarketNewsArticle({
               >
                 {item.ticker}
               </Link>
-              <SourceLink item={item} />
+              <div className="flex items-center gap-2">
+                <MediaLink item={item} compact />
+                <SourceLink item={item} />
+              </div>
             </div>
             {meta}
             <h3 className="mt-2 text-xl font-black leading-tight text-paper">{title}</h3>
@@ -314,7 +324,10 @@ function MarketNewsArticle({
             </Link>
           ) : null}
         </div>
-        <SourceLink item={item} />
+        <div className="flex flex-col items-end gap-2">
+          <MediaLink item={item} compact />
+          <SourceLink item={item} />
+        </div>
       </div>
     </article>
   );
@@ -463,6 +476,29 @@ function SourceLink({ item }: { item: MarketNewsItem }) {
       aria-label="Open source"
     >
       <ExternalLink className="h-4 w-4" />
+    </a>
+  );
+}
+
+function MediaLink({ item, compact = false }: { item: MarketNewsItem; compact?: boolean }) {
+  if (!item.mediaUrl || !item.mediaLabel) {
+    return null;
+  }
+
+  const Icon = item.mediaType === "youtube" ? PlayCircle : Headphones;
+
+  return (
+    <a
+      href={item.mediaUrl}
+      target="_blank"
+      rel="noreferrer"
+      className={clsx(
+        "inline-flex items-center gap-1.5 rounded border border-line bg-panelSoft text-xs font-black text-paper/65 hover:border-cyan/45 hover:text-cyan",
+        compact ? "px-1.5 py-1" : "min-h-9 px-3"
+      )}
+    >
+      <Icon className="h-3.5 w-3.5" aria-hidden="true" />
+      {compact ? null : <span>{item.mediaLabel}</span>}
     </a>
   );
 }

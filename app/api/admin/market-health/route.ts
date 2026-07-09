@@ -130,6 +130,9 @@ const OBSERVATION_SERIES = [
   { source: "gdelt", metric: "article_count", label: "News article count", warningThreshold: null },
   { source: "media_rss", metric: "article_count", label: "Media feed article count", warningThreshold: null },
   { source: "media_rss", metric: "classified_event_count", label: "Media feed event matches", warningThreshold: null },
+  { source: "ai_research", metric: "event_count", label: "AI source-backed events", warningThreshold: null },
+  { source: "ai_research", metric: "high_confidence_event_count", label: "AI high-confidence events", warningThreshold: null },
+  { source: "ai_research", metric: "source_count", label: "AI source count", warningThreshold: null },
   { source: "reddit", metric: "post_count", label: "Community post count", warningThreshold: null },
   { source: "reddit", metric: "engagement_score", label: "Community engagement", warningThreshold: null },
   { source: "reddit", metric: "hype_post_count", label: "Community hype posts", warningThreshold: null },
@@ -852,6 +855,10 @@ function buildWarnings({
 
   if (!config.cronSecretConfigured) {
     warnings.push("CRON_SECRET is missing, so scheduled production market updates are not ready.");
+  }
+
+  if (!config.aiResearchConfigured) {
+    warnings.push("GROQ_API_KEY is missing, so source-backed AI event discovery is not active.");
   }
 
   if (configuredModelVersion !== defaultModelVersion) {
