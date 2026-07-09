@@ -215,6 +215,8 @@ function buildArtistEventSignal(artist: MarketUpdateArtist, runDate: string, eve
         reactionConfirmingSourceCount: event.reactionConfirmingSourceCount,
         reactionOpposingSourceCount: event.reactionOpposingSourceCount,
         reactionNetPublicImpact: event.reactionNetPublicImpact,
+        evidenceSafetyLabel: event.evidenceSafetyLabel,
+        evidenceSafetyMultiplier: event.evidenceSafetyMultiplier,
         uncappedWeightedImpact: event.uncappedWeightedImpact,
         shockWeightedImpact: event.shockWeightedImpact,
         weightedImpact: event.weightedImpact
@@ -243,6 +245,8 @@ type ScoredMarketEvent = ReturnType<typeof scoreEvent> & {
   reactionConfirmingSourceCount: number;
   reactionOpposingSourceCount: number;
   reactionNetPublicImpact: number;
+  evidenceSafetyLabel: string;
+  evidenceSafetyMultiplier: number;
 };
 
 function getEventSignalConfidence(scoredEvents: ScoredMarketEvent[]) {
@@ -815,6 +819,9 @@ function getAiResearchEventProvenance(event: MarketEvent, artist: MarketUpdateAr
   const evidenceLevel = getRawString(event.rawPayload.evidenceLevel) ?? "reported";
   const sourceType = getRawString(event.rawPayload.sourceType) ?? "";
   const reachScope = getRawString(event.rawPayload.reachScope) ?? "";
+  const corroboratingSourceCount = getRawOptionalNumber(event.rawPayload.corroboratingSourceCount) ?? 1;
+  const publicReactionConfirmed = getRawBoolean(event.rawPayload.publicReactionConfirmed);
+  const factualClaimConfirmed = getRawBoolean(event.rawPayload.factualClaimConfirmed);
   const audienceMultiplier = getCommunityAudienceMultiplier(artist);
   const tierProfiles: Record<number, { impact: number; confidence: number }> = {
     0: { impact: 0.74, confidence: 0.88 },
@@ -850,6 +857,34 @@ function getAiResearchEventProvenance(event: MarketEvent, artist: MarketUpdateAr
   const communityLift = sourceType === "community" || reachScope === "underground" || reachScope === "scene"
     ? audienceMultiplier
     : { impact: 1, confidence: 1 };
+  const isSocialOrCommunity = sourceType === "social" || sourceType === "community";
+
+  if (hasHighRiskEvidenceFlags(event)) {
+    return {
+      label: `ai-research-${sourceType || "source"}-rejected-risk`,
+      impactMultiplier: 0,
+      confidenceMultiplier: 0.25
+    };
+  }
+
+  if (evidenceLevel === "rumor" || evidenceLevel === "low_signal") {
+    return {
+      label: `ai-research-${sourceType || "source"}-unconfirmed`,
+      impactMultiplier: 0,
+      confidenceMultiplier: 0.3
+    };
+  }
+
+  if (
+    isSocialOrCommunity &&
+    (!factualClaimConfirmed || (!publicReactionConfirmed && corroboratingSourceCount < 2))
+  ) {
+    return {
+      label: `ai-research-${sourceType}-needs-confirmation`,
+      impactMultiplier: 0.14,
+      confidenceMultiplier: 0.4
+    };
+  }
 
   return {
     label: `ai-research-${sourceType || "source"}-${evidenceLevel}`,
@@ -924,13 +959,97 @@ function applyEventClusterCaps(scoredEvents: Array<ReturnType<typeof scoreEvent>
       reactionConfirmingSourceCount: 0,
       reactionOpposingSourceCount: 0,
       reactionNetPublicImpact: 0,
+      evidenceSafetyLabel: "not_checked",
+      evidenceSafetyMultiplier: 1,
       uncappedWeightedImpact: event.weightedImpact,
       shockWeightedImpact: clamp(weightedImpact * shockDecayMultiplier, -100, 100),
       weightedImpact
     };
   });
 
-  return applyReleaseCycleContext(applyReactionConsensusContext(clusteredEvents));
+  return applyReleaseCycleContext(applyEvidenceSafetyContext(applyReactionConsensusContext(clusteredEvents)));
+}
+
+function applyEvidenceSafetyContext(scoredEvents: ScoredMarketEvent[]): ScoredMarketEvent[] {
+  return scoredEvents.map((event) => {
+    const safety = getEvidenceSafetyAdjustment(event);
+    const weightedImpact = clamp(event.weightedImpact * safety.multiplier, -100, 100);
+    const shockWeightedImpact = clamp(event.shockWeightedImpact * safety.multiplier, -100, 100);
+
+    return {
+      ...event,
+      evidenceSafetyLabel: safety.label,
+      evidenceSafetyMultiplier: safety.multiplier,
+      weightedImpact,
+      shockWeightedImpact
+    };
+  });
+}
+
+function getEvidenceSafetyAdjustment(event: ScoredMarketEvent) {
+  const sourceClass = getReactionSourceClass(event);
+  const source = getRawString(event.event.rawPayload.source) ?? "";
+  const evidenceLevel = getRawString(event.event.rawPayload.evidenceLevel) ?? "";
+  const isSocialOrCommunity = sourceClass === "social" || sourceClass === "community";
+
+  if (hasHighRiskEvidenceFlags(event)) {
+    return {
+      label: "rejected_high_risk_evidence",
+      multiplier: 0
+    };
+  }
+
+  if (evidenceLevel === "rumor" || evidenceLevel === "low_signal") {
+    return {
+      label: "rejected_unconfirmed_evidence",
+      multiplier: 0
+    };
+  }
+
+  if (!isSocialOrCommunity) {
+    return {
+      label: "not_social_evidence",
+      multiplier: 1
+    };
+  }
+
+  const corroboratingSourceCount = getRawOptionalNumber(event.event.rawPayload.corroboratingSourceCount) ?? 1;
+  const publicReactionConfirmed = getRawBoolean(event.event.rawPayload.publicReactionConfirmed);
+  const factualClaimConfirmed = getRawBoolean(event.event.rawPayload.factualClaimConfirmed);
+  const hasClusterConfirmation =
+    event.clusterSourceCount >= 2 ||
+    event.reactionConfirmingSourceCount >= 1 ||
+    corroboratingSourceCount >= 2 ||
+    publicReactionConfirmed;
+  const strongCommunitySignal = hasStrongCommunitySignal(event);
+  const isAiSocialEvent = source === "ai_research_event";
+  const isPositive = event.weightedImpact > 4;
+
+  if (isAiSocialEvent && (!factualClaimConfirmed || !hasClusterConfirmation)) {
+    return {
+      label: "ai_social_needs_independent_confirmation",
+      multiplier: 0.12
+    };
+  }
+
+  if (!hasClusterConfirmation && !strongCommunitySignal) {
+    return {
+      label: isPositive ? "unconfirmed_positive_fan_hype" : "unconfirmed_social_claim",
+      multiplier: isPositive ? 0.2 : 0.34
+    };
+  }
+
+  if (!hasClusterConfirmation) {
+    return {
+      label: "strong_but_single_community_signal",
+      multiplier: isPositive ? 0.48 : 0.62
+    };
+  }
+
+  return {
+    label: "social_evidence_confirmed",
+    multiplier: 1
+  };
 }
 
 function applyReactionConsensusContext(scoredEvents: ScoredMarketEvent[]): ScoredMarketEvent[] {
@@ -1724,6 +1843,66 @@ function getRawOptionalNumber(value: unknown) {
   }
 
   return null;
+}
+
+function getRawBoolean(value: unknown) {
+  if (typeof value === "boolean") {
+    return value;
+  }
+
+  if (typeof value === "string") {
+    return value.trim().toLowerCase() === "true";
+  }
+
+  return false;
+}
+
+function getRiskFlags(rawPayload: Record<string, unknown>) {
+  const value = rawPayload.riskFlags;
+
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value.filter((item): item is string => typeof item === "string").map((item) => normalizeEventText(item));
+}
+
+function hasHighRiskEvidenceFlags(value: MarketEvent | { event: MarketEvent }) {
+  const event = "event" in value ? value.event : value;
+  const flags = getRiskFlags(event.rawPayload);
+
+  return flags.some((flag) =>
+    [
+      "sarcasm",
+      "joke",
+      "meme",
+      "fake",
+      "hoax",
+      "unverified",
+      "private",
+      "screenshot",
+      "troll",
+      "parody",
+      "satire",
+      "copypasta",
+      "bot"
+    ].some((term) => flag.includes(term))
+  );
+}
+
+function hasStrongCommunitySignal(event: ScoredMarketEvent) {
+  const viralityTier = getRawString(event.event.rawPayload.viralityTier);
+  const engagement = getRawOptionalNumber(event.event.rawPayload.engagement) ?? 0;
+  const score = getRawOptionalNumber(event.event.rawPayload.score) ?? 0;
+  const commentCount = getRawOptionalNumber(event.event.rawPayload.commentCount) ?? 0;
+
+  return (
+    viralityTier === "major" ||
+    viralityTier === "breakout" ||
+    engagement >= 150 ||
+    score >= 500 ||
+    commentCount >= 120
+  );
 }
 
 function escapeRegExp(value: string) {

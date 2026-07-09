@@ -249,6 +249,10 @@ function isPublicMarketNewsEvent(
     return false;
   }
 
+  if (hasHighRiskEvidenceFlags(rawPayload)) {
+    return false;
+  }
+
   if (hasStatusSubtype) {
     return impactScore >= 18 && confidence >= 0.45;
   }
@@ -334,8 +338,17 @@ function isPublicAiResearchEvent(
   const sourceTier = getRawNumber(rawPayload.sourceTier) ?? 0;
   const sourceWasFoundBySearch = rawPayload.sourceWasFoundBySearch === true;
   const sourceUrl = event.source_url ?? (getRawText(rawPayload.sourceUrl) || getRawText(rawPayload.url));
+  const corroboratingSourceCount = getRawNumber(rawPayload.corroboratingSourceCount) ?? 1;
+  const publicReactionConfirmed = getRawBoolean(rawPayload.publicReactionConfirmed);
+  const factualClaimConfirmed = getRawBoolean(rawPayload.factualClaimConfirmed);
 
-  if (evidenceLevel === "low_signal" || isLowSignalSocialTitle(title) || isLowValueArticleTitle(title)) {
+  if (
+    evidenceLevel === "low_signal" ||
+    evidenceLevel === "rumor" ||
+    hasHighRiskEvidenceFlags(rawPayload) ||
+    isLowSignalSocialTitle(title) ||
+    isLowValueArticleTitle(title)
+  ) {
     return false;
   }
 
@@ -343,12 +356,14 @@ function isPublicAiResearchEvent(
     return false;
   }
 
-  if (evidenceLevel === "rumor") {
-    return Math.abs(impactScore) >= 50 && confidence >= 0.82;
-  }
-
   if (sourceType === "social" || sourceType === "community") {
-    return sourceWasFoundBySearch && Math.abs(impactScore) >= 36 && confidence >= 0.72;
+    return (
+      sourceWasFoundBySearch &&
+      factualClaimConfirmed &&
+      (publicReactionConfirmed || corroboratingSourceCount >= 2) &&
+      Math.abs(impactScore) >= 36 &&
+      confidence >= 0.76
+    );
   }
 
   if (sourceTier <= 0) {
@@ -671,6 +686,48 @@ function getRawText(value: unknown) {
 
 function getRawNumber(value: unknown) {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+function getRawBoolean(value: unknown) {
+  if (typeof value === "boolean") {
+    return value;
+  }
+
+  if (typeof value === "string") {
+    return value.trim().toLowerCase() === "true";
+  }
+
+  return false;
+}
+
+function getRiskFlags(rawPayload: Record<string, unknown>) {
+  const value = rawPayload.riskFlags;
+
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value.filter((item): item is string => typeof item === "string").map((item) => item.toLowerCase());
+}
+
+function hasHighRiskEvidenceFlags(rawPayload: Record<string, unknown>) {
+  return getRiskFlags(rawPayload).some((flag) =>
+    [
+      "sarcasm",
+      "joke",
+      "meme",
+      "fake",
+      "hoax",
+      "unverified",
+      "private",
+      "screenshot",
+      "troll",
+      "parody",
+      "satire",
+      "copypasta",
+      "bot"
+    ].some((term) => flag.includes(term))
+  );
 }
 
 function getSupportingMediaUrl(rawPayload: Record<string, unknown>) {

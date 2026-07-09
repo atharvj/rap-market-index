@@ -44,6 +44,9 @@ type AiResearchResponseEvent = {
   supportingMediaUrl?: unknown;
   supportingMediaType?: unknown;
   relatedArtistNames?: unknown;
+  corroboratingSourceCount?: unknown;
+  publicReactionConfirmed?: unknown;
+  factualClaimConfirmed?: unknown;
   riskFlags?: unknown;
 };
 
@@ -309,7 +312,7 @@ async function fetchAiResearchEvents({
           {
             role: "system",
             content:
-              "You are a source-backed music market research analyst with access to current web search. Return only strict JSON. Never invent news. Only include events that have a real public source URL you found through search or direct source lookup. If source lookup is unavailable or no source-backed market-moving event exists, return {\"events\":[]}. Prefer music publications, official artist/label sources, credible review outlets, chart/source data, and high-signal public community discussion. Reject low-view random uploads, generic fan praise, private/social pages that cannot be verified, and old items outside the requested window."
+              "You are a source-backed music market research analyst with access to current web search. Return only strict JSON. Never invent news. Only include events that have a real public source URL you found through search or direct source lookup. If source lookup is unavailable or no source-backed market-moving event exists, return {\"events\":[]}. Prefer music publications, official artist/label sources, credible review outlets, chart/source data, and high-signal public community discussion. Reject low-view random uploads, generic fan praise, private/social pages that cannot be verified, sarcasm/jokes/memes presented as facts, and old items outside the requested window."
           },
           {
             role: "user",
@@ -394,11 +397,13 @@ function buildResearchPrompt({
     "",
     "Useful events include: album/mixtape/EP releases, major singles/features, tracklist/cover art reactions, credible reviews, public backlash, legal/health status, viral live performances, viral snippets, fan reception shifts, chart/streaming milestones, or a meaningful decline/falloff story.",
     "For releases: if an artist released a project with multiple tracks, report the project/album/mixtape/EP rather than one random track. Only report a standalone song/video when it has clear reach, coverage, or strong reception.",
-    "For controversy or underground scene events: public Reddit/forum/music-blog/community pages can count, but only when there is concrete public evidence and meaningful reach. Private posts, vague screenshots, or one-off fan comments do not count.",
+    "For controversy or underground scene events: public Reddit/forum/music-blog/community pages can count, but only when there is concrete public evidence, meaningful reach, and the underlying claim is not just fan speculation. Private posts, vague screenshots, or one-off fan comments do not count.",
+    "When using fan/community/social sentiment, separate the factual claim from the reaction. A factual claim needs direct public evidence. Fan reaction needs either multiple independent public sources or strong measurable reach. Do not treat sarcasm, jokes, memes, trolling, copied comments, or obvious exaggeration as literal sentiment.",
+    "If a claim is not confirmed, either omit it or mark evidenceLevel as low_signal. Do not use rumor to move price.",
     "Do not include: random low-view audio uploads, generic social chatter, private posts, fan-only praise with no reach, low-quality scraper pages, or news that is not about this artist.",
     "",
     "Return JSON only:",
-    "{\"events\":[{\"title\":\"short event headline\",\"eventDate\":\"YYYY-MM-DD\",\"eventType\":\"release|review|news|controversy|award|tour|viral\",\"sourceName\":\"publication or platform\",\"sourceUrl\":\"https://...\",\"summary\":\"one sentence factual summary\",\"whyItMatters\":\"why it may move the market\",\"sentimentScore\":-100,\"impactScore\":-100,\"confidence\":0.0,\"sourceType\":\"music_publication|mainstream_news|review|official|community|social|video\",\"evidenceLevel\":\"confirmed|reported|rumor|low_signal\",\"reachScope\":\"underground|scene|broad|mainstream\",\"supportingMediaUrl\":\"optional official YouTube or Spotify URL that exactly matches the release/event\",\"supportingMediaType\":\"youtube|spotify|other|none\",\"relatedArtistNames\":[\"artist names\"],\"riskFlags\":[\"optional concerns\"]}]}",
+    "{\"events\":[{\"title\":\"short event headline\",\"eventDate\":\"YYYY-MM-DD\",\"eventType\":\"release|review|news|controversy|award|tour|viral\",\"sourceName\":\"publication or platform\",\"sourceUrl\":\"https://...\",\"summary\":\"one sentence factual summary\",\"whyItMatters\":\"why it may move the market\",\"sentimentScore\":-100,\"impactScore\":-100,\"confidence\":0.0,\"sourceType\":\"music_publication|mainstream_news|review|official|community|social|video\",\"evidenceLevel\":\"confirmed|reported|rumor|low_signal\",\"reachScope\":\"underground|scene|broad|mainstream\",\"supportingMediaUrl\":\"optional official YouTube or Spotify URL that exactly matches the release/event\",\"supportingMediaType\":\"youtube|spotify|other|none\",\"relatedArtistNames\":[\"artist names\"],\"corroboratingSourceCount\":1,\"publicReactionConfirmed\":false,\"factualClaimConfirmed\":false,\"riskFlags\":[\"optional concerns\"]}]}",
     "Use positive impact for bullish events and negative impact for bearish events. Confidence must reflect source quality and whether the public reaction is confirmed."
   ].join("\n");
 }
@@ -463,6 +468,9 @@ function normalizeAiResearchEvent({
   const riskFlags = Array.isArray(value.riskFlags)
     ? value.riskFlags.map((item) => getString(item)).filter((item): item is string => Boolean(item))
     : [];
+  const corroboratingSourceCount = clamp(Math.round(getNumber(value.corroboratingSourceCount, 1)), 0, 12);
+  const publicReactionConfirmed = getBoolean(value.publicReactionConfirmed);
+  const factualClaimConfirmed = getBoolean(value.factualClaimConfirmed);
 
   if (!title || !sourceUrl || !domain || !isSafeHttpUrl(sourceUrl) || !resolvedEventType) {
     return null;
@@ -485,7 +493,11 @@ function normalizeAiResearchEvent({
       impactScore,
       confidence,
       sourceWasFoundBySearch,
-      executedToolCount
+      executedToolCount,
+      riskFlags,
+      corroboratingSourceCount,
+      publicReactionConfirmed,
+      factualClaimConfirmed
     })
   ) {
     return null;
@@ -516,6 +528,9 @@ function normalizeAiResearchEvent({
       summary,
       whyItMatters,
       relatedArtistNames,
+      corroboratingSourceCount,
+      publicReactionConfirmed,
+      factualClaimConfirmed,
       riskFlags,
       executedToolCount,
       sourceWasFoundBySearch,
@@ -541,7 +556,11 @@ function isTrustworthyAiEvent({
   impactScore,
   confidence,
   sourceWasFoundBySearch,
-  executedToolCount
+  executedToolCount,
+  riskFlags,
+  corroboratingSourceCount,
+  publicReactionConfirmed,
+  factualClaimConfirmed
 }: {
   domain: string;
   sourceTier: number;
@@ -551,16 +570,20 @@ function isTrustworthyAiEvent({
   confidence: number;
   sourceWasFoundBySearch: boolean;
   executedToolCount: number;
+  riskFlags: string[];
+  corroboratingSourceCount: number;
+  publicReactionConfirmed: boolean;
+  factualClaimConfirmed: boolean;
 }) {
   if (executedToolCount <= 0 || !sourceWasFoundBySearch) {
     return false;
   }
 
-  if (evidenceLevel === "low_signal") {
+  if (evidenceLevel === "low_signal" || evidenceLevel === "rumor") {
     return false;
   }
 
-  if (evidenceLevel === "rumor" && (confidence < 0.78 || Math.abs(impactScore) < 45)) {
+  if (hasHighRiskAiFlags(riskFlags)) {
     return false;
   }
 
@@ -568,8 +591,18 @@ function isTrustworthyAiEvent({
     return false;
   }
 
-  if ((sourceType === "social" || sourceType === "community") && confidence < 0.72) {
-    return false;
+  if (sourceType === "social" || sourceType === "community") {
+    if (confidence < 0.76) {
+      return false;
+    }
+
+    if (!factualClaimConfirmed) {
+      return false;
+    }
+
+    if (!publicReactionConfirmed && corroboratingSourceCount < 2) {
+      return false;
+    }
   }
 
   if (sourceTier === 0 && confidence < 0.68 && Math.abs(impactScore) < 42) {
@@ -577,6 +610,28 @@ function isTrustworthyAiEvent({
   }
 
   return Math.abs(impactScore) >= 18 && confidence >= 0.55;
+}
+
+function hasHighRiskAiFlags(riskFlags: string[]) {
+  return riskFlags.some((flag) => {
+    const normalized = flag.toLowerCase();
+
+    return [
+      "sarcasm",
+      "joke",
+      "meme",
+      "fake",
+      "hoax",
+      "unverified",
+      "private",
+      "screenshot",
+      "troll",
+      "parody",
+      "satire",
+      "copypasta",
+      "bot"
+    ].some((term) => normalized.includes(term));
+  });
 }
 
 function createObservation(
@@ -817,6 +872,18 @@ function getNumber(value: unknown, fallback: number) {
   }
 
   return fallback;
+}
+
+function getBoolean(value: unknown) {
+  if (typeof value === "boolean") {
+    return value;
+  }
+
+  if (typeof value === "string") {
+    return value.trim().toLowerCase() === "true";
+  }
+
+  return false;
 }
 
 function normalizeDate(value: string | null) {
