@@ -345,11 +345,10 @@ function addOfficialAudioReleaseClusterEvent({
     }
 
     const releaseKind = typeof event.rawPayload.releaseKind === "string" ? event.rawPayload.releaseKind : "";
-    const reason =
-      typeof event.rawPayload.classificationReason === "string" ? event.rawPayload.classificationReason : "";
 
     return (
-      (["album", "ep", "mixtape"].includes(releaseKind) || reason === "album_announcement_upload_title") &&
+      ["album", "ep", "mixtape"].includes(releaseKind) &&
+      hasStandaloneProjectReleaseEvidence(event) &&
       Math.abs(daysBetween(event.eventDate, cluster.eventDate)) <= 1
     );
   });
@@ -503,6 +502,28 @@ function suppressClusterTrackEvents(events: MarketEvent[], cluster: { events: Ma
 
     return !videoId || !clusterVideoIds.has(videoId);
   });
+}
+
+function hasStandaloneProjectReleaseEvidence(event: MarketEvent) {
+  const reason = getRawString(event.rawPayload.classificationReason) ?? "";
+  const inferredTitle = getRawString(event.rawPayload.inferredReleaseTitle);
+  const viewCount =
+    getRawNumber(event.rawPayload.viewCount) ??
+    getRawNumber(event.rawPayload.representativeViewCount) ??
+    getRawNumber(event.rawPayload.clusterMaxViews);
+  const relatedUploadCount = getRawNumber(event.rawPayload.relatedUploadCount) ?? 0;
+  const clusterTotalViews = getRawNumber(event.rawPayload.clusterTotalViews) ?? 0;
+  const clusterReachRatio = getRawNumber(event.rawPayload.clusterReachRatio) ?? 0;
+
+  if (inferredTitle || relatedUploadCount >= 3 || clusterTotalViews >= 120_000 || clusterReachRatio >= 0.45) {
+    return true;
+  }
+
+  if (reason === "album_announcement_upload_title") {
+    return typeof viewCount === "number" && viewCount >= 750_000;
+  }
+
+  return false;
 }
 
 function getRepresentativeClusterEvent(events: MarketEvent[]) {
@@ -887,12 +908,31 @@ function getUploadQuality(
     classification.reason === "performance_upload_title" ||
     classification.reason === "track_audio_upload_title" ||
     classification.reason === "tour_upload_title";
+  const titleOnlyProjectGuess = classification.reason === "album_announcement_upload_title";
   const majorReleaseCatalyst =
     classification.reason === "album_announcement_upload_title" ||
     classification.reason === "major_feature_upload_title" ||
     classification.releaseKind === "album" ||
     classification.releaseKind === "ep" ||
     classification.releaseKind === "mixtape";
+
+  if (titleOnlyProjectGuess) {
+    if (typeof viewCount !== "number" || viewCount < 75_000) {
+      return {
+        accepted: false,
+        label: "low_reach_project_guess",
+        multiplier: 0
+      };
+    }
+
+    if (viewCount < 250_000) {
+      return {
+        accepted: true,
+        label: "modest_reach_project_guess",
+        multiplier: 0.62
+      };
+    }
+  }
 
   if ((isShortForm || lowReach) && weakCatalyst) {
     return {

@@ -128,7 +128,7 @@ export async function POST(request: Request) {
       artistOffset: body.artistOffset
     });
 
-    if (!dryRun && supabase) {
+    if (supabase && isRealExternalSource(source)) {
       artists = await applyMarketHistoryBaselines({
         supabase,
         artists,

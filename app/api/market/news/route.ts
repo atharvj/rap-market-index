@@ -8,7 +8,14 @@ export const dynamic = "force-dynamic";
 
 type ArtistRow = Pick<
   Database["public"]["Tables"]["artists"]["Row"],
-  "id" | "name" | "ticker" | "current_price" | "daily_change_percent" | "hype_score" | "last_move_explanation"
+  | "id"
+  | "name"
+  | "ticker"
+  | "current_price"
+  | "daily_change_percent"
+  | "hype_score"
+  | "last_move_explanation"
+  | "updated_at"
 >;
 type MarketEventRow = Database["public"]["Tables"]["market_events"]["Row"];
 type MarketNewsType = Database["public"]["Tables"]["market_events"]["Row"]["event_type"];
@@ -151,7 +158,7 @@ export async function GET(request: Request) {
 async function loadArtists(supabase: ReturnType<typeof createAnonServerClient>) {
   const { data, error } = await supabase
     .from("artists")
-    .select("id,name,ticker,current_price,daily_change_percent,hype_score,last_move_explanation")
+    .select("id,name,ticker,current_price,daily_change_percent,hype_score,last_move_explanation,updated_at")
     .eq("is_active", true);
 
   if (error) {
@@ -497,6 +504,11 @@ function createMarketPulseNewsItem(artist: ArtistRow, runDate: string): MarketNe
   const dailyChangePercent = Number(artist.daily_change_percent);
   const hypeScore = Number(artist.hype_score);
   const currentPrice = Number(artist.current_price);
+  const updatedMarketDate = getTimestampMarketDate(artist.updated_at);
+
+  if (updatedMarketDate !== runDate) {
+    return null;
+  }
 
   if (!Number.isFinite(dailyChangePercent) || !Number.isFinite(hypeScore) || !Number.isFinite(currentPrice)) {
     return null;
@@ -540,6 +552,20 @@ function createMarketPulseNewsItem(artist: ArtistRow, runDate: string): MarketNe
     statusSeverity: null,
     createdAt: null
   };
+}
+
+function getTimestampMarketDate(value: string | null) {
+  if (!value) {
+    return null;
+  }
+
+  const date = new Date(value);
+
+  if (!Number.isFinite(date.getTime())) {
+    return null;
+  }
+
+  return getPacificMarketDate(date);
 }
 
 function getYoutubeCap(feedMode: NewsFeedMode, limit: number) {
@@ -588,6 +614,12 @@ function isPublicYoutubeUploadEvent(
   const hasNamedProject = Boolean(getRawText(rawPayload.inferredReleaseTitle));
   const isProjectCluster = releaseKind === "project" || relatedUploadCount >= 2;
   const isGenericCluster = classificationReason === "official_audio_release_cluster" && !hasNamedProject;
+  const hasProjectEvidence =
+    hasNamedProject ||
+    relatedUploadCount >= 3 ||
+    clusterTotalViews >= 120_000 ||
+    (typeof clusterReachRatio === "number" && clusterReachRatio >= 0.45);
+  const isTitleOnlyProjectGuess = classificationReason === "album_announcement_upload_title" && !hasProjectEvidence;
   const isMusicVideo = title.includes("official video") || title.includes("music video");
   const isTrackAudio = title.includes("official audio") || title.includes("audio");
   const isStandaloneTrackAudio = rawPayload.standaloneTrackAudio === true;
@@ -604,8 +636,21 @@ function isPublicYoutubeUploadEvent(
       (typeof clusterReachRatio === "number" && clusterReachRatio >= 0.45));
   const hasEnoughReach =
     typeof viewCount !== "number"
-      ? hasMeaningfulProjectReach || isMajorProjectRelease
+      ? hasMeaningfulProjectReach
       : viewCount >= minimumViews || clusterTotalViews >= 85_000 || (viewCount >= 15_000 && hasStrongEngagement);
+
+  if (isTitleOnlyProjectGuess) {
+    const minimumProjectGuessViews = isMainFeed ? 750_000 : 250_000;
+
+    return (
+      typeof viewCount === "number" &&
+      viewCount >= minimumProjectGuessViews &&
+      !hasLowSignalYoutubeTitle(title) &&
+      qualityMultiplier >= 0.9 &&
+      impactScore >= (isMainFeed ? 54 : 42) &&
+      confidence >= (isMainFeed ? 0.76 : 0.68)
+    );
+  }
 
   if (classificationReason === "track_audio_upload_title" || (isTrackAudio && !isProjectCluster && !isMajorProjectRelease)) {
     const mainFeedMinimumViews = 1_000_000;

@@ -249,17 +249,22 @@ function buildYoutubeSignal({
     max: 45,
     extremeJumpPoints: 6
   });
+  const uploadAudienceValidation = validateUploadMomentumAgainstAudience({
+    uploadMomentum: uploadMomentum.value,
+    viewMomentum: viewMomentum.value,
+    subscriberMomentum: subscriberMomentum.value
+  });
   const stats: Partial<HypeStats> = {};
 
   if (
     typeof viewMomentum.value === "number" ||
     typeof subscriberMomentum.value === "number" ||
-    typeof uploadMomentum.value === "number"
+    typeof uploadAudienceValidation.value === "number"
   ) {
     const youtubeGrowth = weightedAverage([
-      { value: viewMomentum.value, weight: 0.72 },
-      { value: subscriberMomentum.value, weight: 0.18 },
-      { value: uploadMomentum.value, weight: 0.1 }
+      { value: viewMomentum.value, weight: 0.82 },
+      { value: subscriberMomentum.value, weight: 0.16 },
+      { value: uploadAudienceValidation.value, weight: 0.02 }
     ]);
     const socialGrowth = weightedAverage([
       { value: subscriberMomentum.value, weight: 0.75 },
@@ -278,7 +283,7 @@ function buildYoutubeSignal({
       50 +
         (viewMomentum.value ?? 0) * 0.06 +
         (subscriberMomentum.value ?? 0) * 0.04 +
-        Math.max(0, uploadMomentum.value ?? 0) * 0.35,
+        Math.max(0, uploadAudienceValidation.value ?? 0) * 0.04,
       0,
       100
     );
@@ -304,6 +309,8 @@ function buildYoutubeSignal({
     viewMomentum: viewMomentum.value,
     subscriberMomentum: subscriberMomentum.value,
     uploadMomentum: uploadMomentum.value,
+    audienceValidatedUploadMomentum: uploadAudienceValidation.value,
+    uploadMomentumValidation: uploadAudienceValidation.reason,
     viewMomentumQuality: buildMomentumQualityPayload(viewMomentum),
     subscriberMomentumQuality: buildMomentumQualityPayload(subscriberMomentum),
     uploadMomentumQuality: buildMomentumQualityPayload(uploadMomentum),
@@ -326,10 +333,93 @@ function buildYoutubeSignal({
   return {
     signal: {
       stats,
-      confidence: clamp(0.84 * getCombinedConfidenceMultiplier([viewMomentum, subscriberMomentum, uploadMomentum]), 0.3, 0.84),
+      confidence: clamp(
+        0.84 *
+          getCombinedConfidenceMultiplier([
+            viewMomentum,
+            subscriberMomentum,
+            {
+              ...uploadMomentum,
+              value: uploadAudienceValidation.value,
+              confidenceMultiplier: Math.min(
+                uploadMomentum.confidenceMultiplier,
+                uploadAudienceValidation.confidenceMultiplier
+              )
+            }
+          ]),
+        0.3,
+        0.84
+      ),
       rawPayload
     },
     observations
+  };
+}
+
+function validateUploadMomentumAgainstAudience({
+  uploadMomentum,
+  viewMomentum,
+  subscriberMomentum
+}: {
+  uploadMomentum: number | undefined;
+  viewMomentum: number | undefined;
+  subscriberMomentum: number | undefined;
+}) {
+  if (typeof uploadMomentum !== "number") {
+    return {
+      value: undefined,
+      reason: "missing-upload-count",
+      confidenceMultiplier: 0.42
+    };
+  }
+
+  if (uploadMomentum <= 0) {
+    return {
+      value: uploadMomentum,
+      reason: "no-positive-upload-momentum",
+      confidenceMultiplier: 1
+    };
+  }
+
+  const audienceMomentum =
+    Math.max(0, viewMomentum ?? 0) * 0.72 + Math.max(0, subscriberMomentum ?? 0) * 0.28;
+
+  if (audienceMomentum < 2) {
+    return {
+      value: Math.min(uploadMomentum, 2),
+      reason: "upload-count-not-confirmed-by-audience",
+      confidenceMultiplier: 0.35
+    };
+  }
+
+  if (audienceMomentum < 5) {
+    return {
+      value: Math.min(uploadMomentum, 5),
+      reason: "upload-count-weakly-confirmed-by-audience",
+      confidenceMultiplier: 0.55
+    };
+  }
+
+  if (audienceMomentum < 10) {
+    return {
+      value: Math.min(uploadMomentum, 10),
+      reason: "upload-count-moderately-confirmed-by-audience",
+      confidenceMultiplier: 0.72
+    };
+  }
+
+  if (audienceMomentum < 18) {
+    return {
+      value: Math.min(uploadMomentum, 18),
+      reason: "upload-count-confirmed-by-audience",
+      confidenceMultiplier: 0.86
+    };
+  }
+
+  return {
+    value: uploadMomentum,
+    reason: "upload-count-strongly-confirmed-by-audience",
+    confidenceMultiplier: 1
   };
 }
 

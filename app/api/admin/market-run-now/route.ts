@@ -66,10 +66,14 @@ type MarketBatchRunResponse = {
   };
 };
 
-const DEFAULT_RUN_NOW_ARTIST_LIMIT = 10;
+const DEFAULT_RUN_NOW_ARTIST_LIMIT = 100;
 const DEFAULT_RUN_NOW_MAX_BATCHES = 1;
-const DEFAULT_RUN_NOW_EVENT_SCAN_LIMIT = 20;
+const DEFAULT_RUN_NOW_EVENT_SCAN_LIMIT = 100;
 const DEFAULT_RUN_NOW_EVENT_SCAN_MAX_RECORDS = 12;
+const MAX_RUN_NOW_ARTIST_LIMIT = 100;
+const MAX_RUN_NOW_MAX_BATCHES = 10;
+const MAX_RUN_NOW_EVENT_SCAN_LIMIT = 100;
+const MAX_RUN_NOW_EVENT_SCAN_MAX_RECORDS = 50;
 
 export async function POST(request: Request) {
   const auth = await requireAdminRequest(request, { allowMarketSecret: false });
@@ -107,15 +111,15 @@ export async function POST(request: Request) {
   const dryRun = body.dryRun === true;
   const force = body.force !== false;
   const runDate = body.runDate && /^\d{4}-\d{2}-\d{2}$/.test(body.runDate) ? body.runDate : undefined;
-  const artistLimit = normalizeInteger(body.artistLimit, DEFAULT_RUN_NOW_ARTIST_LIMIT, 1, 25);
+  const artistLimit = normalizeInteger(body.artistLimit, DEFAULT_RUN_NOW_ARTIST_LIMIT, 1, MAX_RUN_NOW_ARTIST_LIMIT);
   const artistOffset = normalizeInteger(body.artistOffset, 0, 0, Number.MAX_SAFE_INTEGER);
-  const maxBatches = normalizeInteger(body.maxBatches, DEFAULT_RUN_NOW_MAX_BATCHES, 1, 2);
-  const eventScanLimit = normalizeInteger(body.eventScanLimit, DEFAULT_RUN_NOW_EVENT_SCAN_LIMIT, 0, 20);
+  const maxBatches = normalizeInteger(body.maxBatches, DEFAULT_RUN_NOW_MAX_BATCHES, 1, MAX_RUN_NOW_MAX_BATCHES);
+  const eventScanLimit = normalizeInteger(body.eventScanLimit, DEFAULT_RUN_NOW_EVENT_SCAN_LIMIT, 0, MAX_RUN_NOW_EVENT_SCAN_LIMIT);
   const eventScanMaxRecords = normalizeInteger(
     body.eventScanMaxRecords,
     DEFAULT_RUN_NOW_EVENT_SCAN_MAX_RECORDS,
     1,
-    25
+    MAX_RUN_NOW_EVENT_SCAN_MAX_RECORDS
   );
   const eventScan = await runEventScan({
     request,

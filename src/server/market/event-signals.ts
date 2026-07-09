@@ -473,7 +473,11 @@ function getEventProvenance(event: MarketEvent, artist: MarketUpdateArtist) {
   }
 
   if (normalizedSource === "bluesky_post") {
-    return getBlueskyEventProvenance(event, artist);
+    return {
+      label: "bluesky-disabled",
+      impactMultiplier: 0,
+      confidenceMultiplier: 0.25
+    };
   }
 
   if (normalizedSource === "gdelt_article") {
@@ -548,6 +552,10 @@ function getYoutubeUploadEventQuality(event: MarketEvent) {
     getRawOptionalNumber(event.rawPayload.viewCount) ??
     getRawOptionalNumber(event.rawPayload.representativeViewCount) ??
     getRawOptionalNumber(event.rawPayload.clusterMaxViews);
+  const relatedUploadCount = getRawOptionalNumber(event.rawPayload.relatedUploadCount) ?? 0;
+  const clusterTotalViews = getRawOptionalNumber(event.rawPayload.clusterTotalViews) ?? 0;
+  const clusterReachRatio = getRawOptionalNumber(event.rawPayload.clusterReachRatio);
+  const hasNamedProject = Boolean(getRawString(event.rawPayload.inferredReleaseTitle));
   const durationSeconds = getRawOptionalNumber(event.rawPayload.durationSeconds);
   const hasLowSignalTitle = hasLowSignalYoutubeUploadTitle(event.title, normalizedTitle);
   const isPromoTitle = isPromoHashtagYoutubeUploadTitle(event.title, normalizedTitle);
@@ -563,6 +571,12 @@ function getYoutubeUploadEventQuality(event: MarketEvent) {
   ].includes(reason);
   const hasExplicitRelease = hasExplicitYoutubeReleaseLanguage(normalizedTitle);
   const releaseKind = getRawString(event.rawPayload.releaseKind) ?? "";
+  const hasProjectEvidence =
+    hasNamedProject ||
+    relatedUploadCount >= 3 ||
+    clusterTotalViews >= 120_000 ||
+    (typeof clusterReachRatio === "number" && clusterReachRatio >= 0.45);
+  const titleOnlyProjectGuess = reason === "album_announcement_upload_title" && !hasProjectEvidence;
   const majorReleaseCatalyst =
     reason === "album_announcement_upload_title" ||
     reason === "major_feature_upload_title" ||
@@ -577,6 +591,18 @@ function getYoutubeUploadEventQuality(event: MarketEvent) {
       label,
       multiplier: clamp(storedMultiplier ?? fallbackMultiplier, 0.25, 1.18)
     };
+  }
+
+  if (titleOnlyProjectGuess) {
+    const hasExceptionalStandaloneReach = typeof viewCount === "number" && viewCount >= 750_000 && !isShortForm;
+
+    if (!hasExceptionalStandaloneReach) {
+      return {
+        accepted: false,
+        label: "title-only-project-without-evidence",
+        multiplier: 0
+      };
+    }
   }
 
   if ((hasLowSignalTitle || isPromoTitle) && !hasExplicitRelease) {

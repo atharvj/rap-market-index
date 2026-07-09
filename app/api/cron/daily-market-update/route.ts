@@ -52,8 +52,10 @@ type ExistingRun = {
 const DEFAULT_SOURCE: MarketUpdateSource = "core";
 const DEFAULT_ARTIST_LIMIT = 100;
 const DEFAULT_MAX_BATCHES = 1;
-const DEFAULT_EVENT_SCAN_LIMIT = 20;
+const DEFAULT_EVENT_SCAN_LIMIT = 100;
 const DEFAULT_EVENT_SCAN_MAX_RECORDS = 12;
+const MAX_EVENT_SCAN_LIMIT = 100;
+const MAX_EVENT_SCAN_MAX_RECORDS = 50;
 
 export async function GET(request: Request) {
   const auth = validateCronRequest(request);
@@ -88,12 +90,12 @@ export async function GET(request: Request) {
   const source = normalizeSource(process.env.MARKET_CRON_SOURCE);
   const artistLimit = getInteger(process.env.MARKET_CRON_ARTIST_LIMIT, DEFAULT_ARTIST_LIMIT, 1, 100);
   const maxBatches = getInteger(process.env.MARKET_CRON_MAX_BATCHES, DEFAULT_MAX_BATCHES, 1, 10);
-  const eventScanLimit = getInteger(process.env.MARKET_EVENT_SCAN_LIMIT, DEFAULT_EVENT_SCAN_LIMIT, 0, 20);
+  const eventScanLimit = getInteger(process.env.MARKET_EVENT_SCAN_LIMIT, DEFAULT_EVENT_SCAN_LIMIT, 0, MAX_EVENT_SCAN_LIMIT);
   const eventScanMaxRecords = getInteger(
     process.env.MARKET_EVENT_SCAN_MAX_RECORDS,
     DEFAULT_EVENT_SCAN_MAX_RECORDS,
     1,
-    50
+    MAX_EVENT_SCAN_MAX_RECORDS
   );
   const existing = await loadExistingRun(runDate);
 

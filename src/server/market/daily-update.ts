@@ -801,7 +801,9 @@ function calculateArtistUpdate({
 }): ArtistMarketUpdate {
   const signals = getSignalsForArtist(artist, index, runDate, source, manualSignals, adapterSignals);
   const decayedExistingStats = decayStatsTowardNeutral(artist.stats);
-  const stats = signals.hasMomentumSignal ? blendStats(decayedExistingStats, signals.stats) : decayedExistingStats;
+  const credibleEventSupport = hasCredibleEventSupport(signals.rawPayload, signals.modifiers);
+  const eventMemoryAdjustedStats = dampStaleEventMemory(decayedExistingStats, credibleEventSupport);
+  const stats = signals.hasMomentumSignal ? blendStats(eventMemoryAdjustedStats, signals.stats) : eventMemoryAdjustedStats;
   const staleMomentumDecayDelta = signals.hasMomentumSignal ? 0 : getStaleMomentumDecayDelta(artist.stats, source);
   const conflictMoveMultiplier = getConflictMoveMultiplier(signals.reliabilityDetails);
   const rawSignalDelta = signals.hasMomentumSignal
@@ -819,8 +821,15 @@ function calculateArtistUpdate({
     hasMomentumSignal: signals.hasMomentumSignal,
     reliability: signals.reliability
   });
-  const signalDelta = technicalAdjustment.signalDelta;
   const previousClose = getValidPrice(artist.previousClose, artist.currentPrice);
+  const unsupportedEventMemoryAdjustment = getUnsupportedEventMemoryAdjustment({
+    credibleEventSupport,
+    decayedExistingStats,
+    eventMemoryAdjustedStats,
+    previousClose,
+    oldPrice: artist.currentPrice
+  });
+  const signalDelta = clamp(technicalAdjustment.signalDelta + unsupportedEventMemoryAdjustment, -0.75, 0.75);
   const categoryDailyCap = getCategoryDailyCap(artist.category);
   const dailyCap = getEffectiveDailyCap({
     categoryDailyCap,
@@ -864,14 +873,17 @@ function calculateArtistUpdate({
       reliabilityDetails: signals.reliabilityDetails,
       conflictMoveMultiplier,
       decayedExistingStats,
+      eventMemoryAdjustedStats,
       staleMomentumDecayDelta,
       rawSignalDelta,
       reliabilityAdjustedDelta,
       modifierImpact,
       signalDeltaBeforeTechnicals,
       technicalAdjustment,
+      unsupportedEventMemoryAdjustment,
       catalystDiagnostics,
       sourceAttribution,
+      credibleEventSupport,
       previousClose,
       previousCloseSource: artist.previousCloseSource ?? "artist",
       oldPrice: artist.currentPrice,
@@ -994,6 +1006,99 @@ function decayStatsTowardNeutral(stats: HypeStats): HypeStats {
     newsScore: decayToward(stats.newsScore, 50, 0.22, 0, 100),
     traderDemand: decayToward(stats.traderDemand, 0, 0.28, -40, 40)
   };
+}
+
+function dampStaleEventMemory(stats: HypeStats, credibleEventSupport: boolean): HypeStats {
+  if (credibleEventSupport) {
+    return stats;
+  }
+
+  return {
+    ...stats,
+    searchGrowth: clamp(stats.searchGrowth, -30, 6),
+    socialGrowth: clamp(stats.socialGrowth, -35, 8),
+    newsScore: stats.newsScore >= 50
+      ? Math.min(stats.newsScore, 53)
+      : Math.max(stats.newsScore, 47)
+  };
+}
+
+function getUnsupportedEventMemoryAdjustment({
+  credibleEventSupport,
+  decayedExistingStats,
+  eventMemoryAdjustedStats,
+  previousClose,
+  oldPrice
+}: {
+  credibleEventSupport: boolean;
+  decayedExistingStats: HypeStats;
+  eventMemoryAdjustedStats: HypeStats;
+  previousClose: number;
+  oldPrice: number;
+}) {
+  if (credibleEventSupport || previousClose <= 0 || oldPrice <= 0) {
+    return 0;
+  }
+
+  const wasEventMemoryDamped =
+    Math.abs(decayedExistingStats.searchGrowth - eventMemoryAdjustedStats.searchGrowth) >= 0.75 ||
+    Math.abs(decayedExistingStats.socialGrowth - eventMemoryAdjustedStats.socialGrowth) >= 0.75 ||
+    Math.abs(decayedExistingStats.newsScore - eventMemoryAdjustedStats.newsScore) >= 1;
+
+  if (!wasEventMemoryDamped) {
+    return 0;
+  }
+
+  const stalePriceGap = (oldPrice - previousClose) / previousClose;
+
+  if (Math.abs(stalePriceGap) < 0.004) {
+    return 0;
+  }
+
+  return -clamp(stalePriceGap * 5, -0.22, 0.22);
+}
+
+function hasCredibleEventSupport(rawPayload: Record<string, unknown>, modifiers: MarketSignalModifier[]) {
+  if (
+    modifiers.some((modifier) => {
+      const priceShock = getNumber(modifier.priceShock, 0);
+      const score = Math.abs(getNumber(modifier.score, 0));
+
+      return Math.abs(priceShock) >= 0.0015 && score >= 4;
+    })
+  ) {
+    return true;
+  }
+
+  const marketEvents = getObjectRecord(rawPayload.market_events);
+
+  if (!Object.keys(marketEvents).length) {
+    return false;
+  }
+
+  const totalSignal = Math.abs(getNumber(marketEvents.totalSignal, 0));
+  const sourceConfirmedEventCount = getNumber(marketEvents.sourceConfirmedEventCount, 0);
+  const events = Array.isArray(marketEvents.events)
+    ? marketEvents.events.filter((event): event is Record<string, unknown> =>
+        Boolean(event && typeof event === "object" && !Array.isArray(event))
+      )
+    : [];
+  const hasCredibleEvent = events.some((event) => {
+    const weightedImpact = Math.abs(getNumber(event.weightedImpact, 0));
+    const shockWeightedImpact = Math.abs(getNumber(event.shockWeightedImpact, 0));
+    const provenanceImpactMultiplier = getNumber(event.provenanceImpactMultiplier, 1);
+    const clusterSourceCount = getNumber(event.clusterSourceCount, 0);
+    const releaseCycleSourceCount = getNumber(event.releaseCycleSourceCount, 0);
+    const reactionConfirmingSourceCount = getNumber(event.reactionConfirmingSourceCount, 0);
+
+    return (
+      provenanceImpactMultiplier > 0.05 &&
+      Math.max(weightedImpact, shockWeightedImpact) >= 7 &&
+      (clusterSourceCount > 1 || releaseCycleSourceCount > 1 || reactionConfirmingSourceCount > 1)
+    );
+  });
+
+  return hasCredibleEvent || (totalSignal >= 12 && sourceConfirmedEventCount > 0);
 }
 
 function getStaleMomentumDecayDelta(stats: HypeStats, source: MarketUpdateSource) {
