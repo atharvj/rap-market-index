@@ -19,7 +19,7 @@ export function UserAvatar({
 
   return (
     <span
-      className={`${sizeClass} relative grid shrink-0 place-items-center overflow-hidden rounded border border-line bg-panelSoft font-black text-paper/75`}
+      className={`${sizeClass} relative grid shrink-0 place-items-center overflow-hidden rounded-full border border-line bg-panelSoft font-black text-paper/75`}
       aria-label={`${label} profile picture`}
     >
       {size === "sm" || size === "md" ? (

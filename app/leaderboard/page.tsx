@@ -2,116 +2,75 @@
 
 import { AdminBadge } from "@/components/AdminBadge";
 import { useGame } from "@/components/GameProvider";
-import { MetricCard } from "@/components/MetricCard";
 import { formatCurrency, formatPercent } from "@/lib/formatters";
 import clsx from "clsx";
-import { Medal, Trophy, UsersRound } from "lucide-react";
+import { Crown, Medal } from "lucide-react";
 import Link from "next/link";
 
 export default function LeaderboardPage() {
   const { leaderboard } = useGame();
-  const currentRank = leaderboard.findIndex((entry) => entry.isCurrentUser) + 1;
-  const leader = leaderboard[0];
-  const rankLabel = currentRank > 0 ? `#${currentRank}` : "Unranked";
+  const current = leaderboard.find((entry) => entry.isCurrentUser);
+  const podium = [leaderboard[0], leaderboard[1], current].filter(
+    (entry): entry is NonNullable<typeof entry> => Boolean(entry)
+  );
 
   return (
-    <div className="space-y-6">
-      <div>
-        <p className="text-xs font-bold uppercase tracking-wide text-brass">Leaderboard</p>
-        <h1 className="mt-2 text-4xl font-black">Market standings</h1>
+    <div className="space-y-5">
+      <header>
+        <h1 className="text-3xl font-black">Leaderboard</h1>
+        <p className="mt-1 text-sm font-bold text-paper/70">RMI global league · {leaderboard.length} traders</p>
+      </header>
+
+      <div className="flex gap-2">
+        <button className="rounded-lg border border-line px-4 py-2 text-sm font-black">This league</button>
+        <button className="rounded-lg border border-line px-4 py-2 text-sm font-black text-paper/70">Global</button>
+        <button className="rounded-lg border border-line px-4 py-2 text-sm font-black text-paper/70">Rookies</button>
       </div>
 
-      <section className="grid gap-3 md:grid-cols-3">
-        <MetricCard
-          label="Your rank"
-          value={rankLabel}
-          detail={`${leaderboard.length} traders`}
-          icon={<Trophy className="h-4 w-4" />}
-          tone="warm"
-        />
-        <MetricCard
-          label="Leader"
-          value={leader?.username ?? "N/A"}
-          detail={leader ? formatCurrency(leader.portfolioValue) : "No traders yet"}
-          icon={<Medal className="h-4 w-4" />}
-          tone="good"
-        />
-        <MetricCard
-          label="Field"
-          value={`${leaderboard.length}`}
-          detail="Public rankings"
-          icon={<UsersRound className="h-4 w-4" />}
-          tone="cool"
-        />
+      <section className="grid gap-3 sm:grid-cols-3">
+        {podium.slice(0, 3).map((entry, index) => (
+          <div
+            key={`${entry.id}-${index}`}
+            className={clsx("rmi-card grid place-items-center p-6 text-center", index === 0 && "border-cyan/70")}
+          >
+            {index === 0 ? <Crown className="h-5 w-5 text-brass" /> : <Medal className="h-5 w-5 text-paper/50" />}
+            <Link href={`/users/${entry.id}`} className="mt-3 text-sm font-black hover:text-cyan">
+              {entry.isCurrentUser ? "You" : entry.username}
+            </Link>
+            <p className="text-xs font-bold text-paper/60">portfolio value</p>
+            <p className="mt-1 text-xl font-black text-mint number-tabular">{formatCurrency(entry.portfolioValue)}</p>
+          </div>
+        ))}
       </section>
 
-      <section className="rounded border border-line bg-panel shadow-market">
-        <div className="overflow-x-auto scrollbar-thin">
-          <table className="w-full min-w-[720px] border-collapse">
-            <thead>
-              <tr className="border-b border-line text-left text-xs font-bold uppercase tracking-wide text-paper/40">
-                <th className="px-4 py-3">Rank</th>
-                <th className="px-4 py-3">Trader</th>
-                <th className="px-4 py-3 text-right">Portfolio value</th>
-                <th className="px-4 py-3 text-right">Cash</th>
-                <th className="px-4 py-3 text-right">Gain</th>
-              </tr>
-            </thead>
-            <tbody>
-              {leaderboard.length ? (
-                leaderboard.map((entry, index) => (
-                  <tr
-                    key={entry.id}
-                    className={clsx(
-                      "border-b border-line/70 last:border-0",
-                      entry.isCurrentUser ? "bg-brass/10" : "hover:bg-panelSoft/70"
-                    )}
-                  >
-                    <td className="px-4 py-4">
-                      <span
-                        className={clsx(
-                          "grid h-9 w-9 place-items-center rounded-md font-black",
-                          index === 0 ? "bg-brass text-white" : "border border-line bg-panelSoft text-paper/70"
-                        )}
-                      >
-                        {index + 1}
-                      </span>
-                    </td>
-                    <td className="px-4 py-4">
-                      <div className="flex min-w-0 flex-wrap items-center gap-2">
-                        <Link href={`/users/${entry.id}`} className="font-black text-cyan hover:text-cyan/75">
-                          {entry.username}
-                        </Link>
-                        {entry.isAdmin ? <AdminBadge compact /> : null}
-                      </div>
-                      {entry.isCurrentUser ? <div className="text-sm font-bold text-brass">Current user</div> : null}
-                    </td>
-                    <td className="px-4 py-4 text-right font-black number-tabular">
-                      {formatCurrency(entry.portfolioValue)}
-                    </td>
-                    <td className="px-4 py-4 text-right number-tabular text-paper/60">
-                      {formatCurrency(entry.cashBalance)}
-                    </td>
-                    <td
-                      className={clsx(
-                        "px-4 py-4 text-right font-black number-tabular",
-                        entry.gainPercent >= 0 ? "text-mint" : "text-ember"
-                      )}
-                    >
-                      {formatPercent(entry.gainPercent)}
-                    </td>
-                  </tr>
-                ))
-              ) : (
-                <tr>
-                  <td className="px-4 py-10 text-center text-paper/50" colSpan={5}>
-                    No leaderboard entries yet.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+      <section className="rmi-card overflow-hidden">
+        <div className="grid grid-cols-[54px_minmax(0,1fr)_120px_88px] border-b border-line px-4 py-3 text-xs font-bold text-paper/45">
+          <span>rank</span>
+          <span>trader</span>
+          <span className="text-right">value</span>
+          <span className="text-right">7d change</span>
         </div>
+        {leaderboard.map((entry, index) => (
+          <div
+            key={entry.id}
+            className={clsx(
+              "grid grid-cols-[54px_minmax(0,1fr)_120px_88px] items-center border-b border-line px-4 py-3 text-sm last:border-b-0",
+              entry.isCurrentUser && "bg-cyan/8"
+            )}
+          >
+            <span className="font-black">{index + 1}</span>
+            <span className="flex min-w-0 items-center gap-2">
+              <Link href={`/users/${entry.id}`} className="truncate font-black hover:text-cyan">
+                {entry.username}
+              </Link>
+              {entry.isAdmin ? <AdminBadge compact /> : null}
+            </span>
+            <span className="text-right font-black number-tabular">{formatCurrency(entry.portfolioValue)}</span>
+            <span className={entry.gainPercent >= 0 ? "text-right font-black text-mint" : "text-right font-black text-ember"}>
+              {formatPercent(entry.gainPercent)}
+            </span>
+          </div>
+        ))}
       </section>
     </div>
   );
