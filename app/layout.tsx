@@ -15,6 +15,11 @@ export const metadata: Metadata = {
     template: "%s | Rap Market Index"
   },
   description: "Virtual rap exchange with artist prices, market news, portfolios, and fantasy cash.",
+  icons: {
+    icon: [{ url: "/logo.svg", type: "image/svg+xml" }],
+    shortcut: "/logo.svg",
+    apple: "/logo.svg"
+  },
   openGraph: {
     title: "Rap Market Index",
     description: "Virtual rap exchange with artist prices, market news, portfolios, and fantasy cash.",

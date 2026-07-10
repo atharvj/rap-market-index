@@ -4,6 +4,7 @@ import type { Database } from "@/lib/supabase/database.types";
 import { getPacificMarketDate, shiftMarketDate } from "@/server/market/market-date";
 import { getArtistStatusSubtype } from "@/server/market/status-events";
 import { loadArtistImageUrls } from "@/server/market/artist-images";
+import { loadSourcePreviewImageUrls } from "@/server/market/source-preview-images";
 
 export const dynamic = "force-dynamic";
 
@@ -29,6 +30,7 @@ type MarketNewsItem = {
   ticker: string;
   eventDate: string;
   eventType: string;
+  eventLabel: string | null;
   title: string;
   sourceName: string | null;
   sourceUrl: string | null;
@@ -129,8 +131,18 @@ export async function GET(request: Request) {
     const eventNews = diversifyMarketNewsEvents(rankedEvents, {
       feedMode: selectedArtistId ? "artist" : feedMode,
       limit
-    }).map((event) => mapMarketEventToNewsItem(event, artistById, imageByArtistId));
-    const news = eventNews.slice(0, limit);
+    }).map((event) => mapMarketEventToNewsItem(event, artistById));
+    const sourcePreviewImages = await loadSourcePreviewImageUrls(
+      eventNews.filter((item) => !item.thumbnailUrl).map((item) => item.sourceUrl)
+    );
+    const news = eventNews.slice(0, limit).map((item) => ({
+      ...item,
+      thumbnailUrl:
+        item.thumbnailUrl ??
+        (item.sourceUrl ? sourcePreviewImages.get(item.sourceUrl) : null) ??
+        imageByArtistId.get(item.artistId) ??
+        null
+    }));
 
     return NextResponse.json({
       ok: true,
@@ -168,8 +180,7 @@ async function loadArtists(supabase: ReturnType<typeof createAnonServerClient>) 
 
 function mapMarketEventToNewsItem(
   event: MarketEventRow,
-  artistById: Map<string, ArtistRow>,
-  imageByArtistId: Map<string, string>
+  artistById: Map<string, ArtistRow>
 ): MarketNewsItem {
   const artist = artistById.get(event.artist_id) ?? null;
   const rawPayload = toRawPayload(event.raw_payload);
@@ -184,12 +195,13 @@ function mapMarketEventToNewsItem(
     ticker: artist?.ticker ?? event.artist_id,
     eventDate: event.event_date,
     eventType: event.event_type,
+    eventLabel: getPublicEventLabel(event, rawPayload, artist?.name ?? null),
     title: event.title,
     sourceName,
     sourceUrl,
     sourceDomain,
     sourceIconUrl: getSourceIconUrl(sourceDomain, sourceName),
-    thumbnailUrl: getEventThumbnailUrl(rawPayload) ?? imageByArtistId.get(event.artist_id) ?? null,
+    thumbnailUrl: getEventThumbnailUrl(rawPayload) ?? null,
     mediaUrl: getSupportingMediaUrl(rawPayload),
     mediaType: getSupportingMediaType(rawPayload),
     mediaLabel: getSupportingMediaLabel(rawPayload),
@@ -347,6 +359,11 @@ function isPublicAiResearchEvent(
   const corroboratingSourceCount = getRawNumber(rawPayload.corroboratingSourceCount) ?? 1;
   const publicReactionConfirmed = getRawBoolean(rawPayload.publicReactionConfirmed);
   const factualClaimConfirmed = getRawBoolean(rawPayload.factualClaimConfirmed);
+  const artistRole = getRawString(rawPayload.artistRole);
+
+  if (artistRole === "mentioned") {
+    return false;
+  }
 
   if (
     evidenceLevel === "low_signal" ||
@@ -377,6 +394,34 @@ function isPublicAiResearchEvent(
   }
 
   return Math.abs(impactScore) >= 22 && confidence >= 0.58;
+}
+
+function getPublicEventLabel(
+  event: MarketEventRow,
+  rawPayload: Record<string, unknown>,
+  artistName: string | null
+) {
+  const artistRole = getRawString(rawPayload.artistRole);
+
+  if (artistRole === "featured" || (artistName && titleCreditsArtistAsFeature(event.title, artistName))) {
+    return "Feature";
+  }
+
+  return null;
+}
+
+function titleCreditsArtistAsFeature(title: string, artistName: string) {
+  const escapedArtist = escapeRegExp(artistName).replace(/\s+/g, "\\s+");
+  const pattern = new RegExp(
+    `(?:featuring|feat\\.?|ft\\.?|with|assisted by|alongside)[^,:;|]{0,42}\\b${escapedArtist}\\b`,
+    "i"
+  );
+
+  return pattern.test(title);
+}
+
+function escapeRegExp(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 function getNewsImportanceScore(event: MarketEventRow, runDate: string) {

@@ -191,7 +191,14 @@ export async function POST(request: Request) {
       0,
       MAX_AI_RESEARCH_ARTIST_LIMIT
     );
-    const aiResearchArtists = aiResearchEnabled ? selectAiResearchArtists(artists, mergedEventsPreview(mediaRss.eventsByArtist, result.eventsByArtist), aiResearchArtistLimit) : [];
+    const aiResearchArtists = aiResearchEnabled
+      ? selectAiResearchArtists(
+          artists,
+          mergedEventsPreview(mediaRss.eventsByArtist, result.eventsByArtist),
+          latestAiResearchDates,
+          aiResearchArtistLimit
+        )
+      : [];
     const aiResearch = aiResearchEnabled
       ? await collectAiResearchMarketEvents({
           artists: aiResearchArtists,
@@ -211,7 +218,7 @@ export async function POST(request: Request) {
             1,
             5
           ),
-          delayMs: getEnvInteger("MARKET_AI_RESEARCH_DELAY_MS", 500, 0, 5000),
+          delayMs: getEnvInteger("MARKET_AI_RESEARCH_DELAY_MS", 2100, 0, 5000),
           timeoutMs
         })
       : {
@@ -297,6 +304,7 @@ export async function POST(request: Request) {
 function selectAiResearchArtists(
   artists: MarketUpdateArtist[],
   existingEventsByArtist: Record<string, MarketEvent[]>,
+  latestAiResearchDates: Record<string, string>,
   limit: number
 ) {
   if (limit <= 0) {
@@ -305,6 +313,13 @@ function selectAiResearchArtists(
 
   return [...artists]
     .sort((first, second) => {
+      const firstScanDate = latestAiResearchDates[first.id] ?? "";
+      const secondScanDate = latestAiResearchDates[second.id] ?? "";
+
+      if (firstScanDate !== secondScanDate) {
+        return firstScanDate.localeCompare(secondScanDate);
+      }
+
       const firstEvents = existingEventsByArtist[first.id]?.length ?? 0;
       const secondEvents = existingEventsByArtist[second.id]?.length ?? 0;
 

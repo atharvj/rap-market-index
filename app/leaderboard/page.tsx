@@ -25,14 +25,8 @@ export default function LeaderboardPage() {
       <main className="min-w-0 space-y-5">
         <header>
           <h1 className="text-3xl font-black">Leaderboard</h1>
-          <p className="mt-1 text-sm text-paper/70">RMI global rankings · {leaderboard.length} traders</p>
+          <p className="mt-1 text-sm text-paper/70">Global rankings by fantasy portfolio value · {leaderboard.length} traders</p>
         </header>
-
-        <div className="flex gap-2">
-        <button className="rounded-lg border border-line px-4 py-2 text-sm font-black">This league</button>
-        <button className="rounded-lg border border-line px-4 py-2 text-sm font-black text-paper/70">Global</button>
-        <button className="rounded-lg border border-line px-4 py-2 text-sm font-black text-paper/70">Rookies</button>
-        </div>
 
         <section className="grid gap-3 sm:grid-cols-3">
         {podium.slice(0, 3).map((entry, index) => (

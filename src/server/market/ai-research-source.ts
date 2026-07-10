@@ -47,8 +47,11 @@ type AiResearchResponseEvent = {
   corroboratingSourceCount?: unknown;
   publicReactionConfirmed?: unknown;
   factualClaimConfirmed?: unknown;
+  artistRole?: unknown;
   riskFlags?: unknown;
 };
+
+type AiResearchArtistRole = "primary" | "featured" | "mentioned";
 
 type GroqChatResponse = {
   choices?: Array<{
@@ -92,7 +95,7 @@ const REQUEST_ERROR = "request_error";
 const DEFAULT_MODEL = "groq/compound-mini";
 const DEFAULT_LOOKBACK_DAYS = 14;
 const DEFAULT_MAX_EVENTS_PER_ARTIST = 1;
-const DEFAULT_DELAY_MS = 500;
+const DEFAULT_DELAY_MS = 2100;
 const DEFAULT_TIMEOUT_MS = 25000;
 const MAX_COMPLETION_TOKENS = 420;
 
@@ -397,7 +400,8 @@ function buildResearchPrompt({
     `Search context: ${query}. Return at most ${maxEventsPerArtist} source-backed events.`,
     "Use only catalysts that can move price: album/project/single/feature, review/reception, backlash/legal/health, viral performance/snippet, chart milestone, or clear decline.",
     "If many tracks dropped together, report the project, not one random track. Social/community items need factual confirmation and public reaction.",
-    "JSON shape: {\"events\":[{\"title\":\"headline\",\"eventDate\":\"YYYY-MM-DD\",\"eventType\":\"release|review|news|controversy|award|tour|viral\",\"sourceName\":\"source\",\"sourceUrl\":\"https://...\",\"summary\":\"fact\",\"whyItMatters\":\"market reason\",\"sentimentScore\":0,\"impactScore\":0,\"confidence\":0.0,\"sourceType\":\"music_publication|mainstream_news|review|official|community|social|video\",\"evidenceLevel\":\"confirmed|reported|rumor|low_signal\",\"reachScope\":\"underground|scene|broad|mainstream\",\"supportingMediaUrl\":\"\",\"supportingMediaType\":\"none\",\"relatedArtistNames\":[],\"corroboratingSourceCount\":1,\"publicReactionConfirmed\":false,\"factualClaimConfirmed\":true,\"riskFlags\":[]}]}"
+    "Set artistRole to primary only when this artist owns or is the main subject of the event, featured when they are a credited guest/collaborator, and mentioned when they are merely named. Never call another artist's project this artist's release.",
+    "JSON shape: {\"events\":[{\"title\":\"headline\",\"eventDate\":\"YYYY-MM-DD\",\"eventType\":\"release|review|news|controversy|award|tour|viral\",\"sourceName\":\"source\",\"sourceUrl\":\"https://...\",\"summary\":\"fact\",\"whyItMatters\":\"market reason\",\"sentimentScore\":0,\"impactScore\":0,\"confidence\":0.0,\"artistRole\":\"primary|featured|mentioned\",\"sourceType\":\"music_publication|mainstream_news|review|official|community|social|video\",\"evidenceLevel\":\"confirmed|reported|rumor|low_signal\",\"reachScope\":\"underground|scene|broad|mainstream\",\"supportingMediaUrl\":\"\",\"supportingMediaType\":\"none\",\"relatedArtistNames\":[],\"corroboratingSourceCount\":1,\"publicReactionConfirmed\":false,\"factualClaimConfirmed\":true,\"riskFlags\":[]}]}"
   ].join("\n");
 }
 
@@ -444,13 +448,13 @@ function normalizeAiResearchEvent({
     allowLowTierRelease: true
   });
   const resolvedEventType = eventType ?? classification?.eventType ?? null;
-  const sentimentScore = clamp(
+  const rawSentimentScore = clamp(
     getNumber(value.sentimentScore, classification?.sentimentScore ?? 0),
     -100,
     100
   );
-  const impactScore = clamp(
-    getNumber(value.impactScore, classification?.impactScore ?? sentimentScore),
+  const rawImpactScore = clamp(
+    getNumber(value.impactScore, classification?.impactScore ?? rawSentimentScore),
     -100,
     100
   );
@@ -464,6 +468,16 @@ function normalizeAiResearchEvent({
   const corroboratingSourceCount = clamp(Math.round(getNumber(value.corroboratingSourceCount, 1)), 0, 12);
   const publicReactionConfirmed = getBoolean(value.publicReactionConfirmed);
   const factualClaimConfirmed = getBoolean(value.factualClaimConfirmed);
+  const artistRole = normalizeArtistRole(getString(value.artistRole), title, artist.name);
+
+  if (artistRole === "mentioned") {
+    return null;
+  }
+
+  const roleImpactMultiplier = artistRole === "featured" ? 0.68 : 1;
+  const roleSentimentMultiplier = artistRole === "featured" ? 0.82 : 1;
+  const sentimentScore = clamp(rawSentimentScore * roleSentimentMultiplier, -100, 100);
+  const impactScore = clamp(rawImpactScore * roleImpactMultiplier, -100, 100);
 
   if (!title || !sourceUrl || !domain || !isSafeHttpUrl(sourceUrl) || !resolvedEventType) {
     return null;
@@ -518,6 +532,8 @@ function normalizeAiResearchEvent({
       sourceType,
       evidenceLevel,
       reachScope,
+      artistRole,
+      roleImpactMultiplier,
       summary,
       whyItMatters,
       relatedArtistNames,
@@ -531,7 +547,8 @@ function normalizeAiResearchEvent({
       supportingSearchResults: getSupportingSearchResults(sourceUrl, searchResults).slice(0, 4),
       supportingMediaUrl: supportingMedia?.url ?? null,
       supportingMediaType: supportingMedia?.type ?? null,
-      classificationReason: classification?.reason ?? "ai_research_classification",
+      classificationReason:
+        artistRole === "featured" ? "artist_feature_credit" : classification?.reason ?? "ai_research_classification",
       releaseKind: classification?.releaseKind ?? null,
       statusSubtype: classification?.statusSubtype ?? null,
       statusSeverity: classification?.statusSeverity ?? null,
@@ -865,6 +882,67 @@ function normalizeEvidenceLevel(value: string | null) {
   }
 
   return "reported";
+}
+
+function normalizeArtistRole(
+  value: string | null,
+  title: string | null,
+  artistName: string
+): AiResearchArtistRole {
+  const normalized = normalizeLabel(value);
+
+  if (normalized === "primary" || normalized === "featured" || normalized === "mentioned") {
+    return normalized;
+  }
+
+  if (normalized === "guest" || normalized === "collaborator") {
+    return "featured";
+  }
+
+  if (normalized === "incidental") {
+    return "mentioned";
+  }
+
+  const normalizedTitle = (title ?? "").toLowerCase();
+  const featurePrefix = "(?:featuring|feat\\.?|ft\\.?|with|assisted by|alongside)";
+
+  for (const term of getArtistRoleTerms(artistName)) {
+    const escapedTerm = escapeRegExp(term).replace(/\s+/g, "\\s+");
+    const featurePattern = new RegExp(
+      `${featurePrefix}[^,:;|]{0,42}\\b${escapedTerm}\\b`,
+      "i"
+    );
+
+    if (featurePattern.test(normalizedTitle)) {
+      return "featured";
+    }
+  }
+
+  return "primary";
+}
+
+function getArtistRoleTerms(artistName: string) {
+  const normalized = artistName
+    .toLowerCase()
+    .replace(/[^a-z0-9$]+/g, " ")
+    .trim();
+  const terms = new Set<string>([normalized]);
+
+  if (normalized.startsWith("youngboy never broke again")) {
+    terms.add("youngboy");
+    terms.add("nba youngboy");
+  }
+
+  if (normalized === "a$ap rocky" || normalized === "asap rocky") {
+    terms.add("a$ap rocky");
+    terms.add("asap rocky");
+  }
+
+  return [...terms].filter(Boolean);
+}
+
+function escapeRegExp(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 function normalizeLabel(value: string | null) {

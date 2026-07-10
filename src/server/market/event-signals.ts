@@ -1613,9 +1613,14 @@ function getEventSubtype(event: MarketEvent) {
     getRawString(event.rawPayload.eventReason);
   const text = normalizeEventText(`${rawReason ?? ""} ${event.title}`);
   const statusSubtype = getArtistStatusSubtype(event.rawPayload.statusSubtype);
+  const artistRole = getRawString(event.rawPayload.artistRole);
 
   if (statusSubtype) {
     return `status_${statusSubtype}`;
+  }
+
+  if (artistRole === "featured") {
+    return "feature";
   }
 
   if (event.eventType === "review") {

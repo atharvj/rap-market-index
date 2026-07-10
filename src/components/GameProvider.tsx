@@ -56,6 +56,7 @@ type WatchlistResponse = {
 type GameContextValue = {
   state: GameState;
   hydrated: boolean;
+  marketReady: boolean;
   syncMode: SyncMode;
   syncStatus: string;
   serverRefreshing: boolean;
@@ -87,6 +88,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
   const { configured: authConfigured, loading: authLoading, session } = useAuth();
   const [state, setState] = useState<GameState>(() => createInitialGameState());
   const hydrated = true;
+  const [marketReady, setMarketReady] = useState(false);
   const [syncMode, setSyncMode] = useState<SyncMode>("demo");
   const [syncStatus, setSyncStatus] = useState("Unsaved demo mode");
   const [serverRefreshing, setServerRefreshing] = useState(false);
@@ -97,6 +99,9 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (!hydrated || !authConfigured) {
+      if (!authConfigured) {
+        setMarketReady(true);
+      }
       return;
     }
 
@@ -105,7 +110,12 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     fetch("/api/market/snapshot")
       .then((response) => response.json() as Promise<MarketSnapshotResponse>)
       .then((payload) => {
-        if (!active || !payload.ok || payload.source !== "supabase" || !payload.state) {
+        if (!active) {
+          return;
+        }
+
+        if (!payload.ok || payload.source !== "supabase" || !payload.state) {
+          setMarketReady(true);
           return;
         }
 
@@ -120,10 +130,12 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
           transactions: current.transactions
         }));
         setSyncStatus(session ? "Server market loaded" : "Server market loaded");
+        setMarketReady(true);
       })
       .catch(() => {
         if (active) {
           setSyncStatus("Unsaved demo mode");
+          setMarketReady(true);
         }
       });
 
@@ -473,6 +485,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     () => ({
       state,
       hydrated,
+      marketReady,
       syncMode,
       syncStatus,
       serverRefreshing,
@@ -500,6 +513,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     [
       state,
       hydrated,
+      marketReady,
       syncMode,
       syncStatus,
       serverRefreshing,

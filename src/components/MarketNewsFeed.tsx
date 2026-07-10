@@ -2,7 +2,7 @@
 
 import { formatDate } from "@/lib/formatters";
 import clsx from "clsx";
-import { ArrowRight, ExternalLink, Headphones, PlayCircle } from "lucide-react";
+import { ArrowRight, ExternalLink, Headphones, PlayCircle, Radio } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
@@ -13,6 +13,7 @@ type MarketNewsItem = {
   ticker: string;
   eventDate: string;
   eventType: string;
+  eventLabel?: string | null;
   title: string;
   sourceName?: string | null;
   sourceUrl?: string | null;
@@ -59,10 +60,12 @@ export function MarketNewsFeed({
   variant?: MarketNewsVariant;
 }) {
   const [items, setItems] = useState<MarketNewsItem[]>([]);
+  const [loading, setLoading] = useState(true);
   const resolvedVariant: MarketNewsVariant = variant ?? (compact ? "compact" : "full");
 
   useEffect(() => {
     const controller = new AbortController();
+    setLoading(true);
     const params = new URLSearchParams({
       limit: String(limit),
       lookbackDays: "45",
@@ -88,6 +91,11 @@ export function MarketNewsFeed({
         if (!controller.signal.aborted) {
           setItems([]);
         }
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) {
+          setLoading(false);
+        }
       });
 
     return () => {
@@ -95,10 +103,27 @@ export function MarketNewsFeed({
     };
   }, [artistId, eventType, limit, resolvedVariant]);
 
+  if (loading) {
+    return <MarketNewsSkeleton compact={resolvedVariant === "compact"} />;
+  }
+
   if (!items.length) {
     return (
-      <div className="rounded border border-line bg-panel p-4 text-sm font-bold text-paper/50">
-        No recent major catalysts passed the public news filter.
+      <div className="flex min-h-36 items-center gap-4 px-5 py-7">
+        <span className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-panelSoft text-paper/45">
+          <Radio className="h-5 w-5" aria-hidden="true" />
+        </span>
+        <div>
+          <p className="text-sm font-black text-paper">Market wire is clear</p>
+          <p className="mt-1 max-w-xl text-sm leading-6 text-paper/55">
+            No verified, price-relevant stories are available for this view right now. Routine posts and unconfirmed chatter stay out of the feed.
+          </p>
+          {!artistId && resolvedVariant !== "compact" ? (
+            <Link href="/markets" className="mt-3 inline-flex text-xs font-black text-cyan hover:text-cyan/75">
+              Browse the market
+            </Link>
+          ) : null}
+        </div>
       </div>
     );
   }
@@ -116,6 +141,22 @@ export function MarketNewsFeed({
           variant={resolvedVariant}
           featured={resolvedVariant === "full" && index === 0}
         />
+      ))}
+    </div>
+  );
+}
+
+function MarketNewsSkeleton({ compact }: { compact: boolean }) {
+  return (
+    <div className="grid gap-3 p-4" aria-label="Loading market news" aria-busy="true">
+      {Array.from({ length: compact ? 2 : 3 }).map((_, index) => (
+        <div key={index} className="grid grid-cols-[52px_minmax(0,1fr)] gap-3 py-2">
+          <div className="h-12 rounded bg-panelSoft motion-safe:animate-pulse" />
+          <div className="space-y-2">
+            <div className="h-3 w-1/3 rounded bg-panelSoft motion-safe:animate-pulse" />
+            <div className="h-4 w-full max-w-xl rounded bg-panelSoft motion-safe:animate-pulse" />
+          </div>
+        </div>
       ))}
     </div>
   );
@@ -276,7 +317,7 @@ function MarketNewsArticle({
           positive ? "bg-mint/[0.08] text-mint" : "bg-ember/[0.08] text-ember"
         )}
       >
-        {eventLabels[item.eventType] ?? item.eventType}
+        {getEventLabel(item)}
       </span>
       <SourceMeta item={item} />
     </div>
@@ -394,7 +435,7 @@ function NewsThumbnail({ item, size = "row" }: { item: MarketNewsItem; size?: "h
         <span className="absolute inset-x-0 bottom-0 flex items-center justify-between gap-3 bg-black/58 px-4 py-3 text-sm font-black text-white">
           <span className="truncate">{item.artistName} · {item.ticker}</span>
           <span className="shrink-0 rounded bg-white/15 px-2 py-1 text-[10px] uppercase tracking-wide">
-            {eventLabels[item.eventType] ?? item.eventType}
+            {getEventLabel(item)}
           </span>
         </span>
       ) : (
@@ -440,7 +481,7 @@ function EventBadge({ item, positive }: { item: MarketNewsItem; positive: boolea
               : "bg-ember/[0.08] text-ember"
       )}
     >
-      {eventLabels[item.eventType] ?? item.eventType}
+      {getEventLabel(item)}
     </span>
   );
 }
@@ -466,6 +507,10 @@ function ImpactGauge({ label, value, positive }: { label: string; value: number;
 
 function trimTitle(title: string, limit: number) {
   return title.length > limit ? `${title.slice(0, limit - 3)}...` : title;
+}
+
+function getEventLabel(item: MarketNewsItem) {
+  return item.eventLabel || eventLabels[item.eventType] || item.eventType;
 }
 
 function SourceMeta({ item }: { item: MarketNewsItem }) {

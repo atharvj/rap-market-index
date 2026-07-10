@@ -1,75 +1,47 @@
 "use client";
 
 import { AdminBadge } from "@/components/AdminBadge";
-import { ArtistAvatar } from "@/components/ArtistAvatar";
 import { useAuth } from "@/components/AuthProvider";
 import { useGame } from "@/components/GameProvider";
 import { UserAvatar } from "@/components/UserAvatar";
 import { formatCurrency, formatPercent } from "@/lib/formatters";
 import { applyThemePreference, getStoredThemePreference, type ThemePreference } from "@/lib/theme";
+import type { Artist } from "@/lib/types";
 import clsx from "clsx";
-import { LogOut, Monitor, Moon, Search, SlidersHorizontal, Sun, X } from "lucide-react";
+import { LogOut, Monitor, Moon, SlidersHorizontal, Sun, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 const navItems = [
   { href: "/markets", label: "Markets" },
   { href: "/scout", label: "Scout" },
-  { href: "/leagues", label: "Leagues" },
-  { href: "/leaderboard", label: "Rankings" },
-  { href: "/news", label: "News" }
+  { href: "/news", label: "News" },
+  { href: "/watchlist", label: "Watchlist" },
+  { href: "/portfolio", label: "Portfolio" },
+  { href: "/leaderboard", label: "Rankings" }
 ];
 
 export function Shell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { portfolioValue, state, gainPercent, isAdminUser, avatarUrl } = useGame();
+  const { portfolioValue, state, gainPercent, isAdminUser, avatarUrl, marketReady } = useGame();
   const { session, user, signOut } = useAuth();
-  const [search, setSearch] = useState("");
-  const [searchFocused, setSearchFocused] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
   const [appearanceOpen, setAppearanceOpen] = useState(false);
   const [themePreference, setThemePreference] = useState<ThemePreference>("system");
   const [resolvedTheme, setResolvedTheme] = useState<"light" | "dark">("dark");
-
-  const searchSuggestions = useMemo(() => {
-    const query = search.trim().toLowerCase();
-    const source = query
-      ? state.artists.filter(
-          (artist) =>
-            artist.name.toLowerCase().includes(query) ||
-            artist.ticker.toLowerCase().includes(query)
-        )
-      : [...state.artists].sort((a, b) => Math.abs(b.dailyChangePercent) - Math.abs(a.dailyChangePercent));
-
-    return source.slice(0, 6);
-  }, [search, state.artists]);
+  const accountMenuRef = useRef<HTMLDivElement | null>(null);
+  const tapeArtists = useMemo(
+    () =>
+      [...(marketReady ? state.artists : [])]
+        .sort((first, second) => Math.abs(second.dailyChangePercent) - Math.abs(first.dailyChangePercent))
+        .slice(0, 14),
+    [marketReady, state.artists]
+  );
 
   const accountLabel =
     session && state.username && state.username !== "Demo Guest" ? state.username : user?.email?.split("@")[0] ?? "Guest";
-
-  function submitSearch(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const query = search.trim().toLowerCase();
-
-    if (!query) {
-      return;
-    }
-
-    const match = state.artists.find(
-      (artist) =>
-        artist.ticker.toLowerCase() === query ||
-        artist.name.toLowerCase().includes(query) ||
-        artist.ticker.toLowerCase().includes(query)
-    );
-
-    if (match) {
-      setSearchFocused(false);
-      setSearch("");
-      router.push(`/artists/${match.id}`);
-    }
-  }
 
   async function handleSignOut() {
     setAccountOpen(false);
@@ -95,6 +67,32 @@ export function Shell({ children }: { children: React.ReactNode }) {
     return () => media.removeEventListener("change", handleSystemChange);
   }, []);
 
+  useEffect(() => {
+    if (!accountOpen) {
+      return;
+    }
+
+    function closeOnOutsidePointer(event: PointerEvent) {
+      if (accountMenuRef.current && !accountMenuRef.current.contains(event.target as Node)) {
+        setAccountOpen(false);
+      }
+    }
+
+    function closeOnEscape(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setAccountOpen(false);
+      }
+    }
+
+    document.addEventListener("pointerdown", closeOnOutsidePointer);
+    document.addEventListener("keydown", closeOnEscape);
+
+    return () => {
+      document.removeEventListener("pointerdown", closeOnOutsidePointer);
+      document.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [accountOpen]);
+
   function chooseTheme(preference: ThemePreference) {
     setThemePreference(preference);
     setResolvedTheme(applyThemePreference(preference));
@@ -112,7 +110,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
             <span>RMI</span>
           </Link>
 
-          <nav className="ml-auto hidden items-center gap-6 text-sm font-bold text-paper/70 md:flex" aria-label="Primary">
+          <nav className="ml-6 hidden items-center gap-5 text-sm font-bold text-paper/70 md:flex" aria-label="Primary">
             {navItems.map((item) => {
               const active = pathname === item.href || (item.href === "/leaderboard" && pathname === "/rankings");
 
@@ -128,7 +126,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
             })}
           </nav>
 
-          <div className="relative ml-auto md:ml-0">
+          <div ref={accountMenuRef} className="relative ml-auto">
             {session ? (
               <button
                 type="button"
@@ -171,11 +169,8 @@ export function Shell({ children }: { children: React.ReactNode }) {
                 </div>
 
                 <div className="grid gap-1 py-3 text-sm font-bold">
-                  <Link href="/portfolio" onClick={() => setAccountOpen(false)} className="rounded-lg px-3 py-2 hover:bg-panelSoft">
-                    Portfolio
-                  </Link>
                   <Link href="/account" onClick={() => setAccountOpen(false)} className="rounded-lg px-3 py-2 hover:bg-panelSoft">
-                    Manage account
+                    Manage Account
                   </Link>
                   <Link href="/settings" onClick={() => setAccountOpen(false)} className="rounded-lg px-3 py-2 hover:bg-panelSoft">
                     Settings
@@ -227,49 +222,79 @@ export function Shell({ children }: { children: React.ReactNode }) {
           ))}
         </div>
 
-        <form
-          onSubmit={submitSearch}
-          className={clsx("relative mx-auto max-w-[960px] px-4 pb-5 sm:px-6 lg:px-8", pathname === "/" && "hidden")}
-        >
-          <Search className="pointer-events-none absolute left-8 top-[13px] h-4 w-4 text-paper/35 sm:left-10 lg:left-12" aria-hidden="true" />
-          <input
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-            onFocus={() => setSearchFocused(true)}
-            onBlur={() => window.setTimeout(() => setSearchFocused(false), 120)}
-            className="h-10 w-full rounded-lg border border-line bg-panel pl-11 pr-4 text-sm font-bold outline-none placeholder:text-paper/35 focus:border-cyan"
-            placeholder="Search artists"
-          />
-          {searchFocused ? (
-            <div className="absolute left-4 right-4 top-12 z-40 rounded-xl border border-line bg-panel p-2 shadow-2xl sm:left-6 sm:right-6 lg:left-8 lg:right-8">
-              {searchSuggestions.map((artist) => (
-                <Link
-                  key={artist.id}
-                  href={`/artists/${artist.id}`}
-                  onClick={() => setSearchFocused(false)}
-                  className="flex items-center justify-between gap-3 rounded-lg px-3 py-2 text-sm hover:bg-panelSoft"
-                >
-                  <span className="flex min-w-0 items-center gap-3">
-                    <ArtistAvatar artist={artist} size="sm" />
-                    <span className="min-w-0 truncate font-black">
-                      {artist.name} <span className="font-bold text-paper/45">${artist.ticker}</span>
-                    </span>
-                  </span>
-                  <span className={artist.dailyChangePercent >= 0 ? "text-mint" : "text-ember"}>
-                    {formatPercent(artist.dailyChangePercent)}
-                  </span>
-                </Link>
-              ))}
-            </div>
-          ) : null}
-        </form>
+        {tapeArtists.length ? <MarketTape artists={tapeArtists} /> : null}
+
       </header>
 
       {appearanceOpen ? (
         <AppearanceModal current={themePreference} onChange={chooseTheme} onClose={() => setAppearanceOpen(false)} />
       ) : null}
 
-      <main className="mx-auto w-full max-w-[1440px] px-4 py-8 sm:px-6 lg:px-8">{children}</main>
+      <main className="mx-auto w-full max-w-[1440px] px-4 py-8 sm:px-6 lg:px-8">
+        {marketReady ? children : <MarketLoadingState />}
+      </main>
+    </div>
+  );
+}
+
+function MarketLoadingState() {
+  return (
+    <div className="space-y-5" aria-label="Loading market data" aria-busy="true">
+      <div className="h-8 w-44 rounded bg-panelSoft motion-safe:animate-pulse" />
+      <div className="h-12 rounded-xl bg-panelSoft motion-safe:animate-pulse" />
+      <div className="overflow-hidden rounded-xl border border-line">
+        {Array.from({ length: 7 }).map((_, index) => (
+          <div key={index} className="flex items-center gap-4 border-b border-line px-4 py-4 last:border-b-0">
+            <div className="h-10 w-10 rounded-full bg-panelSoft motion-safe:animate-pulse" />
+            <div className="min-w-0 flex-1 space-y-2">
+              <div className="h-3 w-32 rounded bg-panelSoft motion-safe:animate-pulse" />
+              <div className="h-2.5 w-20 rounded bg-panelSoft motion-safe:animate-pulse" />
+            </div>
+            <div className="h-3 w-20 rounded bg-panelSoft motion-safe:animate-pulse" />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function MarketTape({ artists }: { artists: Artist[] }) {
+  return (
+    <div className="flex min-h-10 border-t border-line/70 bg-panelSoft/45" aria-label="Current RMI market prices">
+      <Link
+        href="/markets"
+        className="z-10 flex shrink-0 items-center gap-2 border-r border-line bg-panelSoft px-4 text-xs font-black sm:px-6"
+      >
+        <span className="h-2 w-2 rounded-full bg-mint" aria-hidden="true" />
+        RMI Market
+      </Link>
+      <div className="market-tape-viewport min-w-0 flex-1 overflow-hidden">
+        <div className="market-tape-track flex h-full w-max items-center">
+          <MarketTapeGroup artists={artists} />
+          <MarketTapeGroup artists={artists} duplicate />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function MarketTapeGroup({ artists, duplicate = false }: { artists: Artist[]; duplicate?: boolean }) {
+  return (
+    <div className="flex h-full shrink-0 items-center" aria-hidden={duplicate || undefined}>
+      {artists.map((artist) => (
+        <Link
+          key={`${duplicate ? "copy" : "primary"}-${artist.id}`}
+          href={`/artists/${artist.id}`}
+          tabIndex={duplicate ? -1 : undefined}
+          className="flex h-full shrink-0 items-center gap-2 border-r border-line/60 px-4 text-xs hover:bg-panelSoft"
+        >
+          <span className="font-black text-cyan">{artist.ticker}</span>
+          <span className="number-tabular text-paper/65">{formatCurrency(artist.currentPrice)}</span>
+          <span className={clsx("font-black number-tabular", artist.dailyChangePercent >= 0 ? "text-mint" : "text-ember")}>
+            {formatPercent(artist.dailyChangePercent)}
+          </span>
+        </Link>
+      ))}
     </div>
   );
 }

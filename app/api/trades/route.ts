@@ -17,7 +17,14 @@ type TradingStatusRow = {
   reason: string;
 };
 
+type PendingCatalyst = {
+  title: string;
+  detectedAt: string;
+};
+
 const MARKET_IMPACT_MIN_ACCOUNT_AGE_HOURS = 24;
+const PENDING_CATALYST_MIN_IMPACT = 35;
+const PENDING_CATALYST_MIN_CONFIDENCE = 0.65;
 
 export async function POST(request: Request) {
   const config = getSupabaseConfigStatus();
@@ -101,6 +108,19 @@ export async function POST(request: Request) {
     );
   }
 
+  const pendingCatalyst = await loadPendingCatalyst(supabase, artistId);
+
+  if (pendingCatalyst) {
+    return NextResponse.json(
+      {
+        ok: false,
+        error: "Trading is temporarily paused for this artist while a newly detected catalyst is incorporated into the quote.",
+        pendingCatalyst
+      },
+      { status: 423 }
+    );
+  }
+
   const functionName = getTradeFunctionName(side);
   const { data, error } = await supabase.rpc(functionName, {
     p_artist_id: artistId,
@@ -130,6 +150,49 @@ export async function POST(request: Request) {
       })
     }
   });
+}
+
+async function loadPendingCatalyst(
+  supabase: ReturnType<typeof createAnonServerClient>,
+  artistId: string
+): Promise<PendingCatalyst | null> {
+  const [eventResult, quoteResult] = await Promise.all([
+    supabase
+      .from("market_events")
+      .select("title,created_at")
+      .eq("artist_id", artistId)
+      .gte("confidence", PENDING_CATALYST_MIN_CONFIDENCE)
+      .or(`impact_score.gte.${PENDING_CATALYST_MIN_IMPACT},impact_score.lte.-${PENDING_CATALYST_MIN_IMPACT}`)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+    supabase
+      .from("price_ticks")
+      .select("observed_at")
+      .eq("artist_id", artistId)
+      .eq("source", "market_run")
+      .order("observed_at", { ascending: false })
+      .limit(1)
+      .maybeSingle()
+  ]);
+
+  // Older projects may not have the event or tick migrations yet. In that case,
+  // preserve trading and let the existing market-status RPC remain authoritative.
+  if (eventResult.error || quoteResult.error || !eventResult.data) {
+    return null;
+  }
+
+  const detectedAt = new Date(eventResult.data.created_at).getTime();
+  const quotedAt = quoteResult.data ? new Date(quoteResult.data.observed_at).getTime() : Number.NEGATIVE_INFINITY;
+
+  if (!Number.isFinite(detectedAt) || detectedAt <= quotedAt) {
+    return null;
+  }
+
+  return {
+    title: eventResult.data.title,
+    detectedAt: eventResult.data.created_at
+  };
 }
 
 async function loadTradingStatus(supabase: ReturnType<typeof createAnonServerClient>, artistId: string) {

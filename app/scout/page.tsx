@@ -39,8 +39,8 @@ export default function ScoutPage() {
       <section>
         <div className="mb-3 flex items-end justify-between gap-4">
           <div>
-            <h2 className="text-lg font-black">On the Radar</h2>
-            <p className="mt-1 text-sm text-paper/55">Live artists from the RMI roster. No fictional candidates.</p>
+          <h2 className="text-lg font-black">On the Radar</h2>
+            <p className="mt-1 text-sm text-paper/55">Smaller active listings showing the strongest current RMI signals.</p>
           </div>
           <span className="text-xs text-paper/45">{emergingArtists.length} shown</span>
         </div>
@@ -52,7 +52,7 @@ export default function ScoutPage() {
       <section className="flex items-start gap-3 rounded-xl bg-panelSoft p-4 text-sm leading-6 text-paper/65">
         <Info className="mt-1 h-4 w-4 shrink-0 text-cyan" aria-hidden="true" />
         <p>
-          Unlisted artist nominations and pre-market backing are not active. They should only launch after RMI has reliable identity checks, source coverage, and enough traders for a fair listing process.
+          Scout highlights active artists with rising audience, media, and market momentum. Open a listing to review its price history and current catalysts.
         </p>
       </section>
     </div>
