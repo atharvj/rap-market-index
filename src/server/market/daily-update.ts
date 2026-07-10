@@ -809,8 +809,15 @@ function calculateArtistUpdate({
   const rawSignalDelta = signals.hasMomentumSignal
     ? calculateSignalDelta(stats) * artist.volatility
     : staleMomentumDecayDelta * artist.volatility;
+  const evidenceAdjustedRawSignalDelta = getEvidenceAdjustedRawSignalDelta({
+    rawSignalDelta,
+    credibleEventSupport,
+    reliability: signals.reliability,
+    reliabilityDetails: signals.reliabilityDetails,
+    source
+  });
   const reliabilityMultiplier = signals.hasMomentumSignal ? getReliabilityPriceMultiplier(signals.reliability) : 0;
-  const reliabilityAdjustedDelta = rawSignalDelta * reliabilityMultiplier;
+  const reliabilityAdjustedDelta = evidenceAdjustedRawSignalDelta * reliabilityMultiplier;
   const modifierImpact = signals.hasMomentumSignal
     ? applySignalModifiers(reliabilityAdjustedDelta * conflictMoveMultiplier, signals.modifiers, reliabilityMultiplier)
     : getEmptyModifierImpact(rawSignalDelta);
@@ -876,6 +883,7 @@ function calculateArtistUpdate({
       eventMemoryAdjustedStats,
       staleMomentumDecayDelta,
       rawSignalDelta,
+      evidenceAdjustedRawSignalDelta,
       reliabilityAdjustedDelta,
       modifierImpact,
       signalDeltaBeforeTechnicals,
@@ -1099,6 +1107,37 @@ function hasCredibleEventSupport(rawPayload: Record<string, unknown>, modifiers:
   });
 
   return hasCredibleEvent || (totalSignal >= 12 && sourceConfirmedEventCount > 0);
+}
+
+function getEvidenceAdjustedRawSignalDelta({
+  rawSignalDelta,
+  credibleEventSupport,
+  reliability,
+  reliabilityDetails,
+  source
+}: {
+  rawSignalDelta: number;
+  credibleEventSupport: boolean;
+  reliability: number;
+  reliabilityDetails: Record<string, unknown>;
+  source: MarketUpdateSource;
+}) {
+  if (rawSignalDelta <= 0 || credibleEventSupport || !isRealExternalSource(source)) {
+    return rawSignalDelta;
+  }
+
+  const sourceCount = getNumber(reliabilityDetails.sourceCount, 1);
+  const statCount = getNumber(reliabilityDetails.statCount, 1);
+
+  if (reliability >= 0.74 && sourceCount >= 3 && statCount >= 3) {
+    return Math.min(rawSignalDelta, 0.012);
+  }
+
+  if (reliability >= 0.62 && sourceCount >= 2 && statCount >= 2) {
+    return Math.min(rawSignalDelta, 0.006);
+  }
+
+  return Math.min(rawSignalDelta, 0.0025);
 }
 
 function getStaleMomentumDecayDelta(stats: HypeStats, source: MarketUpdateSource) {
@@ -1865,21 +1904,13 @@ function explainMove(
     if (primaryCatalyst.reasonPriority >= 8) {
       return `${ticker} ${direction} after ${catalyst} became the main market catalyst${counterClause}${sourceClause}.`;
     }
-
-    return `${ticker} ${direction} as ${signalName} shifted, with ${catalyst} also affecting sentiment${counterClause}${sourceClause}.`;
   }
 
   if (counterCatalyst?.reasonPriority && counterCatalyst.reasonPriority >= 8) {
     return `${ticker} ${direction} as ${signalName} shifted, though ${formatCatalystReason(counterCatalyst.reason)} offset part of the move${sourceClause}.`;
   }
 
-  const leadingSource = sourceAttribution.leadingSource?.label;
-
-  if (leadingSource) {
-    return `${ticker} ${direction} as ${signalName} shifted, led by ${leadingSource}${sourceClause}.`;
-  }
-
-  return `${ticker} ${direction} as ${signalName} shifted${sourceClause}.`;
+  return `${ticker} ${direction} on baseline market data without a source-backed headline catalyst strong enough to lead the move${sourceClause}.`;
 }
 
 function getSourceConsensusClause(sourceAttribution: SourceAttribution) {

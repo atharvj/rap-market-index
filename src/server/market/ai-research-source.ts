@@ -91,9 +91,10 @@ const SOURCE_COUNT = "source_count";
 const REQUEST_ERROR = "request_error";
 const DEFAULT_MODEL = "groq/compound-mini";
 const DEFAULT_LOOKBACK_DAYS = 14;
-const DEFAULT_MAX_EVENTS_PER_ARTIST = 3;
+const DEFAULT_MAX_EVENTS_PER_ARTIST = 1;
 const DEFAULT_DELAY_MS = 500;
 const DEFAULT_TIMEOUT_MS = 25000;
+const MAX_COMPLETION_TOKENS = 420;
 
 const EVENT_TYPES = new Set<MarketEvent["eventType"]>([
   "release",
@@ -114,6 +115,10 @@ const LOW_VALUE_DOMAINS = new Set([
   "twitter.com",
   "x.com"
 ]);
+
+const VIDEO_ONLY_DOMAINS = new Set(["youtube.com", "youtu.be", "music.youtube.com"]);
+
+const LARGE_MODEL_HINTS = ["120b", "70b", "405b"];
 
 export async function collectAiResearchMarketEvents({
   artists,
@@ -141,6 +146,7 @@ export async function collectAiResearchMarketEvents({
   const observations: MarketObservation[] = [];
   const eventsByArtist: Record<string, MarketEvent[]> = {};
   const warnings: string[] = [];
+  const resolvedModel = normalizeAiResearchModel(model);
 
   for (const [index, artist] of artists.entries()) {
     if (index > 0 && delayMs > 0) {
@@ -151,7 +157,7 @@ export async function collectAiResearchMarketEvents({
     const result = await fetchAiResearchEvents({
       provider,
       apiKey: cleanApiKey,
-      model,
+      model: resolvedModel,
       artist,
       runDate,
       query,
@@ -167,7 +173,7 @@ export async function collectAiResearchMarketEvents({
         createObservation(artist.id, runDate, REQUEST_ERROR, 1, "flag", {
           source: SOURCE,
           provider,
-          model,
+          model: resolvedModel,
           query,
           error: result.error
         })
@@ -183,7 +189,7 @@ export async function collectAiResearchMarketEvents({
           runDate,
           query,
           provider,
-          model,
+          model: resolvedModel,
           lookbackDays,
           searchResults: result.searchResults,
           executedToolCount: result.executedToolCount
@@ -198,7 +204,7 @@ export async function collectAiResearchMarketEvents({
       createObservation(artist.id, runDate, EVENT_COUNT, uniqueEvents.length, "events", {
         source: SOURCE,
         provider,
-        model,
+        model: resolvedModel,
         query,
         returnedCandidateCount: result.events.length,
         acceptedEventCount: uniqueEvents.length,
@@ -224,7 +230,7 @@ export async function collectAiResearchMarketEvents({
         {
           source: SOURCE,
           provider,
-          model,
+          model: resolvedModel,
           query
         }
       ),
@@ -237,7 +243,7 @@ export async function collectAiResearchMarketEvents({
         {
           source: SOURCE,
           provider,
-          model,
+          model: resolvedModel,
           query
         }
       )
@@ -302,17 +308,15 @@ async function fetchAiResearchEvents({
       body: JSON.stringify({
         model,
         temperature: 0,
-        max_tokens: 1800,
-        response_format: { type: "json_object" },
+        max_completion_tokens: MAX_COMPLETION_TOKENS,
         search_settings: {
-          country: "US",
           exclude_domains: ["azlyrics.com", "genius.com", "songmeanings.com"]
         },
         messages: [
           {
             role: "system",
             content:
-              "You are a source-backed music market research analyst with access to current web search. Return only strict JSON. Never invent news. Only include events that have a real public source URL you found through search or direct source lookup. If source lookup is unavailable or no source-backed market-moving event exists, return {\"events\":[]}. Prefer music publications, official artist/label sources, credible review outlets, chart/source data, and high-signal public community discussion. Reject low-view random uploads, generic fan praise, private/social pages that cannot be verified, sarcasm/jokes/memes presented as facts, and old items outside the requested window."
+              "Return JSON only. Find current source-backed rap market catalysts. Never invent facts or URLs. If no public source supports a meaningful event, return {\"events\":[]}. Reject low-view uploads, generic fan praise, private pages, sarcasm, jokes, memes, and old items."
           },
           {
             role: "user",
@@ -389,22 +393,11 @@ function buildResearchPrompt({
   maxEventsPerArtist: number;
 }) {
   return [
-    `Research price-relevant public events for rapper/artist: ${artist.name} (${artist.ticker}).`,
-    `Market run date: ${runDate}. Look back ${lookbackDays} days unless the item is an upcoming album/single/tour announcement reported recently.`,
-    `Search query context: ${query}.`,
-    `Return up to ${maxEventsPerArtist} events that could plausibly move a fantasy artist stock.`,
-    "Use current web search. sourceUrl must be the exact public page that supports the event, not a home page or unrelated search result.",
-    "",
-    "Useful events include: album/mixtape/EP releases, major singles/features, tracklist/cover art reactions, credible reviews, public backlash, legal/health status, viral live performances, viral snippets, fan reception shifts, chart/streaming milestones, or a meaningful decline/falloff story.",
-    "For releases: if an artist released a project with multiple tracks, report the project/album/mixtape/EP rather than one random track. Only report a standalone song/video when it has clear reach, coverage, or strong reception.",
-    "For controversy or underground scene events: public Reddit/forum/music-blog/community pages can count, but only when there is concrete public evidence, meaningful reach, and the underlying claim is not just fan speculation. Private posts, vague screenshots, or one-off fan comments do not count.",
-    "When using fan/community/social sentiment, separate the factual claim from the reaction. A factual claim needs direct public evidence. Fan reaction needs either multiple independent public sources or strong measurable reach. Do not treat sarcasm, jokes, memes, trolling, copied comments, or obvious exaggeration as literal sentiment.",
-    "If a claim is not confirmed, either omit it or mark evidenceLevel as low_signal. Do not use rumor to move price.",
-    "Do not include: random low-view audio uploads, generic social chatter, private posts, fan-only praise with no reach, low-quality scraper pages, or news that is not about this artist.",
-    "",
-    "Return JSON only:",
-    "{\"events\":[{\"title\":\"short event headline\",\"eventDate\":\"YYYY-MM-DD\",\"eventType\":\"release|review|news|controversy|award|tour|viral\",\"sourceName\":\"publication or platform\",\"sourceUrl\":\"https://...\",\"summary\":\"one sentence factual summary\",\"whyItMatters\":\"why it may move the market\",\"sentimentScore\":-100,\"impactScore\":-100,\"confidence\":0.0,\"sourceType\":\"music_publication|mainstream_news|review|official|community|social|video\",\"evidenceLevel\":\"confirmed|reported|rumor|low_signal\",\"reachScope\":\"underground|scene|broad|mainstream\",\"supportingMediaUrl\":\"optional official YouTube or Spotify URL that exactly matches the release/event\",\"supportingMediaType\":\"youtube|spotify|other|none\",\"relatedArtistNames\":[\"artist names\"],\"corroboratingSourceCount\":1,\"publicReactionConfirmed\":false,\"factualClaimConfirmed\":false,\"riskFlags\":[\"optional concerns\"]}]}",
-    "Use positive impact for bullish events and negative impact for bearish events. Confidence must reflect source quality and whether the public reaction is confirmed."
+    `Artist: ${artist.name} (${artist.ticker}). Run date: ${runDate}. Window: ${lookbackDays} days.`,
+    `Search context: ${query}. Return at most ${maxEventsPerArtist} source-backed events.`,
+    "Use only catalysts that can move price: album/project/single/feature, review/reception, backlash/legal/health, viral performance/snippet, chart milestone, or clear decline.",
+    "If many tracks dropped together, report the project, not one random track. Social/community items need factual confirmation and public reaction.",
+    "JSON shape: {\"events\":[{\"title\":\"headline\",\"eventDate\":\"YYYY-MM-DD\",\"eventType\":\"release|review|news|controversy|award|tour|viral\",\"sourceName\":\"source\",\"sourceUrl\":\"https://...\",\"summary\":\"fact\",\"whyItMatters\":\"market reason\",\"sentimentScore\":0,\"impactScore\":0,\"confidence\":0.0,\"sourceType\":\"music_publication|mainstream_news|review|official|community|social|video\",\"evidenceLevel\":\"confirmed|reported|rumor|low_signal\",\"reachScope\":\"underground|scene|broad|mainstream\",\"supportingMediaUrl\":\"\",\"supportingMediaType\":\"none\",\"relatedArtistNames\":[],\"corroboratingSourceCount\":1,\"publicReactionConfirmed\":false,\"factualClaimConfirmed\":true,\"riskFlags\":[]}]}"
   ].join("\n");
 }
 
@@ -591,6 +584,13 @@ function isTrustworthyAiEvent({
     return false;
   }
 
+  if (
+    VIDEO_ONLY_DOMAINS.has(domain) &&
+    (sourceType !== "official" || confidence < 0.8 || Math.abs(impactScore) < 58 || corroboratingSourceCount < 2)
+  ) {
+    return false;
+  }
+
   if (sourceType === "social" || sourceType === "community") {
     if (confidence < 0.76) {
       return false;
@@ -655,6 +655,26 @@ function createObservation(
 
 function buildResearchQuery(artist: MarketUpdateArtist, externalIds?: ArtistExternalIds) {
   return externalIds?.gdeltQuery?.trim() || buildDefaultGdeltQuery(artist.name);
+}
+
+function normalizeAiResearchModel(value: string | undefined) {
+  const candidate = value?.trim();
+
+  if (!candidate) {
+    return DEFAULT_MODEL;
+  }
+
+  const allowLargeModel = (process.env.MARKET_AI_RESEARCH_ALLOW_LARGE_MODEL ?? "").trim().toLowerCase();
+
+  if (
+    allowLargeModel !== "true" &&
+    allowLargeModel !== "1" &&
+    LARGE_MODEL_HINTS.some((hint) => candidate.toLowerCase().includes(hint))
+  ) {
+    return DEFAULT_MODEL;
+  }
+
+  return candidate;
 }
 
 function parseJsonObject(value: string) {

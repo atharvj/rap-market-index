@@ -140,6 +140,23 @@ type EventScanState =
       message: string;
     };
 
+type AdminActionState =
+  | {
+      status: "idle";
+    }
+  | {
+      status: "loading";
+      label: string;
+    }
+  | {
+      status: "success";
+      message: string;
+    }
+  | {
+      status: "error";
+      message: string;
+    };
+
 type SourceResolverPreviewState =
   | {
       status: "idle";
@@ -678,6 +695,11 @@ export default function DevPage() {
   const [sourceIds, setSourceIds] = useState<AsyncState<SourceIdDirectory>>({ status: "loading" });
   const [manualSourceForm, setManualSourceForm] = useState<ManualSourceIdForm>(emptyManualSourceIdForm);
   const [manualSourceSave, setManualSourceSave] = useState<ManualSourceIdSaveState>({ status: "idle" });
+  const [resetConfirm, setResetConfirm] = useState("");
+  const [resetStartingCash, setResetStartingCash] = useState("100000");
+  const [prelaunchReset, setPrelaunchReset] = useState<AdminActionState>({ status: "idle" });
+  const [adminCashValue, setAdminCashValue] = useState("100000");
+  const [adminCashAction, setAdminCashAction] = useState<AdminActionState>({ status: "idle" });
   const adminHeaders = useMemo<Record<string, string>>(() => {
     if (!session) {
       return {} as Record<string, string>;
@@ -1154,6 +1176,85 @@ export default function DevPage() {
       setRunNow({
         status: "error",
         message: error instanceof Error ? error.message : "Market run failed."
+      });
+    }
+  }
+
+  async function resetPrelaunchMarket() {
+    setPrelaunchReset({ status: "loading", label: "Resetting prelaunch market" });
+
+    try {
+      const startingCash = Number(resetStartingCash);
+      const response = await fetch("/api/admin/prelaunch-reset", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          ...adminHeaders
+        },
+        body: JSON.stringify({
+          confirm: resetConfirm,
+          startingCash,
+          resetWatchlists: false,
+          clearHalts: true
+        })
+      });
+      const payload = await readJsonResponse(response);
+
+      if (!response.ok || !payload.ok) {
+        throw new Error(payload.error ?? "Prelaunch reset failed.");
+      }
+
+      setPrelaunchReset({
+        status: "success",
+        message: `Reset ${payload.resetArtistCount ?? 0} artists and ${payload.resetProfileCount ?? 0} profile(s). Run market now to seed fresh charts.`
+      });
+      setResetConfirm("");
+      await Promise.all([
+        refreshMarketHealth(),
+        refreshMarketControls(),
+        refreshMarketIntegrity(),
+        refreshArtistRoster(),
+        refreshSourceIds()
+      ]);
+    } catch (error) {
+      setPrelaunchReset({
+        status: "error",
+        message: error instanceof Error ? error.message : "Prelaunch reset failed."
+      });
+    }
+  }
+
+  async function setMyAdminCash() {
+    setAdminCashAction({ status: "loading", label: "Setting cash" });
+
+    try {
+      const cashBalance = Number(adminCashValue);
+      const response = await fetch("/api/admin/profile-cash", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          ...adminHeaders
+        },
+        body: JSON.stringify({
+          target: "self",
+          cashBalance
+        })
+      });
+      const payload = await readJsonResponse(response);
+
+      if (!response.ok || !payload.ok) {
+        throw new Error(payload.error ?? "Cash update failed.");
+      }
+
+      setAdminCashAction({
+        status: "success",
+        message: `Cash set to ${formatCurrency(payload.profile?.cashBalance ?? cashBalance)}.`
+      });
+      await refreshMarketIntegrity();
+    } catch (error) {
+      setAdminCashAction({
+        status: "error",
+        message: error instanceof Error ? error.message : "Cash update failed."
       });
     }
   }
@@ -1806,6 +1907,84 @@ export default function DevPage() {
         {marketIntegrity.status === "error" ? <ErrorText text={marketIntegrity.message} /> : null}
         {marketIntegrity.status === "ready" ? <MarketIntegrityPanel data={marketIntegrity.data} /> : null}
       </Panel>
+
+      <section className="grid gap-6 xl:grid-cols-2">
+        <section className="rounded-md border border-ember/30 bg-panel/88 p-5 shadow-market">
+          <div className="flex items-start gap-3">
+            <AlertTriangle className="mt-1 h-5 w-5 shrink-0 text-ember" />
+            <div>
+              <p className="text-xs font-bold uppercase tracking-wide text-paper/45">Prelaunch reset</p>
+              <h2 className="mt-1 text-2xl font-black">Start the market fresh</h2>
+              <p className="mt-2 text-sm leading-6 text-paper/55">
+                Clears trades, holdings, shorts, chart history, observations, market events, runs, and halts. This is
+                for prelaunch only after you decide the engine is ready.
+              </p>
+            </div>
+          </div>
+          <div className="mt-4 grid gap-3 sm:grid-cols-[1fr_180px]">
+            <label className="space-y-2">
+              <span className="text-xs font-black uppercase tracking-wide text-paper/45">Type RESET RMI</span>
+              <input
+                value={resetConfirm}
+                onChange={(event) => setResetConfirm(event.target.value)}
+                className="h-11 w-full rounded-md border border-line bg-ink px-3 text-sm font-bold outline-none focus:border-ember"
+                placeholder="RESET RMI"
+              />
+            </label>
+            <label className="space-y-2">
+              <span className="text-xs font-black uppercase tracking-wide text-paper/45">Starting cash</span>
+              <input
+                value={resetStartingCash}
+                onChange={(event) => setResetStartingCash(event.target.value)}
+                inputMode="numeric"
+                className="h-11 w-full rounded-md border border-line bg-ink px-3 text-sm font-bold outline-none focus:border-ember"
+              />
+            </label>
+          </div>
+          <button
+            type="button"
+            onClick={resetPrelaunchMarket}
+            disabled={prelaunchReset.status === "loading" || resetConfirm !== "RESET RMI"}
+            className="mt-4 inline-flex min-h-10 items-center justify-center gap-2 rounded-md border border-ember/45 bg-ember/10 px-4 text-sm font-black text-ember disabled:cursor-not-allowed disabled:opacity-45"
+          >
+            <Database className="h-4 w-4" />
+            Reset prelaunch state
+          </button>
+          <AdminActionResult state={prelaunchReset} />
+        </section>
+
+        <section className="rounded-md border border-line bg-panel/88 p-5 shadow-market">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-wide text-paper/45">Admin account</p>
+            <h2 className="mt-1 text-2xl font-black">Set my cash balance</h2>
+            <p className="mt-2 text-sm leading-6 text-paper/55">
+              Updates only your signed-in admin profile. Admin trades remain excluded from market impact by the
+              protected trade path.
+            </p>
+          </div>
+          <div className="mt-4 grid gap-3 sm:grid-cols-[1fr_auto]">
+            <label className="space-y-2">
+              <span className="text-xs font-black uppercase tracking-wide text-paper/45">Cash balance</span>
+              <input
+                value={adminCashValue}
+                onChange={(event) => setAdminCashValue(event.target.value)}
+                inputMode="numeric"
+                className="h-11 w-full rounded-md border border-line bg-ink px-3 text-sm font-bold outline-none focus:border-mint"
+              />
+            </label>
+            <button
+              type="button"
+              onClick={setMyAdminCash}
+              disabled={adminCashAction.status === "loading"}
+              className="self-end inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-mint/45 bg-mint/10 px-4 text-sm font-black text-mint disabled:cursor-wait disabled:opacity-55"
+            >
+              <CheckCircle2 className="h-4 w-4" />
+              Set cash
+            </button>
+          </div>
+          <AdminActionResult state={adminCashAction} />
+        </section>
+      </section>
 
       <section className="rounded-md border border-line bg-panel/88 p-5 shadow-market">
         <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
@@ -4140,6 +4319,22 @@ function ReadinessTile({
         {ready ? readyText : pendingText}
       </p>
     </div>
+  );
+}
+
+function AdminActionResult({ state }: { state: AdminActionState }) {
+  if (state.status === "idle") {
+    return null;
+  }
+
+  if (state.status === "loading") {
+    return <p className="mt-4 text-sm font-bold text-cyan">{state.label}...</p>;
+  }
+
+  return (
+    <p className={`mt-4 text-sm font-bold ${state.status === "success" ? "text-mint" : "text-ember"}`}>
+      {state.message}
+    </p>
   );
 }
 

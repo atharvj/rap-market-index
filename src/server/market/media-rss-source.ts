@@ -1,4 +1,12 @@
 import type { MarketUpdateArtist } from "@/server/market/daily-update";
+import {
+  hasArtistControversySubjectContext,
+  hasArtistReleaseSubjectContext,
+  hasArtistStatusSubjectContext,
+  hasRequiredArtistEventDisambiguation,
+  isGenericMusicListicleTitle,
+  isLowValueMarketArticleTitle
+} from "@/server/market/artist-event-disambiguation";
 import { buildDefaultGdeltQuery } from "@/server/market/artist-text-identifiers";
 import {
   classifyArticleEvent,
@@ -72,9 +80,11 @@ const GOOGLE_NEWS_BASE_URL = "https://news.google.com/rss/search";
 
 const DEFAULT_FEED_URLS = [
   "https://www.hotnewhiphop.com/feed/",
-  "https://hiphopdx.com/feed",
   "https://allhiphop.com/feed/",
   "https://www.rap-up.com/feed/",
+  "https://www.thefader.com/feed.rss",
+  "https://uproxx.com/music/feed/",
+  "https://consequence.net/hip-hop/feed/",
   "https://pitchfork.com/feed/feed-news/rss",
   "https://pitchfork.com/feed/feed-album-reviews/rss",
   "https://www.xxlmag.com/feed/",
@@ -202,12 +212,15 @@ function buildArtistEvents({
     .map((item) => ({
       item,
       titleMatchedArtist: mentionsArtist(item.title, artist.name, query),
-      textMatchedArtist: mentionsArtist(`${item.title} ${item.summary}`, artist.name, query)
+      textMatchedArtist: mentionsArtist(`${item.title} ${item.summary}`, artist.name, query),
+      disambiguatedArtist: hasRequiredArtistDisambiguation({ artist, item })
     }))
-    .filter(({ titleMatchedArtist, textMatchedArtist }) => titleMatchedArtist || textMatchedArtist);
+    .filter(({ titleMatchedArtist, textMatchedArtist, disambiguatedArtist }) =>
+      (titleMatchedArtist || textMatchedArtist) && disambiguatedArtist
+    );
 
   const candidateEvents = matchedItems
-    .map(({ item, titleMatchedArtist, textMatchedArtist }) => {
+    .map(({ item, titleMatchedArtist, textMatchedArtist, disambiguatedArtist }) => {
       const classificationText = `${item.title} ${item.summary}`.slice(0, 420);
       const classification = classifyArticleEvent(classificationText, item.domain, undefined, {
         allowLowTierRelease: item.feedScope === "artist_search" && (titleMatchedArtist || textMatchedArtist)
@@ -218,6 +231,29 @@ function buildArtistEvents({
       }
 
       const sourceTier = getSourceTier(item.domain);
+      const subjectMatchedArtist = hasRequiredEventSubjectContext({
+        artist,
+        query,
+        item,
+        classificationText,
+        classification
+      });
+
+      if (!subjectMatchedArtist) {
+        return null;
+      }
+
+      if (isLowValueMarketArticleTitle(item.title) && !classification.statusSubtype) {
+        return null;
+      }
+
+      if (
+        classification.eventType === "release" &&
+        isGenericMusicListicleTitle(item.title) &&
+        !extractProjectTitle(`${item.title} ${item.summary}`)
+      ) {
+        return null;
+      }
 
       if (
         !isRelevantMediaEvent({
@@ -225,6 +261,8 @@ function buildArtistEvents({
           sourceTier,
           titleMatchedArtist,
           textMatchedArtist,
+          eventType: classification.eventType,
+          classificationReason: classification.reason,
           impactScore: classification.impactScore
         })
       ) {
@@ -235,6 +273,8 @@ function buildArtistEvents({
         item,
         titleMatchedArtist,
         textMatchedArtist,
+        disambiguatedArtist,
+        subjectMatchedArtist,
         sourceTier,
         classification
       };
@@ -243,7 +283,7 @@ function buildArtistEvents({
     .sort((first, second) => getEventRank(second) - getEventRank(first))
     .slice(0, maxEventsPerArtist);
 
-  const events = candidateEvents.map(({ item, titleMatchedArtist, textMatchedArtist, sourceTier, classification }) => {
+  const events = candidateEvents.map(({ item, titleMatchedArtist, textMatchedArtist, disambiguatedArtist, subjectMatchedArtist, sourceTier, classification }) => {
     const classificationText = `${item.title} ${item.summary}`.slice(0, 600);
     const releaseDate = getReleaseEventDate({
       text: classificationText,
@@ -284,7 +324,9 @@ function buildArtistEvents({
         statusHaltRecommended: classification.statusHaltRecommended ?? false,
         inferredReleaseTitle: inferredTitle,
         titleMatchedArtist,
-        textMatchedArtist
+        textMatchedArtist,
+        disambiguatedArtist,
+        subjectMatchedArtist
       }
     };
   });
@@ -319,32 +361,116 @@ function buildArtistEvents({
   };
 }
 
+function hasRequiredArtistDisambiguation({
+  artist,
+  item
+}: {
+  artist: MarketUpdateArtist;
+  item: MediaFeedItem;
+}) {
+  return hasRequiredArtistEventDisambiguation({
+    artistName: artist.name,
+    text: `${item.title} ${item.summary}`,
+    query: item.searchQuery,
+    sourceTier: getSourceTier(item.domain)
+  });
+}
+
+function hasRequiredEventSubjectContext({
+  artist,
+  query,
+  item,
+  classificationText,
+  classification
+}: {
+  artist: MarketUpdateArtist;
+  query: string;
+  item: MediaFeedItem;
+  classificationText: string;
+  classification: ReturnType<typeof classifyArticleEvent> & {};
+}) {
+  const text = `${item.title} ${classificationText}`;
+
+  if (classification.statusSubtype) {
+    return hasArtistStatusSubjectContext({
+      artistName: artist.name,
+      text,
+      query,
+      statusSubtype: classification.statusSubtype
+    });
+  }
+
+  if (classification.reason === "release_terms") {
+    return hasArtistReleaseSubjectContext({
+      artistName: artist.name,
+      text,
+      query
+    });
+  }
+
+  if (classification.reason === "controversy_terms") {
+    return hasArtistControversySubjectContext({
+      artistName: artist.name,
+      text,
+      query
+    });
+  }
+
+  return true;
+}
+
 function isRelevantMediaEvent({
   item,
   sourceTier,
   titleMatchedArtist,
   textMatchedArtist,
+  eventType,
+  classificationReason,
   impactScore
 }: {
   item: MediaFeedItem;
   sourceTier: number;
   titleMatchedArtist: boolean;
   textMatchedArtist: boolean;
+  eventType: MarketEvent["eventType"];
+  classificationReason: string;
   impactScore: number;
 }) {
+  if (sourceTier <= 0) {
+    if (looksLikeCopiedMediaUploadTitle(item.title)) {
+      return false;
+    }
+
+    if (eventType === "release") {
+      return false;
+    }
+
+    return (
+      item.feedScope === "artist_search" &&
+      titleMatchedArtist &&
+      Math.abs(impactScore) >= 34 &&
+      ["news", "tour", "viral"].includes(eventType) &&
+      classificationReason !== "release_terms"
+    );
+  }
+
   if (titleMatchedArtist) {
     return true;
   }
 
-  if (!textMatchedArtist) {
-    return false;
-  }
+  return false;
+}
 
-  if (item.feedScope === "artist_search" && Math.abs(impactScore) >= 34) {
-    return true;
-  }
+function looksLikeCopiedMediaUploadTitle(title: string) {
+  const normalized = title.toLowerCase();
 
-  return sourceTier >= 1 && Math.abs(impactScore) >= 45;
+  return (
+    /\[[^\]]*(official\s+audio|official\s+video|lyric\s+video|visualizer)[^\]]*\]/i.test(title) ||
+    /\b(official\s+audio|official\s+video|official\s+lyric\s+video|lyric\s+video|visualizer)\b/i.test(title) ||
+    /\([a-z0-9_-]{8,}\)/i.test(title) ||
+    normalized.includes("youtube") ||
+    normalized.includes("soundcloud")
+  );
 }
 
 function getEventRank(value: {
@@ -537,8 +663,24 @@ function parseFeedItem({
 function buildArtistNewsQuery(artist: MarketUpdateArtist, externalIds?: ArtistExternalIds) {
   const baseQuery = externalIds?.gdeltQuery?.trim() || buildDefaultGdeltQuery(artist.name);
   const primaryName = quoteSearchPhrase(externalIds?.lastfmName || artist.name);
+  const catalystTerms = [
+    "album",
+    "mixtape",
+    "EP",
+    "single",
+    "feature",
+    "tracklist",
+    "review",
+    "controversy",
+    "fight",
+    "arrest",
+    "viral",
+    "snippet",
+    "performance",
+    "tour"
+  ].join(" OR ");
 
-  return `${baseQuery} OR "${primaryName}" album OR "${primaryName}" tracklist OR "${primaryName}" snippet`;
+  return `(${baseQuery} OR ${primaryName}) (${catalystTerms})`;
 }
 
 function buildGoogleNewsFeedUrl(query: string, lookbackDays: number) {

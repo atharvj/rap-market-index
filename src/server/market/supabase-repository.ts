@@ -455,6 +455,48 @@ export async function loadLatestObservationDates({
   }, {});
 }
 
+export async function loadLatestSourceObservationDates({
+  supabase,
+  artistIds,
+  source,
+  runDate,
+  lookbackDays = 400
+}: {
+  supabase: Supabase;
+  artistIds: string[];
+  source: string;
+  runDate: string;
+  lookbackDays?: number;
+}): Promise<Record<string, string>> {
+  if (!artistIds.length) {
+    return {};
+  }
+
+  const { data, error } = await supabase
+    .from("market_observations")
+    .select("artist_id,observed_date")
+    .in("artist_id", artistIds)
+    .eq("source", source)
+    .gte("observed_date", shiftDate(runDate, -lookbackDays))
+    .lte("observed_date", runDate)
+    .order("observed_date", { ascending: false })
+    .limit(Math.min(10000, Math.max(artistIds.length * lookbackDays, artistIds.length)));
+
+  if (error) {
+    throw new Error(`Could not load latest ${source} observation dates: ${error.message}`);
+  }
+
+  return ((data ?? []) as Pick<MarketObservationRow, "artist_id" | "observed_date">[]).reduce<
+    Record<string, string>
+  >((latest, row) => {
+    if (!latest[row.artist_id] || row.observed_date > latest[row.artist_id]) {
+      latest[row.artist_id] = row.observed_date;
+    }
+
+    return latest;
+  }, {});
+}
+
 function getBaselineAgeMetric(metric: string) {
   return `${metric}__age_days`;
 }

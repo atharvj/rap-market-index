@@ -125,9 +125,23 @@ export function mergeEvents(
   first: Record<string, MarketEvent[]>,
   second: Record<string, MarketEvent[]>
 ) {
-  const merged = Object.fromEntries(
-    Object.entries(first).map(([artistId, events]) => [artistId, [...events]])
-  ) as Record<string, MarketEvent[]>;
+  const merged: Record<string, MarketEvent[]> = {};
+
+  for (const [artistId, events] of Object.entries(first)) {
+    merged[artistId] = [];
+    const existing = new Set((merged[artistId] ?? []).map(getEventKey));
+
+    for (const event of events) {
+      const key = getEventKey(event);
+
+      if (existing.has(key)) {
+        continue;
+      }
+
+      existing.add(key);
+      merged[artistId].push(event);
+    }
+  }
 
   for (const [artistId, events] of Object.entries(second)) {
     const existing = new Set((merged[artistId] ?? []).map(getEventKey));
@@ -584,12 +598,41 @@ function getYoutubeUploadEventQuality(event: MarketEvent) {
 
   if (reason === "official_audio_release_cluster") {
     const label = getRawString(event.rawPayload.clusterReachLabel) ?? "release-cluster";
-    const fallbackMultiplier = normalizeEventText(event.title).includes("project release cycle") ? 0.42 : 0.82;
+    const isGenericProjectCycle = normalizeEventText(event.title).includes("project release cycle");
+    const hasMeaningfulProjectEvidence =
+      hasNamedProject ||
+      relatedUploadCount >= 3 ||
+      clusterTotalViews >= 180_000 ||
+      (typeof clusterReachRatio === "number" && clusterReachRatio >= 0.55);
+    const hasBreakoutStandaloneReach =
+      !hasNamedProject &&
+      relatedUploadCount >= 2 &&
+      (clusterTotalViews >= 650_000 ||
+        (typeof viewCount === "number" && viewCount >= 450_000) ||
+        (typeof clusterReachRatio === "number" && clusterReachRatio >= 1.4));
+
+    if (!hasMeaningfulProjectEvidence && !hasBreakoutStandaloneReach) {
+      return {
+        accepted: false,
+        label: "weak-release-cluster-without-project-reach",
+        multiplier: 0
+      };
+    }
+
+    if (isGenericProjectCycle && !hasNamedProject && clusterTotalViews < 350_000) {
+      return {
+        accepted: false,
+        label: "generic-release-cycle-without-project-source",
+        multiplier: 0
+      };
+    }
+
+    const fallbackMultiplier = isGenericProjectCycle ? 0.34 : hasNamedProject ? 0.86 : 0.58;
 
     return {
       accepted: true,
       label,
-      multiplier: clamp(storedMultiplier ?? fallbackMultiplier, 0.25, 1.18)
+      multiplier: clamp(storedMultiplier ?? fallbackMultiplier, 0.18, 1.08)
     };
   }
 
@@ -2046,5 +2089,16 @@ function isMarketEventType(value: string): value is MarketEvent["eventType"] {
 }
 
 function getEventKey(event: MarketEvent) {
-  return `${event.artistId}:${event.eventType}:${event.eventDate}:${event.title.toLowerCase()}`;
+  return `${event.artistId}:${event.eventType}:${event.eventDate}:${getCanonicalEventTitle(event)}`;
+}
+
+function getCanonicalEventTitle(event: MarketEvent) {
+  let title = normalizeEventText(event.title);
+  const sourceName = event.sourceName ? normalizeEventText(event.sourceName) : "";
+
+  if (sourceName && title.endsWith(` ${sourceName}`)) {
+    title = title.slice(0, -sourceName.length).trim();
+  }
+
+  return title.replace(/\s+(?:fm|radio|com|net|org)$/i, "").trim();
 }

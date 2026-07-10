@@ -1,5 +1,13 @@
 import { clamp } from "@/lib/pricing";
 import type { MarketUpdateArtist } from "@/server/market/daily-update";
+import {
+  hasArtistControversySubjectContext,
+  hasArtistReleaseSubjectContext,
+  hasArtistStatusSubjectContext,
+  hasRequiredArtistEventDisambiguation,
+  isGenericMusicListicleTitle,
+  isLowValueMarketArticleTitle
+} from "@/server/market/artist-event-disambiguation";
 import { buildDefaultGdeltQuery } from "@/server/market/artist-text-identifiers";
 import type {
   AdapterSignal,
@@ -337,13 +345,42 @@ function buildGdeltArticleEvents({
     }
 
     const titleMatchedArtist = mentionsArtist(title, artist.name, query);
+    const disambiguatedArtist = hasRequiredArtistEventDisambiguation({
+      artistName: artist.name,
+      text: title,
+      query,
+      sourceTier
+    });
+
+    if (!disambiguatedArtist) {
+      continue;
+    }
+
+    const subjectMatchedArtist = hasRequiredGdeltEventSubjectContext({
+      artistName: artist.name,
+      query,
+      title,
+      classification
+    });
+
+    if (!subjectMatchedArtist) {
+      continue;
+    }
+
+    if (isLowValueMarketArticleTitle(title) && !classification.statusSubtype) {
+      continue;
+    }
+
+    if (
+      classification.eventType === "release" &&
+      isGenericMusicListicleTitle(title) &&
+      !mentionsSpecificProjectTitle(title)
+    ) {
+      continue;
+    }
 
     if (
       !isRelevantGdeltEvent({
-        artistName: artist.name,
-        query,
-        classification,
-        sourceTier,
         titleMatchedArtist
       })
     ) {
@@ -379,6 +416,8 @@ function buildGdeltArticleEvents({
         statusSeverity: classification.statusSeverity ?? null,
         statusHaltRecommended: classification.statusHaltRecommended ?? false,
         titleMatchedArtist,
+        disambiguatedArtist,
+        subjectMatchedArtist,
         relaxedTitlelessArtistMatch: !titleMatchedArtist,
         sourceTier
       }
@@ -392,31 +431,55 @@ function buildGdeltArticleEvents({
   return events;
 }
 
+function mentionsSpecificProjectTitle(title: string) {
+  return /\b(?:album|project|mixtape|ep)(?:,?\s+titled|\s+called)\s+["']?[^"'.,:;!?]{2,}/i.test(title);
+}
+
 function isRelevantGdeltEvent({
+  titleMatchedArtist
+}: {
+  titleMatchedArtist: boolean;
+}) {
+  return titleMatchedArtist;
+}
+
+function hasRequiredGdeltEventSubjectContext({
   artistName,
   query,
-  classification,
-  sourceTier,
-  titleMatchedArtist
+  title,
+  classification
 }: {
   artistName: string;
   query: string;
+  title: string;
   classification: ArticleMarketClassification;
-  sourceTier: number;
-  titleMatchedArtist: boolean;
 }) {
-  if (titleMatchedArtist) {
-    return true;
+  if (classification.statusSubtype) {
+    return hasArtistStatusSubjectContext({
+      artistName,
+      text: title,
+      query,
+      statusSubtype: classification.statusSubtype
+    });
   }
 
-  if (!classification || sourceTier < 1 || isAmbiguousArtistSearch(artistName, query)) {
-    return false;
+  if (classification.reason === "release_terms") {
+    return hasArtistReleaseSubjectContext({
+      artistName,
+      text: title,
+      query
+    });
   }
 
-  return (
-    TITLELESS_ARTIST_MATCH_REASONS.has(classification.reason) &&
-    Math.abs(classification.impactScore) >= 45
-  );
+  if (classification.reason === "controversy_terms") {
+    return hasArtistControversySubjectContext({
+      artistName,
+      text: title,
+      query
+    });
+  }
+
+  return true;
 }
 
 export function classifyArticleEvent(
@@ -441,6 +504,20 @@ export function classifyArticleEvent(
       statusSeverity: status.statusSeverity,
       statusHaltRecommended: status.statusHaltRecommended
     };
+  }
+
+  if (hasDeathRumorDebunkSignal(lowerTitle)) {
+    return {
+      eventType: "news" as const,
+      sentimentScore: clamp(4 + toneScore * 0.2, -12, 18),
+      impactScore: clamp(8 + Math.max(0, toneScore) * 0.2, -8, 18),
+      confidence: getArticleConfidence(sourceTier, 0.58),
+      reason: "death_rumor_debunked"
+    };
+  }
+
+  if (hasMemorialReactionSignal(lowerTitle)) {
+    return null;
   }
 
   if (hasAny(lowerTitle, CONTROVERSY_TERMS)) {
@@ -528,6 +605,16 @@ export function classifyArticleEvent(
     };
   }
 
+  if (hasAny(lowerTitle, PUBLIC_CONFLICT_TERMS)) {
+    return {
+      eventType: "viral" as const,
+      sentimentScore: clamp(14 + toneScore * 0.55, -45, 70),
+      impactScore: clamp(34 + Math.max(0, toneScore), -20, 80),
+      confidence: getArticleConfidence(sourceTier, 0.64),
+      reason: "public_conflict_terms"
+    };
+  }
+
   const projectRelease = buildReleaseArticleClassification(
     lowerTitle,
     sourceTier,
@@ -590,16 +677,6 @@ export function classifyArticleEvent(
     };
   }
 
-  if (hasAny(lowerTitle, PUBLIC_CONFLICT_TERMS)) {
-    return {
-      eventType: "viral" as const,
-      sentimentScore: clamp(14 + toneScore * 0.55, -45, 70),
-      impactScore: clamp(34 + Math.max(0, toneScore), -20, 80),
-      confidence: getArticleConfidence(sourceTier, 0.64),
-      reason: "public_conflict_terms"
-    };
-  }
-
   if (hasAny(lowerTitle, VIRAL_TERMS)) {
     return {
       eventType: "viral" as const,
@@ -627,6 +704,17 @@ export function classifyArticleEvent(
   return null;
 }
 
+function hasDeathRumorDebunkSignal(title: string) {
+  return (
+    hasAny(title, ["death rumor", "death rumors", "death hoax", "fake death"]) &&
+    hasAny(title, ["debunked", "false", "not dead", "shuts down"])
+  );
+}
+
+function hasMemorialReactionSignal(title: string) {
+  return hasAny(title, MEMORIAL_REACTION_TERMS) && (hasAny(title, DEATH_CONTEXT_TERMS) || title.includes("tribute"));
+}
+
 function buildReleaseArticleClassification(
   title: string,
   sourceTier: number,
@@ -638,8 +726,17 @@ function buildReleaseArticleClassification(
     return null;
   }
 
+  if (hasNonMusicProductDropSignal(title)) {
+    return null;
+  }
+
   const releaseKind = getArticleReleaseKind(title);
   const isProjectRelease = releaseKind === "album" || releaseKind === "ep" || releaseKind === "mixtape";
+  const hasReleaseAction = hasAny(title, RELEASE_ACTION_TERMS);
+
+  if (!hasReleaseAction) {
+    return null;
+  }
 
   if (projectOnly && !isProjectRelease) {
     return null;
@@ -653,6 +750,10 @@ function buildReleaseArticleClassification(
     reason: "release_terms",
     releaseKind: releaseKind ?? undefined
   };
+}
+
+function hasNonMusicProductDropSignal(title: string) {
+  return hasAny(title, NON_MUSIC_PRODUCT_TERMS) && !hasAny(title, CORE_MUSIC_RELEASE_TERMS);
 }
 
 function getArticleReleaseKind(title: string): ArticleReleaseKind | null {
@@ -711,19 +812,23 @@ function getArticleConfidence(sourceTier: number, base: number) {
 }
 
 export function getSourceTier(domain: string) {
-  if (TIER_THREE_DOMAINS.has(domain)) {
+  if (hasTierDomain(TIER_THREE_DOMAINS, domain)) {
     return 3;
   }
 
-  if (TIER_TWO_DOMAINS.has(domain)) {
+  if (hasTierDomain(TIER_TWO_DOMAINS, domain)) {
     return 2;
   }
 
-  if (TIER_ONE_DOMAINS.has(domain)) {
+  if (hasTierDomain(TIER_ONE_DOMAINS, domain)) {
     return 1;
   }
 
   return 0;
+}
+
+function hasTierDomain(domains: Set<string>, domain: string) {
+  return domains.has(domain) || [...domains].some((trustedDomain) => domain.endsWith(`.${trustedDomain}`));
 }
 
 function hasAny(value: string, terms: string[]) {
@@ -757,18 +862,6 @@ export function mentionsArtist(title: string, artistName: string, query?: string
   }
 
   return false;
-}
-
-function isAmbiguousArtistSearch(artistName: string, query?: string) {
-  const candidateNames = [artistName, ...extractQuotedSearchPhrases(query)].filter(Boolean);
-
-  return candidateNames.some((candidate) => {
-    const normalized = normalizeSearchText(candidate);
-    const compact = normalized.replace(/\s+/g, "");
-    const wordCount = normalized.split(/\s+/).filter(Boolean).length;
-
-    return compact.length <= 3 || (wordCount === 1 && compact.length <= 4);
-  });
 }
 
 function containsNormalizedPhrase(normalizedText: string, normalizedPhrase: string) {
@@ -882,6 +975,7 @@ const REVIEW_DOMAINS = new Set([
   "pitchfork.com",
   "rapreviews.com",
   "rollingstone.com",
+  "rollingstone.com.au",
   "slantmagazine.com",
   "spectrumculture.com",
   "theguardian.com",
@@ -899,6 +993,7 @@ const TIER_THREE_DOMAINS = new Set([
   "pitchfork.com",
   "reuters.com",
   "rollingstone.com",
+  "rollingstone.com.au",
   "variety.com",
   "washingtonpost.com"
 ]);
@@ -908,6 +1003,9 @@ const TIER_TWO_DOMAINS = new Set([
   "consequence.net",
   "exclaim.ca",
   "hypebeast.com",
+  "iheart.com",
+  "capitalxtra.com",
+  "hindustantimes.com",
   "musicbusinessworldwide.com",
   "nme.com",
   "stereogum.com",
@@ -929,15 +1027,6 @@ const TIER_ONE_DOMAINS = new Set([
   "revolt.tv",
   "thesource.com",
   "xxlmag.com"
-]);
-
-const TITLELESS_ARTIST_MATCH_REASONS = new Set([
-  "major_feature_terms",
-  "feature_terms",
-  "chart_terms",
-  "review_domain",
-  "performance_terms",
-  "viral_terms"
 ]);
 
 const CONTROVERSY_TERMS = [
@@ -969,6 +1058,29 @@ const CONTROVERSY_TERMS = [
   "zionist"
 ];
 
+const DEATH_CONTEXT_TERMS = [
+  "death",
+  "dead",
+  "died",
+  "dies",
+  "killed",
+  "murdered",
+  "passed away",
+  "rip"
+];
+const MEMORIAL_REACTION_TERMS = [
+  "mourn",
+  "mourns",
+  "pay tribute",
+  "pays tribute",
+  "paid tribute",
+  "react",
+  "reacts",
+  "reacted",
+  "remember",
+  "remembers",
+  "tribute"
+];
 const REVIEW_TERMS = ["review", "reviewed", "reviews", "rated"];
 const REVIEW_PHRASES = [
   "album of the week",
@@ -1010,6 +1122,72 @@ const RELEASE_TERMS = [
   "tracklist",
   "unveils",
   "visualizer"
+];
+const CORE_MUSIC_RELEASE_TERMS = [
+  "album",
+  "deluxe",
+  "ep",
+  "full album",
+  "full project",
+  "mixtape",
+  "music video",
+  "new album",
+  "new ep",
+  "new mixtape",
+  "new project",
+  "new song",
+  "new single",
+  "new tape",
+  "project",
+  "single",
+  "song",
+  "track",
+  "tracklist",
+  "video",
+  "visualizer"
+];
+const NON_MUSIC_PRODUCT_TERMS = [
+  "amazon storefront",
+  "apparel",
+  "capsule",
+  "clothing",
+  "hoodie",
+  "merch",
+  "merchandise",
+  "shirt",
+  "shoe",
+  "sneaker",
+  "storefront",
+  "tee",
+  "t-shirt"
+];
+const RELEASE_ACTION_TERMS = [
+  "announces",
+  "drops",
+  "ep out now",
+  "full album",
+  "full project",
+  "hear new",
+  "listen to now",
+  "mixtape out now",
+  "music video",
+  "new album",
+  "new ep",
+  "new mixtape",
+  "new project",
+  "new song",
+  "new single",
+  "new tape",
+  "out now",
+  "project out now",
+  "release date",
+  "released",
+  "releases",
+  "shares",
+  "stream",
+  "tracklist",
+  "unveils",
+  "watch"
 ];
 const TOUR_TERMS = [
   "announces tour",

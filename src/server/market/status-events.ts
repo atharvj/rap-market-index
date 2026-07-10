@@ -291,6 +291,7 @@ const STATUS_DEATH_PATTERNS = [
   /\bdead at \d{1,3}\b/,
   /\bdied at \d{1,3}\b/,
   /\bdies at \d{1,3}\b/,
+  /\bdies aged\b/,
   /\bdied after\b/,
   /\bdies after\b/,
   /\bfatally shot\b/,

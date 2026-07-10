@@ -12,7 +12,7 @@ import { getArtistStatusSubtype, shouldRecommendStatusTradingHalt } from "@/serv
 import {
   loadActiveArtists,
   loadArtistExternalIds,
-  loadLatestObservationDates,
+  loadLatestSourceObservationDates,
   loadObservationBaselines,
   persistMarketEvents,
   persistMarketObservations
@@ -34,6 +34,7 @@ type MarketEventScanBody = {
   rssMaxItemsPerFeed?: number;
   includeGoogleNews?: boolean;
   includeAiResearch?: boolean;
+  aiResearchArtistLimit?: number;
   aiResearchLookbackDays?: number;
   aiResearchMaxEventsPerArtist?: number;
 };
@@ -49,16 +50,18 @@ type StatusHaltCandidate = {
   reason: string;
 };
 
-const DEFAULT_ARTIST_LIMIT = 10;
-const MAX_ARTIST_LIMIT = 20;
+const DEFAULT_ARTIST_LIMIT = 60;
+const MAX_ARTIST_LIMIT = 100;
 const DEFAULT_MAX_RECORDS = 12;
 const MAX_GDELT_RECORDS = 50;
-const DEFAULT_DELAY_MS = 5200;
+const DEFAULT_DELAY_MS = 700;
 const DEFAULT_TIMEOUT_MS = 12000;
 const DEFAULT_RSS_LOOKBACK_DAYS = 30;
 const DEFAULT_RSS_MAX_ITEMS_PER_FEED = 40;
 const DEFAULT_AI_RESEARCH_LOOKBACK_DAYS = 14;
-const DEFAULT_AI_RESEARCH_EVENTS_PER_ARTIST = 3;
+const DEFAULT_AI_RESEARCH_EVENTS_PER_ARTIST = 1;
+const DEFAULT_AI_RESEARCH_ARTIST_LIMIT = 8;
+const MAX_AI_RESEARCH_ARTIST_LIMIT = 25;
 
 export async function GET(request: Request) {
   const auth = await requireAdminRequest(request);
@@ -106,25 +109,22 @@ export async function POST(request: Request) {
     const allArtists = await loadActiveArtists(supabase);
     const artistIds = allArtists.map((artist) => artist.id);
     const [latestGdeltDates, latestMediaRssDates, latestAiResearchDates] = await Promise.all([
-      loadLatestObservationDates({
+      loadLatestSourceObservationDates({
         supabase,
         artistIds,
         source: "gdelt",
-        metric: "article_count",
         runDate
       }),
-      loadLatestObservationDates({
+      loadLatestSourceObservationDates({
         supabase,
         artistIds,
         source: "media_rss",
-        metric: "article_count",
         runDate
       }),
-      loadLatestObservationDates({
+      loadLatestSourceObservationDates({
         supabase,
         artistIds,
         source: "ai_research",
-        metric: "event_count",
         runDate
       })
     ]);
@@ -185,9 +185,16 @@ export async function POST(request: Request) {
       timeoutMs
     });
     const aiResearchEnabled = body.includeAiResearch ?? getEnvBoolean("MARKET_AI_RESEARCH_ENABLED", config.aiResearchConfigured);
+    const aiResearchArtistLimit = normalizeInteger(
+      body.aiResearchArtistLimit,
+      getEnvInteger("MARKET_AI_RESEARCH_ARTIST_LIMIT", DEFAULT_AI_RESEARCH_ARTIST_LIMIT, 0, MAX_AI_RESEARCH_ARTIST_LIMIT),
+      0,
+      MAX_AI_RESEARCH_ARTIST_LIMIT
+    );
+    const aiResearchArtists = aiResearchEnabled ? selectAiResearchArtists(artists, mergedEventsPreview(mediaRss.eventsByArtist, result.eventsByArtist), aiResearchArtistLimit) : [];
     const aiResearch = aiResearchEnabled
       ? await collectAiResearchMarketEvents({
-          artists,
+          artists: aiResearchArtists,
           runDate,
           externalIds,
           apiKey: process.env.GROQ_API_KEY,
@@ -245,6 +252,7 @@ export async function POST(request: Request) {
       gdeltEventCount: flattenEvents(result.eventsByArtist).length,
       mediaRssEventCount: flattenEvents(mediaRss.eventsByArtist).length,
       aiResearchEnabled,
+      aiResearchScannedArtistCount: aiResearchArtists.length,
       aiResearchEventCount: flattenEvents(aiResearch.eventsByArtist).length,
       mediaRssScannedFeedCount: mediaRss.scannedFeedCount,
       warnings: [...mediaRss.warnings, ...aiResearch.warnings],
@@ -284,6 +292,42 @@ export async function POST(request: Request) {
       { status: 500 }
     );
   }
+}
+
+function selectAiResearchArtists(
+  artists: MarketUpdateArtist[],
+  existingEventsByArtist: Record<string, MarketEvent[]>,
+  limit: number
+) {
+  if (limit <= 0) {
+    return [];
+  }
+
+  return [...artists]
+    .sort((first, second) => {
+      const firstEvents = existingEventsByArtist[first.id]?.length ?? 0;
+      const secondEvents = existingEventsByArtist[second.id]?.length ?? 0;
+
+      if (firstEvents !== secondEvents) {
+        return firstEvents - secondEvents;
+      }
+
+      return first.ticker.localeCompare(second.ticker);
+    })
+    .slice(0, limit);
+}
+
+function mergedEventsPreview(
+  first: Record<string, MarketEvent[]>,
+  second: Record<string, MarketEvent[]>
+) {
+  const merged: Record<string, MarketEvent[]> = { ...first };
+
+  for (const [artistId, events] of Object.entries(second)) {
+    merged[artistId] = [...(merged[artistId] ?? []), ...events];
+  }
+
+  return merged;
 }
 
 async function parseBody(request: Request): Promise<MarketEventScanBody> {

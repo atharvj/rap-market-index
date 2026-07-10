@@ -125,14 +125,7 @@ export async function GET(request: Request) {
       feedMode: selectedArtistId ? "artist" : feedMode,
       limit
     }).map((event) => mapMarketEventToNewsItem(event, artistById));
-    const news =
-      selectedArtistId || feedMode !== "home"
-        ? eventNews.slice(0, limit)
-        : fillWithMarketPulseNews(eventNews, artists, {
-          feedMode,
-          limit,
-          runDate
-        });
+    const news = eventNews.slice(0, limit);
 
     return NextResponse.json({
       ok: true,
@@ -438,6 +431,7 @@ function diversifyMarketNewsEvents(events: MarketEventRow[], options: { feedMode
   const selected: MarketEventRow[] = [];
   const sourceCounts = new Map<string, number>();
   const artistCounts = new Map<string, number>();
+  const seenHeadlineKeys = new Set<string>();
   const youtubeCap = getYoutubeCap(options.feedMode, options.limit);
   const perArtistCap = options.feedMode === "artist" ? options.limit : Math.max(1, Math.ceil(options.limit * 0.22));
 
@@ -449,6 +443,7 @@ function diversifyMarketNewsEvents(events: MarketEventRow[], options: { feedMode
     const source = getRawString(toRawPayload(event.raw_payload).source) || "unknown";
     const sourceCount = sourceCounts.get(source) ?? 0;
     const artistCount = artistCounts.get(event.artist_id) ?? 0;
+    const headlineKey = getNewsHeadlineKey(event);
 
     if (source === "youtube_upload_event" && sourceCount >= youtubeCap) {
       continue;
@@ -458,7 +453,12 @@ function diversifyMarketNewsEvents(events: MarketEventRow[], options: { feedMode
       continue;
     }
 
+    if (seenHeadlineKeys.has(headlineKey)) {
+      continue;
+    }
+
     selected.push(event);
+    seenHeadlineKeys.add(headlineKey);
     sourceCounts.set(source, sourceCount + 1);
     artistCounts.set(event.artist_id, artistCount + 1);
   }
@@ -466,106 +466,18 @@ function diversifyMarketNewsEvents(events: MarketEventRow[], options: { feedMode
   return selected;
 }
 
-function fillWithMarketPulseNews(
-  news: MarketNewsItem[],
-  artists: ArtistRow[],
-  options: {
-    feedMode: NewsFeedMode;
-    limit: number;
-    runDate: string;
-  }
-) {
-  const minimumRows = getMinimumFeedRows(options.feedMode, options.limit);
-
-  if (news.length >= minimumRows) {
-    return news.slice(0, options.limit);
-  }
-
-  const targetRows = Math.min(options.limit, minimumRows);
-  const existingArtistIds = new Set(news.map((item) => item.artistId));
-  const marketPulseItems = artists
-    .filter((artist) => !existingArtistIds.has(artist.id))
-    .map((artist) => createMarketPulseNewsItem(artist, options.runDate))
-    .filter((item): item is MarketNewsItem => Boolean(item))
-    .sort((first, second) => second.impactScore - first.impactScore);
-
-  return [...news, ...marketPulseItems].slice(0, targetRows);
+function getNewsHeadlineKey(event: MarketEventRow) {
+  return `${event.artist_id}:${normalizeNewsHeadline(event.title)}`;
 }
 
-function getMinimumFeedRows(feedMode: NewsFeedMode, limit: number) {
-  if (feedMode === "home") {
-    return Math.min(limit, 5);
-  }
-
-  return 0;
-}
-
-function createMarketPulseNewsItem(artist: ArtistRow, runDate: string): MarketNewsItem | null {
-  const dailyChangePercent = Number(artist.daily_change_percent);
-  const hypeScore = Number(artist.hype_score);
-  const currentPrice = Number(artist.current_price);
-  const updatedMarketDate = getTimestampMarketDate(artist.updated_at);
-
-  if (updatedMarketDate !== runDate) {
-    return null;
-  }
-
-  if (!Number.isFinite(dailyChangePercent) || !Number.isFinite(hypeScore) || !Number.isFinite(currentPrice)) {
-    return null;
-  }
-
-  const absMove = Math.abs(dailyChangePercent);
-  const hasMarketMove = absMove >= 0.18;
-  const hasStrongScore = hypeScore >= 56;
-
-  if (!hasMarketMove && !hasStrongScore) {
-    return null;
-  }
-
-  const positive = dailyChangePercent >= 0;
-  const sourceName = "RMI Market Wire";
-  const moveText = `${positive ? "+" : ""}${dailyChangePercent.toFixed(2)}%`;
-  const title = hasMarketMove
-    ? `${artist.name} ${positive ? "rises" : "slips"} ${moveText} as RMI market signals ${positive ? "improve" : "cool"}.`
-    : `${artist.name} is among the highest-scoring artists on the RMI board.`;
-
-  return {
-    id: `market-pulse-${artist.id}-${runDate}`,
-    artistId: artist.id,
-    artistName: artist.name,
-    ticker: artist.ticker,
-    eventDate: runDate,
-    eventType: "market",
-    title,
-    sourceName,
-    sourceUrl: null,
-    sourceDomain: null,
-    sourceIconUrl: "/logo.svg",
-    thumbnailUrl: null,
-    mediaUrl: null,
-    mediaType: null,
-    mediaLabel: null,
-    sentimentScore: positive ? 18 : -18,
-    impactScore: Math.round(absMove * 12 + hypeScore * 0.75),
-    confidence: 0.72,
-    statusSubtype: null,
-    statusSeverity: null,
-    createdAt: null
-  };
-}
-
-function getTimestampMarketDate(value: string | null) {
-  if (!value) {
-    return null;
-  }
-
-  const date = new Date(value);
-
-  if (!Number.isFinite(date.getTime())) {
-    return null;
-  }
-
-  return getPacificMarketDate(date);
+function normalizeNewsHeadline(value: string) {
+  return value
+    .toLowerCase()
+    .replace(/\s+-\s+[a-z0-9 .&]+$/i, "")
+    .replace(/[’']/g, "")
+    .replace(/[^a-z0-9]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 function getYoutubeCap(feedMode: NewsFeedMode, limit: number) {
