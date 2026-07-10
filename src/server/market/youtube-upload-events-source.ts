@@ -272,7 +272,7 @@ function buildYoutubeUploadEvents({
   const events: MarketEvent[] = [];
 
   for (const video of videos) {
-    const classification = classifyYoutubeUploadTitle(video.title, video);
+    const classification = classifyYoutubeUploadTitle(video.title, video, artist);
 
     if (!classification) {
       continue;
@@ -336,7 +336,7 @@ function addOfficialAudioReleaseClusterEvent({
   const cluster = findOfficialAudioReleaseCluster(events);
 
   if (!cluster) {
-    return events;
+    return suppressLowImpactTrackAudioEvents(events);
   }
 
   const hasProjectRelease = events.some((event) => {
@@ -354,7 +354,7 @@ function addOfficialAudioReleaseClusterEvent({
   });
 
   if (hasProjectRelease) {
-    return suppressClusterTrackEvents(events, cluster);
+    return suppressLowImpactTrackAudioEvents(suppressClusterTrackEvents(events, cluster));
   }
 
   const projectName = inferProjectTitleFromCluster(artist, cluster.events);
@@ -374,7 +374,7 @@ function addOfficialAudioReleaseClusterEvent({
   });
 
   if (!projectName && cluster.events.length < 4 && clusterProfile.reachRatio < 0.8) {
-    return suppressClusterTrackEvents(events, cluster);
+    return suppressLowImpactTrackAudioEvents(suppressClusterTrackEvents(events, cluster));
   }
 
   const confidence = Number((clusterProfile.confidence).toFixed(3));
@@ -427,7 +427,7 @@ function addOfficialAudioReleaseClusterEvent({
     }
   };
 
-  return [clusterEvent, ...suppressClusterTrackEvents(events, cluster)];
+  return [clusterEvent, ...suppressLowImpactTrackAudioEvents(suppressClusterTrackEvents(events, cluster))];
 }
 
 function findOfficialAudioReleaseCluster(events: MarketEvent[]) {
@@ -502,6 +502,41 @@ function suppressClusterTrackEvents(events: MarketEvent[], cluster: { events: Ma
 
     return !videoId || !clusterVideoIds.has(videoId);
   });
+}
+
+function suppressLowImpactTrackAudioEvents(events: MarketEvent[]) {
+  return events.filter((event) => {
+    if (event.rawPayload.classificationReason !== "track_audio_upload_title") {
+      return true;
+    }
+
+    return isHighReachStandaloneTrackAudioEvent(event);
+  });
+}
+
+function isHighReachStandaloneTrackAudioEvent(event: MarketEvent) {
+  const viewCount = getRawNumber(event.rawPayload.viewCount) ?? 0;
+  const likeCount = getRawNumber(event.rawPayload.likeCount) ?? 0;
+  const commentCount = getRawNumber(event.rawPayload.commentCount) ?? 0;
+  const category =
+    typeof event.rawPayload.artistCategory === "string"
+      ? event.rawPayload.artistCategory
+      : "underground";
+  const categoryMinimums: Record<string, number> = {
+    underground: 250_000,
+    rising: 500_000,
+    mainstream: 1_500_000,
+    superstar: 3_000_000
+  };
+  const engagementScore = likeCount * 8 + commentCount * 20;
+  const minimumViews = categoryMinimums[category] ?? 500_000;
+
+  return (
+    viewCount >= minimumViews &&
+    engagementScore >= minimumViews * 0.18 &&
+    event.impactScore >= 44 &&
+    event.confidence >= 0.7
+  );
 }
 
 function hasStandaloneProjectReleaseEvidence(event: MarketEvent) {
@@ -668,6 +703,7 @@ function getOfficialAudioClusterProfile({
   const baseImpact = 40 + countLift;
   const baseSentiment = 22 + Math.min(8, clusterEvents.length * 2);
   const hasProjectName = Boolean(inferProjectTitleFromCluster(artist, clusterEvents));
+  const underperformingProject = releaseAgeDays >= 2 && reachRatio < 0.45;
 
   return {
     totalViews,
@@ -678,8 +714,12 @@ function getOfficialAudioClusterProfile({
     releaseAgeDays,
     reachLabel: profile.label,
     qualityMultiplier: profile.multiplier,
-    impactScore: clampNumber(baseImpact * profile.multiplier, 8, 68),
-    sentimentScore: clampNumber(baseSentiment * profile.multiplier, 4, 48),
+    impactScore: underperformingProject
+      ? clampNumber(-18 + reachRatio * 18, -28, -6)
+      : clampNumber(baseImpact * profile.multiplier, 8, 68),
+    sentimentScore: underperformingProject
+      ? clampNumber(-12 + reachRatio * 16, -22, -4)
+      : clampNumber(baseSentiment * profile.multiplier, 4, 48),
     confidence: clampNumber((clusterEvents.length >= 3 ? 0.72 : 0.64) * profile.confidenceMultiplier + (hasProjectName ? 0.04 : 0), 0.42, 0.86)
   };
 }
@@ -771,7 +811,7 @@ function clampNumber(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value));
 }
 
-function classifyYoutubeUploadTitle(title: string, video?: YoutubeVideo): YoutubeUploadClassification | null {
+function classifyYoutubeUploadTitle(title: string, video?: YoutubeVideo, artist?: MarketUpdateArtist): YoutubeUploadClassification | null {
   const normalized = normalizeTitle(title);
 
   if (!normalized) {
@@ -801,7 +841,7 @@ function classifyYoutubeUploadTitle(title: string, video?: YoutubeVideo): Youtub
       impactScore: 32,
       confidence: 0.72,
       reason: "tour_upload_title"
-    }, title, normalized, video);
+    }, title, normalized, video, artist);
   }
 
   if (hasAlbumSignal) {
@@ -814,7 +854,7 @@ function classifyYoutubeUploadTitle(title: string, video?: YoutubeVideo): Youtub
       confidence: 0.78,
       reason: "album_announcement_upload_title",
       releaseKind
-    }, title, normalized, video);
+    }, title, normalized, video, artist);
   }
 
   if (hasMajorFeatureSignal && (hasSingleSignal || hasOfficialVideoSignal || hasTrackAudioSignal)) {
@@ -824,7 +864,7 @@ function classifyYoutubeUploadTitle(title: string, video?: YoutubeVideo): Youtub
       impactScore: 58,
       confidence: 0.78,
       reason: "major_feature_upload_title"
-    }, title, normalized, video);
+    }, title, normalized, video, artist);
   }
 
   if (hasSingleSignal || hasOfficialVideoSignal) {
@@ -835,7 +875,7 @@ function classifyYoutubeUploadTitle(title: string, video?: YoutubeVideo): Youtub
         impactScore: 16,
         confidence: 0.46,
         reason: "track_audio_upload_title"
-      }, title, normalized, video);
+      }, title, normalized, video, artist);
     }
 
     return applyUploadQuality({
@@ -845,7 +885,7 @@ function classifyYoutubeUploadTitle(title: string, video?: YoutubeVideo): Youtub
       confidence: 0.74,
       reason: hasOfficialVideoSignal ? "official_video_upload_title" : "single_upload_title",
       releaseKind: "single"
-    }, title, normalized, video);
+    }, title, normalized, video, artist);
   }
 
   if (hasSnippetSignal) {
@@ -855,7 +895,7 @@ function classifyYoutubeUploadTitle(title: string, video?: YoutubeVideo): Youtub
       impactScore: 28,
       confidence: 0.6,
       reason: "snippet_upload_title"
-    }, title, normalized, video);
+    }, title, normalized, video, artist);
   }
 
   if (hasPerformanceSignal) {
@@ -865,7 +905,7 @@ function classifyYoutubeUploadTitle(title: string, video?: YoutubeVideo): Youtub
       impactScore: 24,
       confidence: 0.58,
       reason: "performance_upload_title"
-    }, title, normalized, video);
+    }, title, normalized, video, artist);
   }
 
   return null;
@@ -875,9 +915,10 @@ function applyUploadQuality(
   classification: YoutubeUploadClassification,
   rawTitle: string,
   normalizedTitle: string,
-  video?: YoutubeVideo
+  video?: YoutubeVideo,
+  artist?: MarketUpdateArtist
 ): YoutubeUploadClassification | null {
-  const quality = getUploadQuality(classification, rawTitle, normalizedTitle, video);
+  const quality = getUploadQuality(classification, rawTitle, normalizedTitle, video, artist);
 
   if (!quality.accepted) {
     return null;
@@ -897,7 +938,8 @@ function getUploadQuality(
   classification: YoutubeUploadClassification,
   rawTitle: string,
   normalizedTitle: string,
-  video?: YoutubeVideo
+  video?: YoutubeVideo,
+  artist?: MarketUpdateArtist
 ) {
   const isShortForm = isShortFormUpload(rawTitle, normalizedTitle, video);
   const viewCount = video?.viewCount;
@@ -915,6 +957,29 @@ function getUploadQuality(
     classification.releaseKind === "album" ||
     classification.releaseKind === "ep" ||
     classification.releaseKind === "mixtape";
+  const descriptionProjectName = inferProjectTitleFromDescription(video?.description, artist?.name ?? "");
+  const hasProjectContext = Boolean(descriptionProjectName) || majorReleaseCatalyst;
+  const artistExpectedViews = artist ? getExpectedProjectViews(artist) : 75_000;
+  const standaloneAudioReachThreshold = getStandaloneAudioReachThreshold(artist, artistExpectedViews);
+  const meaningfulStandaloneAudioThreshold = standaloneAudioReachThreshold * 2;
+
+  if (isCatalogLyricVideo(normalizedTitle, video?.description)) {
+    return {
+      accepted: false,
+      label: "catalog_lyric_video",
+      multiplier: 0
+    };
+  }
+
+  if (classification.reason === "track_audio_upload_title" && !hasProjectContext) {
+    if (typeof viewCount !== "number" || viewCount < meaningfulStandaloneAudioThreshold) {
+      return {
+        accepted: false,
+        label: "standalone_audio_below_meaningful_reach",
+        multiplier: 0
+      };
+    }
+  }
 
   if (titleOnlyProjectGuess) {
     if (typeof viewCount !== "number" || viewCount < 75_000) {
@@ -1029,6 +1094,53 @@ function hasExplicitReleaseLanguage(normalizedTitle: string) {
     "single",
     "tracklist",
     "visualizer"
+  ]);
+}
+
+function isCatalogLyricVideo(normalizedTitle: string, description?: string | null) {
+  if (!hasAnyTerm(normalizedTitle, ["lyric video", "official lyric video"])) {
+    return false;
+  }
+
+  return !hasNewReleaseLanguage(`${normalizedTitle} ${description ?? ""}`);
+}
+
+function getStandaloneAudioReachThreshold(artist: MarketUpdateArtist | undefined, artistExpectedViews: number) {
+  const categoryMinimums: Record<MarketUpdateArtist["category"], number> = {
+    underground: 75_000,
+    rising: 150_000,
+    mainstream: 500_000,
+    superstar: 1_250_000
+  };
+
+  return Math.max(categoryMinimums[artist?.category ?? "underground"] ?? 100_000, artistExpectedViews * 1.5);
+}
+
+function hasNewReleaseLanguage(value: string) {
+  const normalized = normalizeTitle(value);
+
+  return hasAnyTerm(normalized, [
+    "album out now",
+    "available now",
+    "brand new",
+    "drops",
+    "dropped",
+    "listen now",
+    "new album",
+    "new ep",
+    "new mixtape",
+    "new project",
+    "new single",
+    "new song",
+    "out now",
+    "pre save",
+    "pre-save",
+    "premiere",
+    "premieres",
+    "project out now",
+    "released",
+    "stream now",
+    "streaming now"
   ]);
 }
 
