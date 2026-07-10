@@ -335,7 +335,7 @@ function MarketNewsArticle({
 
 function NewsThumbnail({ item, size = "row" }: { item: MarketNewsItem; size?: "hero" | "featured" | "card" | "row" | "small" }) {
   const hasThumbnail = Boolean(item.thumbnailUrl);
-  const fallbackIcon = item.sourceIconUrl;
+  const isVideo = item.mediaType === "youtube" || item.sourceDomain === "youtube.com";
   const dimensions = {
     hero: "h-48 w-full lg:h-full lg:min-h-[250px]",
     featured: "h-24 w-full sm:h-28",
@@ -353,11 +353,12 @@ function NewsThumbnail({ item, size = "row" }: { item: MarketNewsItem; size?: "h
       )}
       aria-label={`${item.artistName} quote`}
     >
-      <span className="absolute inset-0 grid place-items-center bg-gradient-to-br from-cyan/10 via-brass/10 to-mint/12 text-sm font-black text-paper/75">
-        {fallbackIcon && !hasThumbnail ? (
-          <span className="grid place-items-center gap-2">
+      <span className={clsx("absolute inset-0 grid place-items-center", getNewsFallbackClass(item))}>
+        <span className="absolute inset-0 opacity-55 [background-image:linear-gradient(135deg,rgba(255,255,255,.35)_0,rgba(255,255,255,0)_32%),radial-gradient(circle_at_84%_18%,rgba(255,255,255,.45),transparent_26%)]" />
+        <span className="relative grid place-items-center gap-2 text-paper/75">
+          {item.sourceIconUrl ? (
             <img
-              src={fallbackIcon}
+              src={item.sourceIconUrl}
               alt=""
               className={clsx(size === "hero" ? "h-10 w-10" : "h-6 w-6", "rounded object-contain")}
               loading="lazy"
@@ -365,11 +366,11 @@ function NewsThumbnail({ item, size = "row" }: { item: MarketNewsItem; size?: "h
                 event.currentTarget.style.display = "none";
               }}
             />
-            {size === "hero" ? <span className="text-4xl">{item.ticker}</span> : null}
+          ) : null}
+          <span className={clsx("font-black", size === "hero" ? "text-5xl" : size === "card" ? "text-3xl" : "text-sm")}>
+            {item.ticker}
           </span>
-        ) : (
-          <span className={clsx(size === "hero" ? "text-5xl" : size === "card" ? "text-2xl" : "text-sm")}>{item.ticker}</span>
-        )}
+        </span>
       </span>
       {item.thumbnailUrl ? (
         <img
@@ -382,9 +383,19 @@ function NewsThumbnail({ item, size = "row" }: { item: MarketNewsItem; size?: "h
           }}
         />
       ) : null}
+      {isVideo ? (
+        <span className="absolute inset-0 grid place-items-center">
+          <span className="grid h-10 w-10 place-items-center rounded-full bg-black/72 text-white shadow-lg">
+            <PlayCircle className="h-5 w-5" aria-hidden="true" />
+          </span>
+        </span>
+      ) : null}
       {size === "hero" ? (
-        <span className="absolute inset-x-0 bottom-0 bg-black/55 px-4 py-3 text-sm font-black text-white">
-          {item.artistName} · {item.ticker}
+        <span className="absolute inset-x-0 bottom-0 flex items-center justify-between gap-3 bg-black/58 px-4 py-3 text-sm font-black text-white">
+          <span className="truncate">{item.artistName} · {item.ticker}</span>
+          <span className="shrink-0 rounded bg-white/15 px-2 py-1 text-[10px] uppercase tracking-wide">
+            {eventLabels[item.eventType] ?? item.eventType}
+          </span>
         </span>
       ) : (
         <span className="absolute bottom-1 left-1 rounded bg-white/90 px-1.5 py-0.5 text-[10px] font-black text-paper shadow-sm">
@@ -393,6 +404,26 @@ function NewsThumbnail({ item, size = "row" }: { item: MarketNewsItem; size?: "h
       )}
     </Link>
   );
+}
+
+function getNewsFallbackClass(item: MarketNewsItem) {
+  if (item.eventType === "controversy") {
+    return "bg-gradient-to-br from-ember/14 via-panelSoft to-cyan/10";
+  }
+
+  if (item.eventType === "review") {
+    return "bg-gradient-to-br from-cyan/14 via-panelSoft to-brass/12";
+  }
+
+  if (item.eventType === "viral") {
+    return "bg-gradient-to-br from-cyan/18 via-brass/10 to-panelSoft";
+  }
+
+  if (item.eventType === "tour" || item.eventType === "award") {
+    return "bg-gradient-to-br from-brass/18 via-panelSoft to-cyan/10";
+  }
+
+  return "bg-gradient-to-br from-panelSoft via-brass/12 to-cyan/10";
 }
 
 function EventBadge({ item, positive }: { item: MarketNewsItem; positive: boolean }) {

@@ -53,6 +53,7 @@ type MediaFeedItem = {
   sourceName: string;
   publishedDate: string | null;
   summary: string;
+  thumbnailUrl?: string | null;
   feedUrl: string;
   feedScope: "global" | "artist_search";
   searchArtistId?: string;
@@ -323,6 +324,7 @@ function buildArtistEvents({
         statusSeverity: classification.statusSeverity ?? null,
         statusHaltRecommended: classification.statusHaltRecommended ?? false,
         inferredReleaseTitle: inferredTitle,
+        thumbnailUrl: item.thumbnailUrl ?? null,
         titleMatchedArtist,
         textMatchedArtist,
         disambiguatedArtist,
@@ -345,6 +347,7 @@ function buildArtistEvents({
       sourceName: item.sourceName,
       url: item.url,
       publishedDate: item.publishedDate,
+      thumbnailUrl: item.thumbnailUrl ?? null,
       feedScope: item.feedScope,
       titleMatchedArtist,
       textMatchedArtist
@@ -640,7 +643,9 @@ function parseFeedItem({
     parseFeedDate(getTag(block, ["pubDate", "published", "updated", "dc:date"])) ??
     parseFeedDate(getTag(block, ["lastBuildDate"])) ??
     runDate;
-  const summary = normalizeTextValue(getTag(block, ["description", "summary", "content:encoded"])) ?? "";
+  const rawSummary = getTag(block, ["description", "summary", "content:encoded"]);
+  const summary = normalizeTextValue(rawSummary) ?? "";
+  const thumbnailUrl = getFeedImageUrl(block, rawSummary);
 
   if (!title || !url || !domain) {
     return null;
@@ -653,6 +658,7 @@ function parseFeedItem({
     sourceName,
     publishedDate,
     summary,
+    thumbnailUrl,
     feedUrl,
     feedScope,
     searchArtistId,
@@ -790,6 +796,50 @@ function getSourceUrl(block: string) {
   const match = block.match(/<source\b[^>]*url=["']([^"']+)["'][^>]*>/i);
 
   return match?.[1] ? decodeXml(match[1]) : null;
+}
+
+function getFeedImageUrl(block: string, rawSummary: string | null) {
+  const directAttributeUrl =
+    getTagAttribute(block, "media:thumbnail", "url") ??
+    getTagAttribute(block, "media:content", "url") ??
+    getTagAttribute(block, "enclosure", "url") ??
+    getTagAttribute(block, "itunes:image", "href");
+  const nestedImageUrl = getTag(block, ["url"]);
+  const summaryImageUrl = getImageUrlFromHtml(rawSummary);
+
+  return [directAttributeUrl, nestedImageUrl, summaryImageUrl]
+    .map((value) => normalizeFeedLink(value))
+    .filter((value): value is string => Boolean(value))
+    .find((value) => isLikelyImageUrl(value)) ?? null;
+}
+
+function getTagAttribute(block: string, tagName: string, attributeName: string) {
+  const match = block.match(new RegExp(`<${escapeRegExp(tagName)}\\b[^>]*\\s${escapeRegExp(attributeName)}=["']([^"']+)["'][^>]*>`, "i"));
+
+  return match?.[1] ? decodeXml(match[1]) : null;
+}
+
+function getImageUrlFromHtml(value: string | null) {
+  const match = value?.match(/<img\b[^>]*\ssrc=["']([^"']+)["'][^>]*>/i);
+
+  return match?.[1] ? decodeXml(match[1]) : null;
+}
+
+function isLikelyImageUrl(value: string) {
+  try {
+    const url = new URL(value);
+    const pathname = url.pathname.toLowerCase();
+
+    return (
+      /\.(avif|gif|jpe?g|png|webp)(?:$|\?)/.test(pathname) ||
+      pathname.includes("/image") ||
+      pathname.includes("/images") ||
+      pathname.includes("/media") ||
+      url.searchParams.has("url")
+    );
+  } catch {
+    return false;
+  }
 }
 
 function normalizeFeedLink(value: string | null) {
