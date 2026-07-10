@@ -59,7 +59,7 @@ export default function ArtistDetailPage() {
   }
 
   return (
-    <div className="grid gap-5 md:grid-cols-[minmax(0,1fr)_218px]">
+    <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_300px] xl:grid-cols-[minmax(0,1fr)_340px]">
       <main className="min-w-0 space-y-5">
         <section className="space-y-5">
           <div className="flex items-start gap-4">
@@ -123,7 +123,7 @@ export default function ArtistDetailPage() {
         </RmiSection>
       </main>
 
-      <aside className="space-y-4 md:sticky md:top-6 md:self-start">
+      <aside className="space-y-4 lg:sticky lg:top-6 lg:self-start">
         <section className="rmi-card p-4">
           <div className="grid grid-cols-2 gap-2">
             <button

@@ -128,7 +128,7 @@ export function RmiLineChart({
 
 export function ArtistMiniCard({ artist }: { artist: Artist }) {
   return (
-    <Link href={`/artists/${artist.id}`} className="rmi-card grid gap-4 p-4 transition hover:border-cyan/70">
+    <Link href={`/artists/${artist.id}`} className="rmi-card grid min-w-0 gap-4 p-4 transition hover:-translate-y-0.5 hover:border-cyan/70">
       <ArtistIdentity artist={artist} />
       <div>
         <p className="text-lg font-black number-tabular">{formatCurrency(artist.currentPrice)}</p>

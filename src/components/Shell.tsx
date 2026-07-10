@@ -1,13 +1,14 @@
 "use client";
 
 import { AdminBadge } from "@/components/AdminBadge";
+import { ArtistAvatar } from "@/components/ArtistAvatar";
 import { useAuth } from "@/components/AuthProvider";
 import { useGame } from "@/components/GameProvider";
 import { UserAvatar } from "@/components/UserAvatar";
 import { formatCurrency, formatPercent } from "@/lib/formatters";
 import { applyThemePreference, getStoredThemePreference, type ThemePreference } from "@/lib/theme";
 import clsx from "clsx";
-import { LogIn, LogOut, Monitor, Moon, Search, Settings, SlidersHorizontal, Sun, UserPlus, X } from "lucide-react";
+import { LogOut, Monitor, Moon, Search, SlidersHorizontal, Sun, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
@@ -105,7 +106,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen bg-ink text-paper">
       <header className="border-b border-line/70">
-        <div className="mx-auto flex max-w-[720px] items-center gap-4 px-6 py-4">
+        <div className="mx-auto flex max-w-[1440px] items-center gap-4 px-4 py-4 sm:px-6 lg:px-8">
           <Link href="/" className="flex shrink-0 items-center gap-2 font-black" aria-label="RMI home">
             <SlidersHorizontal className="h-5 w-5 text-cyan" aria-hidden="true" />
             <span>RMI</span>
@@ -119,7 +120,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
                 <Link
                   key={item.href}
                   href={item.href}
-                  className={clsx("hover:text-white", active ? "text-white" : "text-paper/70")}
+                  className={clsx("hover:text-paper", active ? "text-paper" : "text-paper/70")}
                 >
                   {item.label}
                 </Link>
@@ -211,14 +212,14 @@ export function Shell({ children }: { children: React.ReactNode }) {
           </div>
         </div>
 
-        <div className="mx-auto flex max-w-[720px] items-center gap-2 overflow-x-auto px-6 pb-4 md:hidden">
+        <div className="mx-auto flex max-w-[1440px] items-center gap-2 overflow-x-auto px-4 pb-4 sm:px-6 md:hidden">
           {navItems.map((item) => (
             <Link
               key={item.href}
               href={item.href}
               className={clsx(
                 "shrink-0 rounded-full border px-3 py-1.5 text-xs font-bold",
-                pathname === item.href ? "border-cyan bg-cyan/10 text-white" : "border-line text-paper/65"
+                pathname === item.href ? "border-cyan bg-cyan/10 text-paper" : "border-line text-paper/65"
               )}
             >
               {item.label}
@@ -226,8 +227,11 @@ export function Shell({ children }: { children: React.ReactNode }) {
           ))}
         </div>
 
-        <form onSubmit={submitSearch} className="relative mx-auto max-w-[720px] px-6 pb-5">
-          <Search className="pointer-events-none absolute left-10 top-[13px] h-4 w-4 text-paper/35" aria-hidden="true" />
+        <form
+          onSubmit={submitSearch}
+          className={clsx("relative mx-auto max-w-[960px] px-4 pb-5 sm:px-6 lg:px-8", pathname === "/" && "hidden")}
+        >
+          <Search className="pointer-events-none absolute left-8 top-[13px] h-4 w-4 text-paper/35 sm:left-10 lg:left-12" aria-hidden="true" />
           <input
             value={search}
             onChange={(event) => setSearch(event.target.value)}
@@ -237,7 +241,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
             placeholder="Search artists"
           />
           {searchFocused ? (
-            <div className="absolute left-6 right-6 top-12 z-40 rounded-xl border border-line bg-panel p-2 shadow-2xl">
+            <div className="absolute left-4 right-4 top-12 z-40 rounded-xl border border-line bg-panel p-2 shadow-2xl sm:left-6 sm:right-6 lg:left-8 lg:right-8">
               {searchSuggestions.map((artist) => (
                 <Link
                   key={artist.id}
@@ -245,8 +249,11 @@ export function Shell({ children }: { children: React.ReactNode }) {
                   onClick={() => setSearchFocused(false)}
                   className="flex items-center justify-between gap-3 rounded-lg px-3 py-2 text-sm hover:bg-panelSoft"
                 >
-                  <span className="min-w-0 truncate font-black">
-                    {artist.name} <span className="font-bold text-paper/45">${artist.ticker}</span>
+                  <span className="flex min-w-0 items-center gap-3">
+                    <ArtistAvatar artist={artist} size="sm" />
+                    <span className="min-w-0 truncate font-black">
+                      {artist.name} <span className="font-bold text-paper/45">${artist.ticker}</span>
+                    </span>
                   </span>
                   <span className={artist.dailyChangePercent >= 0 ? "text-mint" : "text-ember"}>
                     {formatPercent(artist.dailyChangePercent)}
@@ -262,7 +269,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
         <AppearanceModal current={themePreference} onChange={chooseTheme} onClose={() => setAppearanceOpen(false)} />
       ) : null}
 
-      <main className="mx-auto max-w-[720px] px-6 py-8">{children}</main>
+      <main className="mx-auto w-full max-w-[1440px] px-4 py-8 sm:px-6 lg:px-8">{children}</main>
     </div>
   );
 }

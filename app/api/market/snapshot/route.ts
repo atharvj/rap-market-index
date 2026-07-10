@@ -4,6 +4,7 @@ import { sanitizeMoveExplanation } from "@/lib/artist-explanations";
 import { createAnonServerClient, getSupabaseConfigStatus } from "@/lib/supabase/server";
 import type { Database } from "@/lib/supabase/database.types";
 import type { Artist, GameState, HypeStats, PricePoint } from "@/lib/types";
+import { loadArtistImageUrls } from "@/server/market/artist-images";
 import { getPacificMarketDate, shiftMarketDate } from "@/server/market/market-date";
 
 export const dynamic = "force-dynamic";
@@ -51,11 +52,20 @@ export async function GET() {
       typedArtists.map((artist) => artist.id),
       supabase
     );
+    const imageByArtistId = await loadArtistImageUrls(
+      supabase,
+      typedArtists.map((artist) => artist.id)
+    );
     const fallback = createInitialGameState();
     const state: GameState = {
       ...fallback,
       artists: typedArtists.map((artist) =>
-        mapArtist(artist, statsByArtist[artist.id] ?? null, historyByArtist[artist.id] ?? [])
+        mapArtist(
+          artist,
+          statsByArtist[artist.id] ?? null,
+          historyByArtist[artist.id] ?? [],
+          imageByArtistId.get(artist.id)
+        )
       ),
       holdings: [],
       shortPositions: [],
@@ -131,7 +141,7 @@ async function loadHistoryByArtist(
   }, {});
 }
 
-function mapArtist(row: ArtistRow, stats: ArtistStatsRow | null, history: PricePoint[]): Artist {
+function mapArtist(row: ArtistRow, stats: ArtistStatsRow | null, history: PricePoint[], imageUrl?: string): Artist {
   const fallbackHistory = [
     {
       date: getPacificMarketDate(),
@@ -143,6 +153,7 @@ function mapArtist(row: ArtistRow, stats: ArtistStatsRow | null, history: PriceP
     id: row.id,
     name: row.name,
     ticker: row.ticker,
+    imageUrl,
     currentPrice: Number(row.current_price),
     previousClose: Number(row.previous_close),
     dailyChangePercent: Number(row.daily_change_percent),

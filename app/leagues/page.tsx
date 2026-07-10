@@ -1,55 +1,45 @@
 "use client";
 
-import { useGame } from "@/components/GameProvider";
 import { RmiButton } from "@/components/RmiPrimitives";
-import { formatCurrency, formatPercent } from "@/lib/formatters";
-import { Trophy, UsersRound } from "lucide-react";
-import Link from "next/link";
+import { MessageCircle, ShieldCheck, Trophy, UsersRound } from "lucide-react";
+
+const plannedFeatures = [
+  { icon: UsersRound, title: "Private Leagues", detail: "Invite friends and compare portfolios in a private table." },
+  { icon: Trophy, title: "League Rankings", detail: "Compete on return without changing the public artist market." },
+  { icon: MessageCircle, title: "League Activity", detail: "Follow trades and league updates in one private feed." }
+];
 
 export default function LeaguesPage() {
-  const { leaderboard, portfolioValue, gainPercent } = useGame();
-
   return (
-    <div className="space-y-5">
-      <header>
-        <h1 className="text-3xl font-black">Leagues</h1>
-        <p className="mt-1 text-sm font-bold text-paper/70">Private friend leagues are a future layer. Global competition is live now.</p>
-      </header>
-
-      <section className="grid gap-3 sm:grid-cols-2">
-        <article className="rmi-card p-5">
-          <Trophy className="h-5 w-5 text-brass" />
-          <h2 className="mt-4 text-xl font-black">RMI Global</h2>
-          <p className="mt-1 text-sm font-bold text-paper/65">{leaderboard.length} traders · public rankings</p>
-          <div className="mt-5 grid grid-cols-2 gap-3">
-            <LeagueStat label="portfolio" value={formatCurrency(portfolioValue)} />
-            <LeagueStat label="today" value={formatPercent(gainPercent)} />
+    <div className="mx-auto max-w-5xl space-y-6">
+      <section className="rmi-card overflow-hidden">
+        <div className="grid gap-6 p-7 sm:p-10 lg:grid-cols-[minmax(0,1fr)_280px] lg:items-center">
+          <div>
+            <span className="inline-flex rounded-full bg-cyan/12 px-3 py-1 text-xs font-black text-cyan">Coming Soon</span>
+            <h1 className="mt-4 text-3xl font-black sm:text-4xl">Trade With Your Friends</h1>
+            <p className="mt-3 max-w-xl text-sm leading-6 text-paper/65">
+              Private leagues will arrive after the public market is stable and there are enough active traders to make competition meaningful.
+            </p>
+            <div className="mt-6 flex flex-wrap gap-3">
+              <RmiButton href="/leaderboard">View Global Rankings</RmiButton>
+              <RmiButton href="/markets" variant="secondary">Explore Markets</RmiButton>
+            </div>
           </div>
-          <div className="mt-5">
-            <RmiButton href="/leaderboard">View rankings</RmiButton>
+          <div className="grid place-items-center rounded-xl bg-panelSoft p-10">
+            <ShieldCheck className="h-16 w-16 text-cyan" strokeWidth={1.35} aria-hidden="true" />
           </div>
-        </article>
-
-        <article className="rmi-card p-5">
-          <UsersRound className="h-5 w-5 text-cyan" />
-          <h2 className="mt-4 text-xl font-black">Underground Draft</h2>
-          <p className="mt-1 text-sm font-bold text-paper/65">Draft boards, invites, and league chat will land after the core market is public-ready.</p>
-          <div className="mt-5">
-            <Link href="/scout" className="text-sm font-black text-cyan hover:text-cyan/75">
-              Scout artists first
-            </Link>
-          </div>
-        </article>
+        </div>
       </section>
-    </div>
-  );
-}
 
-function LeagueStat({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-lg bg-panelSoft p-3">
-      <p className="text-xs font-bold text-paper/45">{label}</p>
-      <p className="text-lg font-black number-tabular">{value}</p>
+      <section className="grid gap-3 md:grid-cols-3">
+        {plannedFeatures.map(({ icon: Icon, title, detail }) => (
+          <article key={title} className="rmi-card p-5">
+            <Icon className="h-5 w-5 text-cyan" aria-hidden="true" />
+            <h2 className="mt-4 text-base font-black">{title}</h2>
+            <p className="mt-2 text-sm leading-6 text-paper/55">{detail}</p>
+          </article>
+        ))}
+      </section>
     </div>
   );
 }

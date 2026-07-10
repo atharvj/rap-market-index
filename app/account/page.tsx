@@ -87,6 +87,21 @@ export default function AccountPage() {
     }
   }
 
+  async function sendPasswordReset() {
+    const normalizedEmail = email.trim();
+
+    if (!normalizedEmail) {
+      setMessage("Enter your email address first.");
+      return;
+    }
+
+    const { error } = await getBrowserSupabaseClient().auth.resetPasswordForEmail(normalizedEmail, {
+      redirectTo: `${window.location.origin}/account/reset-password`
+    });
+
+    setMessage(error ? error.message : "Password reset email sent.");
+  }
+
   async function saveProfile(nextAvatarUrl?: string) {
     if (!session) {
       return;
@@ -176,6 +191,11 @@ export default function AccountPage() {
           <button type="submit" disabled={submitting} className="h-11 rounded-lg bg-paper text-sm font-black text-ink disabled:opacity-60">
             {mode === "signup" ? "Sign up" : "Log in"}
           </button>
+          {mode === "signin" ? (
+            <button type="button" onClick={sendPasswordReset} className="text-sm text-paper/60 hover:text-cyan">
+              Forgot your password?
+            </button>
+          ) : null}
           <button
             type="button"
             onClick={() => setMode(mode === "signup" ? "signin" : "signup")}
@@ -190,7 +210,7 @@ export default function AccountPage() {
   }
 
   return (
-    <div className="space-y-5">
+    <div className="mx-auto max-w-5xl space-y-5">
       <header className="flex items-start justify-between gap-4">
         <div>
           <h1 className="text-3xl font-black">Player profile</h1>

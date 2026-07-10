@@ -77,8 +77,8 @@ export default function MarketsPage() {
         })}
       </section>
 
-      <section className="grid gap-3 sm:grid-cols-2">
-        {artists.slice(0, 4).map((artist) => (
+      <section className="grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(280px,1fr))]">
+        {artists.slice(0, 8).map((artist) => (
           <Link key={artist.id} href={`/artists/${artist.id}`} className="rmi-card p-4 hover:border-cyan/70">
             <div className="flex items-start justify-between gap-4">
               <div className="flex min-w-0 items-center gap-3">

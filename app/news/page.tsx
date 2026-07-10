@@ -1,66 +1,53 @@
 "use client";
 
+import { useGame } from "@/components/GameProvider";
 import { MarketNewsFeed } from "@/components/MarketNewsFeed";
-import { Flame, KeyRound, Medal, Music, Ticket } from "lucide-react";
-
-const filters = [
-  { label: "Releases", icon: KeyRound },
-  { label: "Beef & drama", icon: Flame },
-  { label: "Awards", icon: Medal },
-  { label: "Tours", icon: Ticket }
-];
-
-const topics = ["#AlbumWatch", "#DissWatch", "#TourSeason", "#Breakout", "#Reviews", "#Underground"];
+import { ArtistIdentity, ChangeText, RmiButton } from "@/components/RmiPrimitives";
+import { Music, ShieldCheck } from "lucide-react";
+import { useMemo } from "react";
 
 export default function NewsPage() {
+  const { state } = useGame();
+  const movers = useMemo(
+    () => [...state.artists].sort((a, b) => Math.abs(b.dailyChangePercent) - Math.abs(a.dailyChangePercent)).slice(0, 5),
+    [state.artists]
+  );
+
   return (
-    <div className="grid gap-5 md:grid-cols-[minmax(0,1fr)_220px]">
-      <main>
-        <h1 className="text-3xl font-black">Market news</h1>
-        <p className="mt-1 text-sm font-bold text-paper/70">Catalysts ranked by impact, confidence, and recency.</p>
-        <div className="mt-4 grid gap-3">
+    <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_280px] xl:grid-cols-[minmax(0,1fr)_320px]">
+      <main className="min-w-0">
+        <h1 className="text-3xl font-black">Market News</h1>
+        <p className="mt-1 text-sm text-paper/65">The most important verified catalysts, ranked by impact, confidence, and recency.</p>
+        <div className="mt-5 rmi-card px-5">
           <MarketNewsFeed limit={40} variant="full" />
         </div>
       </main>
 
-      <aside className="space-y-6 md:sticky md:top-6 md:self-start">
-        <section>
-          <h2 className="text-sm font-black">Filter by type</h2>
-          <div className="mt-3 grid gap-2">
-            {filters.map((filter) => {
-              const Icon = filter.icon;
-
-              return (
-                <button
-                  key={filter.label}
-                  type="button"
-                  className="flex h-9 items-center gap-2 rounded-lg border border-line px-3 text-left text-sm font-black hover:border-cyan"
-                >
-                  <Icon className="h-4 w-4 text-paper/65" aria-hidden="true" />
-                  {filter.label}
-                </button>
-              );
-            })}
+      <aside className="space-y-4 lg:sticky lg:top-6 lg:self-start">
+        <section className="rmi-card overflow-hidden">
+          <div className="border-b border-line px-4 py-3">
+            <h2 className="text-sm font-black">Moving With the News</h2>
           </div>
-        </section>
-
-        <section>
-          <h2 className="text-sm font-black">Trending topics</h2>
-          <div className="mt-3 flex flex-wrap gap-2">
-            {topics.map((topic) => (
-              <span key={topic} className="rounded-full bg-cyan/18 px-3 py-1 text-xs font-black text-cyan">
-                {topic}
-              </span>
-            ))}
-          </div>
+          {movers.map((artist) => (
+            <div key={artist.id} className="flex items-center justify-between gap-3 border-b border-line px-4 py-3 last:border-b-0">
+              <ArtistIdentity artist={artist} />
+              <ChangeText value={artist.dailyChangePercent} />
+            </div>
+          ))}
+          <div className="p-4"><RmiButton href="/markets" variant="secondary">View Markets</RmiButton></div>
         </section>
 
         <section className="rmi-card p-4">
           <Music className="h-5 w-5 text-cyan" aria-hidden="true" />
           <h2 className="mt-3 text-sm font-black">RMI Market Wire</h2>
-          <p className="mt-2 text-sm font-bold leading-5 text-paper/60">
-            News here is filtered for price relevance. Routine uploads and low-signal chatter are suppressed.
+          <p className="mt-2 text-sm leading-6 text-paper/60">
+            Routine uploads, reposts, and low-signal chatter are excluded. A story must clear evidence and relevance checks before it appears here.
           </p>
+        </section>
+
+        <section className="flex items-start gap-3 rounded-xl bg-panelSoft p-4 text-xs leading-5 text-paper/55">
+          <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-mint" aria-hidden="true" />
+          <p>News can inform a quote, but no single headline determines an artist price by itself.</p>
         </section>
       </aside>
     </div>

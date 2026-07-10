@@ -34,6 +34,7 @@ export type Artist = {
   id: string;
   name: string;
   ticker: string;
+  imageUrl?: string;
   currentPrice: number;
   previousClose: number;
   dailyChangePercent: number;

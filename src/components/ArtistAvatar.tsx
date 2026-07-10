@@ -10,10 +10,23 @@ export function ArtistAvatar({ artist, size = "md" }: { artist: Artist; size?: "
 
   return (
     <div
-      className={`${sizeClass} grid shrink-0 place-items-center rounded-full border border-paper/10 bg-gradient-to-br ${artist.accent} font-black text-white shadow-market saturate-[0.9]`}
-      aria-hidden="true"
+      className={`${sizeClass} relative grid shrink-0 place-items-center overflow-hidden rounded-full border border-paper/10 bg-gradient-to-br ${artist.accent} font-black text-white shadow-market saturate-[0.9]`}
+      aria-label={artist.name}
+      role="img"
     >
-      {artist.ticker.slice(0, 2)}
+      <span aria-hidden="true">{artist.ticker.slice(0, 2)}</span>
+      {artist.imageUrl ? (
+        <img
+          src={artist.imageUrl}
+          alt=""
+          className="absolute inset-0 h-full w-full object-cover"
+          loading="lazy"
+          referrerPolicy="no-referrer"
+          onError={(event) => {
+            event.currentTarget.style.display = "none";
+          }}
+        />
+      ) : null}
     </div>
   );
 }

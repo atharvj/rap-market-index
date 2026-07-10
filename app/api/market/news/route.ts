@@ -3,6 +3,7 @@ import { createAnonServerClient, getSupabaseConfigStatus } from "@/lib/supabase/
 import type { Database } from "@/lib/supabase/database.types";
 import { getPacificMarketDate, shiftMarketDate } from "@/server/market/market-date";
 import { getArtistStatusSubtype } from "@/server/market/status-events";
+import { loadArtistImageUrls } from "@/server/market/artist-images";
 
 export const dynamic = "force-dynamic";
 
@@ -75,6 +76,10 @@ export async function GET(request: Request) {
     const supabase = createAnonServerClient();
     const artists = await loadArtists(supabase);
     const artistById = new Map(artists.map((artist) => [artist.id, artist]));
+    const imageByArtistId = await loadArtistImageUrls(
+      supabase,
+      artists.map((artist) => artist.id)
+    );
     const selectedArtistId = artistId ?? (ticker ? artists.find((artist) => artist.ticker === ticker)?.id ?? null : null);
 
     if (ticker && !selectedArtistId) {
@@ -124,7 +129,7 @@ export async function GET(request: Request) {
     const eventNews = diversifyMarketNewsEvents(rankedEvents, {
       feedMode: selectedArtistId ? "artist" : feedMode,
       limit
-    }).map((event) => mapMarketEventToNewsItem(event, artistById));
+    }).map((event) => mapMarketEventToNewsItem(event, artistById, imageByArtistId));
     const news = eventNews.slice(0, limit);
 
     return NextResponse.json({
@@ -163,7 +168,8 @@ async function loadArtists(supabase: ReturnType<typeof createAnonServerClient>) 
 
 function mapMarketEventToNewsItem(
   event: MarketEventRow,
-  artistById: Map<string, ArtistRow>
+  artistById: Map<string, ArtistRow>,
+  imageByArtistId: Map<string, string>
 ): MarketNewsItem {
   const artist = artistById.get(event.artist_id) ?? null;
   const rawPayload = toRawPayload(event.raw_payload);
@@ -183,7 +189,7 @@ function mapMarketEventToNewsItem(
     sourceUrl,
     sourceDomain,
     sourceIconUrl: getSourceIconUrl(sourceDomain, sourceName),
-    thumbnailUrl: getEventThumbnailUrl(rawPayload),
+    thumbnailUrl: getEventThumbnailUrl(rawPayload) ?? imageByArtistId.get(event.artist_id) ?? null,
     mediaUrl: getSupportingMediaUrl(rawPayload),
     mediaType: getSupportingMediaType(rawPayload),
     mediaLabel: getSupportingMediaLabel(rawPayload),

@@ -37,7 +37,7 @@ export default function PortfolioPage() {
         <RmiLineChart data={chartData} positive={portfolioValue >= STARTING_CASH} height={132} />
       </div>
 
-      <div className="grid gap-5 md:grid-cols-[minmax(0,1fr)_220px]">
+      <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_280px] xl:grid-cols-[minmax(0,1fr)_320px]">
         <RmiSection title="Holdings">
           <div className="overflow-hidden">
             <div className="grid grid-cols-[minmax(0,1fr)_70px_92px_96px] border-b border-line px-4 py-3 text-xs font-bold text-paper/45">

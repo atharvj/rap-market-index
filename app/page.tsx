@@ -2,23 +2,25 @@
 
 import { useAuth } from "@/components/AuthProvider";
 import { useGame } from "@/components/GameProvider";
-import { ArtistMiniCard, ChangeText, RmiButton, RmiSection } from "@/components/RmiPrimitives";
+import { ArtistIdentity, ArtistMiniCard, ChangeText, RmiButton, RmiSection } from "@/components/RmiPrimitives";
 import { formatCompact, formatCurrency, formatPercent } from "@/lib/formatters";
-import { CalendarDays, Flame, KeyRound, Trophy } from "lucide-react";
+import type { Artist } from "@/lib/types";
+import { Flame, KeyRound, Trophy } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useMemo, useState, type ReactNode } from "react";
+import { useMemo, useState } from "react";
 
 export default function HomePage() {
   const router = useRouter();
   const { session } = useAuth();
-  const { state, leaderboard, portfolioValue, gainPercent } = useGame();
+  const { state, portfolioValue, gainPercent } = useGame();
   const [query, setQuery] = useState("");
 
-  const trending = useMemo(
-    () => [...state.artists].sort((a, b) => Math.abs(b.dailyChangePercent) - Math.abs(a.dailyChangePercent)).slice(0, 4),
+  const orderedMovers = useMemo(
+    () => [...state.artists].sort((a, b) => Math.abs(b.dailyChangePercent) - Math.abs(a.dailyChangePercent)),
     [state.artists]
   );
+  const trending = orderedMovers.slice(0, 8);
   const catalysts = useMemo(
     () => [...state.artists].sort((a, b) => Math.abs(b.dailyChangePercent) - Math.abs(a.dailyChangePercent)).slice(0, 3),
     [state.artists]
@@ -31,6 +33,10 @@ export default function HomePage() {
     () => state.artists.reduce((total, artist) => total + Math.abs(artist.dailyChangePercent) * artist.currentPrice * 12000, 0),
     [state.artists]
   );
+  const marketLeader = [...state.artists].sort((a, b) => b.dailyChangePercent - a.dailyChangePercent)[0];
+  const underPressure = [...state.artists].sort((a, b) => a.dailyChangePercent - b.dailyChangePercent)[0];
+  const signalLeader = [...state.artists].sort((a, b) => b.hypeScore - a.hypeScore)[0];
+  const activeMovers = state.artists.filter((artist) => Math.abs(artist.dailyChangePercent) >= 0.25).length;
 
   function submitSearch(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -54,25 +60,34 @@ export default function HomePage() {
 
   return (
     <div className="space-y-6">
-      <section className="border-b border-line pb-6 text-center">
-        <h1 className="text-3xl font-black leading-tight sm:text-4xl">Trade the culture</h1>
-        <p className="mt-2 text-base font-bold text-paper/75">Buy shares in rappers. Build a portfolio when they blow up.</p>
-        <form onSubmit={submitSearch} className="mx-auto mt-5 flex max-w-md gap-2">
-          <input
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            className="min-h-10 min-w-0 flex-1 rounded-lg border border-line bg-panel px-3 text-sm font-bold outline-none placeholder:text-paper/35 focus:border-cyan"
-            placeholder="Search an artist, e.g. Ken Carson"
-          />
-          <RmiButton type="submit">Search</RmiButton>
-        </form>
+      <section className="grid overflow-hidden rounded-xl border border-line bg-panel lg:grid-cols-[minmax(0,1.45fr)_minmax(290px,0.55fr)]">
+        <div className="grid content-center px-6 py-10 text-center sm:px-10 lg:min-h-[300px] lg:text-left">
+          <p className="text-xs font-bold uppercase tracking-[0.18em] text-cyan">Rap Market Index</p>
+          <h1 className="mt-3 text-3xl font-black leading-tight sm:text-5xl">Back the next breakout.</h1>
+          <p className="mt-3 text-base font-bold text-paper/75">Buy shares in rappers. Build a portfolio when they blow up.</p>
+          <form onSubmit={submitSearch} className="mx-auto mt-6 flex w-full max-w-xl gap-2 lg:mx-0">
+            <input
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              className="min-h-11 min-w-0 flex-1 rounded-lg border border-line bg-panelSoft px-3 text-sm outline-none placeholder:text-paper/35 focus:border-cyan"
+              placeholder="Search an artist, e.g. Ken Carson"
+            />
+            <RmiButton type="submit">Search</RmiButton>
+          </form>
+        </div>
+
+        <div className="grid divide-y divide-line border-t border-line bg-panelSoft lg:border-l lg:border-t-0">
+          {marketLeader ? <PulseArtist label="Market leader" artist={marketLeader} /> : null}
+          {underPressure ? <PulseArtist label="Under pressure" artist={underPressure} /> : null}
+          {signalLeader ? <PulseArtist label="Signal leader" artist={signalLeader} score /> : null}
+        </div>
       </section>
 
       <section className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <HeroStat label="market cap" value={`$${formatCompact(marketCap)}`} />
         <HeroStat label="24h volume" value={`$${formatCompact(volume)}`} />
         <HeroStat label="artists listed" value={formatCompact(state.artists.length)} />
-        <HeroStat label="traders online" value={formatCompact(Math.max(leaderboard.length, 1))} />
+        <HeroStat label="active movers" value={formatCompact(activeMovers)} />
       </section>
 
       <section>
@@ -82,14 +97,14 @@ export default function HomePage() {
             Markets
           </Link>
         </div>
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(190px,1fr))]">
           {trending.map((artist) => (
             <ArtistMiniCard key={artist.id} artist={artist} />
           ))}
         </div>
       </section>
 
-      <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_220px]">
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,1.55fr)_minmax(300px,0.65fr)]">
         <RmiSection title="Catalysts this week">
           <div className="grid gap-3 p-4">
             {catalysts.map((artist, index) => (
@@ -108,12 +123,13 @@ export default function HomePage() {
           </div>
         </RmiSection>
 
-        <RmiSection title={session ? "Your leagues" : "Start trading"}>
+        <RmiSection title={session ? "Your portfolio" : "Start trading"}>
           {session ? (
-            <div className="space-y-4 p-4 text-sm">
-              <LeagueRow icon={<Trophy className="h-4 w-4" />} title="RMI Global" detail={`rank ${leaderboard.findIndex((entry) => entry.isCurrentUser) + 1 || "-"} of ${leaderboard.length}`} />
-              <LeagueRow icon={<CalendarDays className="h-4 w-4" />} title="Rookie Board" detail="open league" />
-              <RmiButton href="/leagues" variant="secondary">Join a league</RmiButton>
+            <div className="grid gap-3 p-4 sm:grid-cols-3 lg:grid-cols-1">
+              <SnapshotTile label="portfolio" value={formatCurrency(portfolioValue)} />
+              <SnapshotTile label="cash" value={formatCurrency(state.cashBalance)} />
+              <SnapshotTile label="today" value={formatPercent(gainPercent)} positive={gainPercent >= 0} />
+              <RmiButton href="/portfolio" variant="secondary">View portfolio</RmiButton>
             </div>
           ) : (
             <div className="space-y-4 p-4 text-sm">
@@ -124,13 +140,18 @@ export default function HomePage() {
         </RmiSection>
       </div>
 
-      <RmiSection title="Market snapshot" action={<RmiButton href="/portfolio" variant="secondary">Portfolio</RmiButton>}>
-        <div className="grid gap-3 p-4 sm:grid-cols-3">
-          <SnapshotTile label="portfolio" value={formatCurrency(portfolioValue)} />
-          <SnapshotTile label="cash" value={formatCurrency(state.cashBalance)} />
-          <SnapshotTile label="today" value={formatPercent(gainPercent)} positive={gainPercent >= 0} />
-        </div>
-      </RmiSection>
+    </div>
+  );
+}
+
+function PulseArtist({ label, artist, score = false }: { label: string; artist: Artist; score?: boolean }) {
+  return (
+    <div className="grid content-center gap-3 p-5">
+      <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-paper/45">{label}</p>
+      <div className="flex items-center justify-between gap-4">
+        <ArtistIdentity artist={artist} />
+        {score ? <span className="text-sm font-black text-cyan">{artist.hypeScore}/100</span> : <ChangeText value={artist.dailyChangePercent} />}
+      </div>
     </div>
   );
 }
@@ -158,16 +179,4 @@ function CatalystIcon({ index }: { index: number }) {
   const Icon = icons[index] ?? Flame;
 
   return <Icon className="h-4 w-4 text-paper/45" aria-hidden="true" />;
-}
-
-function LeagueRow({ icon, title, detail }: { icon: ReactNode; title: string; detail: string }) {
-  return (
-    <div className="flex items-start gap-3">
-      <span className="mt-0.5 text-paper/45">{icon}</span>
-      <div>
-        <p className="font-black">{title}</p>
-        <p className="text-paper/55">{detail}</p>
-      </div>
-    </div>
-  );
 }

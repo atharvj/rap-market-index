@@ -7,6 +7,10 @@ const config: Config = {
   ],
   theme: {
     extend: {
+      fontWeight: {
+        bold: "500",
+        black: "700"
+      },
       colors: {
         ink: "rgb(var(--color-ink) / <alpha-value>)",
         panel: "rgb(var(--color-panel) / <alpha-value>)",

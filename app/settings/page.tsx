@@ -7,7 +7,7 @@ import { UserAvatar } from "@/components/UserAvatar";
 import { RmiButton } from "@/components/RmiPrimitives";
 import { getBrowserSupabaseClient } from "@/lib/supabase/client";
 import { applyThemePreference, getStoredThemePreference, type ThemePreference } from "@/lib/theme";
-import clsx from "clsx";
+import { BellRing } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 
 export default function SettingsPage() {
@@ -55,7 +55,7 @@ export default function SettingsPage() {
     }
 
     const { error } = await getBrowserSupabaseClient().auth.resetPasswordForEmail(user.email, {
-      redirectTo: `${window.location.origin}/account`
+      redirectTo: `${window.location.origin}/account/reset-password`
     });
 
     setMessage(error ? error.message : "Password reset email sent.");
@@ -67,7 +67,7 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="space-y-5">
+    <div className="mx-auto max-w-5xl space-y-5">
       <h1 className="text-3xl font-black">Settings</h1>
 
       <section className="flex items-center justify-between gap-4">
@@ -84,7 +84,7 @@ export default function SettingsPage() {
         <RmiButton href="/account" variant="secondary">Edit profile</RmiButton>
       </section>
 
-      <SettingsGroup title="account">
+      <SettingsGroup title="Account">
         <SettingsRow label="Display name">
           <div className="flex flex-1 gap-2">
             <input
@@ -107,18 +107,19 @@ export default function SettingsPage() {
         </SettingsRow>
       </SettingsGroup>
 
-      <SettingsGroup title="notifications">
-        <ToggleRow label="Price alerts" detail="when a holding moves more than 10%" enabled />
-        <ToggleRow label="Catalyst news" detail="releases, beef, awards, tour dates" enabled />
-        <ToggleRow label="League updates" detail="rank changes and league invites" />
+      <SettingsGroup title="Notifications">
+        <div className="flex items-start gap-3 px-4 py-4">
+          <BellRing className="mt-0.5 h-4 w-4 shrink-0 text-cyan" aria-hidden="true" />
+          <div>
+            <p className="text-sm font-black">Browser and email alerts are coming soon</p>
+            <p className="mt-1 text-xs leading-5 text-paper/50">
+              RMI will ask permission before enabling price or catalyst alerts. No notification preferences are active yet.
+            </p>
+          </div>
+        </div>
       </SettingsGroup>
 
-      <SettingsGroup title="preferences">
-        <SettingsRow label="Currency">
-          <select className="h-9 flex-1 rounded-lg border border-line bg-panelSoft px-3 text-sm font-black outline-none">
-            <option>USD ($)</option>
-          </select>
-        </SettingsRow>
+      <SettingsGroup title="Preferences">
         <SettingsRow label="Theme">
           <select
             value={theme}
@@ -132,10 +133,15 @@ export default function SettingsPage() {
         </SettingsRow>
       </SettingsGroup>
 
-      <SettingsGroup title="danger zone" danger>
+      <SettingsGroup title="Danger Zone" danger>
         <SettingsRow label="Delete account">
-          <button type="button" className="rounded-lg border border-ember/70 px-3 py-1.5 text-sm font-black text-ember hover:bg-ember/10">
-            Delete
+          <button
+            type="button"
+            disabled
+            className="cursor-not-allowed rounded-lg border border-line px-3 py-1.5 text-sm text-paper/40"
+            title="Account deletion will be enabled before public launch."
+          >
+            Unavailable in Beta
           </button>
         </SettingsRow>
       </SettingsGroup>
@@ -159,20 +165,6 @@ function SettingsRow({ label, children }: { label: string; children: ReactNode }
     <div className="flex min-h-14 items-center justify-between gap-4 border-b border-line px-4 py-3 last:border-b-0">
       <span className="text-sm font-black">{label}</span>
       <div className="flex min-w-0 flex-1 justify-end">{children}</div>
-    </div>
-  );
-}
-
-function ToggleRow({ label, detail, enabled = false }: { label: string; detail: string; enabled?: boolean }) {
-  return (
-    <div className="flex min-h-14 items-center justify-between gap-4 border-b border-line px-4 py-3 last:border-b-0">
-      <div>
-        <p className="text-sm font-black">{label}</p>
-        <p className="text-xs font-bold text-paper/50">{detail}</p>
-      </div>
-      <span className={clsx("relative h-6 w-11 rounded-full", enabled ? "bg-mint" : "bg-panelSoft")}>
-        <span className={clsx("absolute top-1 h-4 w-4 rounded-full bg-white transition", enabled ? "left-6" : "left-1")} />
-      </span>
     </div>
   );
 }
