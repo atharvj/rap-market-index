@@ -2,6 +2,7 @@ import { calculateHypeScore, calculateSignalDelta, clamp, getDailyChangePercent,
 import type { AdapterSignal, AdapterSignals, MarketSignalModifier } from "@/server/market/market-data";
 import { getMarketModelVersion } from "@/server/market/model-version";
 import type { ArtistCategory, HypeStats } from "@/lib/types";
+import { getAudienceScaleAdjustment } from "@/server/market/audience-scale";
 
 export type MarketUpdateSource =
   | "mock"
@@ -359,9 +360,12 @@ function applyRelativePressure({
     relativeOpportunityCostDrift +
     noSignalLiquidityDrift;
   const repriced = priceFromSignalDelta(update, adjustedSignalDelta);
+  const audienceScaleDominant = update.rawPayload.audienceScaleDominant === true;
   const shouldExplainRelativeMove =
-    repriced.dailyChangePercent < 0 ||
-    (update.rawPayload.hasMomentumSignal !== true && Math.abs(repriced.dailyChangePercent) >= 0.01);
+    !audienceScaleDominant && (
+      repriced.dailyChangePercent < 0 ||
+      (update.rawPayload.hasMomentumSignal !== true && Math.abs(repriced.dailyChangePercent) >= 0.01)
+    );
 
   return {
     ...update,
@@ -836,7 +840,16 @@ function calculateArtistUpdate({
     previousClose,
     oldPrice: artist.currentPrice
   });
-  const signalDelta = clamp(technicalAdjustment.signalDelta + unsupportedEventMemoryAdjustment, -0.75, 0.75);
+  const audienceScaleAdjustment = getAudienceScaleAdjustment(signals.rawPayload, artist.currentPrice);
+  const audienceScaleDominant =
+    Math.abs(audienceScaleAdjustment.adjustment) >= 0.008 &&
+    Math.abs(audienceScaleAdjustment.adjustment) >
+      Math.abs(technicalAdjustment.signalDelta + unsupportedEventMemoryAdjustment) * 1.15;
+  const signalDelta = clamp(
+    technicalAdjustment.signalDelta + unsupportedEventMemoryAdjustment + audienceScaleAdjustment.adjustment,
+    -0.75,
+    0.75
+  );
   const categoryDailyCap = getCategoryDailyCap(artist.category);
   const dailyCap = getEffectiveDailyCap({
     categoryDailyCap,
@@ -866,9 +879,11 @@ function calculateArtistUpdate({
     dailyChangePercent,
     hypeScore,
     stats,
-    explanation: signals.hasMomentumSignal
-      ? explainMove(artist.ticker, stats, dailyChangePercent, catalystDiagnostics, sourceAttribution)
-      : explainNoSignalMove(artist.ticker, source, dailyChangePercent, staleMomentumDecayDelta),
+    explanation: audienceScaleDominant
+      ? explainAudienceScaleMove(artist.ticker, dailyChangePercent)
+      : signals.hasMomentumSignal
+        ? explainMove(artist.ticker, stats, dailyChangePercent, catalystDiagnostics, sourceAttribution)
+        : explainNoSignalMove(artist.ticker, source, dailyChangePercent, staleMomentumDecayDelta),
     signalDelta,
     modelVersion,
     rawPayload: {
@@ -889,6 +904,8 @@ function calculateArtistUpdate({
       signalDeltaBeforeTechnicals,
       technicalAdjustment,
       unsupportedEventMemoryAdjustment,
+      audienceScaleAdjustment,
+      audienceScaleDominant,
       catalystDiagnostics,
       sourceAttribution,
       credibleEventSupport,
@@ -939,16 +956,17 @@ function getSignalsForArtist(
     source === "blended"
   ) {
     const adapter = adapterSignals?.[artist.id] ?? adapterSignals?.[artist.ticker];
+    const adapterPayload = adapter?.rawPayload ?? {
+      status: "missing",
+      note: `No ${source} signal was available for this artist.`
+    };
 
     return buildExplicitSignal(
       artist.stats,
       adapter?.stats ?? {},
       {
+        ...adapterPayload,
         source,
-        adapter: adapter?.rawPayload ?? {
-          status: "missing",
-          note: `No ${source} signal was available for this artist.`
-        }
       },
       adapter?.modifiers,
       "neutral"
@@ -1889,10 +1907,19 @@ function explainMove(
   const [signalName] = signals.reduce((best, current) =>
     Math.abs(current[1]) > Math.abs(best[1]) ? current : best
   );
-  const direction = dailyChangePercent >= 0 ? "moved higher" : "pulled back";
   const primaryCatalyst = catalystDiagnostics.primaryCatalyst;
   const counterCatalyst = catalystDiagnostics.counterCatalyst;
   const sourceClause = getSourceConsensusClause(sourceAttribution);
+
+  if (Math.abs(dailyChangePercent) < 0.005) {
+    if (primaryCatalyst?.reasonPriority && primaryCatalyst.reasonPriority >= 8) {
+      return `${ticker} held flat as ${formatCatalystReason(primaryCatalyst.reason)} was balanced by broader market signals${sourceClause}.`;
+    }
+
+    return `${ticker} held flat as available market signals balanced out without a source-backed headline catalyst strong enough to lead the move${sourceClause}.`;
+  }
+
+  const direction = dailyChangePercent > 0 ? "moved higher" : "pulled back";
 
   if (primaryCatalyst) {
     const counterClause = getCounterCatalystClause({
@@ -1901,7 +1928,7 @@ function explainMove(
     });
     const catalyst = formatCatalystReason(primaryCatalyst.reason);
 
-    if (primaryCatalyst.reasonPriority >= 8) {
+    if (primaryCatalyst.reasonPriority >= 8 && Math.abs(primaryCatalyst.priceShock) >= 0.006) {
       return `${ticker} ${direction} after ${catalyst} became the main market catalyst${counterClause}${sourceClause}.`;
     }
   }
@@ -2034,6 +2061,18 @@ function explainRelativeMove(ticker: string, dailyChangePercent: number, hasMome
   }
 
   return `${ticker} moved as the market repriced relative momentum across active artists.`;
+}
+
+function explainAudienceScaleMove(ticker: string, dailyChangePercent: number) {
+  if (dailyChangePercent > 0.01) {
+    return `${ticker} moved higher as its quote converged toward longer-term audience scale.`;
+  }
+
+  if (dailyChangePercent < -0.01) {
+    return `${ticker} moved lower as its quote converged toward longer-term audience scale.`;
+  }
+
+  return `${ticker} held near its prior close after audience-scale calibration.`;
 }
 
 function getCategoryDailyCap(category: ArtistCategory) {

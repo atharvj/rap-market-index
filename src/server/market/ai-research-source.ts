@@ -1,3 +1,4 @@
+import { get as httpsGet } from "node:https";
 import { clamp } from "@/lib/pricing";
 import type { MarketUpdateArtist } from "@/server/market/daily-update";
 import { buildDefaultGdeltQuery } from "@/server/market/artist-text-identifiers";
@@ -36,6 +37,10 @@ type AiResearchResponseEvent = {
   summary?: unknown;
   whyItMatters?: unknown;
   sentimentScore?: unknown;
+  fanSentimentScore?: unknown;
+  criticSentimentScore?: unknown;
+  sentimentAgreement?: unknown;
+  fanReactionEvidenceCount?: unknown;
   impactScore?: unknown;
   confidence?: unknown;
   sourceType?: unknown;
@@ -45,6 +50,7 @@ type AiResearchResponseEvent = {
   supportingMediaType?: unknown;
   relatedArtistNames?: unknown;
   corroboratingSourceCount?: unknown;
+  corroboratingSourceUrls?: unknown;
   publicReactionConfirmed?: unknown;
   factualClaimConfirmed?: unknown;
   artistRole?: unknown;
@@ -69,7 +75,7 @@ type GroqChatResponse = {
 type GroqExecutedTool = {
   type?: string;
   name?: string;
-  search_results?: GroqSearchResult[];
+  search_results?: GroqSearchResult[] | { results?: GroqSearchResult[] };
   results?: GroqSearchResult[];
 };
 
@@ -79,6 +85,15 @@ type GroqSearchResult = {
   content?: string;
   published_date?: string;
   score?: number;
+};
+
+type MusicBrainzArtistIdentity = {
+  name?: unknown;
+  disambiguation?: unknown;
+  aliases?: Array<{
+    name?: unknown;
+    type?: unknown;
+  }>;
 };
 
 export type AiResearchMarketEvents = {
@@ -95,9 +110,9 @@ const REQUEST_ERROR = "request_error";
 const DEFAULT_MODEL = "groq/compound-mini";
 const DEFAULT_LOOKBACK_DAYS = 14;
 const DEFAULT_MAX_EVENTS_PER_ARTIST = 1;
-const DEFAULT_DELAY_MS = 2100;
+const DEFAULT_DELAY_MS = 12000;
 const DEFAULT_TIMEOUT_MS = 25000;
-const MAX_COMPLETION_TOKENS = 420;
+const MAX_COMPLETION_TOKENS = 480;
 
 const EVENT_TYPES = new Set<MarketEvent["eventType"]>([
   "release",
@@ -122,6 +137,7 @@ const LOW_VALUE_DOMAINS = new Set([
 const VIDEO_ONLY_DOMAINS = new Set(["youtube.com", "youtu.be", "music.youtube.com"]);
 
 const LARGE_MODEL_HINTS = ["120b", "70b", "405b"];
+const musicBrainzIdentityCache = new Map<string, Promise<string | null>>();
 
 export async function collectAiResearchMarketEvents({
   artists,
@@ -156,8 +172,15 @@ export async function collectAiResearchMarketEvents({
       await sleep(delayMs);
     }
 
-    const query = buildResearchQuery(artist, externalIds[artist.id]);
-    const result = await fetchAiResearchEvents({
+    const artistExternalIds = externalIds[artist.id];
+    const identityContext = await loadMusicBrainzIdentityContext({
+      musicbrainzId: artistExternalIds?.musicbrainzId,
+      artistName: artist.name,
+      timeoutMs: Math.min(timeoutMs, 6000)
+    });
+    const query = buildResearchQuery(artist, artistExternalIds, identityContext);
+    let compactMode = false;
+    let result = await fetchAiResearchEvents({
       provider,
       apiKey: cleanApiKey,
       model: resolvedModel,
@@ -169,6 +192,40 @@ export async function collectAiResearchMarketEvents({
       timeoutMs,
       fetchImpl
     });
+
+    if (!result.ok && isRequestTooLargeError(result.error)) {
+      compactMode = true;
+      result = await fetchAiResearchEvents({
+        provider,
+        apiKey: cleanApiKey,
+        model: resolvedModel,
+        artist,
+        runDate,
+        query,
+        lookbackDays,
+        maxEventsPerArtist: 1,
+        timeoutMs,
+        fetchImpl,
+        compactMode
+      });
+    }
+
+    if (!result.ok && isRateLimitError(result.error)) {
+      await sleep(getRateLimitRetryDelayMs(result.error));
+      result = await fetchAiResearchEvents({
+        provider,
+        apiKey: cleanApiKey,
+        model: resolvedModel,
+        artist,
+        runDate,
+        query,
+        lookbackDays,
+        maxEventsPerArtist,
+        timeoutMs,
+        fetchImpl,
+        compactMode
+      });
+    }
 
     if (!result.ok) {
       warnings.push(`${artist.ticker}: AI research failed: ${result.error}`);
@@ -210,6 +267,22 @@ export async function collectAiResearchMarketEvents({
         model: resolvedModel,
         query,
         returnedCandidateCount: result.events.length,
+        returnedCandidates: result.events.slice(0, 4).map((event) => ({
+          title: getString(event.title),
+          eventDate: getString(event.eventDate),
+          eventType: getString(event.eventType),
+          sourceName: getString(event.sourceName),
+          sourceUrl: getString(event.sourceUrl),
+          evidenceLevel: getString(event.evidenceLevel),
+          confidence: getOptionalNumber(event.confidence),
+          impactScore: getOptionalNumber(event.impactScore),
+          fanSentimentScore: getOptionalNumber(event.fanSentimentScore),
+          criticSentimentScore: getOptionalNumber(event.criticSentimentScore),
+          fanReactionEvidenceCount: getOptionalNumber(event.fanReactionEvidenceCount),
+          publicReactionConfirmed: getBoolean(event.publicReactionConfirmed),
+          corroboratingSourceCount: getOptionalNumber(event.corroboratingSourceCount),
+          riskFlags: Array.isArray(event.riskFlags) ? event.riskFlags.slice(0, 8) : []
+        })),
         acceptedEventCount: uniqueEvents.length,
         executedToolCount: result.executedToolCount,
         searchResultCount: result.searchResults.length,
@@ -274,7 +347,8 @@ async function fetchAiResearchEvents({
   lookbackDays,
   maxEventsPerArtist,
   timeoutMs,
-  fetchImpl
+  fetchImpl,
+  compactMode = false
 }: {
   provider: "groq";
   apiKey: string;
@@ -286,6 +360,7 @@ async function fetchAiResearchEvents({
   maxEventsPerArtist: number;
   timeoutMs: number;
   fetchImpl: typeof fetch;
+  compactMode?: boolean;
 }): Promise<
   | { ok: true; events: AiResearchResponseEvent[]; searchResults: GroqSearchResult[]; executedToolCount: number }
   | { ok: false; error: string }
@@ -306,30 +381,39 @@ async function fetchAiResearchEvents({
       signal: controller.signal,
       headers: {
         authorization: `Bearer ${apiKey}`,
-        "content-type": "application/json"
+        "content-type": "application/json",
+        "Groq-Model-Version": "2025-07-23"
       },
       body: JSON.stringify({
         model,
         temperature: 0,
-        max_completion_tokens: MAX_COMPLETION_TOKENS,
+        max_completion_tokens: compactMode ? 320 : MAX_COMPLETION_TOKENS,
+        compound_custom: {
+          tools: {
+            enabled_tools: ["web_search"]
+          }
+        },
         search_settings: {
           exclude_domains: ["azlyrics.com", "genius.com", "songmeanings.com"]
         },
         messages: [
           {
             role: "system",
-            content:
-              "Return JSON only. Find current source-backed rap market catalysts. Never invent facts or URLs. If no public source supports a meaningful event, return {\"events\":[]}. Reject low-view uploads, generic fan praise, private pages, sarcasm, jokes, memes, and old items."
+            content: compactMode
+              ? "Return compact JSON only. Use web evidence; never invent facts or URLs. Return {\"events\":[]} when evidence is weak."
+              : "Return JSON only. Find current source-backed rap market catalysts. Never invent facts or URLs. If no public source supports a meaningful event, return {\"events\":[]}. Separate critic opinion from fan reception. Reject low-view uploads, generic fan praise, private pages, sarcasm, jokes, memes, coordinated brigading, and old items."
           },
           {
             role: "user",
-            content: buildResearchPrompt({
-              artist,
-              runDate,
-              query,
-              lookbackDays,
-              maxEventsPerArtist
-            })
+            content: compactMode
+              ? buildCompactResearchPrompt({ artist, runDate, query, lookbackDays })
+              : buildResearchPrompt({
+                  artist,
+                  runDate,
+                  query,
+                  lookbackDays,
+                  maxEventsPerArtist
+                })
           }
         ]
       })
@@ -397,11 +481,36 @@ function buildResearchPrompt({
 }) {
   return [
     `Artist: ${artist.name} (${artist.ticker}). Run date: ${runDate}. Window: ${lookbackDays} days.`,
-    `Search context: ${query}. Return at most ${maxEventsPerArtist} source-backed events.`,
+    `Verified identity context: ${query}. Return at most ${maxEventsPerArtist} source-backed events.`,
+    "Run separate concise web searches for: (1) artist + latest release/news, (2) newest project title + review/reception, and (3) artist or project + fan reaction/community. Do not paste every topic into one search query.",
     "Use only catalysts that can move price: album/project/single/feature, review/reception, backlash/legal/health, viral performance/snippet, chart milestone, or clear decline.",
     "If many tracks dropped together, report the project, not one random track. Social/community items need factual confirmation and public reaction.",
+    "For releases and reviews, actively search for reception using the release title plus fan reaction, Reddit, review, and community discussion terms. Keep fanSentimentScore separate from criticSentimentScore. A critic score is not fan consensus, and comments on the artist's own channel are biased evidence.",
+    "Set publicReactionConfirmed true only when at least two independent, accessible sources support the same direction. Put every corroborating URL in corroboratingSourceUrls; the application verifies those URLs against your actual web-search results. Count only those sources in fanReactionEvidenceCount. Detect sarcasm, stan brigading, recycled posts, and disagreement; put risks in riskFlags.",
+    "Use sentimentAgreement=agree when critics and fans align, mixed when reception is divided, disagree when they clearly diverge, or unknown. Scale reach relative to the artist: a scene-wide underground event can matter without being mainstream.",
+    "Keep title, summary, and whyItMatters concise so the complete JSON fits without truncation.",
     "Set artistRole to primary only when this artist owns or is the main subject of the event, featured when they are a credited guest/collaborator, and mentioned when they are merely named. Never call another artist's project this artist's release.",
-    "JSON shape: {\"events\":[{\"title\":\"headline\",\"eventDate\":\"YYYY-MM-DD\",\"eventType\":\"release|review|news|controversy|award|tour|viral\",\"sourceName\":\"source\",\"sourceUrl\":\"https://...\",\"summary\":\"fact\",\"whyItMatters\":\"market reason\",\"sentimentScore\":0,\"impactScore\":0,\"confidence\":0.0,\"artistRole\":\"primary|featured|mentioned\",\"sourceType\":\"music_publication|mainstream_news|review|official|community|social|video\",\"evidenceLevel\":\"confirmed|reported|rumor|low_signal\",\"reachScope\":\"underground|scene|broad|mainstream\",\"supportingMediaUrl\":\"\",\"supportingMediaType\":\"none\",\"relatedArtistNames\":[],\"corroboratingSourceCount\":1,\"publicReactionConfirmed\":false,\"factualClaimConfirmed\":true,\"riskFlags\":[]}]}"
+    "JSON shape: {\"events\":[{\"title\":\"headline\",\"eventDate\":\"YYYY-MM-DD\",\"eventType\":\"release|review|news|controversy|award|tour|viral\",\"sourceName\":\"source\",\"sourceUrl\":\"https://...\",\"summary\":\"fact\",\"whyItMatters\":\"market reason\",\"sentimentScore\":0,\"fanSentimentScore\":0,\"criticSentimentScore\":0,\"sentimentAgreement\":\"agree|mixed|disagree|unknown\",\"fanReactionEvidenceCount\":0,\"impactScore\":0,\"confidence\":0.0,\"artistRole\":\"primary|featured|mentioned\",\"sourceType\":\"music_publication|mainstream_news|review|official|community|social|video\",\"evidenceLevel\":\"confirmed|reported|rumor|low_signal\",\"reachScope\":\"underground|scene|broad|mainstream\",\"supportingMediaUrl\":\"\",\"supportingMediaType\":\"none\",\"relatedArtistNames\":[],\"corroboratingSourceUrls\":[\"https://...\"],\"corroboratingSourceCount\":1,\"publicReactionConfirmed\":false,\"factualClaimConfirmed\":true,\"riskFlags\":[]}]}"
+  ].join("\n");
+}
+
+function buildCompactResearchPrompt({
+  artist,
+  runDate,
+  query,
+  lookbackDays
+}: {
+  artist: MarketUpdateArtist;
+  runDate: string;
+  query: string;
+  lookbackDays: number;
+}) {
+  return [
+    `Find one meaningful, source-backed catalyst for ${artist.name} (${artist.ticker}) in the ${lookbackDays} days through ${runDate}. Verified identity terms: ${query}.`,
+    "Use separate short web searches for latest release/news and for that release's review or fan reaction; do not combine every topic into one query.",
+    "Prioritize the newest release or EP and its fan/critic reception, then major news, controversy, charts, tours, or viral performances.",
+    "Require a real accessible source URL. Search the newest release title with fan reaction, Reddit, review, and community terms. Fan sentiment needs two independent sources returned by web search; list them in corroboratingSourceUrls, otherwise set publicReactionConfirmed false and fanReactionEvidenceCount 0. Reject rumors, sarcasm, private posts, and low-view uploads.",
+    "Return compact JSON: {\"events\":[{\"title\":\"\",\"eventDate\":\"YYYY-MM-DD\",\"eventType\":\"release|review|news|controversy|award|tour|viral\",\"sourceName\":\"\",\"sourceUrl\":\"https://\",\"summary\":\"\",\"sentimentScore\":0,\"fanSentimentScore\":0,\"criticSentimentScore\":0,\"sentimentAgreement\":\"agree|mixed|disagree|unknown\",\"fanReactionEvidenceCount\":0,\"impactScore\":0,\"confidence\":0.0,\"artistRole\":\"primary|featured|mentioned\",\"sourceType\":\"music_publication|mainstream_news|review|official|community|social|video\",\"evidenceLevel\":\"confirmed|reported|rumor|low_signal\",\"reachScope\":\"underground|scene|broad|mainstream\",\"corroboratingSourceUrls\":[\"https://\"],\"corroboratingSourceCount\":1,\"publicReactionConfirmed\":false,\"factualClaimConfirmed\":true,\"riskFlags\":[]}]}."
   ].join("\n");
 }
 
@@ -448,11 +557,39 @@ function normalizeAiResearchEvent({
     allowLowTierRelease: true
   });
   const resolvedEventType = eventType ?? classification?.eventType ?? null;
-  const rawSentimentScore = clamp(
-    getNumber(value.sentimentScore, classification?.sentimentScore ?? 0),
-    -100,
-    100
+  const claimedCorroboratingSourceCount = clamp(
+    Math.round(getNumber(value.corroboratingSourceCount, 1)),
+    0,
+    12
   );
+  const claimedFanReactionEvidenceCount = clamp(
+    Math.round(getNumber(value.fanReactionEvidenceCount, 0)),
+    0,
+    20
+  );
+  const corroboratingSourceUrls = normalizeEvidenceUrls(value.corroboratingSourceUrls);
+  const verifiedCorroboratingSources = getVerifiedIndependentSources(
+    [sourceUrl, ...corroboratingSourceUrls],
+    searchResults
+  );
+  const corroboratingSourceCount = verifiedCorroboratingSources.length;
+  const fanReactionEvidenceCount = Math.min(
+    claimedFanReactionEvidenceCount,
+    corroboratingSourceCount
+  );
+  const publicReactionConfirmed =
+    getBoolean(value.publicReactionConfirmed) && fanReactionEvidenceCount >= 2;
+  const fanSentimentScore = getOptionalNumber(value.fanSentimentScore);
+  const criticSentimentScore = getOptionalNumber(value.criticSentimentScore);
+  const sentimentAgreement = normalizeSentimentAgreement(getString(value.sentimentAgreement));
+  const rawSentimentScore = resolveEvidenceWeightedSentiment({
+    aggregateSentiment: getNumber(value.sentimentScore, classification?.sentimentScore ?? 0),
+    fanSentiment: fanSentimentScore,
+    criticSentiment: criticSentimentScore,
+    publicReactionConfirmed,
+    fanReactionEvidenceCount,
+    sentimentAgreement
+  });
   const rawImpactScore = clamp(
     getNumber(value.impactScore, classification?.impactScore ?? rawSentimentScore),
     -100,
@@ -465,8 +602,6 @@ function normalizeAiResearchEvent({
   const riskFlags = Array.isArray(value.riskFlags)
     ? value.riskFlags.map((item) => getString(item)).filter((item): item is string => Boolean(item))
     : [];
-  const corroboratingSourceCount = clamp(Math.round(getNumber(value.corroboratingSourceCount, 1)), 0, 12);
-  const publicReactionConfirmed = getBoolean(value.publicReactionConfirmed);
   const factualClaimConfirmed = getBoolean(value.factualClaimConfirmed);
   const artistRole = normalizeArtistRole(getString(value.artistRole), title, artist.name);
 
@@ -538,7 +673,15 @@ function normalizeAiResearchEvent({
       whyItMatters,
       relatedArtistNames,
       corroboratingSourceCount,
+      claimedCorroboratingSourceCount,
+      corroboratingSourceUrls,
+      verifiedCorroboratingSourceUrls: verifiedCorroboratingSources.map((source) => source.url),
       publicReactionConfirmed,
+      fanReactionEvidenceCount,
+      claimedFanReactionEvidenceCount,
+      fanSentimentScore,
+      criticSentimentScore,
+      sentimentAgreement,
       factualClaimConfirmed,
       riskFlags,
       executedToolCount,
@@ -646,9 +789,58 @@ function hasHighRiskAiFlags(riskFlags: string[]) {
       "parody",
       "satire",
       "copypasta",
-      "bot"
+      "bot",
+      "brigad",
+      "coordinated",
+      "astroturf"
     ].some((term) => normalized.includes(term));
   });
+}
+
+function normalizeSentimentAgreement(value: string | null) {
+  const normalized = normalizeLabel(value);
+
+  if (normalized === "agree" || normalized === "mixed" || normalized === "disagree") {
+    return normalized;
+  }
+
+  return "unknown";
+}
+
+function resolveEvidenceWeightedSentiment({
+  aggregateSentiment,
+  fanSentiment,
+  criticSentiment,
+  publicReactionConfirmed,
+  fanReactionEvidenceCount,
+  sentimentAgreement
+}: {
+  aggregateSentiment: number;
+  fanSentiment: number | null;
+  criticSentiment: number | null;
+  publicReactionConfirmed: boolean;
+  fanReactionEvidenceCount: number;
+  sentimentAgreement: string;
+}) {
+  const confirmedFanSentiment =
+    publicReactionConfirmed && fanReactionEvidenceCount >= 2 && fanSentiment !== null
+      ? clamp(fanSentiment, -100, 100)
+      : null;
+  const cleanCriticSentiment = criticSentiment === null ? null : clamp(criticSentiment, -100, 100);
+  let resolved = clamp(aggregateSentiment, -100, 100);
+
+  if (confirmedFanSentiment !== null && cleanCriticSentiment !== null) {
+    resolved = confirmedFanSentiment * 0.65 + cleanCriticSentiment * 0.35;
+  } else if (confirmedFanSentiment !== null) {
+    resolved = confirmedFanSentiment;
+  } else if (cleanCriticSentiment !== null) {
+    resolved = cleanCriticSentiment;
+  }
+
+  const disagreementMultiplier =
+    sentimentAgreement === "disagree" ? 0.55 : sentimentAgreement === "mixed" ? 0.72 : 1;
+
+  return clamp(resolved * disagreementMultiplier, -100, 100);
 }
 
 function createObservation(
@@ -670,8 +862,145 @@ function createObservation(
   };
 }
 
-function buildResearchQuery(artist: MarketUpdateArtist, externalIds?: ArtistExternalIds) {
-  return externalIds?.gdeltQuery?.trim() || buildDefaultGdeltQuery(artist.name);
+function buildResearchQuery(
+  artist: MarketUpdateArtist,
+  externalIds?: ArtistExternalIds,
+  identityContext?: string | null
+) {
+  const identityQuery = externalIds?.gdeltQuery?.trim() || buildDefaultGdeltQuery(artist.name);
+  const verifiedIdentity = identityContext ? ` ${identityContext}` : "";
+
+  return `${identityQuery}${verifiedIdentity}`;
+}
+
+async function loadMusicBrainzIdentityContext({
+  musicbrainzId,
+  artistName,
+  timeoutMs
+}: {
+  musicbrainzId?: string;
+  artistName: string;
+  timeoutMs: number;
+}) {
+  const id = musicbrainzId?.trim().toLowerCase();
+
+  if (!id || !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(id)) {
+    return null;
+  }
+
+  const cached = musicBrainzIdentityCache.get(id);
+
+  if (cached) {
+    return cached;
+  }
+
+  const request = fetchMusicBrainzIdentityContext({
+    musicbrainzId: id,
+    artistName,
+    timeoutMs
+  });
+  musicBrainzIdentityCache.set(id, request);
+  return request;
+}
+
+async function fetchMusicBrainzIdentityContext({
+  musicbrainzId,
+  artistName,
+  timeoutMs
+}: {
+  musicbrainzId: string;
+  artistName: string;
+  timeoutMs: number;
+}) {
+  try {
+    const url = new URL(`https://musicbrainz.org/ws/2/artist/${musicbrainzId}`);
+    url.searchParams.set("fmt", "json");
+    url.searchParams.set("inc", "aliases");
+    const value = await fetchMusicBrainzArtistIdentity(url, timeoutMs);
+
+    if (!value) {
+      return null;
+    }
+    const normalizedArtistName = normalizeIdentityTerm(artistName);
+    const disambiguation = getString(value.disambiguation);
+    const aliases = (value.aliases ?? [])
+      .map((alias) => ({
+        name: getString(alias.name),
+        type: normalizeLabel(getString(alias.type))
+      }))
+      .filter((alias): alias is { name: string; type: string } => Boolean(alias.name))
+      .filter((alias) => normalizeIdentityTerm(alias.name) !== normalizedArtistName)
+      .filter((alias) => /^[\x20-\x7e]+$/.test(alias.name))
+      .sort((first, second) => getIdentityAliasPriority(second.type) - getIdentityAliasPriority(first.type))
+      .slice(0, 2)
+      .map((alias) => `"${alias.name.replaceAll('"', "")}"`);
+    const terms = [disambiguation, ...aliases].filter((term): term is string => Boolean(term));
+
+    return terms.length ? terms.join(" ") : null;
+  } catch {
+    return null;
+  }
+}
+
+function fetchMusicBrainzArtistIdentity(url: URL, timeoutMs: number) {
+  return new Promise<MusicBrainzArtistIdentity | null>((resolve) => {
+    const request = httpsGet(
+      url,
+      {
+        headers: {
+          accept: "application/json",
+          "user-agent": "RapMarketIndex/1.0 (https://rap-market-index.vercel.app)"
+        }
+      },
+      (response) => {
+        if (response.statusCode !== 200) {
+          response.resume();
+          resolve(null);
+          return;
+        }
+
+        const chunks: Buffer[] = [];
+        let byteLength = 0;
+
+        response.on("data", (chunk: Buffer) => {
+          byteLength += chunk.length;
+
+          if (byteLength > 100_000) {
+            request.destroy(new Error("MusicBrainz identity response was too large."));
+            return;
+          }
+
+          chunks.push(chunk);
+        });
+        response.on("end", () => {
+          try {
+            resolve(JSON.parse(Buffer.concat(chunks).toString("utf8")) as MusicBrainzArtistIdentity);
+          } catch {
+            resolve(null);
+          }
+        });
+      }
+    );
+
+    request.setTimeout(timeoutMs, () => request.destroy(new Error("MusicBrainz identity request timed out.")));
+    request.on("error", () => resolve(null));
+  });
+}
+
+function normalizeIdentityTerm(value: string) {
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, "");
+}
+
+function getIdentityAliasPriority(type: string) {
+  if (type === "artist_name") {
+    return 3;
+  }
+
+  if (type === "legal_name") {
+    return 2;
+  }
+
+  return 1;
 }
 
 function normalizeAiResearchModel(value: string | undefined) {
@@ -714,7 +1043,11 @@ function parseJsonObject(value: string) {
 
 function normalizeGroqSearchResults(executedTools: GroqExecutedTool[]) {
   const searchResults = executedTools.flatMap((tool) => {
-    const results = Array.isArray(tool.search_results) ? tool.search_results : tool.results;
+    const results = Array.isArray(tool.search_results)
+      ? tool.search_results
+      : tool.search_results && typeof tool.search_results === "object" && Array.isArray(tool.search_results.results)
+        ? tool.search_results.results
+        : tool.results;
 
     return Array.isArray(results) ? results : [];
   });
@@ -811,6 +1144,57 @@ function hasSourceUrlInSearchResults(sourceUrl: string | null, searchResults: Gr
 
     return false;
   });
+}
+
+function normalizeEvidenceUrls(value: unknown) {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return Array.from(
+    new Set(
+      value
+        .map((item) => getString(item))
+        .filter((item): item is string => Boolean(item && isSafeHttpUrl(item)))
+    )
+  ).slice(0, 8);
+}
+
+function getVerifiedIndependentSources(urls: Array<string | null>, searchResults: GroqSearchResult[]) {
+  const domains = new Set<string>();
+  const verified: Array<{ domain: string; url: string }> = [];
+
+  for (const candidateUrl of urls) {
+    if (!candidateUrl || !isSafeHttpUrl(candidateUrl)) {
+      continue;
+    }
+
+    const candidateKey = normalizeUrlForComparison(candidateUrl);
+    const matchingResult = searchResults.find((result) => {
+      if (!result.url) {
+        return false;
+      }
+
+      const resultKey = normalizeUrlForComparison(result.url);
+
+      return resultKey === candidateKey || resultKey.includes(candidateKey) || candidateKey.includes(resultKey);
+    });
+
+    if (!matchingResult?.url) {
+      continue;
+    }
+
+    const domain = normalizeDomain(undefined, matchingResult.url);
+
+    if (!domain || domains.has(domain)) {
+      continue;
+    }
+
+    domains.add(domain);
+    verified.push({ domain, url: matchingResult.url });
+  }
+
+  return verified;
 }
 
 function getSupportingSearchResults(sourceUrl: string | null, searchResults: GroqSearchResult[]) {
@@ -972,6 +1356,12 @@ function getNumber(value: unknown, fallback: number) {
   return fallback;
 }
 
+function getOptionalNumber(value: unknown) {
+  const parsed = getNumber(value, Number.NaN);
+
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
 function getBoolean(value: unknown) {
   if (typeof value === "boolean") {
     return value;
@@ -1019,4 +1409,29 @@ function sleep(ms: number) {
   return new Promise((resolve) => {
     setTimeout(resolve, ms);
   });
+}
+
+function isRateLimitError(message: string) {
+  const normalized = message.toLowerCase();
+
+  return normalized.includes("rate limit") || normalized.includes("too many requests") || normalized.includes("http 429");
+}
+
+function isRequestTooLargeError(message: string) {
+  const normalized = message.toLowerCase();
+
+  return normalized.includes("request entity too large") || normalized.includes("request_too_large") || normalized.includes("http 413");
+}
+
+function getRateLimitRetryDelayMs(message: string) {
+  const match = message.match(/try again in\s+([\d.]+)\s*(ms|s)/i);
+
+  if (!match) {
+    return 16000;
+  }
+
+  const value = Number(match[1]);
+  const milliseconds = match[2].toLowerCase() === "ms" ? value : value * 1000;
+
+  return clamp(Math.ceil(milliseconds + 1250), 5000, 30000);
 }

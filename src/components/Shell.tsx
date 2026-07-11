@@ -25,7 +25,7 @@ const navItems = [
 export function Shell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { portfolioValue, state, gainPercent, isAdminUser, avatarUrl, marketReady } = useGame();
+  const { portfolioValue, portfolioDayChange, state, isAdminUser, avatarUrl, marketReady } = useGame();
   const { session, user, signOut } = useAuth();
   const [accountOpen, setAccountOpen] = useState(false);
   const [appearanceOpen, setAppearanceOpen] = useState(false);
@@ -42,6 +42,8 @@ export function Shell({ children }: { children: React.ReactNode }) {
 
   const accountLabel =
     session && state.username && state.username !== "Demo Guest" ? state.username : user?.email?.split("@")[0] ?? "Guest";
+  const portfolioDayChangePercent =
+    portfolioValue - portfolioDayChange > 0 ? (portfolioDayChange / (portfolioValue - portfolioDayChange)) * 100 : 0;
 
   async function handleSignOut() {
     setAccountOpen(false);
@@ -102,7 +104,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
     themePreference === "system" ? `System (${resolvedTheme})` : themePreference === "dark" ? "Dark" : "Light";
 
   return (
-    <div className="min-h-screen bg-ink text-paper">
+    <div className="flex min-h-screen flex-col bg-ink text-paper">
       <header className="border-b border-line/70">
         <div className="mx-auto flex max-w-[1440px] items-center gap-4 px-4 py-4 sm:px-6 lg:px-8">
           <Link href="/" className="flex shrink-0 items-center gap-2 font-black" aria-label="RMI home">
@@ -126,7 +128,23 @@ export function Shell({ children }: { children: React.ReactNode }) {
             })}
           </nav>
 
-          <div ref={accountMenuRef} className="relative ml-auto">
+          {session ? (
+            <Link
+              href="/portfolio"
+              className="ml-auto hidden items-center gap-4 rounded-lg border border-line bg-panel px-3 py-2 text-xs hover:border-cyan lg:flex"
+              aria-label={`Portfolio ${formatCurrency(portfolioValue)}, today ${formatPercent(portfolioDayChangePercent)}`}
+            >
+              <span>
+                <span className="block text-[10px] font-bold uppercase tracking-wide text-paper/40">Portfolio</span>
+                <span className="block font-black number-tabular">{formatCurrency(portfolioValue)}</span>
+              </span>
+              <span className={portfolioDayChangePercent >= 0 ? "font-black text-mint number-tabular" : "font-black text-ember number-tabular"}>
+                {formatPercent(portfolioDayChangePercent)}
+              </span>
+            </Link>
+          ) : null}
+
+          <div ref={accountMenuRef} className={session ? "relative ml-auto lg:ml-0" : "relative ml-auto"}>
             {session ? (
               <button
                 type="button"
@@ -191,7 +209,11 @@ export function Shell({ children }: { children: React.ReactNode }) {
                 <div className="grid grid-cols-3 gap-2 border-y border-line py-3 text-xs font-bold">
                   <StatMini label="portfolio" value={formatCurrency(portfolioValue)} />
                   <StatMini label="cash" value={formatCurrency(state.cashBalance)} />
-                  <StatMini label="today" value={formatPercent(gainPercent)} tone={gainPercent >= 0 ? "good" : "bad"} />
+                  <StatMini
+                    label="today"
+                    value={formatPercent(portfolioDayChangePercent)}
+                    tone={portfolioDayChangePercent >= 0 ? "good" : "bad"}
+                  />
                 </div>
 
                 <button
@@ -230,9 +252,10 @@ export function Shell({ children }: { children: React.ReactNode }) {
         <AppearanceModal current={themePreference} onChange={chooseTheme} onClose={() => setAppearanceOpen(false)} />
       ) : null}
 
-      <main className="mx-auto w-full max-w-[1440px] px-4 py-8 sm:px-6 lg:px-8">
+      <main className="mx-auto w-full max-w-[1440px] flex-1 px-4 py-8 sm:px-6 lg:px-8">
         {marketReady ? children : <MarketLoadingState />}
       </main>
+      <SiteFooter />
     </div>
   );
 }
@@ -260,19 +283,80 @@ function MarketLoadingState() {
 
 function MarketTape({ artists }: { artists: Artist[] }) {
   return (
-    <div className="flex min-h-10 border-t border-line/70 bg-panelSoft/45" aria-label="Current RMI market prices">
-      <Link
-        href="/markets"
-        className="z-10 flex shrink-0 items-center gap-2 border-r border-line bg-panelSoft px-4 text-xs font-black sm:px-6"
-      >
-        <span className="h-2 w-2 rounded-full bg-mint" aria-hidden="true" />
-        RMI Market
-      </Link>
-      <div className="market-tape-viewport min-w-0 flex-1 overflow-hidden">
-        <div className="market-tape-track flex h-full w-max items-center">
-          <MarketTapeGroup artists={artists} />
-          <MarketTapeGroup artists={artists} duplicate />
+    <div className="border-t border-line/70 bg-panelSoft/45" aria-label="Current RMI market prices">
+      <div className="mx-auto flex min-h-10 max-w-[1440px] px-4 sm:px-6 lg:px-8">
+        <Link
+          href="/markets"
+          className="z-10 flex shrink-0 items-center gap-2 bg-panelSoft/90 pr-4 text-xs font-black"
+        >
+          <span className="h-2 w-2 rounded-full bg-mint" aria-hidden="true" />
+          RMI Market
+        </Link>
+        <div className="market-tape-viewport min-w-0 flex-1 overflow-hidden">
+          <div className="market-tape-track flex h-full w-max items-center">
+            <MarketTapeGroup artists={artists} />
+            <MarketTapeGroup artists={artists} duplicate />
+          </div>
         </div>
+      </div>
+    </div>
+  );
+}
+
+function SiteFooter() {
+  return (
+    <footer className="mt-10 border-t border-line bg-panelSoft/55">
+      <div className="mx-auto grid max-w-[1440px] gap-8 px-4 py-9 sm:grid-cols-2 sm:px-6 lg:grid-cols-[1.4fr_0.7fr_0.7fr_1fr] lg:px-8">
+        <div>
+          <div className="flex items-center gap-2 font-black">
+            <SlidersHorizontal className="h-4 w-4 text-cyan" aria-hidden="true" />
+            RMI
+          </div>
+          <p className="mt-3 max-w-sm text-sm leading-6 text-paper/55">
+            A fantasy market for tracking artist momentum, verified catalysts, and portfolio performance.
+          </p>
+          <p className="mt-3 text-xs leading-5 text-paper/40">No real money, cash-out, or artist affiliation.</p>
+        </div>
+        <FooterColumn
+          title="Market"
+          links={[
+            ["Markets", "/markets"],
+            ["News", "/news"],
+            ["Scout", "/scout"]
+          ]}
+        />
+        <FooterColumn
+          title="Compete"
+          links={[
+            ["Portfolio", "/portfolio"],
+            ["Watchlist", "/watchlist"],
+            ["Rankings", "/leaderboard"]
+          ]}
+        />
+        <div>
+          <h2 className="text-xs font-black uppercase tracking-[0.14em] text-paper/45">About RMI</h2>
+          <p className="mt-3 text-sm leading-6 text-paper/55">
+            Quotes update from audience momentum, media coverage, verified events, and market activity.
+          </p>
+          <Link href="/about" className="mt-3 inline-flex text-sm font-black text-cyan hover:text-cyan/75">
+            How the market works
+          </Link>
+        </div>
+      </div>
+    </footer>
+  );
+}
+
+function FooterColumn({ title, links }: { title: string; links: Array<[string, string]> }) {
+  return (
+    <div>
+      <h2 className="text-xs font-black uppercase tracking-[0.14em] text-paper/45">{title}</h2>
+      <div className="mt-3 grid gap-2 text-sm font-bold text-paper/60">
+        {links.map(([label, href]) => (
+          <Link key={href} href={href} className="hover:text-cyan">
+            {label}
+          </Link>
+        ))}
       </div>
     </div>
   );
@@ -286,7 +370,7 @@ function MarketTapeGroup({ artists, duplicate = false }: { artists: Artist[]; du
           key={`${duplicate ? "copy" : "primary"}-${artist.id}`}
           href={`/artists/${artist.id}`}
           tabIndex={duplicate ? -1 : undefined}
-          className="flex h-full shrink-0 items-center gap-2 border-r border-line/60 px-4 text-xs hover:bg-panelSoft"
+          className="flex h-full shrink-0 items-center gap-2 px-4 text-xs hover:bg-panelSoft"
         >
           <span className="font-black text-cyan">{artist.ticker}</span>
           <span className="number-tabular text-paper/65">{formatCurrency(artist.currentPrice)}</span>

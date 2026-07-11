@@ -127,36 +127,11 @@ export function mergeEvents(
 ) {
   const merged: Record<string, MarketEvent[]> = {};
 
-  for (const [artistId, events] of Object.entries(first)) {
-    merged[artistId] = [];
-    const existing = new Set((merged[artistId] ?? []).map(getEventKey));
-
-    for (const event of events) {
-      const key = getEventKey(event);
-
-      if (existing.has(key)) {
-        continue;
-      }
-
-      existing.add(key);
-      merged[artistId].push(event);
-    }
-  }
-
-  for (const [artistId, events] of Object.entries(second)) {
-    const existing = new Set((merged[artistId] ?? []).map(getEventKey));
-    merged[artistId] ??= [];
-
-    for (const event of events) {
-      const key = getEventKey(event);
-
-      if (existing.has(key)) {
-        continue;
-      }
-
-      existing.add(key);
-      merged[artistId].push(event);
-    }
+  for (const artistId of new Set([...Object.keys(first), ...Object.keys(second)])) {
+    merged[artistId] = dedupeSemanticallyEquivalentEvents([
+      ...(first[artistId] ?? []),
+      ...(second[artistId] ?? [])
+    ]);
   }
 
   return merged;
@@ -167,7 +142,11 @@ export function flattenEvents(eventsByArtist: Record<string, MarketEvent[]>) {
 }
 
 function buildArtistEventSignal(artist: MarketUpdateArtist, runDate: string, events: MarketEvent[]) {
-  const scoredEvents = applyEventClusterCaps(events.map((event) => scoreEvent(event, runDate, artist)));
+  const uniqueEvents = dedupeSemanticallyEquivalentEvents(events);
+  const scoredEvents = applyEventClusterCaps(
+    uniqueEvents.map((event) => scoreEvent(event, runDate, artist)),
+    artist
+  );
   const totalSignal = scoredEvents.reduce((total, event) => total + event.weightedImpact, 0);
   const reviewSignal = scoredEvents
     .filter((event) => event.event.eventType === "review")
@@ -195,7 +174,8 @@ function buildArtistEventSignal(artist: MarketUpdateArtist, runDate: string, eve
     confidence: getEventSignalConfidence(scoredEvents),
     rawPayload: {
       source: "market_events",
-      eventCount: events.length,
+      eventCount: uniqueEvents.length,
+      rawEventCount: events.length,
       totalSignal,
       reviewSignal,
       releaseSignal,
@@ -507,10 +487,12 @@ function getEventProvenance(event: MarketEvent, artist: MarketUpdateArtist) {
   }
 
   if (normalizedSource === "musicbrainz_release_group") {
+    const corroborated = getRawBoolean(event.rawPayload.corroborated);
+
     return {
-      label: "release-database",
-      impactMultiplier: 1.08,
-      confidenceMultiplier: 1.06
+      label: corroborated ? "release-database-corroborated" : "release-database-metadata-only",
+      impactMultiplier: corroborated ? 0.78 : 0,
+      confidenceMultiplier: corroborated ? 0.82 : 0.2
     };
   }
 
@@ -890,6 +872,8 @@ function getAiResearchEventProvenance(event: MarketEvent, artist: MarketUpdateAr
   const reachScope = getRawString(event.rawPayload.reachScope) ?? "";
   const corroboratingSourceCount = getRawOptionalNumber(event.rawPayload.corroboratingSourceCount) ?? 1;
   const publicReactionConfirmed = getRawBoolean(event.rawPayload.publicReactionConfirmed);
+  const fanReactionEvidenceCount = getRawOptionalNumber(event.rawPayload.fanReactionEvidenceCount) ?? 0;
+  const sentimentAgreement = getRawString(event.rawPayload.sentimentAgreement) ?? "unknown";
   const factualClaimConfirmed = getRawBoolean(event.rawPayload.factualClaimConfirmed);
   const audienceMultiplier = getCommunityAudienceMultiplier(artist);
   const tierProfiles: Record<number, { impact: number; confidence: number }> = {
@@ -927,6 +911,12 @@ function getAiResearchEventProvenance(event: MarketEvent, artist: MarketUpdateAr
     ? audienceMultiplier
     : { impact: 1, confidence: 1 };
   const isSocialOrCommunity = sourceType === "social" || sourceType === "community";
+  const receptionMultiplier =
+    sentimentAgreement === "disagree"
+      ? { impact: 0.7, confidence: 0.82 }
+      : sentimentAgreement === "mixed"
+        ? { impact: 0.84, confidence: 0.9 }
+        : { impact: 1, confidence: 1 };
 
   if (hasHighRiskEvidenceFlags(event)) {
     return {
@@ -946,7 +936,10 @@ function getAiResearchEventProvenance(event: MarketEvent, artist: MarketUpdateAr
 
   if (
     isSocialOrCommunity &&
-    (!factualClaimConfirmed || (!publicReactionConfirmed && corroboratingSourceCount < 2))
+    (!factualClaimConfirmed ||
+      !publicReactionConfirmed ||
+      corroboratingSourceCount < 2 ||
+      fanReactionEvidenceCount < 2)
   ) {
     return {
       label: `ai-research-${sourceType}-needs-confirmation`,
@@ -957,16 +950,28 @@ function getAiResearchEventProvenance(event: MarketEvent, artist: MarketUpdateAr
 
   return {
     label: `ai-research-${sourceType || "source"}-${evidenceLevel}`,
-    impactMultiplier: clamp(tier.impact * evidence.impact * source.impact * reach.impact * communityLift.impact, 0.32, 1.28),
+    impactMultiplier: clamp(
+      tier.impact * evidence.impact * source.impact * reach.impact * communityLift.impact * receptionMultiplier.impact,
+      0.32,
+      1.28
+    ),
     confidenceMultiplier: clamp(
-      tier.confidence * evidence.confidence * source.confidence * reach.confidence * communityLift.confidence,
+      tier.confidence *
+        evidence.confidence *
+        source.confidence *
+        reach.confidence *
+        communityLift.confidence *
+        receptionMultiplier.confidence,
       0.5,
       1.2
     )
   };
 }
 
-function applyEventClusterCaps(scoredEvents: Array<ReturnType<typeof scoreEvent>>): ScoredMarketEvent[] {
+function applyEventClusterCaps(
+  scoredEvents: Array<ReturnType<typeof scoreEvent>>,
+  artist: MarketUpdateArtist
+): ScoredMarketEvent[] {
   const groups = scoredEvents.reduce<Record<string, Array<ReturnType<typeof scoreEvent>>>>((memo, event) => {
     const sign = event.weightedImpact < 0 ? "negative" : "positive";
     const key = `${event.event.eventType}:${event.event.eventDate}:${sign}`;
@@ -1001,7 +1006,7 @@ function applyEventClusterCaps(scoredEvents: Array<ReturnType<typeof scoreEvent>
       confirmationMultiplier: 1
     };
     const confirmedImpact = event.weightedImpact * cluster.confirmationMultiplier;
-    const eventSubtype = getEventSubtype(event.event);
+    const eventSubtype = getEventSubtype(event.event, artist);
     const shockDecayMultiplier = getEventShockDecayMultiplier({
       eventType: event.event.eventType,
       eventSubtype,
@@ -1075,6 +1080,12 @@ function getEvidenceSafetyAdjustment(event: ScoredMarketEvent) {
     };
   }
 
+  const featureAdjustment = getFeatureEvidenceAdjustment(event);
+
+  if (featureAdjustment.multiplier < 1) {
+    return featureAdjustment;
+  }
+
   if (!isSocialOrCommunity) {
     return {
       label: "not_social_evidence",
@@ -1118,6 +1129,48 @@ function getEvidenceSafetyAdjustment(event: ScoredMarketEvent) {
   return {
     label: "social_evidence_confirmed",
     multiplier: 1
+  };
+}
+
+function getFeatureEvidenceAdjustment(event: ScoredMarketEvent) {
+  if (event.eventSubtype !== "feature" && event.eventSubtype !== "major_feature") {
+    return {
+      label: "not_feature_evidence",
+      multiplier: 1
+    };
+  }
+
+  const publicReactionConfirmed = getRawBoolean(event.event.rawPayload.publicReactionConfirmed);
+  const corroboratingSourceCount = getRawOptionalNumber(event.event.rawPayload.corroboratingSourceCount) ?? 1;
+  const fanReactionEvidenceCount = getRawOptionalNumber(event.event.rawPayload.fanReactionEvidenceCount) ?? 0;
+  const reachScope = getRawString(event.event.rawPayload.reachScope) ?? "";
+  const broadReach = reachScope === "broad" || reachScope === "mainstream";
+  const sourceCount = Math.max(event.clusterSourceCount, corroboratingSourceCount);
+
+  if (publicReactionConfirmed && fanReactionEvidenceCount >= 2 && sourceCount >= 2) {
+    return {
+      label: "feature_with_confirmed_public_reaction",
+      multiplier: 1
+    };
+  }
+
+  if (broadReach && sourceCount >= 2) {
+    return {
+      label: "feature_with_broad_confirmed_reach",
+      multiplier: event.eventSubtype === "major_feature" ? 0.82 : 0.68
+    };
+  }
+
+  if (sourceCount >= 2) {
+    return {
+      label: "feature_confirmed_without_broad_reaction",
+      multiplier: event.eventSubtype === "major_feature" ? 0.62 : 0.48
+    };
+  }
+
+  return {
+    label: "feature_credit_without_reaction_confirmation",
+    multiplier: event.eventSubtype === "major_feature" ? 0.42 : 0.28
   };
 }
 
@@ -1606,7 +1659,7 @@ function normalizeOneManualEvent(
   };
 }
 
-function getEventSubtype(event: MarketEvent) {
+function getEventSubtype(event: MarketEvent, artist?: MarketUpdateArtist) {
   const rawReason =
     getRawString(event.rawPayload.classificationReason) ??
     getRawString(event.rawPayload.reason) ??
@@ -1620,6 +1673,20 @@ function getEventSubtype(event: MarketEvent) {
   }
 
   if (artistRole === "featured") {
+    return "feature";
+  }
+
+  const normalizedArtistName = artist ? normalizeEventText(artist.name) : "";
+  const titleIdentifiesArtistAsFeature =
+    normalizedArtistName &&
+    (event.eventType === "release" || event.eventType === "viral") &&
+    hasAnyTerm(text, [
+      `featuring ${normalizedArtistName}`,
+      `feat ${normalizedArtistName}`,
+      `ft ${normalizedArtistName}`
+    ]);
+
+  if (titleIdentifiesArtistAsFeature) {
     return "feature";
   }
 
@@ -2094,7 +2161,40 @@ function isMarketEventType(value: string): value is MarketEvent["eventType"] {
 }
 
 function getEventKey(event: MarketEvent) {
-  return `${event.artistId}:${event.eventType}:${event.eventDate}:${getCanonicalEventTitle(event)}`;
+  return `${event.artistId}:${event.eventDate}:${getCanonicalEventTitle(event)}`;
+}
+
+function dedupeSemanticallyEquivalentEvents(events: MarketEvent[]) {
+  const selected = new Map<string, MarketEvent>();
+
+  for (const event of events) {
+    const key = getEventKey(event);
+    const existing = selected.get(key);
+
+    if (!existing || getEventEvidencePreference(event) > getEventEvidencePreference(existing)) {
+      selected.set(key, event);
+    }
+  }
+
+  return [...selected.values()];
+}
+
+function getEventEvidencePreference(event: MarketEvent) {
+  const artistRole = getRawString(event.rawPayload.artistRole);
+  const evidenceLevel = getRawString(event.rawPayload.evidenceLevel);
+  const sourceTier = getRawOptionalNumber(event.rawPayload.sourceTier) ?? 0;
+  const corroboratingSourceCount = getRawOptionalNumber(event.rawPayload.corroboratingSourceCount) ?? 1;
+  const roleScore = artistRole === "featured" ? 80 : artistRole === "subject" ? 24 : artistRole === "mentioned" ? -80 : 0;
+  const evidenceScore = evidenceLevel === "verified" ? 18 : evidenceLevel === "reported" ? 9 : evidenceLevel === "rumor" ? -30 : 0;
+
+  return (
+    roleScore +
+    evidenceScore +
+    sourceTier * 7 +
+    corroboratingSourceCount * 5 +
+    event.confidence * 24 +
+    Math.abs(event.impactScore) * 0.12
+  );
 }
 
 function getCanonicalEventTitle(event: MarketEvent) {

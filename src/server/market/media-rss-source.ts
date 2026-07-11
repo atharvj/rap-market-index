@@ -1,11 +1,13 @@
 import type { MarketUpdateArtist } from "@/server/market/daily-update";
 import {
   hasArtistControversySubjectContext,
+  hasArtistFeatureCreditContext,
   hasArtistReleaseSubjectContext,
   hasArtistStatusSubjectContext,
   hasRequiredArtistEventDisambiguation,
   isGenericMusicListicleTitle,
-  isLowValueMarketArticleTitle
+  isLowValueMarketArticleTitle,
+  isUncorroboratedLowTierMarketClaim
 } from "@/server/market/artist-event-disambiguation";
 import { buildDefaultGdeltQuery } from "@/server/market/artist-text-identifiers";
 import {
@@ -223,13 +225,33 @@ function buildArtistEvents({
   const candidateEvents = matchedItems
     .map(({ item, titleMatchedArtist, textMatchedArtist, disambiguatedArtist }) => {
       const classificationText = `${item.title} ${item.summary}`.slice(0, 420);
-      const classification = classifyArticleEvent(classificationText, item.domain, undefined, {
+      const initialClassification = classifyArticleEvent(classificationText, item.domain, undefined, {
         allowLowTierRelease: item.feedScope === "artist_search" && (titleMatchedArtist || textMatchedArtist)
       });
 
-      if (!classification) {
+      if (!initialClassification) {
         return null;
       }
+
+      const artistRole = hasArtistFeatureCreditContext({
+        artistName: artist.name,
+        text: classificationText,
+        query
+      })
+        ? "featured"
+        : "primary";
+      const classification =
+        initialClassification.eventType === "release" && artistRole === "featured"
+          ? {
+              ...initialClassification,
+              eventType: "viral" as const,
+              sentimentScore: 30,
+              impactScore: 48,
+              confidence: Math.min(initialClassification.confidence, 0.82),
+              reason: "feature_terms",
+              releaseKind: undefined
+            }
+          : initialClassification;
 
       const sourceTier = getSourceTier(item.domain);
       const subjectMatchedArtist = hasRequiredEventSubjectContext({
@@ -276,6 +298,7 @@ function buildArtistEvents({
         textMatchedArtist,
         disambiguatedArtist,
         subjectMatchedArtist,
+        artistRole,
         sourceTier,
         classification
       };
@@ -284,7 +307,7 @@ function buildArtistEvents({
     .sort((first, second) => getEventRank(second) - getEventRank(first))
     .slice(0, maxEventsPerArtist);
 
-  const events = candidateEvents.map(({ item, titleMatchedArtist, textMatchedArtist, disambiguatedArtist, subjectMatchedArtist, sourceTier, classification }) => {
+  const events = candidateEvents.map(({ item, titleMatchedArtist, textMatchedArtist, disambiguatedArtist, subjectMatchedArtist, artistRole, sourceTier, classification }) => {
     const classificationText = `${item.title} ${item.summary}`.slice(0, 600);
     const releaseDate = getReleaseEventDate({
       text: classificationText,
@@ -328,7 +351,8 @@ function buildArtistEvents({
         titleMatchedArtist,
         textMatchedArtist,
         disambiguatedArtist,
-        subjectMatchedArtist
+        subjectMatchedArtist,
+        artistRole
       }
     };
   });
@@ -439,6 +463,15 @@ function isRelevantMediaEvent({
   classificationReason: string;
   impactScore: number;
 }) {
+  if (
+    isUncorroboratedLowTierMarketClaim({
+      sourceTier,
+      classificationReason
+    })
+  ) {
+    return false;
+  }
+
   if (sourceTier <= 0) {
     if (looksLikeCopiedMediaUploadTitle(item.title)) {
       return false;

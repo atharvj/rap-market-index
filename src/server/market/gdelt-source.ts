@@ -239,11 +239,9 @@ async function fetchGdeltArticles({
   timeoutMs: number;
   fetchImpl: typeof fetch;
 }): Promise<{ ok: true; articles: GdeltArticle[] } | { ok: false; error: string }> {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), timeoutMs);
   const url = new URL("https://api.gdeltproject.org/api/v2/doc/doc");
 
-  url.searchParams.set("query", query);
+  url.searchParams.set("query", normalizeGdeltApiQuery(query));
   url.searchParams.set("mode", "ArtList");
   url.searchParams.set("format", "json");
   url.searchParams.set("maxrecords", String(maxRecords));
@@ -251,43 +249,93 @@ async function fetchGdeltArticles({
   url.searchParams.set("startdatetime", toGdeltDateTime(shiftDate(runDate, -6), "start"));
   url.searchParams.set("enddatetime", toGdeltDateTime(runDate, "end"));
 
-  try {
-    const response = await fetchImpl(url, {
-      signal: controller.signal,
-      headers: {
-        "user-agent": "rap-market-index/0.1 market research"
-      }
-    });
-    const text = await response.text();
-
-    if (!response.ok) {
-      return {
-        ok: false,
-        error: `GDELT request failed with ${response.status}.`
-      };
-    }
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), timeoutMs);
 
     try {
-      const parsed = JSON.parse(text) as GdeltResponse;
+      const response = await fetchImpl(url, {
+        signal: controller.signal,
+        cache: "no-store",
+        headers: {
+          accept: "application/json",
+          "user-agent": "rap-market-index/0.1 market research"
+        }
+      });
+      const text = await response.text();
+
+      if (!response.ok) {
+        if (attempt === 0 && shouldRetryGdeltStatus(response.status)) {
+          await sleep(getRetryDelayMs(response.headers.get("retry-after")));
+          continue;
+        }
+
+        return {
+          ok: false,
+          error: `GDELT request failed with ${response.status}.`
+        };
+      }
+
+      try {
+        const parsed = JSON.parse(text) as GdeltResponse;
+
+        return {
+          ok: true,
+          articles: Array.isArray(parsed.articles) ? parsed.articles : []
+        };
+      } catch {
+        return {
+          ok: false,
+          error: text.slice(0, 220) || "GDELT returned a non-JSON response."
+        };
+      }
+    } catch (error) {
+      if (attempt === 0 && !isAbortError(error)) {
+        await sleep(1800);
+        continue;
+      }
 
       return {
-        ok: true,
-        articles: Array.isArray(parsed.articles) ? parsed.articles : []
-      };
-    } catch {
-      return {
         ok: false,
-        error: text.slice(0, 220) || "GDELT returned a non-JSON response."
+        error: error instanceof Error ? error.message : "GDELT request failed."
       };
+    } finally {
+      clearTimeout(timeout);
     }
-  } catch (error) {
-    return {
-      ok: false,
-      error: error instanceof Error ? error.message : "GDELT request failed."
-    };
-  } finally {
-    clearTimeout(timeout);
   }
+
+  return {
+    ok: false,
+    error: "GDELT request failed after retry."
+  };
+}
+
+export function normalizeGdeltApiQuery(query: string) {
+  const normalized = query.replace(/\s+/g, " ").trim();
+
+  if (!/\sOR\s/i.test(normalized) || (normalized.startsWith("(") && normalized.endsWith(")"))) {
+    return normalized;
+  }
+
+  return `(${normalized})`;
+}
+
+function shouldRetryGdeltStatus(status: number) {
+  return status === 408 || status === 425 || status === 429 || status >= 500;
+}
+
+function getRetryDelayMs(retryAfter: string | null) {
+  const seconds = retryAfter ? Number(retryAfter) : Number.NaN;
+
+  if (Number.isFinite(seconds) && seconds >= 0) {
+    return clamp(seconds * 1000, 1000, 8000);
+  }
+
+  return 5500;
+}
+
+function isAbortError(error: unknown) {
+  return error instanceof Error && error.name === "AbortError";
 }
 
 function createObservation(
@@ -520,6 +568,16 @@ export function classifyArticleEvent(
     return null;
   }
 
+  if (hasUnverifiedLeakDisputeSignal(lowerTitle)) {
+    return {
+      eventType: "news" as const,
+      sentimentScore: 0,
+      impactScore: 0,
+      confidence: getArticleConfidence(sourceTier, 0.62),
+      reason: "unverified_leak_dispute"
+    };
+  }
+
   if (hasAny(lowerTitle, CONTROVERSY_TERMS)) {
     return {
       eventType: "controversy" as const,
@@ -527,6 +585,16 @@ export function classifyArticleEvent(
       impactScore: clamp(Math.min(-45, toneScore - 35), -100, 10),
       confidence: getArticleConfidence(sourceTier, 0.76),
       reason: "controversy_terms"
+    };
+  }
+
+  if (hasAny(lowerTitle, POLARIZING_CONTEXT_TERMS)) {
+    return {
+      eventType: "controversy" as const,
+      sentimentScore: 0,
+      impactScore: 0,
+      confidence: getArticleConfidence(sourceTier, 0.58),
+      reason: "polarizing_context_unscored"
     };
   }
 
@@ -595,7 +663,7 @@ export function classifyArticleEvent(
     };
   }
 
-  if (hasAny(lowerTitle, AWARD_TERMS)) {
+  if (hasAwardRecognitionSignal(lowerTitle)) {
     return {
       eventType: "award" as const,
       sentimentScore: clamp(35 + Math.max(0, toneScore), -20, 85),
@@ -627,7 +695,11 @@ export function classifyArticleEvent(
     return projectRelease;
   }
 
-  if (hasAny(lowerTitle, MAJOR_FEATURE_TERMS)) {
+  if (
+    hasAny(lowerTitle, MAJOR_FEATURE_TERMS) &&
+    hasMusicFeatureContext(lowerTitle) &&
+    !hasSpeculativeFeatureContext(lowerTitle)
+  ) {
     return {
       eventType: "viral" as const,
       sentimentScore: clamp(38 + Math.max(0, toneScore * 0.6), -15, 88),
@@ -637,7 +709,11 @@ export function classifyArticleEvent(
     };
   }
 
-  if (hasAny(lowerTitle, FEATURE_TERMS)) {
+  if (
+    hasAny(lowerTitle, FEATURE_TERMS) &&
+    hasMusicFeatureContext(lowerTitle) &&
+    !hasSpeculativeFeatureContext(lowerTitle)
+  ) {
     return {
       eventType: "viral" as const,
       sentimentScore: clamp(30 + Math.max(0, toneScore * 0.6), -20, 82),
@@ -713,6 +789,13 @@ function hasDeathRumorDebunkSignal(title: string) {
 
 function hasMemorialReactionSignal(title: string) {
   return hasAny(title, MEMORIAL_REACTION_TERMS) && (hasAny(title, DEATH_CONTEXT_TERMS) || title.includes("tribute"));
+}
+
+function hasUnverifiedLeakDisputeSignal(title: string) {
+  return (
+    hasAny(title, ["alleged leak", "alleged leaks", "fake leak", "fake leaks", "song leaks"]) &&
+    hasAny(title, ["denies", "disappointed", "fake", "not legit", "slams"])
+  );
 }
 
 function buildReleaseArticleClassification(
@@ -796,6 +879,22 @@ function hasPublicReactionSignal(title: string) {
   return hasAny(title, PUBLIC_REACTION_TERMS) && hasAny(title, PUBLIC_REACTION_CONTEXT_TERMS);
 }
 
+function hasAwardRecognitionSignal(title: string) {
+  return hasAny(title, AWARD_RECOGNITION_TERMS) && !hasAny(title, LEGAL_JUDGMENT_TERMS);
+}
+
+function hasMusicFeatureContext(title: string) {
+  if (hasAny(title, NON_MUSIC_FEATURE_TERMS) && !hasAny(title, STRONG_MUSIC_FEATURE_TERMS)) {
+    return false;
+  }
+
+  return hasAny(title, STRONG_MUSIC_FEATURE_TERMS);
+}
+
+function hasSpeculativeFeatureContext(title: string) {
+  return hasAny(title, SPECULATIVE_FEATURE_TERMS) && !hasAny(title, CONFIRMED_FEATURE_TERMS);
+}
+
 function getTitleSentiment(title: string) {
   const positive = countMatches(title, POSITIVE_REVIEW_TERMS);
   const negative = countMatches(title, NEGATIVE_REVIEW_TERMS);
@@ -832,7 +931,11 @@ function hasTierDomain(domains: Set<string>, domain: string) {
 }
 
 function hasAny(value: string, terms: string[]) {
-  return terms.some((term) => value.includes(term));
+  return terms.some((term) => {
+    const escaped = term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+    return new RegExp(`(^|[^a-z0-9])${escaped}($|[^a-z0-9])`, "i").test(value);
+  });
 }
 
 export function mentionsArtist(title: string, artistName: string, query?: string) {
@@ -1037,24 +1140,33 @@ const CONTROVERSY_TERMS = [
   "boycott",
   "charged",
   "controversy",
+  "controversial",
   "criticized",
   "death",
   "dies",
   "died",
   "exposed",
-  "flag",
-  "israel flag",
+  "fans slam",
   "hospitalized",
   "injured",
   "lawsuit",
-  "palestine",
   "problematic",
   "pleads",
   "pleads guilty",
   "racist",
   "sentenced",
+  "slammed by",
   "sued",
   "trial",
+  "under fire"
+];
+
+const POLARIZING_CONTEXT_TERMS = [
+  "flag",
+  "israel flag",
+  "palestine",
+  "palestinian flag",
+  "political statement",
   "zionist"
 ];
 
@@ -1113,6 +1225,7 @@ const RELEASE_TERMS = [
   "new tape",
   "out now",
   "project out now",
+  "readies",
   "release",
   "release date",
   "released",
@@ -1180,6 +1293,7 @@ const RELEASE_ACTION_TERMS = [
   "new tape",
   "out now",
   "project out now",
+  "readies",
   "release date",
   "released",
   "releases",
@@ -1190,9 +1304,14 @@ const RELEASE_ACTION_TERMS = [
   "watch"
 ];
 const TOUR_TERMS = [
+  "adds concert date",
+  "announces concert",
   "announces tour",
+  "concert dates",
+  "concert series",
   "festival lineup",
   "headlines festival",
+  "headline tour",
   "tour dates",
   "world tour"
 ];
@@ -1206,6 +1325,24 @@ const AWARD_TERMS = [
   "nominated",
   "vmas",
   "wins"
+];
+const AWARD_RECOGNITION_TERMS = [
+  "award winner",
+  "honored",
+  "honoured",
+  "nomination",
+  "nominated",
+  "takes home",
+  "wins",
+  "won"
+];
+const LEGAL_JUDGMENT_TERMS = [
+  "court",
+  "judgment",
+  "judge",
+  "lawsuit",
+  "settlement",
+  "trial"
 ];
 const CHART_TERMS = [
   "billboard 200",
@@ -1244,6 +1381,58 @@ const FEATURE_TERMS = [
   "with future",
   "with kendrick",
   "with travis"
+];
+const STRONG_MUSIC_FEATURE_TERMS = [
+  "album",
+  "ep",
+  "feat",
+  "feat.",
+  "feature",
+  "featured on",
+  "featuring",
+  "ft",
+  "ft.",
+  "guest verse",
+  "mixtape",
+  "music video",
+  "remix",
+  "single",
+  "song",
+  "track",
+  "verse"
+];
+const NON_MUSIC_FEATURE_TERMS = [
+  "apparel",
+  "fashion campaign",
+  "google maps",
+  "magazine",
+  "print archive",
+  "shoe",
+  "sneaker",
+  "storefront"
+];
+const SPECULATIVE_FEATURE_TERMS = [
+  "calls for",
+  "hopes for",
+  "hopes to",
+  "needs",
+  "should collab",
+  "wants",
+  "wants to",
+  "would like"
+];
+const CONFIRMED_FEATURE_TERMS = [
+  "drops",
+  "feat.",
+  "featured on",
+  "featuring",
+  "ft.",
+  "new single",
+  "new song",
+  "out now",
+  "releases",
+  "remix",
+  "shares"
 ];
 const MAJOR_FEATURE_TERMS = [
   "carti feature",
@@ -1294,17 +1483,14 @@ const MAJOR_FEATURE_TERMS = [
   "with travis"
 ];
 const PERFORMANCE_TERMS = [
-  "booed",
-  "concert",
+  "brings out",
   "crowd booed",
   "crowd goes wild",
   "crowd went crazy",
-  "festival set",
-  "live performance",
-  "performs",
-  "performed",
-  "rolling loud",
-  "stage",
+  "goes viral during performance",
+  "performance goes viral",
+  "surprise guest",
+  "surprise performance",
   "viral performance"
 ];
 const SNIPPET_TERMS = [
@@ -1365,6 +1551,8 @@ const VIRAL_TERMS = [
   "viral clip"
 ];
 const DECLINE_TERMS = [
+  "booed",
+  "crowd booed",
   "dead crowd",
   "decline",
   "declines",

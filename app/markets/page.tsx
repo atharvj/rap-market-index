@@ -2,10 +2,11 @@
 
 import { ArtistAvatar } from "@/components/ArtistAvatar";
 import { useGame } from "@/components/GameProvider";
-import { ChangeText, RmiButton, RmiLineChart } from "@/components/RmiPrimitives";
+import { ArtistIdentity, ChangeText, RmiButton, RmiLineChart, RmiSection } from "@/components/RmiPrimitives";
 import { WatchlistButton } from "@/components/WatchlistButton";
-import { formatCurrency } from "@/lib/formatters";
-import { ArrowDownAZ, ArrowDownUp, ArrowUpAZ } from "lucide-react";
+import { formatCurrency, formatPercent } from "@/lib/formatters";
+import { buildMarketIndexSeries, getMarketBreadth, getSeriesChangePercent } from "@/lib/market-analytics";
+import { ArrowDown, ArrowDownAZ, ArrowUp, ArrowUpAZ } from "lucide-react";
 import Link from "next/link";
 import { useMemo, useState } from "react";
 
@@ -16,6 +17,13 @@ export default function MarketsPage() {
   const [query, setQuery] = useState("");
   const [sortKey, setSortKey] = useState<SortKey>("change");
   const [sortDescending, setSortDescending] = useState(true);
+  const marketIndex = useMemo(() => buildMarketIndexSeries(state.artists), [state.artists]);
+  const marketIndexChange = getSeriesChangePercent(marketIndex);
+  const breadth = getMarketBreadth(state.artists);
+  const leadingMovers = useMemo(
+    () => [...state.artists].sort((first, second) => Math.abs(second.dailyChangePercent) - Math.abs(first.dailyChangePercent)).slice(0, 4),
+    [state.artists]
+  );
   const artists = useMemo(() => {
     const normalized = query.trim().toLowerCase();
 
@@ -51,13 +59,49 @@ export default function MarketsPage() {
 
   return (
     <div className="space-y-5">
-      <header className="flex items-end justify-between gap-4">
+      <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1 className="text-3xl font-black">Markets</h1>
           <p className="mt-1 text-sm font-bold text-paper/70">{artists.length} artists listed</p>
         </div>
         <RmiButton href="/scout" variant="secondary">Scout artists</RmiButton>
       </header>
+
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_340px]">
+        <RmiSection
+          title="Market Overview"
+          subtitle="Equal-weight RMI index built from recorded artist quotes."
+          action={
+            <span className={marketIndexChange >= 0 ? "text-sm font-black text-mint number-tabular" : "text-sm font-black text-ember number-tabular"}>
+              {formatPercent(marketIndexChange)}
+            </span>
+          }
+        >
+          <div className="h-40 p-4">
+            <RmiLineChart data={marketIndex} positive={marketIndexChange >= 0} height={150} />
+          </div>
+        </RmiSection>
+
+        <RmiSection title="Session Breadth" subtitle="How much of the board is participating today.">
+          <div className="grid grid-cols-1 gap-2 p-4 sm:grid-cols-3 lg:grid-cols-1">
+            <BreadthRow label="Advancing" value={breadth.advancers} tone="good" />
+            <BreadthRow label="Declining" value={breadth.decliners} tone="bad" />
+            <BreadthRow label="Unchanged" value={breadth.unchanged} />
+          </div>
+        </RmiSection>
+      </div>
+
+      <section>
+        <div className="mb-3 flex items-center justify-between gap-4">
+          <div>
+            <h2 className="text-base font-black">Leading Movers</h2>
+            <p className="mt-1 text-sm text-paper/50">Largest absolute quote changes in the current session.</p>
+          </div>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          {leadingMovers.map((artist) => <MarketMoverCard key={artist.id} artist={artist} />)}
+        </div>
+      </section>
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
         <input
@@ -70,18 +114,24 @@ export default function MarketsPage() {
           <SortButton active={sortKey === "name"} onClick={() => chooseSort("name")}>Name</SortButton>
           <SortButton active={sortKey === "price"} onClick={() => chooseSort("price")}>Price</SortButton>
           <SortButton active={sortKey === "change"} onClick={() => chooseSort("change")}>24h</SortButton>
-          <span className="grid h-8 w-8 place-items-center text-paper/45" title={sortDescending ? "Descending" : "Ascending"}>
+          <button
+            type="button"
+            onClick={() => setSortDescending((current) => !current)}
+            className="grid h-8 w-8 place-items-center rounded-md text-paper/45 hover:bg-panelSoft hover:text-paper"
+            title={sortDescending ? "Change to ascending" : "Change to descending"}
+            aria-label={sortDescending ? "Change to ascending order" : "Change to descending order"}
+          >
             {sortKey === "name" ? (
               sortDescending ? <ArrowDownAZ className="h-4 w-4" /> : <ArrowUpAZ className="h-4 w-4" />
             ) : (
-              <ArrowDownUp className="h-4 w-4" />
+              sortDescending ? <ArrowDown className="h-4 w-4" /> : <ArrowUp className="h-4 w-4" />
             )}
-          </span>
+          </button>
         </div>
       </div>
 
       <section className="rmi-card overflow-hidden">
-        <div className="grid grid-cols-[minmax(0,1fr)_96px_76px_40px] gap-x-3 border-b border-line px-4 py-3 text-xs font-bold text-paper/45">
+        <div className="grid grid-cols-[minmax(0,1fr)_104px_84px_44px] gap-x-4 border-b border-line px-4 py-3 text-xs font-bold text-paper/45">
           <span>artist</span>
           <span className="text-right">price</span>
           <span className="text-right">24h</span>
@@ -90,7 +140,7 @@ export default function MarketsPage() {
         {artists.map((artist) => (
           <div
             key={artist.id}
-            className="grid grid-cols-[minmax(0,1fr)_96px_76px_40px] items-center gap-x-3 border-b border-line px-4 py-3 last:border-b-0 hover:bg-panelSoft"
+            className="grid grid-cols-[minmax(0,1fr)_104px_84px_44px] items-center gap-x-4 border-b border-line px-4 py-3 last:border-b-0 hover:bg-panelSoft"
           >
             <Link href={`/artists/${artist.id}`} className="flex min-w-0 items-center gap-3">
               <ArtistAvatar artist={artist} />
@@ -107,27 +157,35 @@ export default function MarketsPage() {
           </div>
         ))}
       </section>
+    </div>
+  );
+}
 
-      <section className="grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(280px,1fr))]">
-        {artists.slice(0, 8).map((artist) => (
-          <Link key={artist.id} href={`/artists/${artist.id}`} className="rmi-card p-4 hover:border-cyan/70">
-            <div className="flex items-start justify-between gap-4">
-              <div className="flex min-w-0 items-center gap-3">
-                <ArtistAvatar artist={artist} />
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-black">{artist.name}</p>
-                  <p className="text-xs font-bold text-paper/45">${artist.ticker} · {formatCurrency(artist.currentPrice)}</p>
-                </div>
-              </div>
-              <ChangeText value={artist.dailyChangePercent} />
-            </div>
-            <div className="mt-4 h-16">
-              <RmiLineChart data={artist.priceHistory} positive={artist.dailyChangePercent >= 0} height={72} />
-            </div>
-            <p className="mt-2 text-xs font-black text-paper/45">{artist.hypeScore}/100 RMI score</p>
-          </Link>
-        ))}
-      </section>
+function MarketMoverCard({ artist }: { artist: ReturnType<typeof useGame>["state"]["artists"][number] }) {
+  return (
+    <Link href={`/artists/${artist.id}`} className="rmi-card p-4 transition hover:-translate-y-0.5 hover:border-cyan/60">
+      <div className="flex items-start justify-between gap-3">
+        <ArtistIdentity artist={artist} />
+        <ChangeText value={artist.dailyChangePercent} />
+      </div>
+      <div className="mt-4 h-16">
+        <RmiLineChart data={artist.priceHistory} positive={artist.dailyChangePercent >= 0} height={72} />
+      </div>
+      <div className="mt-2 flex items-center justify-between gap-3 text-xs font-bold text-paper/45">
+        <span>{formatCurrency(artist.currentPrice)}</span>
+        <span>{artist.hypeScore}/100 signal</span>
+      </div>
+    </Link>
+  );
+}
+
+function BreadthRow({ label, value, tone = "neutral" }: { label: string; value: number; tone?: "neutral" | "good" | "bad" }) {
+  return (
+    <div className="flex items-center justify-between gap-3 rounded-lg bg-panelSoft px-3 py-2 text-sm">
+      <span className="font-bold text-paper/60">{label}</span>
+      <span className={tone === "good" ? "font-black text-mint number-tabular" : tone === "bad" ? "font-black text-ember number-tabular" : "font-black number-tabular"}>
+        {value}
+      </span>
     </div>
   );
 }

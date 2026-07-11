@@ -8,7 +8,7 @@ import { UserAvatar } from "@/components/UserAvatar";
 import { RmiButton } from "@/components/RmiPrimitives";
 import { formatCurrency } from "@/lib/formatters";
 import { getBrowserSupabaseClient } from "@/lib/supabase/client";
-import { Camera, CalendarDays, ImagePlus, LogOut, Star, WalletCards } from "lucide-react";
+import { Camera, CalendarDays, ImagePlus, LogOut, Plus, Search, Star, WalletCards, X } from "lucide-react";
 import Link from "next/link";
 import { ChangeEvent, FormEvent, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
@@ -32,6 +32,7 @@ export default function AccountPage() {
   const [username, setUsername] = useState("");
   const [bio, setBio] = useState("");
   const [favoriteArtistIds, setFavoriteArtistIds] = useState<string[]>([]);
+  const [favoriteQuery, setFavoriteQuery] = useState("");
   const [message, setMessage] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const fileRef = useRef<HTMLInputElement | null>(null);
@@ -43,6 +44,33 @@ export default function AccountPage() {
         .filter((artist): artist is (typeof state.artists)[number] => Boolean(artist)),
     [favoriteArtistIds, state.artists]
   );
+  const favoriteSuggestions = useMemo(() => {
+    const normalized = favoriteQuery.trim().toLowerCase();
+
+    return state.artists
+      .filter(
+        (artist) =>
+          !favoriteArtistIds.includes(artist.id) &&
+          (!normalized ||
+            artist.name.toLowerCase().includes(normalized) ||
+            artist.ticker.toLowerCase().includes(normalized))
+      )
+      .sort((first, second) => {
+        if (normalized) {
+          const firstStarts =
+            first.name.toLowerCase().startsWith(normalized) || first.ticker.toLowerCase().startsWith(normalized);
+          const secondStarts =
+            second.name.toLowerCase().startsWith(normalized) || second.ticker.toLowerCase().startsWith(normalized);
+
+          if (firstStarts !== secondStarts) {
+            return firstStarts ? -1 : 1;
+          }
+        }
+
+        return first.name.localeCompare(second.name);
+      })
+      .slice(0, 8);
+  }, [favoriteArtistIds, favoriteQuery, state.artists]);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -102,7 +130,7 @@ export default function AccountPage() {
     setMessage(error ? error.message : "Password reset email sent.");
   }
 
-  async function saveProfile(nextAvatarUrl?: string) {
+  async function saveProfile(nextAvatarUrl?: string, nextFavoriteArtistIds = favoriteArtistIds) {
     if (!session) {
       return;
     }
@@ -116,7 +144,7 @@ export default function AccountPage() {
       body: JSON.stringify({
         profileBio: bio,
         avatarUrl: nextAvatarUrl ?? avatarUrl,
-        favoriteArtistIds
+        favoriteArtistIds: nextFavoriteArtistIds
       })
     });
     const payload = (await response.json()) as ProfileDetailsResponse;
@@ -265,21 +293,82 @@ export default function AccountPage() {
 
       <section className="grid gap-4 sm:grid-cols-2">
         <div>
-          <h2 className="mb-3 text-lg font-black">Favorite artists</h2>
-          <div className="rmi-card overflow-hidden">
+          <div className="mb-3 flex items-end justify-between gap-3">
+            <div>
+              <h2 className="text-lg font-black">Favorite artists</h2>
+              <p className="text-xs text-paper/50">Choose up to 12 artists for your public profile.</p>
+            </div>
+            <span className="text-xs font-bold text-paper/45">{favoriteArtistIds.length}/12</span>
+          </div>
+          <div className="rmi-card overflow-visible">
             {favoriteArtists.length ? (
               favoriteArtists.map((artist) => (
-                <Link key={artist.id} href={`/artists/${artist.id}`} className="flex items-center gap-3 border-b border-line px-4 py-3 last:border-b-0 hover:bg-panelSoft">
-                  <ArtistAvatar artist={artist} size="sm" />
-                  <span>
-                    <span className="block text-sm font-black">{artist.name}</span>
-                    <span className="text-xs font-bold text-paper/45">${artist.ticker}</span>
-                  </span>
-                </Link>
+                <div key={artist.id} className="flex items-center gap-3 border-b border-line px-4 py-3 hover:bg-panelSoft">
+                  <Link href={`/artists/${artist.id}`} className="flex min-w-0 flex-1 items-center gap-3">
+                    <ArtistAvatar artist={artist} size="sm" />
+                    <span className="min-w-0">
+                      <span className="block truncate text-sm font-black">{artist.name}</span>
+                      <span className="text-xs font-bold text-paper/45">${artist.ticker}</span>
+                    </span>
+                  </Link>
+                  <button
+                    type="button"
+                    onClick={() => setFavoriteArtistIds((current) => current.filter((artistId) => artistId !== artist.id))}
+                    className="grid h-8 w-8 shrink-0 place-items-center rounded-md text-paper/45 hover:bg-panel hover:text-ember"
+                    title={`Remove ${artist.name}`}
+                    aria-label={`Remove ${artist.name} from favorite artists`}
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
               ))
             ) : (
               <p className="p-4 text-sm font-bold text-paper/60">No favorite artists yet.</p>
             )}
+
+            <div className="relative border-t border-line p-3">
+              <Search className="pointer-events-none absolute left-6 top-6 h-4 w-4 text-paper/35" aria-hidden="true" />
+              <input
+                value={favoriteQuery}
+                onChange={(event) => setFavoriteQuery(event.target.value)}
+                className="h-10 w-full rounded-lg border border-line bg-panelSoft pl-9 pr-3 text-sm outline-none placeholder:text-paper/35 focus:border-cyan"
+                placeholder="Find an artist to add"
+                disabled={favoriteArtistIds.length >= 12}
+              />
+              {favoriteQuery.trim() && favoriteArtistIds.length < 12 ? (
+                <div className="absolute left-3 right-3 top-14 z-20 max-h-64 overflow-y-auto rounded-lg border border-line bg-panel p-1 shadow-2xl">
+                  {favoriteSuggestions.length ? (
+                    favoriteSuggestions.map((artist) => (
+                      <button
+                        key={artist.id}
+                        type="button"
+                        onClick={() => {
+                          setFavoriteArtistIds((current) => [...current, artist.id].slice(0, 12));
+                          setFavoriteQuery("");
+                        }}
+                        className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-left hover:bg-panelSoft"
+                      >
+                        <ArtistAvatar artist={artist} size="sm" />
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-sm font-black">{artist.name}</span>
+                          <span className="text-xs text-paper/45">${artist.ticker}</span>
+                        </span>
+                        <Plus className="h-4 w-4 text-cyan" aria-hidden="true" />
+                      </button>
+                    ))
+                  ) : (
+                    <p className="px-3 py-4 text-center text-sm text-paper/50">No matching artists.</p>
+                  )}
+                </div>
+              ) : null}
+              <button
+                type="button"
+                onClick={() => saveProfile(undefined, favoriteArtistIds)}
+                className="mt-3 h-10 w-full rounded-lg bg-paper px-4 text-sm font-black text-ink hover:bg-paper/90"
+              >
+                Save favorite artists
+              </button>
+            </div>
           </div>
         </div>
 

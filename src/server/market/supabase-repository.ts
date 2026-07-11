@@ -136,6 +136,76 @@ export async function loadPreviousClosePrices({
   }, {});
 }
 
+export async function loadExistingPriceHistoryArtistIds({
+  supabase,
+  artistIds,
+  runDate
+}: {
+  supabase: Supabase;
+  artistIds: string[];
+  runDate: string;
+}) {
+  if (!artistIds.length) {
+    return new Set<string>();
+  }
+
+  const { data, error } = await supabase
+    .from("price_history")
+    .select("artist_id")
+    .in("artist_id", artistIds)
+    .eq("price_date", runDate);
+
+  if (error) {
+    throw new Error(`Could not inspect current-day price history: ${error.message}`);
+  }
+
+  return new Set((data ?? []).map((row) => row.artist_id));
+}
+
+export async function loadPreviousSignalStats({
+  supabase,
+  artistIds,
+  runDate
+}: {
+  supabase: Supabase;
+  artistIds: string[];
+  runDate: string;
+}): Promise<Record<string, HypeStats>> {
+  if (!artistIds.length) {
+    return {};
+  }
+
+  const { data, error } = await supabase
+    .from("market_signal_snapshots")
+    .select(
+      "artist_id,source_date,streaming_growth,youtube_growth,search_growth,social_growth,news_score,trader_demand"
+    )
+    .in("artist_id", artistIds)
+    .lt("source_date", runDate)
+    .order("source_date", { ascending: false });
+
+  if (error) {
+    throw new Error(`Could not load previous signal snapshots: ${error.message}`);
+  }
+
+  return (data ?? []).reduce<Record<string, HypeStats>>((statsByArtist, row) => {
+    if (statsByArtist[row.artist_id]) {
+      return statsByArtist;
+    }
+
+    statsByArtist[row.artist_id] = {
+      streamingGrowth: Number(row.streaming_growth),
+      youtubeGrowth: Number(row.youtube_growth),
+      searchGrowth: Number(row.search_growth),
+      socialGrowth: Number(row.social_growth),
+      newsScore: Number(row.news_score),
+      traderDemand: Number(row.trader_demand)
+    };
+
+    return statsByArtist;
+  }, {});
+}
+
 export async function loadPriceTrendContexts({
   supabase,
   artistIds,
@@ -517,6 +587,8 @@ export async function persistMarketObservations(supabase: Supabase, observations
     return;
   }
 
+  await removeResolvedObservationErrors(supabase, observations);
+
   const { error } = await supabase.from("market_observations").upsert(
     observations.map((observation) => ({
       artist_id: observation.artistId,
@@ -533,6 +605,43 @@ export async function persistMarketObservations(supabase: Supabase, observations
 
   if (error) {
     throw new Error(`Could not save market observations: ${error.message}`);
+  }
+}
+
+async function removeResolvedObservationErrors(supabase: Supabase, observations: MarketObservation[]) {
+  const failedKeys = new Set(
+    observations
+      .filter((observation) => observation.metric === "request_error")
+      .map((observation) => `${observation.artistId}\u0000${observation.source}\u0000${observation.observedDate}`)
+  );
+  const resolvedGroups = new Map<string, Set<string>>();
+
+  for (const observation of observations) {
+    const key = `${observation.artistId}\u0000${observation.source}\u0000${observation.observedDate}`;
+
+    if (observation.metric === "request_error" || failedKeys.has(key)) {
+      continue;
+    }
+
+    const groupKey = `${observation.source}\u0000${observation.observedDate}`;
+    const artistIds = resolvedGroups.get(groupKey) ?? new Set<string>();
+    artistIds.add(observation.artistId);
+    resolvedGroups.set(groupKey, artistIds);
+  }
+
+  for (const [groupKey, artistIds] of resolvedGroups) {
+    const [source, observedDate] = groupKey.split("\u0000");
+    const { error } = await supabase
+      .from("market_observations")
+      .delete()
+      .eq("source", source)
+      .eq("metric", "request_error")
+      .eq("observed_date", observedDate)
+      .in("artist_id", [...artistIds]);
+
+    if (error) {
+      throw new Error(`Could not clear resolved ${source} observation errors: ${error.message}`);
+    }
   }
 }
 
@@ -588,6 +697,8 @@ export async function persistMarketEvents(supabase: Supabase, events: MarketEven
     return;
   }
 
+  await removeConflictingEventClassifications(supabase, events);
+
   const { error } = await supabase.from("market_events").upsert(
     events.map((event) => ({
       artist_id: event.artistId,
@@ -606,6 +717,43 @@ export async function persistMarketEvents(supabase: Supabase, events: MarketEven
 
   if (error) {
     throw new Error(`Could not save market events: ${error.message}`);
+  }
+}
+
+async function removeConflictingEventClassifications(supabase: Supabase, events: MarketEvent[]) {
+  const artistIds = Array.from(new Set(events.map((event) => event.artistId)));
+  const eventDates = events.map((event) => event.eventDate).sort();
+  const desiredTypes = new Map(
+    events.map((event) => [`${event.artistId}\u0000${event.eventDate}\u0000${event.title}`, event.eventType])
+  );
+  const { data, error } = await supabase
+    .from("market_events")
+    .select("id,artist_id,event_date,event_type,title")
+    .in("artist_id", artistIds)
+    .gte("event_date", eventDates[0])
+    .lte("event_date", eventDates[eventDates.length - 1]);
+
+  if (error) {
+    throw new Error(`Could not inspect existing market event classifications: ${error.message}`);
+  }
+
+  const conflictingIds = (data ?? [])
+    .filter((row) => {
+      const desiredType = desiredTypes.get(`${row.artist_id}\u0000${row.event_date}\u0000${row.title}`);
+
+      return Boolean(desiredType && desiredType !== row.event_type);
+    })
+    .map((row) => row.id);
+
+  for (let offset = 0; offset < conflictingIds.length; offset += 100) {
+    const { error: deleteError } = await supabase
+      .from("market_events")
+      .delete()
+      .in("id", conflictingIds.slice(offset, offset + 100));
+
+    if (deleteError) {
+      throw new Error(`Could not replace stale market event classifications: ${deleteError.message}`);
+    }
   }
 }
 

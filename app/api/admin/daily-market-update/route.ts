@@ -11,13 +11,27 @@ import {
 } from "@/server/market/daily-update";
 import { collectBlueskyMarketSignals } from "@/server/market/bluesky-source";
 import {
+  attachAudienceScaleCalibration,
+  type AudienceScaleSnapshots
+} from "@/server/market/audience-scale";
+import {
+  hasArtistControversySubjectContext,
+  hasArtistReleaseSubjectContext,
+  isLowValueMarketArticleTitle,
+  isUncorroboratedLowTierMarketClaim
+} from "@/server/market/artist-event-disambiguation";
+import {
   buildEventMarketSignals,
   flattenEvents,
   mergeEvents,
   normalizeManualMarketEvents,
   type ManualMarketEvents
 } from "@/server/market/event-signals";
-import { collectGdeltMarketSignals } from "@/server/market/gdelt-source";
+import {
+  classifyArticleEvent,
+  collectGdeltMarketSignals,
+  normalizeDomain
+} from "@/server/market/gdelt-source";
 import { collectLastfmMarketSignals } from "@/server/market/lastfm-source";
 import { collectMusicbrainzReleaseEvents } from "@/server/market/musicbrainz-releases";
 import { collectRedditMarketSignals } from "@/server/market/reddit-source";
@@ -41,8 +55,10 @@ import {
   loadActiveArtistCount,
   loadActiveArtistsPage,
   loadArtistExternalIds,
+  loadExistingPriceHistoryArtistIds,
   loadObservationBaselines,
   loadPreviousClosePrices,
+  loadPreviousSignalStats,
   loadPriceTrendContexts,
   loadRecentMarketEvents,
   persistMarketEvents,
@@ -153,7 +169,11 @@ export async function POST(request: Request) {
       seedDetectedEventsByArtist: realSignals.detectedEventsByArtist,
       manualEvents: body.manualEvents
     });
-    const adapterSignals = mergeAdapterSignals(...realSignals.adapterSignalSources, eventSignals.adapterSignals);
+    const adapterSignals = attachAudienceScaleCalibration({
+      artists,
+      signals: mergeAdapterSignals(...realSignals.adapterSignalSources, eventSignals.adapterSignals),
+      snapshots: realSignals.audienceScaleSnapshots
+    });
     const warnings = [...realSignals.warnings, ...eventSignals.warnings];
     const result = calculateDailyMarketUpdates({
       artists,
@@ -415,7 +435,7 @@ async function applyMarketHistoryBaselines({
   runDate: string;
 }) {
   const artistIds = artists.map((artist) => artist.id);
-  const [previousCloses, priceTrends] = await Promise.all([
+  const [previousCloses, priceTrends, existingPriceHistoryArtistIds, previousSignalStats] = await Promise.all([
     loadPreviousClosePrices({
       supabase,
       artistIds,
@@ -425,12 +445,23 @@ async function applyMarketHistoryBaselines({
       supabase,
       artistIds,
       runDate
+    }),
+    loadExistingPriceHistoryArtistIds({
+      supabase,
+      artistIds,
+      runDate
+    }),
+    loadPreviousSignalStats({
+      supabase,
+      artistIds,
+      runDate
     })
   ]);
 
   return artists.map((artist) => {
     const previousClose = previousCloses[artist.id];
     const priceTrend = priceTrends[artist.id];
+    const isSameDayRecalculation = existingPriceHistoryArtistIds.has(artist.id);
 
     if (previousClose === undefined || !Number.isFinite(previousClose) || previousClose <= 0) {
       return {
@@ -441,8 +472,10 @@ async function applyMarketHistoryBaselines({
 
     return {
       ...artist,
+      currentPrice: isSameDayRecalculation ? previousClose : artist.currentPrice,
       previousClose,
       previousCloseSource: "price_history" as const,
+      stats: isSameDayRecalculation ? previousSignalStats[artist.id] ?? artist.stats : artist.stats,
       priceTrend
     };
   });
@@ -467,6 +500,7 @@ async function collectRealSignals({
   warnings: string[];
   externalIds: Record<string, ArtistExternalIds>;
   detectedEventsByArtist: Record<string, MarketEvent[]>;
+  audienceScaleSnapshots: AudienceScaleSnapshots;
 }> {
   const useGdelt = source === "gdelt" || source === "blended";
   const useLastfm = source === "lastfm" || source === "core" || source === "blended";
@@ -486,7 +520,8 @@ async function collectRealSignals({
       observations: [],
       warnings: [],
       externalIds: {},
-      detectedEventsByArtist: {}
+      detectedEventsByArtist: {},
+      audienceScaleSnapshots: {}
     };
   }
 
@@ -622,202 +657,221 @@ async function collectRealSignals({
   const sources: AdapterSignals[] = [];
   const observations: MarketObservation[] = [];
   let detectedEventsByArtist: Record<string, MarketEvent[]> = {};
+  const sourceTasks: Array<Promise<void>> = [];
 
   if (useGdelt) {
-    const gdelt = await collectExternalSource("GDELT news", warnings, () =>
-      collectGdeltMarketSignals({
-        artists,
-        runDate,
-        externalIds,
-        baselines: gdeltBaselines
-      })
-    );
+    sourceTasks.push((async () => {
+      const gdelt = await collectExternalSource("GDELT news", warnings, () =>
+        collectGdeltMarketSignals({
+          artists,
+          runDate,
+          externalIds,
+          baselines: gdeltBaselines
+        })
+      );
 
-    if (gdelt) {
-      sources.push(gdelt.signals);
-      observations.push(...gdelt.observations);
-      detectedEventsByArtist = mergeEvents(detectedEventsByArtist, gdelt.eventsByArtist);
-    }
+      if (gdelt) {
+        sources.push(gdelt.signals);
+        observations.push(...gdelt.observations);
+        detectedEventsByArtist = mergeEvents(detectedEventsByArtist, gdelt.eventsByArtist);
+      }
+    })());
   }
 
   if (useLastfm) {
-    const lastfm = await collectExternalSource("Last.fm", warnings, () =>
-      collectLastfmMarketSignals({
-        artists,
-        runDate,
-        apiKey: process.env.LASTFM_API_KEY,
-        externalIds,
-        baselines: lastfmBaselines
-      })
-    );
+    sourceTasks.push((async () => {
+      const lastfm = await collectExternalSource("Last.fm", warnings, () =>
+        collectLastfmMarketSignals({
+          artists,
+          runDate,
+          apiKey: process.env.LASTFM_API_KEY,
+          externalIds,
+          baselines: lastfmBaselines
+        })
+      );
 
-    if (lastfm) {
-      sources.push(lastfm.signals);
-      observations.push(...lastfm.observations);
-      warnings.push(...lastfm.warnings);
-    }
+      if (lastfm) {
+        sources.push(lastfm.signals);
+        observations.push(...lastfm.observations);
+        warnings.push(...lastfm.warnings);
+      }
+    })());
   }
 
   if (useSpotify) {
-    const spotify = await collectExternalSource("Spotify", warnings, () =>
-      collectSpotifyMarketSignals({
-        artists,
-        runDate,
-        credentials: {
-          clientId: process.env.SPOTIFY_CLIENT_ID,
-          clientSecret: process.env.SPOTIFY_CLIENT_SECRET
-        },
-        externalIds,
-        baselines: spotifyBaselines
-      })
-    );
+    sourceTasks.push((async () => {
+      const spotify = await collectExternalSource("Spotify", warnings, () =>
+        collectSpotifyMarketSignals({
+          artists,
+          runDate,
+          credentials: {
+            clientId: process.env.SPOTIFY_CLIENT_ID,
+            clientSecret: process.env.SPOTIFY_CLIENT_SECRET
+          },
+          externalIds,
+          baselines: spotifyBaselines
+        })
+      );
 
-    if (spotify) {
-      sources.push(spotify.signals);
-      observations.push(...spotify.observations);
-      warnings.push(...spotify.warnings);
-    }
+      if (spotify) {
+        sources.push(spotify.signals);
+        observations.push(...spotify.observations);
+        warnings.push(...spotify.warnings);
+      }
+    })());
   }
 
   if (useYoutube) {
-    const youtube = await collectExternalSource("YouTube channel", warnings, () =>
-      collectYoutubeMarketSignals({
-        artists,
-        runDate,
-        apiKey: process.env.YOUTUBE_API_KEY,
-        externalIds,
-        baselines: youtubeBaselines
-      })
-    );
-
-    if (youtube) {
-      sources.push(youtube.signals);
-      observations.push(...youtube.observations);
-      warnings.push(...youtube.warnings);
-    }
-
-    const maxUploadEventVideos = getEnvInteger("MARKET_YOUTUBE_UPLOAD_EVENT_VIDEOS", 12, 0, 12);
-
-    if (maxUploadEventVideos > 0) {
-      const youtubeUploadEvents = await collectExternalSource("YouTube upload events", warnings, () =>
-        collectYoutubeUploadEvents({
+    sourceTasks.push((async () => {
+      const youtube = await collectExternalSource("YouTube channel", warnings, () =>
+        collectYoutubeMarketSignals({
           artists,
           runDate,
           apiKey: process.env.YOUTUBE_API_KEY,
           externalIds,
-          maxVideosPerArtist: maxUploadEventVideos,
-          lookbackDays: getEnvInteger("MARKET_YOUTUBE_UPLOAD_EVENT_DAYS", 14, 1, 45)
+          baselines: youtubeBaselines
         })
       );
 
-      if (youtubeUploadEvents) {
-        observations.push(...youtubeUploadEvents.observations);
-        warnings.push(...youtubeUploadEvents.warnings);
-        detectedEventsByArtist = mergeEvents(detectedEventsByArtist, youtubeUploadEvents.eventsByArtist);
+      if (youtube) {
+        sources.push(youtube.signals);
+        observations.push(...youtube.observations);
+        warnings.push(...youtube.warnings);
       }
-    }
 
-    const maxVideosPerArtist = getEnvInteger("MARKET_YOUTUBE_COMMENT_VIDEOS", 0, 0, 3);
+      const maxUploadEventVideos = getEnvInteger("MARKET_YOUTUBE_UPLOAD_EVENT_VIDEOS", 12, 0, 12);
 
-    if (maxVideosPerArtist > 0) {
-      const youtubeComments = await collectExternalSource("YouTube comments", warnings, () =>
-        collectYoutubeCommentMarketSignals({
-          artists,
-          runDate,
-          apiKey: process.env.YOUTUBE_API_KEY,
-          externalIds,
-          baselines: youtubeCommentBaselines,
-          maxVideosPerArtist,
-          maxCommentsPerVideo: getEnvInteger("MARKET_YOUTUBE_COMMENT_LIMIT", 25, 1, 100)
-        })
-      );
+      if (maxUploadEventVideos > 0) {
+        const youtubeUploadEvents = await collectExternalSource("YouTube upload events", warnings, () =>
+          collectYoutubeUploadEvents({
+            artists,
+            runDate,
+            apiKey: process.env.YOUTUBE_API_KEY,
+            externalIds,
+            maxVideosPerArtist: maxUploadEventVideos,
+            lookbackDays: getEnvInteger("MARKET_YOUTUBE_UPLOAD_EVENT_DAYS", 14, 1, 45)
+          })
+        );
 
-      if (youtubeComments) {
-        sources.push(youtubeComments.signals);
-        observations.push(...youtubeComments.observations);
-        warnings.push(...youtubeComments.warnings);
+        if (youtubeUploadEvents) {
+          observations.push(...youtubeUploadEvents.observations);
+          warnings.push(...youtubeUploadEvents.warnings);
+          detectedEventsByArtist = mergeEvents(detectedEventsByArtist, youtubeUploadEvents.eventsByArtist);
+        }
       }
-    }
+
+      const maxVideosPerArtist = getEnvInteger("MARKET_YOUTUBE_COMMENT_VIDEOS", 1, 0, 3);
+
+      if (maxVideosPerArtist > 0) {
+        const youtubeComments = await collectExternalSource("YouTube comments", warnings, () =>
+          collectYoutubeCommentMarketSignals({
+            artists,
+            runDate,
+            apiKey: process.env.YOUTUBE_API_KEY,
+            externalIds,
+            baselines: youtubeCommentBaselines,
+            maxVideosPerArtist,
+            maxCommentsPerVideo: getEnvInteger("MARKET_YOUTUBE_COMMENT_LIMIT", 25, 1, 100)
+          })
+        );
+
+        if (youtubeComments) {
+          sources.push(youtubeComments.signals);
+          observations.push(...youtubeComments.observations);
+          warnings.push(...youtubeComments.warnings);
+        }
+      }
+    })());
   }
 
   if (useWikimedia) {
-    const wikimedia = await collectExternalSource("public attention", warnings, () =>
-      collectWikimediaMarketSignals({
-        artists,
-        runDate,
-        baselines: wikimediaBaselines
-      })
-    );
+    sourceTasks.push((async () => {
+      const wikimedia = await collectExternalSource("public attention", warnings, () =>
+        collectWikimediaMarketSignals({
+          artists,
+          runDate,
+          baselines: wikimediaBaselines
+        })
+      );
 
-    if (wikimedia) {
-      sources.push(wikimedia.signals);
-      observations.push(...wikimedia.observations);
-      warnings.push(...wikimedia.warnings);
-    }
+      if (wikimedia) {
+        sources.push(wikimedia.signals);
+        observations.push(...wikimedia.observations);
+        warnings.push(...wikimedia.warnings);
+      }
+    })());
   }
 
   if (useReddit) {
-    const reddit = await collectExternalSource("Reddit community hype", warnings, () =>
-      collectRedditMarketSignals({
-        artists,
-        runDate,
-        credentials: {
-          clientId: process.env.REDDIT_CLIENT_ID,
-          clientSecret: process.env.REDDIT_CLIENT_SECRET,
-          userAgent: process.env.REDDIT_USER_AGENT
-        },
-        externalIds,
-        baselines: redditBaselines,
-        subreddits: getEnvList("MARKET_REDDIT_SUBREDDITS"),
-        postsPerArtist: getEnvInteger("MARKET_REDDIT_POST_LIMIT", 25, 5, 100),
-        lookbackDays: getEnvInteger("MARKET_REDDIT_LOOKBACK_DAYS", 7, 1, 30)
-      })
-    );
+    sourceTasks.push((async () => {
+      const reddit = await collectExternalSource("Reddit community hype", warnings, () =>
+        collectRedditMarketSignals({
+          artists,
+          runDate,
+          credentials: {
+            clientId: process.env.REDDIT_CLIENT_ID,
+            clientSecret: process.env.REDDIT_CLIENT_SECRET,
+            userAgent: process.env.REDDIT_USER_AGENT
+          },
+          externalIds,
+          baselines: redditBaselines,
+          subreddits: getEnvList("MARKET_REDDIT_SUBREDDITS"),
+          postsPerArtist: getEnvInteger("MARKET_REDDIT_POST_LIMIT", 25, 5, 100),
+          lookbackDays: getEnvInteger("MARKET_REDDIT_LOOKBACK_DAYS", 7, 1, 30)
+        })
+      );
 
-    if (reddit) {
-      sources.push(reddit.signals);
-      observations.push(...reddit.observations);
-      warnings.push(...reddit.warnings);
-      detectedEventsByArtist = mergeEvents(detectedEventsByArtist, reddit.eventsByArtist);
-    }
+      if (reddit) {
+        sources.push(reddit.signals);
+        observations.push(...reddit.observations);
+        warnings.push(...reddit.warnings);
+        detectedEventsByArtist = mergeEvents(detectedEventsByArtist, reddit.eventsByArtist);
+      }
+    })());
   }
 
   if (useBluesky) {
-    const bluesky = await collectExternalSource("Bluesky social chatter", warnings, () =>
-      collectBlueskyMarketSignals({
-        artists,
-        runDate,
-        externalIds,
-        baselines: blueskyBaselines,
-        postsPerArtist: getEnvInteger("MARKET_BLUESKY_POST_LIMIT", 20, 5, 100),
-        lookbackDays: getEnvInteger("MARKET_BLUESKY_LOOKBACK_DAYS", 7, 1, 30),
-        delayMs: getEnvInteger("MARKET_BLUESKY_DELAY_MS", 250, 0, 2000)
-      })
-    );
+    sourceTasks.push((async () => {
+      const bluesky = await collectExternalSource("Bluesky social chatter", warnings, () =>
+        collectBlueskyMarketSignals({
+          artists,
+          runDate,
+          externalIds,
+          baselines: blueskyBaselines,
+          postsPerArtist: getEnvInteger("MARKET_BLUESKY_POST_LIMIT", 20, 5, 100),
+          lookbackDays: getEnvInteger("MARKET_BLUESKY_LOOKBACK_DAYS", 7, 1, 30),
+          delayMs: getEnvInteger("MARKET_BLUESKY_DELAY_MS", 250, 0, 2000)
+        })
+      );
 
-    if (bluesky) {
-      sources.push(bluesky.signals);
-      observations.push(...bluesky.observations);
-      warnings.push(...bluesky.warnings);
-      detectedEventsByArtist = mergeEvents(detectedEventsByArtist, bluesky.eventsByArtist);
-    }
+      if (bluesky) {
+        sources.push(bluesky.signals);
+        observations.push(...bluesky.observations);
+        warnings.push(...bluesky.warnings);
+        detectedEventsByArtist = mergeEvents(detectedEventsByArtist, bluesky.eventsByArtist);
+      }
+    })());
   }
 
   if (useTradeFlow && supabase) {
-    const tradeFlow = await collectExternalSource("trade flow", warnings, () =>
-      collectTradeFlowMarketSignals({
-        supabase,
-        artists,
-        runDate
-      })
-    );
+    sourceTasks.push((async () => {
+      const tradeFlow = await collectExternalSource("trade flow", warnings, () =>
+        collectTradeFlowMarketSignals({
+          supabase,
+          artists,
+          runDate
+        })
+      );
 
-    if (tradeFlow) {
-      sources.push(tradeFlow.signals);
-      observations.push(...tradeFlow.observations);
-      warnings.push(...tradeFlow.warnings);
-    }
+      if (tradeFlow) {
+        sources.push(tradeFlow.signals);
+        observations.push(...tradeFlow.observations);
+        warnings.push(...tradeFlow.warnings);
+      }
+    })());
   }
+
+  await Promise.all(sourceTasks);
 
   return {
     adapterSignals: mergeAdapterSignals(...sources),
@@ -825,8 +879,55 @@ async function collectRealSignals({
     observations,
     warnings,
     externalIds,
-    detectedEventsByArtist
+    detectedEventsByArtist,
+    audienceScaleSnapshots: buildAudienceScaleSnapshots({
+      artists,
+      lastfmBaselines,
+      youtubeBaselines,
+      wikimediaBaselines
+    })
   };
+}
+
+function buildAudienceScaleSnapshots({
+  artists,
+  lastfmBaselines,
+  youtubeBaselines,
+  wikimediaBaselines
+}: {
+  artists: ReturnType<typeof getMockMarketArtists>;
+  lastfmBaselines: ObservationBaselines;
+  youtubeBaselines: ObservationBaselines;
+  wikimediaBaselines: ObservationBaselines;
+}): AudienceScaleSnapshots {
+  return Object.fromEntries(
+    artists.map((artist) => {
+      const lastfm = lastfmBaselines[artist.id] ?? {};
+      const youtube = youtubeBaselines[artist.id] ?? {};
+      const wikimedia = wikimediaBaselines[artist.id] ?? {};
+
+      return [
+        artist.id,
+        {
+          lastfm: {
+            listeners: getPositiveBaseline(lastfm.listeners),
+            playcount: getPositiveBaseline(lastfm.playcount)
+          },
+          youtube: {
+            subscriberCount: getPositiveBaseline(youtube.subscriber_count),
+            viewCount: getPositiveBaseline(youtube.channel_views)
+          },
+          wikimedia: {
+            pageviews7d: getPositiveBaseline(wikimedia.pageviews_7d)
+          }
+        }
+      ];
+    })
+  );
+}
+
+function getPositiveBaseline(value: number | undefined) {
+  return typeof value === "number" && Number.isFinite(value) && value > 0 ? value : undefined;
 }
 
 function hasSpotifyCredentials() {
@@ -931,7 +1032,7 @@ async function collectEventSignals({
         runDate,
         lookbackDays: 30
       });
-      storedEvents = filterStoredEventsForSourcePolicy(storedEvents, source);
+      storedEvents = filterStoredEventsForSourcePolicy(storedEvents, source, artists);
     } catch (error) {
       if (!dryRun) {
         throw error;
@@ -939,7 +1040,11 @@ async function collectEventSignals({
     }
   }
 
-  if ((source === "core" || source === "blended") && supabase) {
+  if (
+    (source === "core" || source === "blended") &&
+    supabase &&
+    getEnvBoolean("MARKET_MUSICBRAINZ_RELEASES_ENABLED", false)
+  ) {
     const releaseEvents = await collectMusicbrainzReleaseEvents({
       artists,
       runDate,
@@ -973,14 +1078,12 @@ async function collectEventSignals({
 
 function filterStoredEventsForSourcePolicy(
   eventsByArtist: Record<string, MarketEvent[]>,
-  source: MarketUpdateSource
+  source: MarketUpdateSource,
+  artists: ReturnType<typeof getMockMarketArtists>
 ) {
   const allowBluesky =
     source === "bluesky" || ((source === "core" || source === "blended") && getEnvBoolean("MARKET_BLUESKY_ENABLED", false));
-
-  if (allowBluesky) {
-    return eventsByArtist;
-  }
+  const artistById = new Map(artists.map((artist) => [artist.id, artist]));
 
   return Object.fromEntries(
     Object.entries(eventsByArtist)
@@ -989,9 +1092,95 @@ function filterStoredEventsForSourcePolicy(
         events.filter((event) => {
           const eventSource = typeof event.rawPayload.source === "string" ? event.rawPayload.source : "";
 
-          return eventSource !== "bluesky_post";
+          if (!allowBluesky && eventSource === "bluesky_post") {
+            return false;
+          }
+
+          return isStoredEventEligibleForPricing(event, artistById.get(artistId));
         })
       ])
       .filter(([, events]) => events.length > 0)
   );
+}
+
+function isStoredEventEligibleForPricing(
+  event: MarketEvent,
+  artist: ReturnType<typeof getMockMarketArtists>[number] | undefined
+) {
+  const eventSource = typeof event.rawPayload.source === "string" ? event.rawPayload.source : "";
+
+  if (eventSource === "musicbrainz_release_group") {
+    return event.rawPayload.corroborated === true;
+  }
+
+  if ((eventSource !== "media_rss_item" && eventSource !== "gdelt_article") || !artist) {
+    return true;
+  }
+
+  if (isLowValueMarketArticleTitle(event.title)) {
+    return false;
+  }
+
+  const domain =
+    (typeof event.rawPayload.domain === "string" ? event.rawPayload.domain : "") ||
+    normalizeDomain(undefined, event.sourceUrl) ||
+    "";
+  const classification = classifyArticleEvent(event.title, domain, undefined, {
+    allowLowTierRelease: true
+  });
+  const storedReason =
+    typeof event.rawPayload.classificationReason === "string"
+      ? event.rawPayload.classificationReason
+      : "";
+  const sourceTier =
+    typeof event.rawPayload.sourceTier === "number" && Number.isFinite(event.rawPayload.sourceTier)
+      ? event.rawPayload.sourceTier
+      : 0;
+  const corroboratingSourceCount =
+    typeof event.rawPayload.corroboratingSourceCount === "number" &&
+    Number.isFinite(event.rawPayload.corroboratingSourceCount)
+      ? event.rawPayload.corroboratingSourceCount
+      : 0;
+
+  if (
+    !classification ||
+    classification.eventType !== event.eventType ||
+    (storedReason && classification.reason !== storedReason)
+  ) {
+    return false;
+  }
+
+  if (
+    isUncorroboratedLowTierMarketClaim({
+      sourceTier,
+      classificationReason: classification.reason,
+      corroborated: event.rawPayload.corroborated === true,
+      corroboratingSourceCount
+    })
+  ) {
+    return false;
+  }
+
+  const query =
+    typeof event.rawPayload.searchQuery === "string"
+      ? event.rawPayload.searchQuery
+      : undefined;
+
+  if (classification.reason === "release_terms") {
+    return hasArtistReleaseSubjectContext({
+      artistName: artist.name,
+      text: event.title,
+      query
+    });
+  }
+
+  if (classification.reason === "controversy_terms") {
+    return hasArtistControversySubjectContext({
+      artistName: artist.name,
+      text: event.title,
+      query
+    });
+  }
+
+  return true;
 }

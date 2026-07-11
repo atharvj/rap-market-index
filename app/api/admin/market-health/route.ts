@@ -357,7 +357,7 @@ async function checkMarketOperations(
   const checkedAt = new Date().toISOString();
 
   try {
-    const rpc = supabase.rpc as unknown as (
+    const rpc = supabase.rpc.bind(supabase) as unknown as (
       fn: string,
       args: Record<string, unknown>
     ) => Promise<{
@@ -417,7 +417,7 @@ async function checkIntegrityGuardrails(
   supabase: ReturnType<typeof createServiceRoleClient>
 ): Promise<IntegrityGuardrailHealth> {
   const checkedAt = new Date().toISOString();
-  const rpc = supabase.rpc as unknown as (
+  const rpc = supabase.rpc.bind(supabase) as unknown as (
     fn: string,
     args: Record<string, unknown>
   ) => Promise<{ error: { message: string } | null }>;

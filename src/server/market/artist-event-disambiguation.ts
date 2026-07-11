@@ -73,6 +73,23 @@ const CATALYST_TERMS = [
   "video"
 ];
 
+const LOW_TIER_CLAIMS_REQUIRING_CORROBORATION = new Set([
+  "award_terms",
+  "chart_terms",
+  "controversy_terms",
+  "decline_terms",
+  "feature_terms",
+  "major_feature_terms",
+  "performance_terms",
+  "public_conflict_terms",
+  "public_reaction_terms",
+  "review_keyword",
+  "snippet_terms",
+  "tour_terms",
+  "tracklist_reaction_terms",
+  "viral_terms"
+]);
+
 export function hasRequiredArtistEventDisambiguation({
   artistName,
   text,
@@ -153,6 +170,11 @@ export function hasArtistReleaseSubjectContext({
   query?: string;
 }) {
   const normalizedText = normalizeEventSearchText(text);
+
+  if (hasArtistFeatureCreditContext({ artistName, text, query })) {
+    return false;
+  }
+
   const aliases = getArtistAliases(artistName, query);
 
   return aliases.some((alias) => hasDirectReleaseSubject(normalizedText, alias));
@@ -175,7 +197,38 @@ export function hasArtistControversySubjectContext({
       return false;
     }
 
+    if (hasControversyActorContext(normalizedText, alias)) {
+      return false;
+    }
+
     return !hasIncidentalControversyContext(normalizedText, alias);
+  });
+}
+
+export function hasArtistFeatureCreditContext({
+  artistName,
+  text,
+  query
+}: {
+  artistName: string;
+  text: string;
+  query?: string;
+}) {
+  const normalizedText = normalizeEventSearchText(text);
+  const aliases = getArtistAliases(artistName, query);
+
+  return aliases.some((normalizedAlias) => {
+    if (!normalizedAlias || !containsNormalizedPhrase(normalizedText, normalizedAlias)) {
+      return false;
+    }
+
+    const alias = toRegexPhrase(normalizedAlias);
+    const creditPrefix = "(?:feat|ft|featuring|features|with|alongside)";
+
+    return (
+      new RegExp(`\\b${creditPrefix}(?:\\s+\\S+){0,2}\\s+${alias}\\b`).test(normalizedText) ||
+      new RegExp(`\\b${alias}\\b(?:\\s+\\S+){0,2}\\s+(?:feature|guest\\s+verse|verse)\\b`).test(normalizedText)
+    );
   });
 }
 
@@ -197,6 +250,13 @@ export function isLowValueMarketArticleTitle(title: string) {
     return true;
   }
 
+  if (
+    /\bmagazine\b/.test(normalized) &&
+    !/\b(?:announces?\s+(?:a\s+)?tour|tour\s+dates?)\b/.test(normalized)
+  ) {
+    return true;
+  }
+
   return (
     /\b(?:top|best|greatest)\s+\d+\b/.test(normalized) ||
     /\b\d+\s+(?:best|greatest|top)\b/.test(normalized) ||
@@ -211,9 +271,32 @@ export function isLowValueMarketArticleTitle(title: string) {
     /\bbang\s+them\b/.test(normalized) ||
     /\bfans?\s+sign\b/.test(normalized) ||
     /\bholds?\s+up\s+fans?\s+sign\b/.test(normalized) ||
+    /\b(?:thinks?|believes?|says?)\b.*\bwon\b.*\b(?:beef|diss|feud)\b/.test(normalized) ||
+    /\b(?:sneakers?|shoes?)\s+(?:we|you)\s+want\s+to\s+see\b/.test(normalized) ||
+    /\b(?:rumou?red|set to)\b.*\b(?:album|collab|song)\b.*\bwhat we know\b/.test(normalized) ||
+    /\bhow\b.*\bbecame\b.*\b(?:star|viral|famous|popular)\b/.test(normalized) ||
     /\bviral\s+chaos\b/.test(normalized) ||
     /\bdeath\s+(?:rumou?r|hoax)\b/.test(normalized) ||
     /\brumou?rs?\s+debunked\b/.test(normalized)
+  );
+}
+
+export function isUncorroboratedLowTierMarketClaim({
+  sourceTier,
+  classificationReason,
+  corroborated = false,
+  corroboratingSourceCount = 0
+}: {
+  sourceTier: number;
+  classificationReason: string;
+  corroborated?: boolean;
+  corroboratingSourceCount?: number;
+}) {
+  return (
+    sourceTier <= 0 &&
+    LOW_TIER_CLAIMS_REQUIRING_CORROBORATION.has(classificationReason) &&
+    !corroborated &&
+    corroboratingSourceCount < 2
   );
 }
 
@@ -301,15 +384,12 @@ function hasDirectReleaseSubject(normalizedText: string, normalizedAlias: string
     "(?:album|deluxe|ep|full\\s+length|mixtape|music\\s+video|project|single|song|track|tracklist|video|visualizer)";
   const releaseActions =
     "(?:announces|announced|drops|dropped|delivers|previews|previewed|releases|released|returns\\s+with|shares|shared|stream|teases|teased|unveils|unveiled|watch)";
-  const featureActions = "(?:feat|ft|featuring|features|features\\s+from|includes|joins|with)";
   const startsWithArtist = new RegExp(`^${alias}\\b`);
   const patterns = [
     startsWithArtist,
     new RegExp(`\\b${alias}\\b(?:\\s+\\S+){0,5}\\s+${releaseActions}\\b`),
     new RegExp(`\\b${alias}\\b(?:\\s+\\S+){0,8}\\s+${releaseNouns}\\b`),
-    new RegExp(`\\b${releaseNouns}\\s+(?:from|by)\\s+${alias}\\b`),
-    new RegExp(`\\b${featureActions}\\s+${alias}\\b`),
-    new RegExp(`\\b${alias}\\b(?:\\s+\\S+){0,4}\\s+(?:feature|guest\\s+verse|verse)\\b`)
+    new RegExp(`\\b${releaseNouns}\\s+(?:from|by)\\s+${alias}\\b`)
   ];
 
   return patterns.some((pattern) => pattern.test(normalizedText));
@@ -335,6 +415,14 @@ function hasIncidentalControversyContext(normalizedText: string, normalizedAlias
   ];
 
   return patterns.some((pattern) => pattern.test(normalizedText));
+}
+
+function hasControversyActorContext(normalizedText: string, normalizedAlias: string) {
+  const alias = toRegexPhrase(normalizedAlias);
+
+  return new RegExp(
+    `\\b${alias}\\b(?:\\s+\\S+){0,3}\\s+(?:accuses|calls\\s+out|criticizes|denies|slams)\\b`
+  ).test(normalizedText);
 }
 
 function getStatusTerms(statusSubtype?: ArtistStatusSubtype | null) {

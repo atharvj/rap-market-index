@@ -4,6 +4,13 @@ import type { Database } from "@/lib/supabase/database.types";
 import { getPacificMarketDate, shiftMarketDate } from "@/server/market/market-date";
 import { getArtistStatusSubtype } from "@/server/market/status-events";
 import { loadArtistImageUrls } from "@/server/market/artist-images";
+import {
+  hasArtistControversySubjectContext,
+  hasArtistReleaseSubjectContext,
+  isLowValueMarketArticleTitle,
+  isUncorroboratedLowTierMarketClaim
+} from "@/server/market/artist-event-disambiguation";
+import { classifyArticleEvent, normalizeDomain } from "@/server/market/gdelt-source";
 import { loadSourcePreviewImageUrls } from "@/server/market/source-preview-images";
 
 export const dynamic = "force-dynamic";
@@ -124,7 +131,8 @@ export async function GET(request: Request) {
         (event) =>
           artistById.has(event.artist_id) &&
           isPublicMarketNewsEvent(event, {
-            feedMode: selectedArtistId ? "artist" : feedMode
+            feedMode: selectedArtistId ? "artist" : feedMode,
+            artist: artistById.get(event.artist_id) ?? null
           })
       )
       .sort((first, second) => getNewsImportanceScore(second, runDate) - getNewsImportanceScore(first, runDate));
@@ -251,9 +259,11 @@ function getInteger(value: string | null, fallback: number, min: number, max: nu
 function isPublicMarketNewsEvent(
   event: MarketEventRow,
   {
-    feedMode
+    feedMode,
+    artist
   }: {
     feedMode: NewsFeedMode;
+    artist: ArtistRow | null;
   }
 ) {
   const rawPayload = toRawPayload(event.raw_payload);
@@ -268,6 +278,13 @@ function isPublicMarketNewsEvent(
   }
 
   if (hasHighRiskEvidenceFlags(rawPayload)) {
+    return false;
+  }
+
+  if (
+    (source === "media_rss_item" || source === "gdelt_article") &&
+    !isStoredMediaEventStillValid(event, rawPayload, artist)
+  ) {
     return false;
   }
 
@@ -296,7 +313,12 @@ function isPublicMarketNewsEvent(
   }
 
   if (source === "musicbrainz_release_group") {
-    return event.event_type === "release" && impactScore >= 25 && confidence >= 0.55;
+    return (
+      rawPayload.corroborated === true &&
+      event.event_type === "release" &&
+      impactScore >= 25 &&
+      confidence >= 0.55
+    );
   }
 
   if (source === "ai_research_event") {
@@ -317,6 +339,66 @@ function isPublicMarketNewsEvent(
   }
 
   return impactScore >= 35 && confidence >= 0.65 && !isLowSignalSocialTitle(title);
+}
+
+function isStoredMediaEventStillValid(
+  event: MarketEventRow,
+  rawPayload: Record<string, unknown>,
+  artist: ArtistRow | null
+) {
+  if (!artist || isLowValueMarketArticleTitle(event.title)) {
+    return false;
+  }
+
+  const domain =
+    getRawString(rawPayload.domain) ||
+    normalizeDomain(undefined, event.source_url ?? undefined) ||
+    "";
+  const classification = classifyArticleEvent(event.title, domain, undefined, {
+    allowLowTierRelease: true
+  });
+  const storedReason = getRawString(rawPayload.classificationReason);
+  const sourceTier = getRawNumber(rawPayload.sourceTier) ?? 0;
+  const corroboratingSourceCount = getRawNumber(rawPayload.corroboratingSourceCount) ?? 0;
+
+  if (
+    !classification ||
+    classification.eventType !== event.event_type ||
+    (storedReason && classification.reason !== storedReason)
+  ) {
+    return false;
+  }
+
+  if (
+    isUncorroboratedLowTierMarketClaim({
+      sourceTier,
+      classificationReason: classification.reason,
+      corroborated: rawPayload.corroborated === true,
+      corroboratingSourceCount
+    })
+  ) {
+    return false;
+  }
+
+  const query = getRawString(rawPayload.searchQuery) ?? undefined;
+
+  if (classification.reason === "release_terms") {
+    return hasArtistReleaseSubjectContext({
+      artistName: artist.name,
+      text: event.title,
+      query
+    });
+  }
+
+  if (classification.reason === "controversy_terms") {
+    return hasArtistControversySubjectContext({
+      artistName: artist.name,
+      text: event.title,
+      query
+    });
+  }
+
+  return true;
 }
 
 function isPublicSocialCatalystEvent(

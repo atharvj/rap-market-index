@@ -101,7 +101,7 @@ export function RmiLineChart({
   height?: number;
   fill?: boolean;
 }) {
-  const points = data.length >= 2 ? data.slice(-24) : buildFlatPoints();
+  const points = data.length >= 2 ? data.slice(-24) : buildFlatPoints(data[0]);
   const width = 520;
   const prices = points.map((point) => point.price);
   const min = Math.min(...prices);
@@ -156,9 +156,11 @@ export function ArtistTableRow({
   );
 }
 
-function buildFlatPoints(): PricePoint[] {
-  return Array.from({ length: 8 }, (_, index) => ({
-    date: String(index),
-    price: 10 + index * 0.2
-  }));
+function buildFlatPoints(point?: PricePoint): PricePoint[] {
+  const price = point?.price ?? 0;
+
+  return [
+    { date: point?.date ?? "start", price },
+    { date: point?.date ?? "current", price }
+  ];
 }

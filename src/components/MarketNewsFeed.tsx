@@ -6,7 +6,7 @@ import { ArrowRight, ExternalLink, Headphones, PlayCircle, Radio } from "lucide-
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
-type MarketNewsItem = {
+export type MarketNewsItem = {
   id: string;
   artistId: string;
   artistName: string;
@@ -51,13 +51,15 @@ export function MarketNewsFeed({
   eventType,
   limit = 8,
   compact = false,
-  variant
+  variant,
+  onItemsChange
 }: {
   artistId?: string;
   eventType?: string;
   limit?: number;
   compact?: boolean;
   variant?: MarketNewsVariant;
+  onItemsChange?: (items: MarketNewsItem[]) => void;
 }) {
   const [items, setItems] = useState<MarketNewsItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -85,11 +87,14 @@ export function MarketNewsFeed({
     })
       .then((response) => response.json() as Promise<MarketNewsResponse>)
       .then((payload) => {
-        setItems(payload.ok ? payload.news ?? [] : []);
+        const nextItems = payload.ok ? payload.news ?? [] : [];
+        setItems(nextItems);
+        onItemsChange?.(nextItems);
       })
       .catch(() => {
         if (!controller.signal.aborted) {
           setItems([]);
+          onItemsChange?.([]);
         }
       })
       .finally(() => {
@@ -101,7 +106,7 @@ export function MarketNewsFeed({
     return () => {
       controller.abort();
     };
-  }, [artistId, eventType, limit, resolvedVariant]);
+  }, [artistId, eventType, limit, onItemsChange, resolvedVariant]);
 
   if (loading) {
     return <MarketNewsSkeleton compact={resolvedVariant === "compact"} />;

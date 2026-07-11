@@ -7,7 +7,6 @@ import { UserAvatar } from "@/components/UserAvatar";
 import { RmiButton } from "@/components/RmiPrimitives";
 import { getBrowserSupabaseClient } from "@/lib/supabase/client";
 import { applyThemePreference, getStoredThemePreference, type ThemePreference } from "@/lib/theme";
-import { BellRing } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 
 export default function SettingsPage() {
@@ -105,18 +104,6 @@ export default function SettingsPage() {
             Change
           </button>
         </SettingsRow>
-      </SettingsGroup>
-
-      <SettingsGroup title="Notifications">
-        <div className="flex items-start gap-3 px-4 py-4">
-          <BellRing className="mt-0.5 h-4 w-4 shrink-0 text-cyan" aria-hidden="true" />
-          <div>
-            <p className="text-sm font-black">Browser and email alerts are coming soon</p>
-            <p className="mt-1 text-xs leading-5 text-paper/50">
-              RMI will ask permission before enabling price or catalyst alerts. No notification preferences are active yet.
-            </p>
-          </div>
-        </div>
       </SettingsGroup>
 
       <SettingsGroup title="Preferences">

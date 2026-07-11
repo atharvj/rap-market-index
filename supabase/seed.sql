@@ -76,7 +76,7 @@ values
   (50, 'lazerdim700', 'Lazer Dim 700', 'LZR700', 19.75, 17.90, 1.980, 'underground', 'from-lime-300 via-cyan-200 to-zinc-100'),
   (51, 'protect', 'Protect', 'PRTCT', 6.70, 6.45, 2.120, 'underground', 'from-rose-300 via-emerald-200 to-stone-100'),
   (52, 'xaviersobased', 'xaviersobased', 'XAVIER', 12.95, 12.20, 1.960, 'underground', 'from-violet-300 via-zinc-100 to-emerald-300'),
-  (53, 'prettifun', 'prettifun', 'PRETTY', 6.25, 5.85, 2.180, 'underground', 'from-red-300 via-zinc-100 to-cyan-300'),
+  (53, 'prettifun', 'prettifun', 'PRETTI', 6.25, 5.85, 2.180, 'underground', 'from-red-300 via-zinc-100 to-cyan-300'),
   (54, 'babychiefdoit', 'BabyChiefDoIt', 'BCDOIT', 8.20, 7.70, 2.140, 'underground', 'from-blue-300 via-stone-100 to-emerald-300');
 
 create or replace function pg_temp.rmi_round_signal(p_value numeric)

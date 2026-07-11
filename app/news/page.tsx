@@ -1,17 +1,24 @@
 "use client";
 
 import { useGame } from "@/components/GameProvider";
-import { MarketNewsFeed } from "@/components/MarketNewsFeed";
+import { MarketNewsFeed, type MarketNewsItem } from "@/components/MarketNewsFeed";
 import { ArtistIdentity, ChangeText, RmiButton } from "@/components/RmiPrimitives";
 import { Music, ShieldCheck } from "lucide-react";
-import { useMemo } from "react";
+import { useCallback, useMemo, useState } from "react";
 
 export default function NewsPage() {
   const { state } = useGame();
+  const [newsArtistIds, setNewsArtistIds] = useState<Set<string>>(new Set());
   const movers = useMemo(
-    () => [...state.artists].sort((a, b) => Math.abs(b.dailyChangePercent) - Math.abs(a.dailyChangePercent)).slice(0, 5),
-    [state.artists]
+    () => [...state.artists]
+      .filter((artist) => newsArtistIds.has(artist.id) && Math.abs(artist.dailyChangePercent) >= 0.01)
+      .sort((a, b) => Math.abs(b.dailyChangePercent) - Math.abs(a.dailyChangePercent))
+      .slice(0, 5),
+    [newsArtistIds, state.artists]
   );
+  const handleNewsItems = useCallback((items: MarketNewsItem[]) => {
+    setNewsArtistIds(new Set(items.map((item) => item.artistId)));
+  }, []);
 
   return (
     <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_280px] xl:grid-cols-[minmax(0,1fr)_320px]">
@@ -19,21 +26,25 @@ export default function NewsPage() {
         <h1 className="text-3xl font-black">Market News</h1>
         <p className="mt-1 text-sm text-paper/65">The most important verified catalysts, ranked by impact, confidence, and recency.</p>
         <div className="mt-5 rmi-card px-5">
-          <MarketNewsFeed limit={40} variant="full" />
+          <MarketNewsFeed limit={40} variant="full" onItemsChange={handleNewsItems} />
         </div>
       </main>
 
       <aside className="space-y-4 lg:sticky lg:top-6 lg:self-start">
         <section className="rmi-card overflow-hidden">
           <div className="border-b border-line px-4 py-3">
-            <h2 className="text-sm font-black">Moving With the News</h2>
+            <h2 className="text-sm font-black">News-Linked Movers</h2>
           </div>
-          {movers.map((artist) => (
-            <div key={artist.id} className="flex items-center justify-between gap-3 border-b border-line px-4 py-3 last:border-b-0">
-              <ArtistIdentity artist={artist} />
-              <ChangeText value={artist.dailyChangePercent} />
-            </div>
-          ))}
+          {movers.length ? movers.map((artist) => (
+              <div key={artist.id} className="flex items-center justify-between gap-3 border-b border-line px-4 py-3 last:border-b-0">
+                <ArtistIdentity artist={artist} />
+                <ChangeText value={artist.dailyChangePercent} />
+              </div>
+            )) : (
+              <p className="px-4 py-5 text-sm leading-6 text-paper/50">
+                No artist with a verified story is making a material quote move right now.
+              </p>
+            )}
           <div className="p-4"><RmiButton href="/markets" variant="secondary">View Markets</RmiButton></div>
         </section>
 

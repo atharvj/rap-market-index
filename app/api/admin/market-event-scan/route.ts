@@ -33,6 +33,9 @@ type MarketEventScanBody = {
   rssLookbackDays?: number;
   rssMaxItemsPerFeed?: number;
   includeGoogleNews?: boolean;
+  includeGdelt?: boolean;
+  gdeltArtistLimit?: number;
+  includeMediaRss?: boolean;
   includeAiResearch?: boolean;
   aiResearchArtistLimit?: number;
   aiResearchLookbackDays?: number;
@@ -55,12 +58,15 @@ const MAX_ARTIST_LIMIT = 100;
 const DEFAULT_MAX_RECORDS = 12;
 const MAX_GDELT_RECORDS = 50;
 const DEFAULT_DELAY_MS = 700;
+const DEFAULT_GDELT_ARTIST_LIMIT = 20;
+const MAX_GDELT_ARTIST_LIMIT = 40;
+const DEFAULT_GDELT_DELAY_MS = 5200;
 const DEFAULT_TIMEOUT_MS = 12000;
 const DEFAULT_RSS_LOOKBACK_DAYS = 30;
 const DEFAULT_RSS_MAX_ITEMS_PER_FEED = 40;
 const DEFAULT_AI_RESEARCH_LOOKBACK_DAYS = 14;
 const DEFAULT_AI_RESEARCH_EVENTS_PER_ARTIST = 1;
-const DEFAULT_AI_RESEARCH_ARTIST_LIMIT = 8;
+const DEFAULT_AI_RESEARCH_ARTIST_LIMIT = 6;
 const MAX_AI_RESEARCH_ARTIST_LIMIT = 25;
 
 export async function GET(request: Request) {
@@ -154,36 +160,56 @@ export async function POST(request: Request) {
         lookbackDays: 30
       })
     ]);
-    const result = await collectGdeltMarketSignals({
-      artists,
-      runDate,
-      externalIds,
-      baselines,
-      delayMs,
-      maxRecords,
-      timeoutMs
-    });
-    const mediaRss = await collectMediaRssMarketEvents({
-      artists,
-      runDate,
-      externalIds,
-      feedUrls: getConfiguredRssFeedUrls(body.rssFeedUrls),
-      includeGoogleNews: body.includeGoogleNews ?? getEnvBoolean("MARKET_RSS_GOOGLE_NEWS", true),
-      lookbackDays: normalizeInteger(
-        body.rssLookbackDays,
-        getEnvInteger("MARKET_RSS_LOOKBACK_DAYS", DEFAULT_RSS_LOOKBACK_DAYS, 1, 30),
-        1,
-        30
-      ),
-      maxItemsPerFeed: normalizeInteger(
-        body.rssMaxItemsPerFeed,
-        getEnvInteger("MARKET_RSS_MAX_ITEMS_PER_FEED", DEFAULT_RSS_MAX_ITEMS_PER_FEED, 5, 100),
-        5,
-        100
-      ),
-      delayMs: Math.min(delayMs, 1000),
-      timeoutMs
-    });
+    const gdeltEnabled = body.includeGdelt ?? getEnvBoolean("MARKET_GDELT_ENABLED", false);
+    const mediaRssEnabled = body.includeMediaRss !== false;
+    const gdeltArtistLimit = requestedArtistIds.length
+      ? artists.length
+      : normalizeInteger(
+          body.gdeltArtistLimit,
+          getEnvInteger("MARKET_GDELT_ARTIST_LIMIT", DEFAULT_GDELT_ARTIST_LIMIT, 1, MAX_GDELT_ARTIST_LIMIT),
+          1,
+          MAX_GDELT_ARTIST_LIMIT
+        );
+    const gdeltArtists = gdeltEnabled
+      ? selectOldestSourceArtists(artists, latestGdeltDates, gdeltArtistLimit)
+      : [];
+    const result = gdeltEnabled
+      ? await collectGdeltMarketSignals({
+          artists: gdeltArtists,
+          runDate,
+          externalIds,
+          baselines,
+          delayMs: Math.max(
+            delayMs,
+            getEnvInteger("MARKET_GDELT_DELAY_MS", DEFAULT_GDELT_DELAY_MS, 5000, 15000)
+          ),
+          maxRecords,
+          timeoutMs
+        })
+      : { signals: {}, observations: [], eventsByArtist: {} };
+    const mediaRss = mediaRssEnabled
+      ? await collectMediaRssMarketEvents({
+          artists,
+          runDate,
+          externalIds,
+          feedUrls: getConfiguredRssFeedUrls(body.rssFeedUrls),
+          includeGoogleNews: body.includeGoogleNews ?? getEnvBoolean("MARKET_RSS_GOOGLE_NEWS", true),
+          lookbackDays: normalizeInteger(
+            body.rssLookbackDays,
+            getEnvInteger("MARKET_RSS_LOOKBACK_DAYS", DEFAULT_RSS_LOOKBACK_DAYS, 1, 30),
+            1,
+            30
+          ),
+          maxItemsPerFeed: normalizeInteger(
+            body.rssMaxItemsPerFeed,
+            getEnvInteger("MARKET_RSS_MAX_ITEMS_PER_FEED", DEFAULT_RSS_MAX_ITEMS_PER_FEED, 5, 100),
+            5,
+            100
+          ),
+          delayMs: Math.min(delayMs, 1000),
+          timeoutMs
+        })
+      : { observations: [], eventsByArtist: {}, warnings: [], scannedFeedCount: 0 };
     const aiResearchEnabled = body.includeAiResearch ?? getEnvBoolean("MARKET_AI_RESEARCH_ENABLED", config.aiResearchConfigured);
     const aiResearchArtistLimit = normalizeInteger(
       body.aiResearchArtistLimit,
@@ -196,6 +222,7 @@ export async function POST(request: Request) {
           artists,
           mergedEventsPreview(mediaRss.eventsByArtist, result.eventsByArtist),
           latestAiResearchDates,
+          runDate,
           aiResearchArtistLimit
         )
       : [];
@@ -218,7 +245,7 @@ export async function POST(request: Request) {
             1,
             5
           ),
-          delayMs: getEnvInteger("MARKET_AI_RESEARCH_DELAY_MS", 2100, 0, 5000),
+          delayMs: getEnvInteger("MARKET_AI_RESEARCH_DELAY_MS", 12000, 0, 30000),
           timeoutMs
         })
       : {
@@ -257,7 +284,10 @@ export async function POST(request: Request) {
       observationCount: observations.length,
       eventCount: events.length,
       gdeltEventCount: flattenEvents(result.eventsByArtist).length,
+      gdeltScannedArtistCount: gdeltArtists.length,
       mediaRssEventCount: flattenEvents(mediaRss.eventsByArtist).length,
+      gdeltEnabled,
+      mediaRssEnabled,
       aiResearchEnabled,
       aiResearchScannedArtistCount: aiResearchArtists.length,
       aiResearchEventCount: flattenEvents(aiResearch.eventsByArtist).length,
@@ -305,13 +335,33 @@ function selectAiResearchArtists(
   artists: MarketUpdateArtist[],
   existingEventsByArtist: Record<string, MarketEvent[]>,
   latestAiResearchDates: Record<string, string>,
+  runDate: string,
   limit: number
 ) {
   if (limit <= 0) {
     return [];
   }
 
-  return [...artists]
+  const prioritySlotCount = Math.min(limit, Math.max(1, Math.ceil(limit * 0.25)));
+  const priorityArtists = [...artists]
+    .filter(
+      (artist) =>
+        (existingEventsByArtist[artist.id]?.length ?? 0) > 0 && latestAiResearchDates[artist.id] !== runDate
+    )
+    .sort((first, second) => {
+      const eventDifference = getArtistEventPriority(existingEventsByArtist[second.id]) -
+        getArtistEventPriority(existingEventsByArtist[first.id]);
+
+      if (eventDifference !== 0) {
+        return eventDifference;
+      }
+
+      return (latestAiResearchDates[first.id] ?? "").localeCompare(latestAiResearchDates[second.id] ?? "");
+    })
+    .slice(0, prioritySlotCount);
+  const selected = new Set(priorityArtists.map((artist) => artist.id));
+  const rotatingArtists = [...artists]
+    .filter((artist) => !selected.has(artist.id))
     .sort((first, second) => {
       const firstScanDate = latestAiResearchDates[first.id] ?? "";
       const secondScanDate = latestAiResearchDates[second.id] ?? "";
@@ -325,6 +375,33 @@ function selectAiResearchArtists(
 
       if (firstEvents !== secondEvents) {
         return firstEvents - secondEvents;
+      }
+
+      return first.ticker.localeCompare(second.ticker);
+    })
+    .slice(0, Math.max(0, limit - priorityArtists.length));
+
+  return [...priorityArtists, ...rotatingArtists];
+}
+
+function getArtistEventPriority(events: MarketEvent[] | undefined) {
+  return (events ?? []).reduce(
+    (highest, event) => Math.max(highest, Math.abs(event.impactScore) * event.confidence),
+    0
+  );
+}
+
+function selectOldestSourceArtists(
+  artists: MarketUpdateArtist[],
+  latestDates: Record<string, string>,
+  limit: number
+) {
+  return [...artists]
+    .sort((first, second) => {
+      const dateDifference = (latestDates[first.id] ?? "").localeCompare(latestDates[second.id] ?? "");
+
+      if (dateDifference !== 0) {
+        return dateDifference;
       }
 
       return first.ticker.localeCompare(second.ticker);

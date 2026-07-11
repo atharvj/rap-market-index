@@ -53,6 +53,7 @@ const TICKER_OVERRIDES: Record<string, string> = {
   "megan thee stallion": "MEGAN",
   "nle choppa": "NLE",
   "plaqueboymax": "PBM",
+  "prettifun": "PRETTI",
   "that mexican ot": "MXOT",
   "ynw melly": "MELLY",
   "youngboy never broke again": "YB"
