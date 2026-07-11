@@ -2,7 +2,8 @@
 
 import { ArtistAvatar } from "@/components/ArtistAvatar";
 import { useGame } from "@/components/GameProvider";
-import { ArtistIdentity, ChangeText, RmiButton, RmiLineChart, RmiSection } from "@/components/RmiPrimitives";
+import { ChangeText, RmiButton, RmiSection } from "@/components/RmiPrimitives";
+import { PriceChart } from "@/components/PriceChart";
 import { WatchlistButton } from "@/components/WatchlistButton";
 import { formatCurrency, formatPercent } from "@/lib/formatters";
 import { buildMarketIndexSeries, getMarketBreadth, getSeriesChangePercent } from "@/lib/market-analytics";
@@ -20,10 +21,6 @@ export default function MarketsPage() {
   const marketIndex = useMemo(() => buildMarketIndexSeries(state.artists), [state.artists]);
   const marketIndexChange = getSeriesChangePercent(marketIndex);
   const breadth = getMarketBreadth(state.artists);
-  const leadingMovers = useMemo(
-    () => [...state.artists].sort((first, second) => Math.abs(second.dailyChangePercent) - Math.abs(first.dailyChangePercent)).slice(0, 4),
-    [state.artists]
-  );
   const artists = useMemo(() => {
     const normalized = query.trim().toLowerCase();
 
@@ -64,25 +61,25 @@ export default function MarketsPage() {
           <h1 className="text-3xl font-black">Markets</h1>
           <p className="mt-1 text-sm font-bold text-paper/70">{artists.length} artists listed</p>
         </div>
-        <RmiButton href="/scout" variant="secondary">Scout artists</RmiButton>
+        <RmiButton href="/scout" variant="secondary">Scout Artists</RmiButton>
       </header>
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_340px]">
         <RmiSection
-          title="Market Overview"
-          subtitle="Equal-weight RMI index built from recorded artist quotes."
+          title="Overall Market Trend"
+          subtitle="Average price movement across every listed artist over recorded market sessions."
           action={
             <span className={marketIndexChange >= 0 ? "text-sm font-black text-mint number-tabular" : "text-sm font-black text-ember number-tabular"}>
               {formatPercent(marketIndexChange)}
             </span>
           }
         >
-          <div className="h-40 p-4">
-            <RmiLineChart data={marketIndex} positive={marketIndexChange >= 0} height={150} />
+          <div className="p-4">
+            <PriceChart data={marketIndex} height={190} />
           </div>
         </RmiSection>
 
-        <RmiSection title="Session Breadth" subtitle="How much of the board is participating today.">
+        <RmiSection title="Market Direction" subtitle="How many artist quotes are rising, falling, or unchanged today.">
           <div className="grid grid-cols-1 gap-2 p-4 sm:grid-cols-3 lg:grid-cols-1">
             <BreadthRow label="Advancing" value={breadth.advancers} tone="good" />
             <BreadthRow label="Declining" value={breadth.decliners} tone="bad" />
@@ -90,18 +87,6 @@ export default function MarketsPage() {
           </div>
         </RmiSection>
       </div>
-
-      <section>
-        <div className="mb-3 flex items-center justify-between gap-4">
-          <div>
-            <h2 className="text-base font-black">Leading Movers</h2>
-            <p className="mt-1 text-sm text-paper/50">Largest absolute quote changes in the current session.</p>
-          </div>
-        </div>
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          {leadingMovers.map((artist) => <MarketMoverCard key={artist.id} artist={artist} />)}
-        </div>
-      </section>
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
         <input
@@ -113,7 +98,7 @@ export default function MarketsPage() {
         <div className="flex items-center gap-1 rounded-lg border border-line bg-panel p-1" aria-label="Sort markets">
           <SortButton active={sortKey === "name"} onClick={() => chooseSort("name")}>Name</SortButton>
           <SortButton active={sortKey === "price"} onClick={() => chooseSort("price")}>Price</SortButton>
-          <SortButton active={sortKey === "change"} onClick={() => chooseSort("change")}>24h</SortButton>
+          <SortButton active={sortKey === "change"} onClick={() => chooseSort("change")}>24H</SortButton>
           <button
             type="button"
             onClick={() => setSortDescending((current) => !current)}
@@ -132,9 +117,9 @@ export default function MarketsPage() {
 
       <section className="rmi-card overflow-hidden">
         <div className="grid grid-cols-[minmax(0,1fr)_104px_84px_44px] gap-x-4 border-b border-line px-4 py-3 text-xs font-bold text-paper/45">
-          <span>artist</span>
-          <span className="text-right">price</span>
-          <span className="text-right">24h</span>
+          <span>Artist</span>
+          <span className="text-right">Price</span>
+          <span className="text-right">24H</span>
           <span className="sr-only">watchlist</span>
         </div>
         {artists.map((artist) => (
@@ -158,24 +143,6 @@ export default function MarketsPage() {
         ))}
       </section>
     </div>
-  );
-}
-
-function MarketMoverCard({ artist }: { artist: ReturnType<typeof useGame>["state"]["artists"][number] }) {
-  return (
-    <Link href={`/artists/${artist.id}`} className="rmi-card p-4 transition hover:-translate-y-0.5 hover:border-cyan/60">
-      <div className="flex items-start justify-between gap-3">
-        <ArtistIdentity artist={artist} linked={false} />
-        <ChangeText value={artist.dailyChangePercent} />
-      </div>
-      <div className="mt-4 h-16">
-        <RmiLineChart data={artist.priceHistory} positive={artist.dailyChangePercent >= 0} height={72} />
-      </div>
-      <div className="mt-2 flex items-center justify-between gap-3 text-xs font-bold text-paper/45">
-        <span>{formatCurrency(artist.currentPrice)}</span>
-        <span>{artist.hypeScore}/100 signal</span>
-      </div>
-    </Link>
   );
 }
 

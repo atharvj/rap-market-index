@@ -1,7 +1,8 @@
 "use client";
 
 import { useGame } from "@/components/GameProvider";
-import { ArtistIdentity, ArtistMiniCard, ChangeText, RmiButton, RmiLineChart, RmiSection } from "@/components/RmiPrimitives";
+import { PriceChart } from "@/components/PriceChart";
+import { ArtistIdentity, ArtistMiniCard, ChangeText, RmiButton, RmiSection } from "@/components/RmiPrimitives";
 import { formatPercent } from "@/lib/formatters";
 import { buildMarketIndexSeries, getMarketBreadth, getSeriesChangePercent } from "@/lib/market-analytics";
 import { Activity, Info, Radar, ShieldCheck, TrendingUp } from "lucide-react";
@@ -31,7 +32,7 @@ export default function ScoutPage() {
 
   return (
     <div className="space-y-6">
-      <header className="grid gap-5 rounded-xl border border-line bg-panel p-6 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
+      <header className="grid gap-5 rounded-lg border border-line bg-panel p-6 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
         <div>
           <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.16em] text-cyan">
             <Radar className="h-4 w-4" aria-hidden="true" />
@@ -54,12 +55,12 @@ export default function ScoutPage() {
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_340px]">
         <RmiSection
-          title="Discovery Trend"
-          subtitle="Equal-weight quote performance for the artists currently surfaced by Scout."
+          title="Scout Market Trend"
+          subtitle="Average quote movement for the emerging artists currently surfaced by Scout."
           action={<TrendingUp className="h-4 w-4 text-cyan" aria-hidden="true" />}
         >
-          <div className="h-40 p-4">
-            <RmiLineChart data={discoveryIndex} positive={discoveryChange >= 0} height={150} />
+          <div className="p-4">
+            <PriceChart data={discoveryIndex} height={190} />
           </div>
         </RmiSection>
 
@@ -115,7 +116,7 @@ export default function ScoutPage() {
 
 function ScoutStat({ label, value, detail, tone = "neutral" }: { label: string; value: string; detail: string; tone?: "neutral" | "good" | "bad" }) {
   return (
-    <div className="rounded-xl bg-panelSoft p-4">
+    <div className="rounded-lg bg-panelSoft p-4">
       <p className="text-xs font-bold text-paper/50">{label}</p>
       <p className={tone === "good" ? "mt-1 text-xl font-black text-mint number-tabular" : tone === "bad" ? "mt-1 text-xl font-black text-ember number-tabular" : "mt-1 text-xl font-black number-tabular"}>{value}</p>
       <p className="mt-1 text-xs text-paper/40">{detail}</p>
@@ -134,7 +135,7 @@ function SignalTile({ label, value }: { label: string; value: string }) {
 
 function ScoutMethod({ icon, title, copy }: { icon: React.ReactNode; title: string; copy: string }) {
   return (
-    <div className="flex items-start gap-3 rounded-xl bg-panelSoft p-4">
+    <div className="flex items-start gap-3 rounded-lg bg-panelSoft p-4">
       <span className="mt-0.5 text-cyan">{icon}</span>
       <div>
         <h3 className="text-sm font-black">{title}</h3>

@@ -8,7 +8,7 @@ export function SignedInGate({ title, description }: { title: string; descriptio
   const { loading } = useAuth();
 
   if (loading) {
-    return <div className="mx-auto h-64 max-w-xl rounded-xl bg-panelSoft motion-safe:animate-pulse" />;
+    return <div className="mx-auto h-64 max-w-xl rounded-lg bg-panelSoft motion-safe:animate-pulse" />;
   }
 
   return (

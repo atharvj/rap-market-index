@@ -3,8 +3,9 @@
 import { ArtistAvatar } from "@/components/ArtistAvatar";
 import { useAuth } from "@/components/AuthProvider";
 import { useGame } from "@/components/GameProvider";
+import { PriceChart } from "@/components/PriceChart";
 import { SignedInGate } from "@/components/SignedInGate";
-import { ChangeText, RmiButton, RmiLineChart, RmiSection } from "@/components/RmiPrimitives";
+import { ChangeText, RmiButton, RmiSection } from "@/components/RmiPrimitives";
 import { formatCurrency, formatDate, formatPercent, formatShares } from "@/lib/formatters";
 import { buildPortfolioQuoteSeries, getSeriesChangePercent } from "@/lib/market-analytics";
 import { STARTING_CASH } from "@/lib/market";
@@ -62,8 +63,8 @@ export default function PortfolioPage() {
       </section>
 
       <RmiSection
-        title="Current Positions at Historical Quotes"
-        subtitle="Values today's positions and cash against each recorded market close."
+        title="Portfolio Value History"
+        subtitle="Estimated value of your current holdings and cash at each recorded market close."
         action={chartData.length ? (
           <span className={quoteHistoryChange >= 0 ? "text-sm font-black text-mint number-tabular" : "text-sm font-black text-ember number-tabular"}>
             {formatPercent(quoteHistoryChange)}
@@ -71,8 +72,8 @@ export default function PortfolioPage() {
         ) : null}
       >
         {chartData.length ? (
-          <div className="h-44 p-4">
-            <RmiLineChart data={chartData} positive={quoteHistoryChange >= 0} height={165} />
+          <div className="p-4">
+            <PriceChart data={chartData} height={220} />
           </div>
         ) : (
           <div className="grid min-h-40 place-items-center p-6 text-center">
@@ -195,7 +196,7 @@ export default function PortfolioPage() {
 
 function PortfolioStat({ label, value, detail, good = true }: { label: string; value: string; detail?: string; good?: boolean }) {
   return (
-    <div className="rounded-xl bg-panelSoft p-4">
+    <div className="rounded-lg bg-panelSoft p-4">
       <p className="text-xs font-bold text-paper/55">{label}</p>
       <p className="mt-1 text-2xl font-black number-tabular">{value}</p>
       {detail ? <p className={good ? "mt-1 text-xs font-black text-mint" : "mt-1 text-xs font-black text-ember"}>{detail}</p> : null}

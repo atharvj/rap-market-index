@@ -114,7 +114,7 @@ export default function PublicUserProfilePage() {
 
   return (
     <div className="mx-auto max-w-5xl space-y-5">
-      <section className="rounded border border-line bg-panel p-5 shadow-market">
+      <section className="rmi-card p-5 shadow-market">
         <div className="grid gap-5 md:grid-cols-[130px_minmax(0,1fr)]">
           <UserAvatar avatarUrl={profile.avatarUrl} label={profile.username} size="lg" />
           <div className="min-w-0">
@@ -123,9 +123,9 @@ export default function PublicUserProfilePage() {
               {profile.isAdmin ? <AdminBadge /> : null}
             </div>
             <div className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
-              <ProfileMetric icon={<CalendarDays className="h-4 w-4" />} label="Member since" value={memberSince} />
+              <ProfileMetric icon={<CalendarDays className="h-4 w-4" />} label="Member Since" value={memberSince} />
               <ProfileMetric icon={<Trophy className="h-4 w-4" />} label="Rank" value="Global standings" />
-              <ProfileMetric icon={<WalletCards className="h-4 w-4" />} label="Net worth" value={portfolioVisible ? formatCurrency(profile.portfolioValue ?? 0) : "Private"} />
+              <ProfileMetric icon={<WalletCards className="h-4 w-4" />} label="Net Worth" value={portfolioVisible ? formatCurrency(profile.portfolioValue ?? 0) : "Private"} />
               <ProfileMetric icon={<WalletCards className="h-4 w-4" />} label="Cash" value={portfolioVisible ? formatCurrency(profile.cashBalance ?? 0) : "Private"} />
             </div>
             <p className="mt-5 max-w-3xl text-sm font-bold leading-6 text-paper/58">
@@ -133,18 +133,18 @@ export default function PublicUserProfilePage() {
             </p>
             {profile.gainPercent !== null ? (
               <p className={clsx("mt-3 text-sm font-black number-tabular", profile.gainPercent >= 0 ? "text-mint" : "text-ember")}>
-                {formatPercent(profile.gainPercent)} all-time
+                {formatPercent(profile.gainPercent)} All-Time
               </p>
             ) : null}
           </div>
         </div>
       </section>
 
-      <section className="rounded border border-line bg-panel shadow-market">
+      <section className="rmi-card shadow-market">
         <div className="flex min-h-11 items-center gap-2 border-b border-line bg-panelSoft px-4">
           <span className="h-5 w-1 rounded bg-brass" />
           <BarChart3 className="h-4 w-4 text-brass" aria-hidden="true" />
-          <h2 className="text-xs font-black uppercase tracking-wide">Public portfolio</h2>
+          <h2 className="text-xs font-black uppercase tracking-wide">Public Portfolio</h2>
         </div>
         <div className="divide-y divide-line">
           {!profile.portfolioIsPublic ? (
@@ -190,16 +190,16 @@ export default function PublicUserProfilePage() {
         </div>
       </section>
 
-      <section className="rounded border border-line bg-panel shadow-market">
+      <section className="rmi-card shadow-market">
         <div className="flex min-h-11 items-center gap-2 border-b border-line bg-panelSoft px-4">
           <span className="h-5 w-1 rounded bg-brass" />
           <Star className="h-4 w-4 text-brass" aria-hidden="true" />
-          <h2 className="text-xs font-black uppercase tracking-wide">Favorite artists</h2>
+          <h2 className="text-xs font-black uppercase tracking-wide">Favorite Artists</h2>
         </div>
         <div className="grid divide-y divide-line sm:grid-cols-2 sm:divide-x sm:divide-y-0 lg:grid-cols-3">
           {profile.favoriteArtists.length ? (
             profile.favoriteArtists.map((artist) => (
-              <Link key={artist.id} href={`/artists/${artist.id}`} className="grid gap-3 p-4 hover:bg-panelSoft/70">
+              <Link key={artist.id} href={`/artists/${artist.id}`} className="flex items-center gap-3 p-4 hover:bg-panelSoft/70">
                 <span className="flex items-center gap-3">
                   <ProfileArtistImage
                     name={artist.name}
@@ -209,16 +209,8 @@ export default function PublicUserProfilePage() {
                   />
                   <span className="min-w-0">
                     <span className="block truncate text-sm font-black">{artist.name}</span>
-                    <span className="text-xs font-bold text-paper/50">
-                      {artist.ticker} · {formatCurrency(artist.currentPrice)}
-                    </span>
+                    <span className="text-xs font-bold text-paper/50">${artist.ticker}</span>
                   </span>
-                </span>
-                <span className="flex items-center justify-between text-xs font-black number-tabular">
-                  <span className={artist.dailyChangePercent >= 0 ? "text-mint" : "text-ember"}>
-                    {formatPercent(artist.dailyChangePercent)}
-                  </span>
-                  <span className="text-paper/45">{artist.hypeScore}/100 score</span>
                 </span>
               </Link>
             ))
@@ -243,7 +235,7 @@ function ProfileMetric({ icon, label, value }: { icon: React.ReactNode; label: s
 
 function StatusCard({ text }: { text: string }) {
   return (
-    <section className="mx-auto max-w-xl rounded border border-line bg-panel p-5 text-sm font-bold text-paper/55 shadow-market">
+    <section className="rmi-card mx-auto max-w-xl p-5 text-sm font-bold text-paper/55 shadow-market">
       {text}
     </section>
   );

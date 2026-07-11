@@ -75,25 +75,25 @@ export function TradeTicket({
   }
 
   return (
-    <section className="rounded border border-line bg-panel shadow-market">
+    <section className="rmi-card overflow-hidden shadow-market">
       <div className="border-b border-line bg-panelSoft px-4 py-3">
         <p className="text-sm font-black">Trade {artist.ticker}</p>
       </div>
       <div className="p-4">
         <div className="flex items-start justify-between gap-3">
           <div>
-            <p className="text-xs font-bold uppercase tracking-wide text-paper/50">Last price</p>
+            <p className="text-xs font-bold uppercase tracking-wide text-paper/50">Last Price</p>
             <h2 className="mt-1 text-2xl font-black number-tabular">{formatCurrency(artist.currentPrice)}</h2>
           </div>
-          <p className="rounded border border-line bg-panel px-3 py-1 text-sm font-bold number-tabular text-paper/70">
+          <p className="rounded-lg border border-line bg-panel px-3 py-1 text-sm font-bold number-tabular text-paper/70">
             {artist.name}
           </p>
         </div>
 
-        <div className="mt-4 grid grid-cols-2 gap-1 rounded border border-line bg-panelSoft p-1">
+        <div className="mt-4 grid grid-cols-2 gap-1 rounded-lg border border-line bg-panelSoft p-1">
           <button
             type="button"
-            className={`rounded px-3 py-2 text-sm font-black transition ${
+            className={`rounded-md px-3 py-2 text-sm font-black transition ${
               side === "buy" ? "bg-mint text-white" : "text-paper/60 hover:bg-panel hover:text-paper"
             }`}
             onClick={() => setSide("buy")}
@@ -102,7 +102,7 @@ export function TradeTicket({
           </button>
           <button
             type="button"
-            className={`rounded px-3 py-2 text-sm font-black transition ${
+            className={`rounded-md px-3 py-2 text-sm font-black transition ${
               side === "sell" ? "bg-ember text-white" : "text-paper/60 hover:bg-panel hover:text-paper"
             }`}
             onClick={() => setSide("sell")}
@@ -114,7 +114,7 @@ export function TradeTicket({
         <label className="mt-4 block text-xs font-bold uppercase tracking-wide text-paper/50" htmlFor="shares">
           Shares
         </label>
-        <div className="mt-2 flex min-h-12 items-center overflow-hidden rounded border border-line bg-panel">
+        <div className="mt-2 flex min-h-12 items-center overflow-hidden rounded-lg border border-line bg-panel">
           <button
             type="button"
             className="grid h-12 w-12 place-items-center border-r border-line text-paper/50 hover:bg-panelSoft hover:text-paper"
@@ -171,7 +171,7 @@ export function TradeTicket({
           type="button"
           disabled={disabled}
           onClick={submitTrade}
-          className={`mt-4 flex min-h-11 w-full items-center justify-center rounded px-4 text-sm font-black transition ${
+          className={`mt-4 flex min-h-11 w-full items-center justify-center rounded-lg px-4 text-sm font-black transition ${
             side === "buy"
               ? "bg-mint text-white hover:bg-mint/90"
               : "bg-ember text-white hover:bg-ember/90"

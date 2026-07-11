@@ -56,7 +56,7 @@ export default function NewsPage() {
           </p>
         </section>
 
-        <section className="flex items-start gap-3 rounded-xl bg-panelSoft p-4 text-xs leading-5 text-paper/55">
+        <section className="flex items-start gap-3 rounded-lg bg-panelSoft p-4 text-xs leading-5 text-paper/55">
           <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-mint" aria-hidden="true" />
           <p>News can inform a quote, but no single headline determines an artist price by itself.</p>
         </section>

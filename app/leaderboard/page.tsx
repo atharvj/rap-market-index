@@ -3,6 +3,7 @@
 import { AdminBadge } from "@/components/AdminBadge";
 import { ArtistIdentity, ChangeText, RmiButton } from "@/components/RmiPrimitives";
 import { useGame } from "@/components/GameProvider";
+import { UserAvatar } from "@/components/UserAvatar";
 import { formatCurrency, formatPercent } from "@/lib/formatters";
 import clsx from "clsx";
 import { Crown, Medal, ShieldCheck, Users } from "lucide-react";
@@ -11,7 +12,7 @@ import Link from "next/link";
 export default function LeaderboardPage() {
   const { leaderboard, portfolioValue, gainPercent, state } = useGame();
   const current = leaderboard.find((entry) => entry.isCurrentUser);
-  const currentRank = current ? leaderboard.findIndex((entry) => entry.id === current.id) + 1 : null;
+  const currentRank = current ? current.rank ?? leaderboard.findIndex((entry) => entry.id === current.id) + 1 : null;
   const leader = leaderboard[0];
   const medianPortfolio = leaderboard.length
     ? [...leaderboard].sort((first, second) => first.portfolioValue - second.portfolioValue)[Math.floor((leaderboard.length - 1) / 2)]?.portfolioValue ?? 0
@@ -52,10 +53,11 @@ export default function LeaderboardPage() {
             className={clsx("rmi-card grid place-items-center p-6 text-center", index === 0 && "border-cyan/70")}
           >
             {index === 0 ? <Crown className="h-5 w-5 text-brass" /> : <Medal className="h-5 w-5 text-paper/50" />}
+            <div className="mt-3"><UserAvatar avatarUrl={entry.avatarUrl} label={entry.username} size="sm" /></div>
             <Link href={`/users/${entry.id}`} className="mt-3 text-sm font-black hover:text-cyan">
               {entry.isCurrentUser ? "You" : entry.username}
             </Link>
-            <p className="text-xs font-bold text-paper/60">portfolio value</p>
+            <p className="text-xs font-bold text-paper/60">Portfolio Value</p>
             <p className="mt-1 text-xl font-black text-mint number-tabular">{formatCurrency(entry.portfolioValue)}</p>
           </div>
         ))}
@@ -64,24 +66,26 @@ export default function LeaderboardPage() {
         <section className="rmi-card overflow-x-auto">
         <div className="min-w-[650px]">
         <div className="grid grid-cols-[54px_minmax(0,1fr)_120px_110px_88px] border-b border-line px-4 py-3 text-xs font-bold text-paper/45">
-          <span>rank</span>
-          <span>trader</span>
-          <span className="text-right">value</span>
-          <span className="text-right">invested</span>
-          <span className="text-right">all-time</span>
+          <span>Rank</span>
+          <span>Trader</span>
+          <span className="text-right">Value</span>
+          <span className="text-right">Invested</span>
+          <span className="text-right">All-Time</span>
         </div>
         {leaderboard.map((entry, index) => (
           <div
             key={entry.id}
             className={clsx(
               "grid grid-cols-[54px_minmax(0,1fr)_120px_110px_88px] items-center border-b border-line px-4 py-3 text-sm last:border-b-0",
-              entry.isCurrentUser && "bg-cyan/8"
+              entry.isCurrentUser && "border-l-2 border-l-cyan bg-cyan/10"
             )}
+            aria-current={entry.isCurrentUser ? "true" : undefined}
           >
-            <span className="font-black">{index + 1}</span>
+            <span className="font-black">{entry.rank ?? index + 1}</span>
             <span className="flex min-w-0 items-center gap-2">
+              <UserAvatar avatarUrl={entry.avatarUrl} label={entry.username} size="sm" />
               <Link href={`/users/${entry.id}`} className="truncate font-black hover:text-cyan">
-                {entry.username}
+                {entry.isCurrentUser ? `${entry.username} (You)` : entry.username}
               </Link>
               {entry.isAdmin ? <AdminBadge compact /> : null}
             </span>
@@ -132,6 +136,7 @@ export default function LeaderboardPage() {
         <section className="rmi-card p-5">
           <p className="text-xs font-bold uppercase tracking-[0.14em] text-paper/45">Your Standing</p>
           <p className="mt-3 text-3xl font-black number-tabular">{formatCurrency(portfolioValue)}</p>
+          <p className="mt-2 text-sm font-black text-cyan">{currentRank ? `Rank #${currentRank}` : "Not currently ranked"}</p>
           <p className={gainPercent >= 0 ? "mt-1 text-sm font-black text-mint" : "mt-1 text-sm font-black text-ember"}>
             {formatPercent(gainPercent)} all time
           </p>
@@ -171,7 +176,7 @@ export default function LeaderboardPage() {
 
 function RankingStat({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-xl bg-panelSoft p-4">
+    <div className="rounded-lg bg-panelSoft p-4">
       <p className="text-xs font-bold text-paper/50">{label}</p>
       <p className="mt-1 text-xl font-black number-tabular">{value}</p>
     </div>

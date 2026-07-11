@@ -99,7 +99,7 @@ export default function OnboardingPage() {
   }
 
   if (loading) {
-    return <div className="mx-auto h-96 max-w-2xl rounded-xl bg-panelSoft motion-safe:animate-pulse" />;
+    return <div className="mx-auto h-96 max-w-2xl rounded-lg bg-panelSoft motion-safe:animate-pulse" />;
   }
 
   function toggleGenre(genre: string) {

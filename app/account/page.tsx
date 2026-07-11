@@ -8,7 +8,7 @@ import { UserAvatar } from "@/components/UserAvatar";
 import { RmiButton } from "@/components/RmiPrimitives";
 import { formatCurrency } from "@/lib/formatters";
 import { getBrowserSupabaseClient } from "@/lib/supabase/client";
-import { Camera, CalendarDays, ImagePlus, LogOut, Plus, Search, Star, WalletCards, X } from "lucide-react";
+import { Camera, CalendarDays, Eye, EyeOff, ImagePlus, LogOut, Plus, Search, Star, WalletCards, X } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ChangeEvent, FormEvent, Suspense, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
@@ -26,7 +26,7 @@ type ProfileDetailsResponse = {
 
 export default function AccountPage() {
   return (
-    <Suspense fallback={<div className="mx-auto h-80 max-w-md rounded-xl bg-panelSoft motion-safe:animate-pulse" />}>
+    <Suspense fallback={<div className="mx-auto h-80 max-w-md rounded-lg bg-panelSoft motion-safe:animate-pulse" />}>
       <AccountPageContent />
     </Suspense>
   );
@@ -40,6 +40,7 @@ function AccountPageContent() {
   const [mode, setMode] = useState<"signin" | "signup">("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [username, setUsername] = useState("");
   const [bio, setBio] = useState("");
   const [favoriteArtistIds, setFavoriteArtistIds] = useState<string[]>([]);
@@ -86,6 +87,22 @@ function AccountPageContent() {
 
   useEffect(() => {
     setMode(searchParams.get("mode") === "signup" ? "signup" : "signin");
+  }, [searchParams]);
+
+  useEffect(() => {
+    const hash = new URLSearchParams(window.location.hash.replace(/^#/, ""));
+    const authError = hash.get("error_description");
+
+    if (authError) {
+      setMode("signin");
+      setMessage(authError.replace(/\+/g, " "));
+      window.history.replaceState(null, "", `${window.location.pathname}${window.location.search}`);
+      return;
+    }
+
+    if (searchParams.get("confirmed") === "1") {
+      setMessage("Email confirmed. You can log in now.");
+    }
   }, [searchParams]);
 
   useEffect(() => {
@@ -152,7 +169,7 @@ function AccountPageContent() {
       type: "signup",
       email: normalizedEmail,
       options: {
-        emailRedirectTo: `${window.location.origin}/account`
+        emailRedirectTo: `${window.location.origin}/account?confirmed=1`
       }
     });
 
@@ -253,16 +270,27 @@ function AccountPageContent() {
             autoComplete="email"
             required
           />
-          <input
-            value={password}
-            onChange={(event) => setPassword(event.target.value)}
-            type="password"
-            className="h-11 rounded-lg border border-line bg-panelSoft px-3 text-sm font-bold outline-none focus:border-cyan"
-            placeholder="Password"
-            autoComplete={mode === "signup" ? "new-password" : "current-password"}
-            minLength={mode === "signup" ? 8 : undefined}
-            required
-          />
+          <div className="relative">
+            <input
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              type={showPassword ? "text" : "password"}
+              className="h-11 w-full rounded-lg border border-line bg-panelSoft px-3 pr-11 text-sm font-bold outline-none focus:border-cyan"
+              placeholder="Password"
+              autoComplete={mode === "signup" ? "new-password" : "current-password"}
+              minLength={mode === "signup" ? 8 : undefined}
+              required
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword((visible) => !visible)}
+              className="absolute right-1 top-1 grid h-9 w-9 place-items-center rounded-md text-paper/45 hover:bg-panel hover:text-paper"
+              aria-label={showPassword ? "Hide password" : "Show password"}
+              title={showPassword ? "Hide password" : "Show password"}
+            >
+              {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+            </button>
+          </div>
           <button type="submit" disabled={submitting} className="h-11 rounded-lg bg-paper text-sm font-black text-ink disabled:opacity-60">
             {mode === "signup" ? "Sign up" : "Log in"}
           </button>
@@ -293,11 +321,11 @@ function AccountPageContent() {
     <div className="mx-auto max-w-5xl space-y-5">
       <header className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-black">Player profile</h1>
+          <h1 className="text-3xl font-black">Player Profile</h1>
           <p className="mt-1 text-sm font-bold text-paper/70">Manage your public RMI identity.</p>
         </div>
         <div className="flex flex-wrap gap-2">
-          {state.userId ? <RmiButton href={`/users/${state.userId}`} variant="secondary">View public profile</RmiButton> : null}
+          {state.userId ? <RmiButton href={`/users/${state.userId}`} variant="secondary">View Public Profile</RmiButton> : null}
           <RmiButton href="/settings" variant="secondary">Settings</RmiButton>
         </div>
       </header>
@@ -314,7 +342,7 @@ function AccountPageContent() {
             <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp,image/gif" className="hidden" onChange={uploadAvatar} />
             <button type="button" onClick={() => fileRef.current?.click()} className="mt-3 flex items-center gap-2 text-sm font-black text-cyan">
               <ImagePlus className="h-4 w-4" />
-              add image
+              Add Image
             </button>
           </div>
 
@@ -350,7 +378,7 @@ function AccountPageContent() {
         <div>
           <div className="mb-3 flex items-end justify-between gap-3">
             <div>
-              <h2 className="text-lg font-black">Favorite artists</h2>
+              <h2 className="text-lg font-black">Favorite Artists</h2>
               <p className="text-xs text-paper/50">Choose up to 12 artists for your public profile.</p>
             </div>
             <span className="text-xs font-bold text-paper/45">{favoriteArtistIds.length}/12</span>
@@ -421,7 +449,7 @@ function AccountPageContent() {
                 onClick={() => saveProfile(favoriteArtistIds)}
                 className="mt-3 h-10 w-full rounded-lg bg-paper px-4 text-sm font-black text-ink hover:bg-paper/90"
               >
-                Save favorite artists
+                Save Favorite Artists
               </button>
             </div>
           </div>

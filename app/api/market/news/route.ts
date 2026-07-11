@@ -619,6 +619,10 @@ function diversifyMarketNewsEvents(events: MarketEventRow[], options: { feedMode
       continue;
     }
 
+    if (isNearDuplicateStory(event, selected)) {
+      continue;
+    }
+
     selected.push(event);
     seenHeadlineKeys.add(headlineKey);
     sourceCounts.set(source, sourceCount + 1);
@@ -626,6 +630,46 @@ function diversifyMarketNewsEvents(events: MarketEventRow[], options: { feedMode
   }
 
   return selected;
+}
+
+function isNearDuplicateStory(candidate: MarketEventRow, selected: MarketEventRow[]) {
+  const candidateTokens = getDistinctiveHeadlineTokens(candidate.title);
+
+  if (candidateTokens.size < 2) {
+    return false;
+  }
+
+  return selected.some((existing) => {
+    if (existing.artist_id !== candidate.artist_id || existing.event_type !== candidate.event_type) {
+      return false;
+    }
+
+    const candidateDate = Date.parse(`${candidate.event_date}T00:00:00Z`);
+    const existingDate = Date.parse(`${existing.event_date}T00:00:00Z`);
+
+    if (!Number.isFinite(candidateDate) || !Number.isFinite(existingDate) || Math.abs(candidateDate - existingDate) > 4 * 86_400_000) {
+      return false;
+    }
+
+    const existingTokens = getDistinctiveHeadlineTokens(existing.title);
+    const shared = [...candidateTokens].filter((token) => existingTokens.has(token)).length;
+    const smallerSetSize = Math.min(candidateTokens.size, existingTokens.size);
+
+    return shared >= 4 || (shared >= 3 && shared / Math.max(1, smallerSetSize) >= 0.5);
+  });
+}
+
+function getDistinctiveHeadlineTokens(value: string) {
+  const ignored = new Set([
+    "a", "an", "and", "at", "by", "for", "from", "in", "is", "it", "new", "of", "on", "the", "to", "with",
+    "official", "audio", "video", "music", "rapper", "rap", "announces", "reveals", "says", "report", "reports"
+  ]);
+
+  return new Set(
+    normalizeNewsHeadline(value)
+      .split(" ")
+      .filter((token) => token.length >= 3 && !ignored.has(token) && !/^20\d{2}$/.test(token))
+  );
 }
 
 function getNewsHeadlineKey(event: MarketEventRow) {
@@ -909,11 +953,6 @@ function getEventThumbnailUrl(rawPayload: Record<string, unknown>) {
 
 function getSourceDomain(sourceUrl: string | null, sourceName: string | null) {
   const sourceDomain = getDomainFromUrl(sourceUrl);
-
-  if (sourceDomain) {
-    return sourceDomain;
-  }
-
   const normalizedSource = (sourceName ?? "").trim().toLowerCase();
   const sourceMap: Record<string, string> = {
     billboard: "billboard.com",
@@ -923,8 +962,25 @@ function getSourceDomain(sourceUrl: string | null, sourceName: string | null) {
     youtube: "youtube.com",
     reddit: "reddit.com",
     bluesky: "bsky.app",
-    musicbrainz: "musicbrainz.org"
+    musicbrainz: "musicbrainz.org",
+    variety: "variety.com",
+    complex: "complex.com",
+    xxl: "xxlmag.com",
+    "hotnewhiphop": "hotnewhiphop.com",
+    "hotnewhiphop.com": "hotnewhiphop.com",
+    "capital xtra": "capitalxtra.com",
+    "rolling stone": "rollingstone.com",
+    "rolling stone australia": "au.rollingstone.com",
+    forbes: "forbes.com",
+    "consequence of sound": "consequence.net",
+    hypebeast: "hypebeast.com",
+    tmz: "tmz.com",
+    genius: "genius.com"
   };
+
+  if (sourceDomain && sourceDomain !== "news.google.com") {
+    return sourceDomain;
+  }
 
   if (sourceMap[normalizedSource]) {
     return sourceMap[normalizedSource];
@@ -934,7 +990,7 @@ function getSourceDomain(sourceUrl: string | null, sourceName: string | null) {
     return normalizedSource.replace(/^www\./, "");
   }
 
-  return null;
+  return sourceDomain;
 }
 
 function getDomainFromUrl(sourceUrl: string | null) {

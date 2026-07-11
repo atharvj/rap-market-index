@@ -53,7 +53,7 @@ export function WatchlistButton({
         title={title}
         aria-label={action}
         className={clsx(
-          "inline-flex min-h-9 shrink-0 items-center justify-center gap-2 rounded border px-2.5 text-sm font-black transition disabled:cursor-wait disabled:opacity-60",
+          "inline-flex min-h-9 shrink-0 items-center justify-center gap-2 rounded-lg border px-2.5 text-sm font-black transition disabled:cursor-wait disabled:opacity-60",
           active
             ? "border-brass/45 bg-brass/[0.15] text-brass"
             : "border-line bg-panel text-paper/50 hover:border-brass/40 hover:text-brass"

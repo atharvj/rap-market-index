@@ -2,7 +2,7 @@
 
 import { formatDate } from "@/lib/formatters";
 import clsx from "clsx";
-import { ArrowRight, ExternalLink, Headphones, PlayCircle, Radio } from "lucide-react";
+import { ArrowRight, ExternalLink, Headphones, Newspaper, PlayCircle, Radio } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
@@ -126,13 +126,13 @@ export function MarketNewsFeed({
           <Radio className="h-5 w-5" aria-hidden="true" />
         </span>
         <div>
-          <p className="text-sm font-black text-paper">Market wire is clear</p>
+          <p className="text-sm font-black text-paper">Market Wire Is Clear</p>
           <p className="mt-1 max-w-xl text-sm leading-6 text-paper/55">
             No verified, price-relevant stories are available for this view right now. Routine posts and unconfirmed chatter stay out of the feed.
           </p>
           {!artistId && !artistIdsKey && resolvedVariant !== "compact" ? (
             <Link href="/markets" className="mt-3 inline-flex text-xs font-black text-cyan hover:text-cyan/75">
-              Browse the market
+              Browse the Market
             </Link>
           ) : null}
         </div>
@@ -207,7 +207,7 @@ function HomeLeadStory({ item }: { item: MarketNewsItem }) {
   const source = item.sourceName || item.sourceDomain || "RMI Market Wire";
 
   return (
-    <article className="overflow-hidden rounded border border-line bg-panel shadow-market">
+    <article className="overflow-hidden rounded-lg border border-line bg-panel shadow-market">
       <div className="grid gap-0 lg:grid-cols-[minmax(260px,0.88fr)_minmax(0,1fr)]">
         <NewsThumbnail item={item} size="hero" />
         <div className="grid content-between gap-5 p-5 sm:p-6">
@@ -258,7 +258,7 @@ function HomeStoryCard({ item }: { item: MarketNewsItem }) {
   const positive = item.sentimentScore >= 0;
 
   return (
-    <article className="overflow-hidden rounded border border-line bg-panel shadow-sm hover:border-cyan/50">
+    <article className="overflow-hidden rounded-lg border border-line bg-panel shadow-sm hover:border-cyan/50">
       <NewsThumbnail item={item} size="card" />
       <div className="grid gap-3 p-3.5">
         <div className="flex flex-wrap items-center gap-2 text-[11px] font-black text-paper/50">
@@ -287,7 +287,7 @@ function HomeBrief({ item }: { item: MarketNewsItem }) {
   const positive = item.sentimentScore >= 0;
 
   return (
-    <article className="rounded border border-line bg-panel px-3 py-3 hover:bg-panelSoft/60">
+    <article className="rounded-lg border border-line bg-panel px-3 py-3 hover:bg-panelSoft/60">
       <div className="grid grid-cols-[46px_minmax(0,1fr)_18px] items-start gap-3">
         <NewsThumbnail item={item} size="small" />
         <div className="min-w-0">
@@ -401,7 +401,7 @@ function NewsThumbnail({ item, size = "row" }: { item: MarketNewsItem; size?: "h
     <Link
       href={`/artists/${item.artistId}`}
       className={clsx(
-        "relative block shrink-0 overflow-hidden rounded border border-line bg-panelSoft",
+        "relative block shrink-0 overflow-hidden rounded-lg border border-line bg-panelSoft",
         dimensions
       )}
       aria-label={`${item.artistName} quote`}
@@ -544,7 +544,9 @@ function SourceMeta({ item }: { item: MarketNewsItem }) {
             event.currentTarget.style.display = "none";
           }}
         />
-      ) : null}
+      ) : (
+        <Newspaper className="h-3.5 w-3.5 shrink-0 text-paper/40" aria-hidden="true" />
+      )}
       <span className="truncate">{label}</span>
     </span>
   );
@@ -581,7 +583,7 @@ function MediaLink({ item, compact = false }: { item: MarketNewsItem; compact?: 
       target="_blank"
       rel="noreferrer"
       className={clsx(
-        "inline-flex items-center gap-1.5 rounded border border-line bg-panelSoft text-xs font-black text-paper/65 hover:border-cyan/45 hover:text-cyan",
+        "inline-flex items-center gap-1.5 rounded-lg border border-line bg-panelSoft text-xs font-black text-paper/65 hover:border-cyan/45 hover:text-cyan",
         compact ? "px-1.5 py-1" : "min-h-9 px-3"
       )}
     >

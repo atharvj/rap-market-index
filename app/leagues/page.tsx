@@ -25,7 +25,7 @@ export default function LeaguesPage() {
               <RmiButton href="/markets" variant="secondary">Explore Markets</RmiButton>
             </div>
           </div>
-          <div className="grid place-items-center rounded-xl bg-panelSoft p-10">
+          <div className="grid place-items-center rounded-lg bg-panelSoft p-10">
             <ShieldCheck className="h-16 w-16 text-cyan" strokeWidth={1.35} aria-hidden="true" />
           </div>
         </div>

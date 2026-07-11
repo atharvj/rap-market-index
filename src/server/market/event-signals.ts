@@ -870,6 +870,8 @@ function getAiResearchEventProvenance(event: MarketEvent, artist: MarketUpdateAr
   const evidenceLevel = getRawString(event.rawPayload.evidenceLevel) ?? "reported";
   const sourceType = getRawString(event.rawPayload.sourceType) ?? "";
   const reachScope = getRawString(event.rawPayload.reachScope) ?? "";
+  const marketConnection = getRawString(event.rawPayload.marketConnection) ?? "unknown";
+  const musicDemandConfirmed = getRawBoolean(event.rawPayload.musicDemandConfirmed);
   const corroboratingSourceCount = getRawOptionalNumber(event.rawPayload.corroboratingSourceCount) ?? 1;
   const publicReactionConfirmed = getRawBoolean(event.rawPayload.publicReactionConfirmed);
   const fanReactionEvidenceCount = getRawOptionalNumber(event.rawPayload.fanReactionEvidenceCount) ?? 0;
@@ -917,6 +919,10 @@ function getAiResearchEventProvenance(event: MarketEvent, artist: MarketUpdateAr
       : sentimentAgreement === "mixed"
         ? { impact: 0.84, confidence: 0.9 }
         : { impact: 1, confidence: 1 };
+  const marketConnectionMultiplier = getMarketConnectionMultiplier({
+    marketConnection,
+    musicDemandConfirmed
+  });
 
   if (hasHighRiskEvidenceFlags(event)) {
     return {
@@ -949,10 +955,16 @@ function getAiResearchEventProvenance(event: MarketEvent, artist: MarketUpdateAr
   }
 
   return {
-    label: `ai-research-${sourceType || "source"}-${evidenceLevel}`,
+    label: `ai-research-${sourceType || "source"}-${evidenceLevel}-${marketConnectionMultiplier.label}`,
     impactMultiplier: clamp(
-      tier.impact * evidence.impact * source.impact * reach.impact * communityLift.impact * receptionMultiplier.impact,
-      0.32,
+      tier.impact *
+        evidence.impact *
+        source.impact *
+        reach.impact *
+        communityLift.impact *
+        receptionMultiplier.impact *
+        marketConnectionMultiplier.impact,
+      0.12,
       1.28
     ),
     confidenceMultiplier: clamp(
@@ -961,11 +973,37 @@ function getAiResearchEventProvenance(event: MarketEvent, artist: MarketUpdateAr
         source.confidence *
         reach.confidence *
         communityLift.confidence *
-        receptionMultiplier.confidence,
-      0.5,
+        receptionMultiplier.confidence *
+        marketConnectionMultiplier.confidence,
+      0.35,
       1.2
     )
   };
+}
+
+function getMarketConnectionMultiplier({
+  marketConnection,
+  musicDemandConfirmed
+}: {
+  marketConnection: string;
+  musicDemandConfirmed: boolean;
+}) {
+  if (marketConnection === "attention_only") {
+    return musicDemandConfirmed
+      ? { label: "attention-with-demand", impact: 0.55, confidence: 0.82 }
+      : { label: "attention-only", impact: 0.18, confidence: 0.62 };
+  }
+
+  if (marketConnection === "career_availability") {
+    return { label: "career-availability", impact: 0.86, confidence: 0.95 };
+  }
+
+  if (marketConnection === "direct_music") {
+    return { label: "direct-music", impact: 1, confidence: 1 };
+  }
+
+  // Preserve previously stored events that predate this classification.
+  return { label: "legacy", impact: 1, confidence: 1 };
 }
 
 function applyEventClusterCaps(

@@ -5,23 +5,36 @@ import { useAuth } from "@/components/AuthProvider";
 import { useGame } from "@/components/GameProvider";
 import { MarketNewsFeed } from "@/components/MarketNewsFeed";
 import { SignedInGate } from "@/components/SignedInGate";
-import { ArtistIdentity, ChangeText, RmiButton, RmiLineChart, RmiSection } from "@/components/RmiPrimitives";
+import { ArtistIdentity, ChangeText, RmiButton, RmiSection } from "@/components/RmiPrimitives";
 import { WatchlistButton } from "@/components/WatchlistButton";
-import { formatCurrency, formatPercent } from "@/lib/formatters";
-import { buildMarketIndexSeries, getMarketBreadth, getSeriesChangePercent } from "@/lib/market-analytics";
+import { formatCurrency } from "@/lib/formatters";
+import { getMarketBreadth } from "@/lib/market-analytics";
+import { Search } from "lucide-react";
 import Link from "next/link";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 
 export default function WatchlistPage() {
   const { session } = useAuth();
-  const { watchlistArtists } = useGame();
-  const watchlistIndex = useMemo(() => buildMarketIndexSeries(watchlistArtists), [watchlistArtists]);
-  const indexChange = getSeriesChangePercent(watchlistIndex);
+  const { state, watchlistArtistIds, watchlistArtists } = useGame();
+  const [addQuery, setAddQuery] = useState("");
+  const [addFocused, setAddFocused] = useState(false);
   const breadth = getMarketBreadth(watchlistArtists);
   const biggestMover = [...watchlistArtists].sort(
     (first, second) => Math.abs(second.dailyChangePercent) - Math.abs(first.dailyChangePercent)
   )[0];
   const signalLeader = [...watchlistArtists].sort((first, second) => second.hypeScore - first.hypeScore)[0];
+  const addSuggestions = useMemo(() => {
+    const normalized = addQuery.trim().toLowerCase();
+
+    return state.artists
+      .filter(
+        (artist) =>
+          !watchlistArtistIds.includes(artist.id) &&
+          (!normalized || artist.name.toLowerCase().includes(normalized) || artist.ticker.toLowerCase().includes(normalized))
+      )
+      .sort((first, second) => second.dailyChangePercent - first.dailyChangePercent || first.name.localeCompare(second.name))
+      .slice(0, 7);
+  }, [addQuery, state.artists, watchlistArtistIds]);
 
   if (!session) {
     return (
@@ -39,45 +52,60 @@ export default function WatchlistPage() {
           <h1 className="text-3xl font-black">Watchlist</h1>
           <p className="mt-1 text-sm font-bold text-paper/70">{watchlistArtists.length} artists you're tracking</p>
         </div>
-        <RmiButton href="/markets" variant="secondary">+ Add artist</RmiButton>
+        <div className="relative w-full sm:w-80">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-paper/35" aria-hidden="true" />
+          <input
+            value={addQuery}
+            onChange={(event) => setAddQuery(event.target.value)}
+            onFocus={() => setAddFocused(true)}
+            onBlur={() => window.setTimeout(() => setAddFocused(false), 140)}
+            className="h-10 w-full rounded-lg border border-line bg-panel pl-9 pr-3 text-sm outline-none placeholder:text-paper/35 focus:border-cyan"
+            placeholder="Add an artist"
+            aria-label="Add an artist to your watchlist"
+          />
+          {addFocused ? (
+            <div className="absolute left-0 right-0 top-12 z-50 max-h-80 overflow-y-auto rounded-lg border border-line bg-panel p-1 shadow-2xl scrollbar-thin">
+              {addSuggestions.length ? addSuggestions.map((artist) => (
+                <div key={artist.id} className="flex items-center gap-3 rounded-md px-2 py-2 hover:bg-panelSoft">
+                  <Link href={`/artists/${artist.id}`} className="flex min-w-0 flex-1 items-center gap-3">
+                    <ArtistAvatar artist={artist} size="sm" />
+                    <span className="min-w-0">
+                      <span className="block truncate text-sm font-black">{artist.name}</span>
+                      <span className="text-xs text-paper/45">${artist.ticker}</span>
+                    </span>
+                  </Link>
+                  <WatchlistButton artistId={artist.id} />
+                </div>
+              )) : <p className="px-3 py-5 text-center text-sm text-paper/50">No matching artists.</p>}
+            </div>
+          ) : null}
+        </div>
       </header>
 
       {watchlistArtists.length ? (
-        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_340px]">
-          <RmiSection
-            title="Watchlist Trend"
-            subtitle="Equal-weight performance of the artists you follow over recorded quote history."
-            action={
-              <span className={indexChange >= 0 ? "text-sm font-black text-mint number-tabular" : "text-sm font-black text-ember number-tabular"}>
-                {formatPercent(indexChange)}
-              </span>
-            }
-          >
-            <div className="h-40 p-4">
-              <RmiLineChart data={watchlistIndex} positive={indexChange >= 0} height={150} />
-            </div>
-          </RmiSection>
-
-          <RmiSection title="Watchlist Briefing" subtitle="The strongest signals inside your saved list.">
-            <div className="divide-y divide-line">
+        <section>
+          <div className="mb-3">
+            <h2 className="text-base font-black">Watchlist Briefing</h2>
+            <p className="mt-1 text-sm text-paper/50">The strongest quote and signal activity among the artists you follow.</p>
+          </div>
+          <div className="grid gap-3 md:grid-cols-3">
               {biggestMover ? <WatchlistInsight label="Biggest Move" artist={biggestMover} value={<ChangeText value={biggestMover.dailyChangePercent} />} /> : null}
               {signalLeader ? <WatchlistInsight label="Signal Leader" artist={signalLeader} value={`${signalLeader.hypeScore}/100`} /> : null}
-              <div className="grid grid-cols-3 gap-2 p-4 text-center text-xs">
+              <div className="rmi-card grid grid-cols-3 gap-2 p-4 text-center text-xs">
                 <BriefingCount label="Up" value={breadth.advancers} tone="good" />
                 <BriefingCount label="Down" value={breadth.decliners} tone="bad" />
                 <BriefingCount label="Flat" value={breadth.unchanged} />
               </div>
-            </div>
-          </RmiSection>
-        </div>
+          </div>
+        </section>
       ) : null}
 
       <section className="rmi-card overflow-hidden">
         <div className="grid grid-cols-[minmax(0,1fr)_78px_64px_40px] gap-x-3 border-b border-line px-4 py-3 text-xs font-bold text-paper/45 sm:grid-cols-[minmax(0,1fr)_96px_76px_60px_40px]">
-          <span>artist</span>
-          <span className="text-right">price</span>
-          <span className="text-right">24h</span>
-          <span className="hidden text-right sm:block">signal</span>
+          <span>Artist</span>
+          <span className="text-right">Price</span>
+          <span className="text-right">24H</span>
+          <span className="hidden text-right sm:block">Signal</span>
           <span className="sr-only">remove from watchlist</span>
         </div>
         {watchlistArtists.length ? (
@@ -131,7 +159,7 @@ export default function WatchlistPage() {
 
 function WatchlistInsight({ label, artist, value }: { label: string; artist: Parameters<typeof ArtistIdentity>[0]["artist"]; value: React.ReactNode }) {
   return (
-    <div className="p-4">
+    <div className="rmi-card p-4">
       <p className="mb-3 text-[11px] font-bold uppercase tracking-[0.14em] text-paper/40">{label}</p>
       <div className="flex items-center justify-between gap-3">
         <ArtistIdentity artist={artist} />

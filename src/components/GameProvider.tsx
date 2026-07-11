@@ -209,14 +209,16 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
   );
 
   const refreshLeaderboard = useCallback(
-    async (currentUserId?: string) => {
+    async (currentUserId?: string, accessToken?: string) => {
       if (!authConfigured) {
         setServerLeaderboard(null);
         return false;
       }
 
       try {
-        const response = await fetch("/api/leaderboard");
+        const response = await fetch("/api/leaderboard", {
+          headers: accessToken ? { authorization: `Bearer ${accessToken}` } : undefined
+        });
         const payload = (await response.json()) as LeaderboardResponse;
 
         if (!response.ok || !payload.ok || !payload.leaderboard) {
@@ -307,7 +309,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
         setAvatarUrl(profileData.avatarUrl ?? "");
         setOnboardingCompleted(profileData.onboardingCompleted !== false);
         setProfileLoaded(true);
-        void refreshLeaderboard(profileData.id);
+        void refreshLeaderboard(profileData.id, session.access_token);
         void refreshWatchlist(session.access_token);
 
         const snapshotAvailable = snapshotResponse.ok && snapshot.ok && snapshot.source === "supabase" && Boolean(snapshot.state);
@@ -650,7 +652,8 @@ async function submitServerTrade({
         ticker: payload.trade?.ticker,
         executionPrice: payload.trade?.execution_price ?? payload.trade?.executionPrice,
         commission: payload.trade?.commission,
-        marketEligible: payload.trade?.market_eligible ?? payload.trade?.marketEligible
+        marketEligible: payload.marketEligibility?.eligible ?? payload.trade?.market_eligible ?? payload.trade?.marketEligible,
+        marketEligibilityReason: payload.marketEligibility?.reason
       })
   };
 }
@@ -661,7 +664,8 @@ function formatTradeMessage({
   ticker,
   executionPrice,
   commission,
-  marketEligible
+  marketEligible,
+  marketEligibilityReason
 }: {
   side: "buy" | "sell" | "short" | "cover";
   shares: number;
@@ -669,6 +673,7 @@ function formatTradeMessage({
   executionPrice?: number;
   commission?: number;
   marketEligible?: boolean;
+  marketEligibilityReason?: "eligible" | "new_account_cooldown" | "market_impact_exempt_account";
 }) {
   const executionText =
     typeof executionPrice === "number" && Number.isFinite(executionPrice)
@@ -678,9 +683,24 @@ function formatTradeMessage({
     typeof commission === "number" && Number.isFinite(commission)
       ? ` Commission ${new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(commission)}.`
       : "";
-  const testingText = marketEligible === false ? " Test/admin trade: no market impact." : "";
+  const eligibilityText = getTradeEligibilityText(marketEligible, marketEligibilityReason);
 
-  return `${getTradeVerb(side)} ${shares} ${ticker ?? "shares"}${executionText}.${commissionText}${testingText}`;
+  return `${getTradeVerb(side)} ${shares} ${ticker ?? "shares"}${executionText}.${commissionText}${eligibilityText}`;
+}
+
+function getTradeEligibilityText(
+  marketEligible?: boolean,
+  reason?: "eligible" | "new_account_cooldown" | "market_impact_exempt_account"
+) {
+  if (marketEligible !== false) {
+    return "";
+  }
+
+  if (reason === "new_account_cooldown") {
+    return " This order is recorded normally. New accounts do not influence market prices during their first 24 hours.";
+  }
+
+  return " Admin/test order: excluded from market-demand signals.";
 }
 
 function getTradeVerb(side: "buy" | "sell" | "short" | "cover") {

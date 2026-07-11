@@ -7,7 +7,7 @@ import { UserAvatar } from "@/components/UserAvatar";
 import { RmiButton } from "@/components/RmiPrimitives";
 import { getBrowserSupabaseClient } from "@/lib/supabase/client";
 import { applyThemePreference, getStoredThemePreference, type ThemePreference } from "@/lib/theme";
-import { ShieldCheck } from "lucide-react";
+import { Eye, EyeOff, Trash2, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
 
@@ -20,8 +20,9 @@ export default function SettingsPage() {
   const [theme, setTheme] = useState<ThemePreference>("system");
   const [profileIsPublic, setProfileIsPublic] = useState(true);
   const [portfolioIsPublic, setPortfolioIsPublic] = useState(true);
-  const [deleteConfirmation, setDeleteConfirmation] = useState("");
+  const [deleteOpen, setDeleteOpen] = useState(false);
   const [deletePassword, setDeletePassword] = useState("");
+  const [showDeletePassword, setShowDeletePassword] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const displayName = state.username === "Demo Guest" ? user?.email?.split("@")[0] ?? "Guest" : state.username;
 
@@ -107,7 +108,7 @@ export default function SettingsPage() {
     applyThemePreference(value);
   }
 
-  async function savePrivacy() {
+  async function savePrivacy(nextProfileIsPublic: boolean, nextPortfolioIsPublic: boolean) {
     if (!session) {
       return;
     }
@@ -119,12 +120,12 @@ export default function SettingsPage() {
         authorization: `Bearer ${session.access_token}`
       },
       body: JSON.stringify({
-        profileIsPublic,
-        portfolioIsPublic: profileIsPublic && portfolioIsPublic
+        profileIsPublic: nextProfileIsPublic,
+        portfolioIsPublic: nextProfileIsPublic && nextPortfolioIsPublic
       })
     });
     const payload = await response.json();
-    setMessage(payload.ok ? "Privacy settings saved." : payload.error ?? "Could not save privacy settings.");
+    setMessage(payload.ok ? "Visibility updated." : payload.error ?? "Could not update visibility.");
   }
 
   async function deleteAccount() {
@@ -139,7 +140,7 @@ export default function SettingsPage() {
         "content-type": "application/json",
         authorization: `Bearer ${session.access_token}`
       },
-      body: JSON.stringify({ confirmation: deleteConfirmation, password: deletePassword })
+      body: JSON.stringify({ confirmation: displayName, password: deletePassword })
     });
     const payload = await response.json();
 
@@ -168,7 +169,7 @@ export default function SettingsPage() {
             <p className="truncate text-xs font-bold text-paper/55">{user?.email}</p>
           </div>
         </div>
-        <RmiButton href="/account" variant="secondary">Edit profile</RmiButton>
+        <RmiButton href="/account" variant="secondary">Edit Profile</RmiButton>
       </section>
 
       <SettingsGroup title="Account">
@@ -211,15 +212,15 @@ export default function SettingsPage() {
         </SettingsRow>
       </SettingsGroup>
 
-      <SettingsGroup title="Privacy">
+      <SettingsGroup title="Profile Visibility">
         <SettingsRow label="Public Profile">
           <Toggle
             checked={profileIsPublic}
             onChange={(checked) => {
               setProfileIsPublic(checked);
-              if (!checked) {
-                setPortfolioIsPublic(false);
-              }
+              const nextPortfolioIsPublic = checked ? portfolioIsPublic : false;
+              setPortfolioIsPublic(nextPortfolioIsPublic);
+              void savePrivacy(checked, nextPortfolioIsPublic);
             }}
             label="Allow traders to open your profile"
           />
@@ -227,63 +228,81 @@ export default function SettingsPage() {
         <SettingsRow label="Public Portfolio">
           <Toggle
             checked={profileIsPublic && portfolioIsPublic}
-            onChange={setPortfolioIsPublic}
+            onChange={(checked) => {
+              setPortfolioIsPublic(checked);
+              void savePrivacy(profileIsPublic, checked);
+            }}
             disabled={!profileIsPublic}
             label="Show holdings and performance on your profile"
           />
         </SettingsRow>
-        <div className="flex justify-end border-t border-line px-4 py-3">
-          <button type="button" onClick={savePrivacy} className="rounded-lg bg-paper px-4 py-2 text-sm font-black text-ink">
-            Save Privacy
-          </button>
-        </div>
       </SettingsGroup>
-
-      <section className="rmi-card flex gap-3 p-4 text-sm leading-6 text-paper/65">
-        <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-mint" aria-hidden="true" />
-        <p>
-          Email addresses and trade history are never shown on public profiles. Public portfolio visibility only controls holdings, cash, and performance.
-        </p>
-      </section>
 
       <SettingsGroup title="Danger Zone" danger>
         <SettingsRow label="Delete Account">
-          <div className="grid w-full max-w-md gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
-            <input
-              value={deleteConfirmation}
-              onChange={(event) => setDeleteConfirmation(event.target.value)}
-              placeholder={`Type ${displayName} to confirm`}
-              className="h-9 min-w-0 rounded-lg border border-ember/40 bg-panelSoft px-3 text-sm outline-none focus:border-ember"
-              disabled={isAdminUser || deleting}
-            />
-            <input
-              value={deletePassword}
-              onChange={(event) => setDeletePassword(event.target.value)}
-              type="password"
-              autoComplete="current-password"
-              placeholder="Password"
-              className="h-9 min-w-0 rounded-lg border border-ember/40 bg-panelSoft px-3 text-sm outline-none focus:border-ember sm:row-start-2"
-              disabled={isAdminUser || deleting}
-            />
+          <div className="flex w-full items-center justify-end gap-3">
+            {isAdminUser ? <span className="text-xs text-paper/45">Protected operator account</span> : null}
             <button
               type="button"
-              onClick={deleteAccount}
-              disabled={isAdminUser || deleting || deleteConfirmation !== displayName || deletePassword.length < 8}
-              className="rounded-lg border border-ember/60 px-3 py-1.5 text-sm font-black text-ember disabled:cursor-not-allowed disabled:opacity-40 sm:row-span-2"
-              title={isAdminUser ? "Administrator accounts must be removed by another administrator." : undefined}
+              onClick={() => setDeleteOpen(true)}
+              disabled={isAdminUser}
+              className="inline-flex items-center gap-2 rounded-lg border border-ember/60 px-3 py-1.5 text-sm font-black text-ember disabled:cursor-not-allowed disabled:opacity-40"
+              title={isAdminUser ? "Administrator accounts must be removed by another administrator." : "Delete account"}
             >
-              {deleting ? "Deleting..." : "Delete"}
+              <Trash2 className="h-4 w-4" aria-hidden="true" />
+              Delete Account
             </button>
-            {isAdminUser ? (
-              <p className="text-xs leading-5 text-paper/45 sm:col-span-2">
-                Administrator deletion is locked here to prevent the only operator account from being removed accidentally.
-              </p>
-            ) : null}
           </div>
         </SettingsRow>
       </SettingsGroup>
 
       {message ? <p className="text-sm font-bold text-paper/65">{message}</p> : null}
+
+      {deleteOpen ? (
+        <div className="fixed inset-0 z-50 grid place-items-center bg-black/75 px-4" role="dialog" aria-modal="true" aria-labelledby="delete-account-title">
+          <div className="rmi-card w-full max-w-md p-5 shadow-2xl">
+            <div className="flex items-center justify-between gap-4">
+              <h2 id="delete-account-title" className="text-xl font-black">Delete Account</h2>
+              <button type="button" onClick={() => setDeleteOpen(false)} className="grid h-9 w-9 place-items-center rounded-full text-paper/55 hover:bg-panelSoft" aria-label="Close">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <p className="mt-3 text-sm leading-6 text-paper/60">
+              This permanently removes your profile, watchlist, portfolio, and trade records. Enter your password to continue.
+            </p>
+            <div className="relative mt-5">
+              <input
+                value={deletePassword}
+                onChange={(event) => setDeletePassword(event.target.value)}
+                type={showDeletePassword ? "text" : "password"}
+                autoComplete="current-password"
+                placeholder="Password"
+                className="h-11 w-full rounded-lg border border-ember/40 bg-panelSoft px-3 pr-11 text-sm outline-none focus:border-ember"
+                disabled={deleting}
+              />
+              <button
+                type="button"
+                onClick={() => setShowDeletePassword((visible) => !visible)}
+                className="absolute right-1 top-1 grid h-9 w-9 place-items-center rounded-md text-paper/45 hover:bg-panel"
+                aria-label={showDeletePassword ? "Hide password" : "Show password"}
+              >
+                {showDeletePassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              </button>
+            </div>
+            <div className="mt-5 flex justify-end gap-2">
+              <button type="button" onClick={() => setDeleteOpen(false)} className="min-h-10 rounded-lg border border-line px-4 text-sm font-black">Cancel</button>
+              <button
+                type="button"
+                onClick={deleteAccount}
+                disabled={deleting || deletePassword.length < 8}
+                className="min-h-10 rounded-lg bg-ember px-4 text-sm font-black text-white disabled:opacity-40"
+              >
+                {deleting ? "Deleting..." : "Delete Permanently"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -292,7 +311,7 @@ function SettingsGroup({ title, children, danger = false }: { title: string; chi
   return (
     <section>
       <h2 className={danger ? "mb-2 text-sm font-black text-ember" : "mb-2 text-sm font-black text-paper/65"}>{title}</h2>
-      <div className={danger ? "overflow-hidden rounded-xl border border-ember/50" : "rmi-card overflow-hidden"}>{children}</div>
+      <div className={danger ? "overflow-hidden rounded-lg border border-ember/50" : "rmi-card overflow-hidden"}>{children}</div>
     </section>
   );
 }

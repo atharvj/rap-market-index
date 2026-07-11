@@ -78,13 +78,13 @@ export function ArtistPriceHistoryPanel({
   }, [hasRealHistory, history, status]);
 
   return (
-    <section className="rounded border border-line bg-panel p-4 shadow-market sm:p-5">
+    <section className="rmi-card p-4 shadow-market sm:p-5">
       <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="text-xl font-black">Chart</h2>
           <p className="mt-1 text-sm font-bold text-paper/50">{subtitle}</p>
         </div>
-        <div className="inline-flex max-w-full overflow-x-auto rounded border border-line bg-panelSoft p-1 scrollbar-thin">
+        <div className="inline-flex max-w-full overflow-x-auto rounded-lg border border-line bg-panelSoft p-1 scrollbar-thin">
           {ranges.map((candidate) => (
             <button
               key={candidate}

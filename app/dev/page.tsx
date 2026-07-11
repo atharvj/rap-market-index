@@ -2227,7 +2227,7 @@ function MarketHealthPanel({ data }: { data: MarketHealth }) {
 
   return (
     <div className="space-y-4">
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 2xl:grid-cols-7">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <ReadinessTile
           label="Price history"
           ready={data.priceHistoryHealth.freshCoveragePercent >= 80}
@@ -4317,7 +4317,7 @@ function ReadinessTile({
         <span className="shrink-0">{icon}</span>
         <span className="min-w-0 break-words">{label}</span>
       </div>
-      <p className={`mt-2 min-w-0 break-words text-base font-black leading-tight number-tabular ${ready ? "text-mint" : "text-brass"}`}>
+      <p className={`mt-2 min-w-0 break-words text-sm font-black leading-tight number-tabular ${ready ? "text-mint" : "text-brass"}`}>
         {ready ? readyText : pendingText}
       </p>
     </div>

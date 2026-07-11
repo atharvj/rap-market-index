@@ -3,10 +3,10 @@
 @tailwind utilities;
 
 :root {
-  --color-ink: 30 30 28;
-  --color-panel: 42 42 39;
-  --color-panel-soft: 24 24 22;
-  --color-line: 70 70 66;
+  --color-ink: 12 12 12;
+  --color-panel: 24 24 23;
+  --color-panel-soft: 18 18 17;
+  --color-line: 51 51 48;
   --color-paper: 248 248 246;
   --color-brass: 255 176 28;
   --color-mint: 0 200 5;
@@ -29,10 +29,10 @@
 }
 
 [data-theme="dark"] {
-  --color-ink: 30 30 28;
-  --color-panel: 42 42 39;
-  --color-panel-soft: 24 24 22;
-  --color-line: 70 70 66;
+  --color-ink: 12 12 12;
+  --color-panel: 24 24 23;
+  --color-panel-soft: 18 18 17;
+  --color-line: 51 51 48;
   --color-paper: 248 248 246;
   --color-brass: 255 176 28;
   --color-mint: 0 200 5;
@@ -84,13 +84,13 @@ select {
 .rmi-card {
   border: 1px solid rgb(var(--color-line));
   background: rgb(var(--color-panel));
-  border-radius: 12px;
+  border-radius: 8px;
 }
 
 .rmi-soft-card {
   border: 1px solid rgba(var(--color-line), 0.78);
   background: rgb(var(--color-panel-soft));
-  border-radius: 10px;
+  border-radius: 8px;
 }
 
 .market-tape-track {

@@ -53,6 +53,8 @@ type AiResearchResponseEvent = {
   corroboratingSourceUrls?: unknown;
   publicReactionConfirmed?: unknown;
   factualClaimConfirmed?: unknown;
+  marketConnection?: unknown;
+  musicDemandConfirmed?: unknown;
   artistRole?: unknown;
   riskFlags?: unknown;
 };
@@ -483,14 +485,15 @@ function buildResearchPrompt({
     `Artist: ${artist.name} (${artist.ticker}). Run date: ${runDate}. Window: ${lookbackDays} days.`,
     `Verified identity context: ${query}. Return at most ${maxEventsPerArtist} source-backed events.`,
     "Run separate concise web searches for: (1) artist + latest release/news, (2) newest project title + review/reception, and (3) artist or project + fan reaction/community. Do not paste every topic into one search query.",
-    "Use only catalysts that can move price: album/project/single/feature, review/reception, backlash/legal/health, viral performance/snippet, chart milestone, or clear decline.",
+    "Use only meaningful catalysts: album/project/single/feature, review/reception, backlash/legal/health, viral performance/snippet, chart milestone, clear decline, or a major non-music event with measurable public reach.",
+    "Classify marketConnection as direct_music when the event directly concerns music demand, career_availability when it changes the artist's ability to record, release, tour, or perform, or attention_only when it only raises celebrity visibility. Set musicDemandConfirmed true only when independent listening, chart, search, ticket, or fan-demand evidence connects the event to music interest. Never assume fame automatically means music demand.",
     "If many tracks dropped together, report the project, not one random track. Social/community items need factual confirmation and public reaction.",
     "For releases and reviews, actively search for reception using the release title plus fan reaction, Reddit, review, and community discussion terms. Keep fanSentimentScore separate from criticSentimentScore. A critic score is not fan consensus, and comments on the artist's own channel are biased evidence.",
     "Set publicReactionConfirmed true only when at least two independent, accessible sources support the same direction. Put every corroborating URL in corroboratingSourceUrls; the application verifies those URLs against your actual web-search results. Count only those sources in fanReactionEvidenceCount. Detect sarcasm, stan brigading, recycled posts, and disagreement; put risks in riskFlags.",
     "Use sentimentAgreement=agree when critics and fans align, mixed when reception is divided, disagree when they clearly diverge, or unknown. Scale reach relative to the artist: a scene-wide underground event can matter without being mainstream.",
     "Keep title, summary, and whyItMatters concise so the complete JSON fits without truncation.",
     "Set artistRole to primary only when this artist owns or is the main subject of the event, featured when they are a credited guest/collaborator, and mentioned when they are merely named. Never call another artist's project this artist's release.",
-    "JSON shape: {\"events\":[{\"title\":\"headline\",\"eventDate\":\"YYYY-MM-DD\",\"eventType\":\"release|review|news|controversy|award|tour|viral\",\"sourceName\":\"source\",\"sourceUrl\":\"https://...\",\"summary\":\"fact\",\"whyItMatters\":\"market reason\",\"sentimentScore\":0,\"fanSentimentScore\":0,\"criticSentimentScore\":0,\"sentimentAgreement\":\"agree|mixed|disagree|unknown\",\"fanReactionEvidenceCount\":0,\"impactScore\":0,\"confidence\":0.0,\"artistRole\":\"primary|featured|mentioned\",\"sourceType\":\"music_publication|mainstream_news|review|official|community|social|video\",\"evidenceLevel\":\"confirmed|reported|rumor|low_signal\",\"reachScope\":\"underground|scene|broad|mainstream\",\"supportingMediaUrl\":\"\",\"supportingMediaType\":\"none\",\"relatedArtistNames\":[],\"corroboratingSourceUrls\":[\"https://...\"],\"corroboratingSourceCount\":1,\"publicReactionConfirmed\":false,\"factualClaimConfirmed\":true,\"riskFlags\":[]}]}"
+    "JSON shape: {\"events\":[{\"title\":\"headline\",\"eventDate\":\"YYYY-MM-DD\",\"eventType\":\"release|review|news|controversy|award|tour|viral\",\"sourceName\":\"source\",\"sourceUrl\":\"https://...\",\"summary\":\"fact\",\"whyItMatters\":\"market reason\",\"sentimentScore\":0,\"fanSentimentScore\":0,\"criticSentimentScore\":0,\"sentimentAgreement\":\"agree|mixed|disagree|unknown\",\"fanReactionEvidenceCount\":0,\"impactScore\":0,\"confidence\":0.0,\"artistRole\":\"primary|featured|mentioned\",\"sourceType\":\"music_publication|mainstream_news|review|official|community|social|video\",\"evidenceLevel\":\"confirmed|reported|rumor|low_signal\",\"reachScope\":\"underground|scene|broad|mainstream\",\"marketConnection\":\"direct_music|career_availability|attention_only\",\"musicDemandConfirmed\":false,\"supportingMediaUrl\":\"\",\"supportingMediaType\":\"none\",\"relatedArtistNames\":[],\"corroboratingSourceUrls\":[\"https://...\"],\"corroboratingSourceCount\":1,\"publicReactionConfirmed\":false,\"factualClaimConfirmed\":true,\"riskFlags\":[]}]}"
   ].join("\n");
 }
 
@@ -508,9 +511,9 @@ function buildCompactResearchPrompt({
   return [
     `Find one meaningful, source-backed catalyst for ${artist.name} (${artist.ticker}) in the ${lookbackDays} days through ${runDate}. Verified identity terms: ${query}.`,
     "Use separate short web searches for latest release/news and for that release's review or fan reaction; do not combine every topic into one query.",
-    "Prioritize the newest release or EP and its fan/critic reception, then major news, controversy, charts, tours, or viral performances.",
+    "Prioritize the newest release or EP and its fan/critic reception, then major news, controversy, charts, tours, or viral performances. Classify marketConnection as direct_music, career_availability, or attention_only; set musicDemandConfirmed only with independent evidence connecting attention to music demand.",
     "Require a real accessible source URL. Search the newest release title with fan reaction, Reddit, review, and community terms. Fan sentiment needs two independent sources returned by web search; list them in corroboratingSourceUrls, otherwise set publicReactionConfirmed false and fanReactionEvidenceCount 0. Reject rumors, sarcasm, private posts, and low-view uploads.",
-    "Return compact JSON: {\"events\":[{\"title\":\"\",\"eventDate\":\"YYYY-MM-DD\",\"eventType\":\"release|review|news|controversy|award|tour|viral\",\"sourceName\":\"\",\"sourceUrl\":\"https://\",\"summary\":\"\",\"sentimentScore\":0,\"fanSentimentScore\":0,\"criticSentimentScore\":0,\"sentimentAgreement\":\"agree|mixed|disagree|unknown\",\"fanReactionEvidenceCount\":0,\"impactScore\":0,\"confidence\":0.0,\"artistRole\":\"primary|featured|mentioned\",\"sourceType\":\"music_publication|mainstream_news|review|official|community|social|video\",\"evidenceLevel\":\"confirmed|reported|rumor|low_signal\",\"reachScope\":\"underground|scene|broad|mainstream\",\"corroboratingSourceUrls\":[\"https://\"],\"corroboratingSourceCount\":1,\"publicReactionConfirmed\":false,\"factualClaimConfirmed\":true,\"riskFlags\":[]}]}."
+    "Return compact JSON: {\"events\":[{\"title\":\"\",\"eventDate\":\"YYYY-MM-DD\",\"eventType\":\"release|review|news|controversy|award|tour|viral\",\"sourceName\":\"\",\"sourceUrl\":\"https://\",\"summary\":\"\",\"sentimentScore\":0,\"fanSentimentScore\":0,\"criticSentimentScore\":0,\"sentimentAgreement\":\"agree|mixed|disagree|unknown\",\"fanReactionEvidenceCount\":0,\"impactScore\":0,\"confidence\":0.0,\"artistRole\":\"primary|featured|mentioned\",\"sourceType\":\"music_publication|mainstream_news|review|official|community|social|video\",\"evidenceLevel\":\"confirmed|reported|rumor|low_signal\",\"reachScope\":\"underground|scene|broad|mainstream\",\"marketConnection\":\"direct_music|career_availability|attention_only\",\"musicDemandConfirmed\":false,\"corroboratingSourceUrls\":[\"https://\"],\"corroboratingSourceCount\":1,\"publicReactionConfirmed\":false,\"factualClaimConfirmed\":true,\"riskFlags\":[]}]}."
   ].join("\n");
 }
 
@@ -543,6 +546,8 @@ function normalizeAiResearchEvent({
   const sourceType = normalizeLabel(getString(value.sourceType));
   const evidenceLevel = normalizeEvidenceLevel(getString(value.evidenceLevel));
   const reachScope = normalizeLabel(getString(value.reachScope));
+  const marketConnection = normalizeMarketConnection(getString(value.marketConnection));
+  const musicDemandConfirmed = getBoolean(value.musicDemandConfirmed);
   const supportingMediaUrl = getString(value.supportingMediaUrl);
   const supportingMedia = normalizeSupportingMedia({
     url: supportingMediaUrl,
@@ -667,6 +672,8 @@ function normalizeAiResearchEvent({
       sourceType,
       evidenceLevel,
       reachScope,
+      marketConnection,
+      musicDemandConfirmed,
       artistRole,
       roleImpactMultiplier,
       summary,
@@ -801,6 +808,20 @@ function normalizeSentimentAgreement(value: string | null) {
   const normalized = normalizeLabel(value);
 
   if (normalized === "agree" || normalized === "mixed" || normalized === "disagree") {
+    return normalized;
+  }
+
+  return "unknown";
+}
+
+function normalizeMarketConnection(value: string | null) {
+  const normalized = normalizeLabel(value);
+
+  if (
+    normalized === "direct_music" ||
+    normalized === "career_availability" ||
+    normalized === "attention_only"
+  ) {
     return normalized;
   }
 

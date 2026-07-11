@@ -1,40 +1,46 @@
-import Link from "next/link";
+import { PolicyDocument } from "@/components/PolicyDocument";
+
+const sections = [
+  {
+    id: "fantasy-market",
+    title: "Fantasy Market Only",
+    body: "RMI is an entertainment game using fictional cash. Quotes, holdings, and returns have no cash value, cannot be deposited or withdrawn, and are not securities, financial products, gambling proceeds, or investment advice."
+  },
+  {
+    id: "accounts",
+    title: "Accounts and Access",
+    body: "Provide accurate registration information, protect your login credentials, and use only accounts you are authorized to control. Email confirmation may be required before trading. You are responsible for activity performed through your account."
+  },
+  {
+    id: "fair-play",
+    title: "Fair Play",
+    body: "Do not automate orders, coordinate accounts to manipulate quotes or rankings, exploit defects, impersonate another person, scrape protected account data, or interfere with the service. RMI may exclude suspicious activity, pause trading, reverse a broken operation, or restrict an account to protect fair play."
+  },
+  {
+    id: "market-data",
+    title: "Quotes and Market Data",
+    body: "Quotes are model-generated fantasy estimates based on available audience, media, event, and eligible order-flow signals. Sources can be delayed, incomplete, duplicated, or wrong. RMI may correct source data, update its model, or rebase quotes while preserving an audit trail of the change."
+  },
+  {
+    id: "profiles",
+    title: "Profiles and Uploaded Content",
+    body: "Use a lawful display name, biography, and image that you have permission to publish. Do not upload abusive, deceptive, infringing, malicious, or privacy-invasive content."
+  },
+  {
+    id: "availability",
+    title: "Availability and Changes",
+    body: "RMI may change features, pause an artist or the full market, remove unreliable data, or discontinue beta functionality. The service is provided without a guarantee of uninterrupted availability or a guarantee that any quote will match public opinion."
+  }
+];
 
 export default function TermsPage() {
   return (
-    <article className="mx-auto max-w-3xl space-y-6">
-      <header>
-        <p className="text-xs font-bold uppercase tracking-[0.16em] text-cyan">RMI Policy</p>
-        <h1 className="mt-2 text-3xl font-black">Terms of Use</h1>
-        <p className="mt-2 text-sm text-paper/50">Effective July 10, 2026</p>
-      </header>
-
-      <PolicySection title="Fantasy Market Only">
-        RMI is an entertainment game using fictional cash. Quotes, holdings, and returns have no cash value, cannot be withdrawn, and are not financial products or investment advice.
-      </PolicySection>
-      <PolicySection title="Fair Play">
-        Do not automate orders, create accounts to manipulate quotes or rankings, exploit defects, impersonate another person, or interfere with the service. RMI may exclude suspicious activity, halt trading, or restrict an account to protect market integrity.
-      </PolicySection>
-      <PolicySection title="Market Data">
-        Quotes are model-generated estimates based on available audience, media, event, and eligible order-flow signals. Sources can be delayed, incomplete, or wrong, so RMI may correct data and rebase quotes when its model changes.
-      </PolicySection>
-      <PolicySection title="Profiles and Content">
-        Use a lawful display name and profile image that you have permission to use. Do not upload abusive, deceptive, infringing, or malicious content.
-      </PolicySection>
-      <PolicySection title="Availability">
-        RMI may change features, pause an artist or the full market, reverse a broken operation, or discontinue beta functionality. The service is provided without a guarantee of uninterrupted availability.
-      </PolicySection>
-
-      <Link href="/about" className="inline-flex text-sm font-black text-cyan hover:text-cyan/75">How RMI Works</Link>
-    </article>
-  );
-}
-
-function PolicySection({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <section className="rmi-card p-5">
-      <h2 className="text-lg font-black">{title}</h2>
-      <p className="mt-2 text-sm leading-6 text-paper/65">{children}</p>
-    </section>
+    <PolicyDocument
+      title="Terms of Use"
+      summary="These terms establish the rules for using RMI's fantasy artist market and participating in its public rankings."
+      effectiveDate="July 11, 2026"
+      sections={sections}
+      link={{ href: "/about", label: "Read How RMI Works" }}
+    />
   );
 }

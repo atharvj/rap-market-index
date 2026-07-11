@@ -9,7 +9,7 @@ import { TradeTicket } from "@/components/TradeTicket";
 import { WatchlistButton } from "@/components/WatchlistButton";
 import { sanitizeMoveExplanation } from "@/lib/artist-explanations";
 import { formatCurrency, formatShares } from "@/lib/formatters";
-import { BadgeCheck, CalendarDays, KeyRound, Trophy } from "lucide-react";
+import { BadgeCheck, KeyRound } from "lucide-react";
 import { useParams } from "next/navigation";
 import type { ReactNode } from "react";
 
@@ -44,7 +44,7 @@ export default function ArtistDetailPage() {
             <ArtistAvatar artist={artist} size="xl" />
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
-                <h1 className="truncate text-xl font-black">{artist.name}</h1>
+                <h1 className="truncate text-2xl font-black">{artist.name}</h1>
                 <BadgeCheck className="h-4 w-4 text-cyan" aria-hidden="true" />
                 <WatchlistButton artistId={artist.id} />
               </div>
@@ -63,21 +63,19 @@ export default function ArtistDetailPage() {
         <ArtistPriceHistoryPanel artistId={artist.id} fallbackData={artist.priceHistory} />
 
         <section className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <QuoteStat label="previous close" value={formatCurrency(activeArtist.previousClose)} />
-          <QuoteStat label="today's change" value={`${priceChange >= 0 ? "+" : ""}${formatCurrency(priceChange)}`} />
-          <QuoteStat label="recorded high" value={formatCurrency(recordedHigh)} />
-          <QuoteStat label="RMI score" value={`${activeArtist.hypeScore}/100`} />
+          <QuoteStat label="Previous Close" value={formatCurrency(activeArtist.previousClose)} />
+          <QuoteStat label="Today's Change" value={`${priceChange >= 0 ? "+" : ""}${formatCurrency(priceChange)}`} />
+          <QuoteStat label="Recorded High" value={formatCurrency(recordedHigh)} />
+          <QuoteStat label="RMI Score" value={`${activeArtist.hypeScore}/100`} />
         </section>
 
-        <RmiSection title="Catalysts">
-          <div className="divide-y divide-line px-4">
-            <CatalystRow icon={<KeyRound className="h-4 w-4" />} text={`Latest model summary: ${explanation}`} />
-            <CatalystRow icon={<CalendarDays className="h-4 w-4" />} text="Release, review, social, and audience signals are checked during market runs." />
-            <CatalystRow icon={<Trophy className="h-4 w-4" />} text="Large moves require stronger source confidence than routine uploads." />
+        <RmiSection title="Why the Quote Moved">
+          <div className="px-4">
+            <CatalystRow icon={<KeyRound className="h-4 w-4" />} text={explanation} />
           </div>
         </RmiSection>
 
-        <RmiSection title="Market news">
+        <RmiSection title="Market News">
           <div className="px-4">
             <MarketNewsFeed artistId={artist.id} limit={6} compact />
           </div>
@@ -87,11 +85,11 @@ export default function ArtistDetailPage() {
       <aside className="space-y-4 lg:sticky lg:top-6 lg:self-start">
         <TradeTicket artist={activeArtist} />
         {holding ? (
-          <RmiSection title="Your position">
+          <RmiSection title="Your Position">
             <div className="space-y-2 p-4 text-sm">
-              <PositionRow label="shares" value={formatShares(holding.shares)} />
-              <PositionRow label="value" value={formatCurrency(holding.currentValue)} />
-              <PositionRow label="avg cost" value={formatCurrency(holding.averageBuyPrice)} />
+              <PositionRow label="Shares" value={formatShares(holding.shares)} />
+              <PositionRow label="Value" value={formatCurrency(holding.currentValue)} />
+              <PositionRow label="Average Cost" value={formatCurrency(holding.averageBuyPrice)} />
             </div>
           </RmiSection>
         ) : null}

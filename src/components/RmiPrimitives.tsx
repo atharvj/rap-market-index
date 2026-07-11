@@ -1,6 +1,6 @@
 import { ArtistAvatar } from "@/components/ArtistAvatar";
 import { formatCurrency, formatPercent } from "@/lib/formatters";
-import type { Artist, PricePoint } from "@/lib/types";
+import type { Artist } from "@/lib/types";
 import clsx from "clsx";
 import Link from "next/link";
 import type { ReactNode } from "react";
@@ -108,42 +108,6 @@ export function ChangeText({ value, suffix = "" }: { value: number; suffix?: str
   );
 }
 
-export function RmiLineChart({
-  data,
-  positive = true,
-  height = 110,
-  fill = true
-}: {
-  data: PricePoint[];
-  positive?: boolean;
-  height?: number;
-  fill?: boolean;
-}) {
-  const points = data.length >= 2 ? data.slice(-24) : buildFlatPoints(data[0]);
-  const width = 520;
-  const prices = points.map((point) => point.price);
-  const min = Math.min(...prices);
-  const max = Math.max(...prices);
-  const range = Math.max(0.01, max - min);
-  const step = width / Math.max(1, points.length - 1);
-  const coords = points.map((point, index) => {
-    const x = index * step;
-    const y = height - ((point.price - min) / range) * (height - 12) - 6;
-
-    return { x, y };
-  });
-  const line = coords.map((point, index) => `${index === 0 ? "M" : "L"}${point.x.toFixed(2)},${point.y.toFixed(2)}`).join(" ");
-  const area = `${line} L${width},${height} L0,${height} Z`;
-  const color = positive ? "#00c805" : "#ff6570";
-
-  return (
-    <svg className="h-full w-full overflow-visible" viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Price chart">
-      {fill ? <path d={area} fill={color} opacity="0.10" /> : null}
-      <path d={line} fill="none" stroke={color} strokeLinecap="round" strokeWidth="3" />
-    </svg>
-  );
-}
-
 export function ArtistMiniCard({ artist }: { artist: Artist }) {
   return (
     <Link href={`/artists/${artist.id}`} className="rmi-card grid min-w-0 gap-4 p-4 transition hover:-translate-y-0.5 hover:border-cyan/70">
@@ -172,13 +136,4 @@ export function ArtistTableRow({
       <div className="text-right text-sm">{right ?? <ChangeText value={artist.dailyChangePercent} />}</div>
     </div>
   );
-}
-
-function buildFlatPoints(point?: PricePoint): PricePoint[] {
-  const price = point?.price ?? 0;
-
-  return [
-    { date: point?.date ?? "start", price },
-    { date: point?.date ?? "current", price }
-  ];
 }

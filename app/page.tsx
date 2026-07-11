@@ -5,9 +5,8 @@ import { useGame } from "@/components/GameProvider";
 import { ArtistIdentity, ArtistMiniCard, ChangeText, RmiButton, RmiSection } from "@/components/RmiPrimitives";
 import { ArtistAvatar } from "@/components/ArtistAvatar";
 import { MarketNewsFeed } from "@/components/MarketNewsFeed";
-import { PriceChart } from "@/components/PriceChart";
 import { formatCurrency, formatPercent } from "@/lib/formatters";
-import { buildMarketIndexSeries, getMarketBreadth, getSeriesChangePercent } from "@/lib/market-analytics";
+import { getMarketBreadth } from "@/lib/market-analytics";
 import type { Artist } from "@/lib/types";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -35,13 +34,30 @@ export default function HomePage() {
           artist.name.toLowerCase().includes(normalized) ||
           artist.ticker.toLowerCase().includes(normalized)
       )
-      .sort((first, second) => first.name.localeCompare(second.name));
+      .sort((first, second) => {
+        if (normalized) {
+          const firstExact = first.name.toLowerCase() === normalized || first.ticker.toLowerCase() === normalized;
+          const secondExact = second.name.toLowerCase() === normalized || second.ticker.toLowerCase() === normalized;
+
+          if (firstExact !== secondExact) {
+            return firstExact ? -1 : 1;
+          }
+
+          const firstStarts = first.name.toLowerCase().startsWith(normalized) || first.ticker.toLowerCase().startsWith(normalized);
+          const secondStarts = second.name.toLowerCase().startsWith(normalized) || second.ticker.toLowerCase().startsWith(normalized);
+
+          if (firstStarts !== secondStarts) {
+            return firstStarts ? -1 : 1;
+          }
+        }
+
+        return second.dailyChangePercent - first.dailyChangePercent || first.name.localeCompare(second.name);
+      })
+      .slice(0, 8);
   }, [query, state.artists]);
   const marketLeader = [...state.artists].sort((a, b) => b.dailyChangePercent - a.dailyChangePercent)[0];
   const underPressure = [...state.artists].sort((a, b) => a.dailyChangePercent - b.dailyChangePercent)[0];
   const signalLeader = [...state.artists].sort((a, b) => b.hypeScore - a.hypeScore)[0];
-  const marketIndex = useMemo(() => buildMarketIndexSeries(state.artists), [state.artists]);
-  const marketIndexChange = getSeriesChangePercent(marketIndex);
   const breadth = getMarketBreadth(state.artists);
   const portfolioDayPercent = portfolioValue - portfolioDayChange > 0
     ? (portfolioDayChange / (portfolioValue - portfolioDayChange)) * 100
@@ -70,10 +86,10 @@ export default function HomePage() {
 
   return (
     <div className="space-y-6">
-      <section className="relative z-20 grid min-w-0 overflow-visible rounded-xl border border-line bg-panel lg:grid-cols-[minmax(0,1.45fr)_minmax(290px,0.55fr)]">
-        <div className="grid min-w-0 content-center px-5 py-10 text-center sm:px-10 lg:min-h-[300px] lg:text-left">
+      <section className="relative z-40 grid min-w-0 overflow-visible rounded-lg border border-line bg-panel lg:grid-cols-[minmax(0,1.45fr)_minmax(290px,0.55fr)]">
+        <div className="grid min-w-0 content-center px-5 py-8 text-center sm:px-8 lg:min-h-[230px] lg:text-left">
           <p className="text-xs font-bold uppercase tracking-[0.18em] text-cyan">Rap Market Index</p>
-          <h1 className="mt-3 min-w-0 break-words text-2xl font-black leading-tight sm:text-4xl lg:text-5xl">Spot the rise before everyone else.</h1>
+          <h1 className="mt-3 min-w-0 break-words text-3xl font-black leading-tight sm:text-4xl">Spot the next rise.</h1>
           <p className="mt-3 text-base font-bold text-paper/75">Buy shares in rappers. Build a portfolio when they blow up.</p>
           <form onSubmit={submitSearch} className="relative mx-auto mt-6 flex w-full min-w-0 max-w-xl flex-col gap-2 sm:flex-row lg:mx-0">
             <input
@@ -86,7 +102,7 @@ export default function HomePage() {
             />
             <RmiButton type="submit">Search</RmiButton>
             {searchFocused ? (
-              <div className="absolute left-0 right-0 top-[100px] z-50 max-h-72 overflow-y-auto rounded-xl border border-line bg-panel p-2 text-left shadow-2xl scrollbar-thin sm:right-20 sm:top-12">
+              <div className="absolute left-0 right-0 top-[100px] z-[100] max-h-72 overflow-y-auto rounded-lg border border-line bg-panel p-2 text-left shadow-2xl scrollbar-thin sm:right-20 sm:top-12">
                 {searchSuggestions.map((artist) => (
                   <Link
                     key={artist.id}
@@ -117,51 +133,17 @@ export default function HomePage() {
       </section>
 
       <section className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <HeroStat label="active listings" value={String(state.artists.length)} />
-        <HeroStat label="gaining today" value={String(breadth.advancers)} />
-        <HeroStat label="declining today" value={String(breadth.decliners)} />
-        <HeroStat label="average move" value={formatPercent(breadth.averageAbsoluteMove)} />
-      </section>
-
-      <RmiSection
-        title="RMI Composite"
-        subtitle="Equal-weight view of the listed artist market over recorded quote history."
-        action={
-          <span className={marketIndexChange >= 0 ? "text-sm font-black text-mint number-tabular" : "text-sm font-black text-ember number-tabular"}>
-            {formatPercent(marketIndexChange)}
-          </span>
-        }
-      >
-        <div className="grid gap-5 p-4 md:grid-cols-[minmax(0,1fr)_260px] md:items-center">
-          <div className="h-44">
-            <PriceChart data={marketIndex} height={176} compact />
-          </div>
-          <div className="grid grid-cols-3 gap-2 md:grid-cols-1">
-            <MarketBreadthRow label="Advancing" value={breadth.advancers} tone="good" />
-            <MarketBreadthRow label="Declining" value={breadth.decliners} tone="bad" />
-            <MarketBreadthRow label="Unchanged" value={breadth.unchanged} />
-          </div>
-        </div>
-      </RmiSection>
-
-      <section>
-        <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-base font-black">Trending now</h2>
-          <Link href="/markets" className="text-sm font-bold text-paper/55 hover:text-cyan">
-            Markets
-          </Link>
-        </div>
-        <div className="grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(190px,1fr))]">
-          {trending.map((artist) => (
-            <ArtistMiniCard key={artist.id} artist={artist} />
-          ))}
-        </div>
+        <HeroStat label="Active Listings" value={String(state.artists.length)} />
+        <HeroStat label="Gaining Today" value={String(breadth.advancers)} />
+        <HeroStat label="Declining Today" value={String(breadth.decliners)} />
+        <HeroStat label="Average Move" value={formatPercent(breadth.averageAbsoluteMove)} />
       </section>
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1.55fr)_minmax(300px,0.65fr)]">
         <RmiSection
-          title="Market catalysts"
-          action={<Link href="/news" className="text-xs font-bold text-cyan hover:text-cyan/75">All news</Link>}
+          title="Market Catalysts"
+          subtitle="Verified stories with enough evidence and relevance to inform an RMI quote."
+          action={<Link href="/news" className="text-xs font-bold text-cyan hover:text-cyan/75">All News</Link>}
         >
           <div className="px-4">
             <MarketNewsFeed limit={5} variant="full" />
@@ -169,13 +151,13 @@ export default function HomePage() {
         </RmiSection>
 
         <div className="space-y-4">
-          <RmiSection title={session ? "Your portfolio" : "Start trading"}>
+          <RmiSection title={session ? "Your Portfolio" : "Start Trading"}>
             {session ? (
               <div className="grid gap-3 p-4 sm:grid-cols-3 lg:grid-cols-1">
-                <SnapshotTile label="portfolio" value={formatCurrency(portfolioValue)} />
-                <SnapshotTile label="cash" value={formatCurrency(state.cashBalance)} />
-                <SnapshotTile label="today" value={formatPercent(portfolioDayPercent)} positive={portfolioDayPercent >= 0} />
-                <RmiButton href="/portfolio" variant="secondary">View portfolio</RmiButton>
+                <SnapshotTile label="Portfolio" value={formatCurrency(portfolioValue)} />
+                <SnapshotTile label="Cash" value={formatCurrency(state.cashBalance)} />
+                <SnapshotTile label="Today" value={formatPercent(portfolioDayPercent)} positive={portfolioDayPercent >= 0} />
+                <RmiButton href="/portfolio" variant="secondary">View Portfolio</RmiButton>
               </div>
             ) : (
               <div className="space-y-4 p-4 text-sm">
@@ -186,7 +168,7 @@ export default function HomePage() {
           </RmiSection>
 
           {session ? (
-            <RmiSection title="Your watchlist" action={<Link href="/watchlist" className="text-xs text-cyan">View all</Link>}>
+            <RmiSection title="Your Watchlist" action={<Link href="/watchlist" className="text-xs text-cyan">View All</Link>}>
               {watchlistArtists.length ? (
                 watchlistArtists.slice(0, 5).map((artist) => (
                   <div key={artist.id} className="flex items-center justify-between gap-3 border-b border-line px-4 py-3 last:border-b-0">
@@ -203,6 +185,20 @@ export default function HomePage() {
           ) : null}
         </div>
       </div>
+
+      <section>
+        <div className="mb-3 flex items-center justify-between">
+          <h2 className="text-base font-black">Trending Now</h2>
+          <Link href="/markets" className="text-sm font-bold text-paper/55 hover:text-cyan">
+            View Markets
+          </Link>
+        </div>
+        <div className="grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(190px,1fr))]">
+          {trending.map((artist) => (
+            <ArtistMiniCard key={artist.id} artist={artist} />
+          ))}
+        </div>
+      </section>
 
     </div>
   );
@@ -234,17 +230,6 @@ function SnapshotTile({ label, value, positive = true }: { label: string; value:
     <div className="rounded-lg bg-panelSoft p-4">
       <p className="text-xs font-bold text-paper/55">{label}</p>
       <p className={positive ? "mt-1 text-xl font-black text-paper number-tabular" : "mt-1 text-xl font-black text-ember number-tabular"}>{value}</p>
-    </div>
-  );
-}
-
-function MarketBreadthRow({ label, value, tone = "neutral" }: { label: string; value: number; tone?: "neutral" | "good" | "bad" }) {
-  return (
-    <div className="flex items-center justify-between gap-3 rounded-lg bg-panelSoft px-3 py-2 text-sm">
-      <span className="font-bold text-paper/60">{label}</span>
-      <span className={tone === "good" ? "font-black text-mint number-tabular" : tone === "bad" ? "font-black text-ember number-tabular" : "font-black number-tabular"}>
-        {value}
-      </span>
     </div>
   );
 }

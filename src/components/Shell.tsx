@@ -2,13 +2,14 @@
 
 import { AdminBadge } from "@/components/AdminBadge";
 import { useAuth } from "@/components/AuthProvider";
+import { GlobalArtistSearch } from "@/components/GlobalArtistSearch";
 import { useGame } from "@/components/GameProvider";
 import { UserAvatar } from "@/components/UserAvatar";
 import { formatCurrency, formatPercent } from "@/lib/formatters";
 import { applyThemePreference, getStoredThemePreference, type ThemePreference } from "@/lib/theme";
 import type { Artist } from "@/lib/types";
 import clsx from "clsx";
-import { LogOut, Monitor, Moon, SlidersHorizontal, Sun, X } from "lucide-react";
+import { AudioLines, CircleHelp, LogOut, Monitor, Moon, Palette, Settings, Sun, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -106,13 +107,13 @@ export function Shell({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex min-h-screen flex-col bg-ink text-paper">
       <header className="border-b border-line/70">
-        <div className="mx-auto flex max-w-[1440px] items-center gap-4 px-4 py-4 sm:px-6 lg:px-8">
+        <div className="mx-auto flex max-w-[1280px] items-center gap-4 px-4 py-4 sm:px-6 lg:px-8">
           <Link href="/" className="flex shrink-0 items-center gap-2 font-black" aria-label="RMI home">
-            <SlidersHorizontal className="h-5 w-5 text-cyan" aria-hidden="true" />
+            <AudioLines className="h-5 w-5 text-cyan" aria-hidden="true" />
             <span>RMI</span>
           </Link>
 
-          <nav className="ml-6 hidden items-center gap-5 text-sm font-bold text-paper/70 md:flex" aria-label="Primary">
+          <nav className="ml-3 hidden items-center gap-4 text-sm font-bold text-paper/70 md:flex" aria-label="Primary">
             {navItems.map((item) => {
               const active = pathname === item.href || (item.href === "/leaderboard" && pathname === "/rankings");
 
@@ -128,10 +129,12 @@ export function Shell({ children }: { children: React.ReactNode }) {
             })}
           </nav>
 
+          <GlobalArtistSearch className="ml-auto hidden w-52 lg:block xl:w-64" />
+
           {session ? (
             <Link
               href="/portfolio"
-              className="ml-auto hidden items-center gap-4 rounded-lg border border-line bg-panel px-3 py-2 text-xs hover:border-cyan lg:flex"
+              className="hidden items-center gap-4 rounded-lg border border-line bg-panel px-3 py-2 text-xs hover:border-cyan xl:flex"
               aria-label={`Portfolio ${formatCurrency(portfolioValue)}, today ${formatPercent(portfolioDayChangePercent)}`}
             >
               <span>
@@ -144,7 +147,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
             </Link>
           ) : null}
 
-          <div ref={accountMenuRef} className={session ? "relative ml-auto lg:ml-0" : "relative ml-auto"}>
+          <div ref={accountMenuRef} className="relative ml-auto lg:ml-0">
             {session ? (
               <button
                 type="button"
@@ -174,7 +177,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
             )}
 
             {accountOpen ? (
-              <div className="absolute right-0 top-12 z-50 w-72 rounded-xl border border-line bg-panel p-3 shadow-2xl" role="menu">
+              <div className="absolute right-0 top-12 z-[90] w-80 rounded-lg border border-line bg-panel p-3 shadow-2xl" role="menu">
                 <div className="flex items-center gap-3 border-b border-line pb-3">
                   <UserAvatar avatarUrl={avatarUrl} label={accountLabel} />
                   <div className="min-w-0">
@@ -182,16 +185,20 @@ export function Shell({ children }: { children: React.ReactNode }) {
                       <p className="truncate text-sm font-black">{accountLabel}</p>
                       {isAdminUser ? <AdminBadge compact /> : null}
                     </div>
-                    <p className="truncate text-xs font-bold text-paper/45">{user?.email}</p>
+                    <p className="truncate text-xs font-bold text-paper/45">RMI trader</p>
                   </div>
                 </div>
 
-                <div className="grid gap-1 py-3 text-sm font-bold">
-                  <Link href="/account" onClick={() => setAccountOpen(false)} className="rounded-lg px-3 py-2 hover:bg-panelSoft">
-                    Manage Account
+                <div className="py-3">
+                  <Link href="/account" onClick={() => setAccountOpen(false)} className="flex min-h-11 items-center justify-center rounded-lg border border-line px-3 text-sm font-black hover:border-cyan">
+                    Manage Your Account
                   </Link>
-                  <Link href="/settings" onClick={() => setAccountOpen(false)} className="rounded-lg px-3 py-2 hover:bg-panelSoft">
-                    Settings
+                </div>
+
+                <div className="grid gap-1 border-t border-line py-3 text-sm font-bold">
+                  <Link href="/settings" onClick={() => setAccountOpen(false)} className="flex items-center gap-3 rounded-lg px-3 py-2 hover:bg-panelSoft">
+                    <Settings className="h-4 w-4 text-paper/45" aria-hidden="true" />
+                    Account Settings
                   </Link>
                   <button
                     type="button"
@@ -201,25 +208,22 @@ export function Shell({ children }: { children: React.ReactNode }) {
                     }}
                     className="flex items-center justify-between gap-3 rounded-lg px-3 py-2 text-left hover:bg-panelSoft"
                   >
-                    <span>Appearance</span>
+                    <span className="flex items-center gap-3">
+                      <Palette className="h-4 w-4 text-paper/45" aria-hidden="true" />
+                      Appearance
+                    </span>
                     <span className="text-xs font-black text-paper/45">{themeLabel}</span>
                   </button>
-                </div>
-
-                <div className="grid grid-cols-3 gap-2 border-y border-line py-3 text-xs font-bold">
-                  <StatMini label="portfolio" value={formatCurrency(portfolioValue)} />
-                  <StatMini label="cash" value={formatCurrency(state.cashBalance)} />
-                  <StatMini
-                    label="today"
-                    value={formatPercent(portfolioDayChangePercent)}
-                    tone={portfolioDayChangePercent >= 0 ? "good" : "bad"}
-                  />
+                  <Link href="/about" onClick={() => setAccountOpen(false)} className="flex items-center gap-3 rounded-lg px-3 py-2 hover:bg-panelSoft">
+                    <CircleHelp className="h-4 w-4 text-paper/45" aria-hidden="true" />
+                    Help & About
+                  </Link>
                 </div>
 
                 <button
                   type="button"
                   onClick={handleSignOut}
-                  className="mt-3 flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm font-black hover:bg-panelSoft hover:text-ember"
+                  className="flex w-full items-center gap-3 border-t border-line px-3 pt-4 text-left text-sm font-black hover:text-ember"
                 >
                   <LogOut className="h-4 w-4" aria-hidden="true" />
                   Sign out
@@ -229,7 +233,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
           </div>
         </div>
 
-        <div className="mx-auto flex max-w-[1440px] items-center gap-2 overflow-x-auto px-4 pb-4 sm:px-6 md:hidden">
+        <div className="mx-auto flex max-w-[1280px] items-center gap-2 overflow-x-auto px-4 pb-4 sm:px-6 md:hidden">
           {navItems.map((item) => (
             <Link
               key={item.href}
@@ -252,9 +256,9 @@ export function Shell({ children }: { children: React.ReactNode }) {
         <AppearanceModal current={themePreference} onChange={chooseTheme} onClose={() => setAppearanceOpen(false)} />
       ) : null}
 
-      <main className="mx-auto w-full max-w-[1440px] flex-1 px-4 py-8 sm:px-6 lg:px-8">
+      <main className="mx-auto w-full max-w-[1280px] flex-1 px-4 py-7 sm:px-6 lg:px-8">
         {marketError ? (
-          <div className="mb-5 rounded-xl border border-ember/45 bg-ember/10 px-4 py-3 text-sm font-bold text-ember" role="alert">
+          <div className="mb-5 rounded-lg border border-ember/45 bg-ember/10 px-4 py-3 text-sm font-bold text-ember" role="alert">
             {marketError}
           </div>
         ) : null}
@@ -267,11 +271,11 @@ export function Shell({ children }: { children: React.ReactNode }) {
 
 function MarketTape({ artists }: { artists: Artist[] }) {
   return (
-    <div className="border-t border-line/70 bg-panelSoft/45" aria-label="Current RMI market prices">
-      <div className="mx-auto flex min-h-10 max-w-[1440px] px-4 sm:px-6 lg:px-8">
+    <div className="bg-panelSoft/45" aria-label="Current RMI market prices">
+      <div className="mx-auto flex min-h-10 max-w-[1280px] px-4 sm:px-6 lg:px-8">
         <Link
           href="/markets"
-          className="z-10 flex shrink-0 items-center gap-2 bg-panelSoft/90 pr-4 text-xs font-black"
+          className="z-10 flex shrink-0 items-center gap-2 pr-5 text-xs font-black"
         >
           <span className="h-2 w-2 rounded-full bg-mint" aria-hidden="true" />
           RMI Market
@@ -290,10 +294,10 @@ function MarketTape({ artists }: { artists: Artist[] }) {
 function SiteFooter() {
   return (
     <footer className="mt-10 border-t border-line bg-panelSoft/55">
-      <div className="mx-auto grid max-w-[1440px] gap-8 px-4 py-9 sm:grid-cols-2 sm:px-6 lg:grid-cols-[1.4fr_0.7fr_0.7fr_1fr] lg:px-8">
+      <div className="mx-auto grid max-w-[1280px] gap-8 px-4 py-9 sm:grid-cols-2 sm:px-6 lg:grid-cols-[1.4fr_0.7fr_0.7fr_1fr] lg:px-8">
         <div>
           <div className="flex items-center gap-2 font-black">
-            <SlidersHorizontal className="h-4 w-4 text-cyan" aria-hidden="true" />
+            <AudioLines className="h-4 w-4 text-cyan" aria-hidden="true" />
             RMI
           </div>
           <p className="mt-3 max-w-sm text-sm leading-6 text-paper/55">
@@ -371,23 +375,6 @@ function MarketTapeGroup({ artists, duplicate = false }: { artists: Artist[]; du
   );
 }
 
-function StatMini({ label, value, tone = "neutral" }: { label: string; value: string; tone?: "neutral" | "good" | "bad" }) {
-  return (
-    <div className="min-w-0">
-      <p className="truncate text-[10px] uppercase text-paper/40">{label}</p>
-      <p
-        className={clsx(
-          "truncate text-xs font-black number-tabular",
-          tone === "good" && "text-mint",
-          tone === "bad" && "text-ember"
-        )}
-      >
-        {value}
-      </p>
-    </div>
-  );
-}
-
 function AppearanceModal({
   current,
   onChange,
@@ -405,7 +392,7 @@ function AppearanceModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4" role="dialog" aria-modal="true">
-      <div className="w-full max-w-lg rounded-2xl border border-line bg-panel p-5 shadow-2xl">
+      <div className="w-full max-w-lg rounded-lg border border-line bg-panel p-5 shadow-2xl">
         <div className="flex items-center justify-between">
           <h2 className="text-2xl font-black">Appearance</h2>
           <button type="button" onClick={onClose} className="grid h-9 w-9 place-items-center rounded-full hover:bg-panelSoft" aria-label="Close">
@@ -419,7 +406,7 @@ function AppearanceModal({
               type="button"
               onClick={() => onChange(option.value)}
               className={clsx(
-                "flex items-center justify-between rounded-xl border px-4 py-3 text-left text-sm font-black",
+                "flex items-center justify-between rounded-lg border px-4 py-3 text-left text-sm font-black",
                 current === option.value ? "border-cyan bg-cyan/10" : "border-line bg-panelSoft hover:border-cyan"
               )}
             >
@@ -431,7 +418,7 @@ function AppearanceModal({
             </button>
           ))}
         </div>
-        <button type="button" onClick={onClose} className="mt-5 h-11 w-full rounded-xl bg-paper text-sm font-black text-ink">
+        <button type="button" onClick={onClose} className="mt-5 h-11 w-full rounded-lg bg-paper text-sm font-black text-ink">
           Done
         </button>
       </div>

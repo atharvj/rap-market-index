@@ -4,7 +4,7 @@ import Link from "next/link";
 export default function NotFoundPage() {
   return (
     <section className="mx-auto flex min-h-[520px] max-w-3xl items-center justify-center py-12">
-      <div className="w-full rounded border border-line bg-panel p-6 shadow-market">
+      <div className="rmi-card w-full p-6 shadow-market">
         <div className="flex items-start gap-4">
           <div className="grid h-11 w-11 shrink-0 place-items-center rounded bg-brass/10 text-brass">
             <Search className="h-5 w-5" aria-hidden="true" />

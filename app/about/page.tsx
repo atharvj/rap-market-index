@@ -18,6 +18,14 @@ const sections = [
     body: "Monthly reach can jump temporarily after a feature or playlist placement. RMI treats that as momentum first and waits for durable listening, direct-channel growth, and broader attention before allowing it to become a permanent valuation change."
   },
   {
+    title: "How catalysts are checked",
+    body: "Release, review, social, and audience signals are checked during market runs. Routine uploads and isolated fan posts are filtered out, while larger moves require stronger source confidence, independent confirmation, or measurable audience reaction. No single headline determines an artist quote by itself."
+  },
+  {
+    title: "What happens outside music",
+    body: "A major appearance, controversy, performance, or cultural moment can create short-term public-attention momentum and may appear in RMI news. It has a smaller and more temporary price effect unless direct music demand, audience growth, or sustained fan interest confirms that the attention is carrying back into the artist's music career."
+  },
+  {
     title: "Why it exists",
     body: "Rap fans already debate who is rising, falling, overhyped, underrated, or about to break out. RMI turns those debates into a structured fantasy market with prices, charts, watchlists, portfolios, and standings."
   }
@@ -26,7 +34,7 @@ const sections = [
 export default function AboutPage() {
   return (
     <div className="mx-auto grid max-w-6xl gap-5 lg:grid-cols-[minmax(0,1fr)_320px]">
-      <main className="rounded border border-line bg-panel shadow-market">
+      <main className="rmi-card shadow-market">
         <section className="border-b border-line p-5">
           <p className="text-[11px] font-black uppercase tracking-wide text-brass">About RMI</p>
           <h1 className="mt-2 text-3xl font-black leading-tight">Rap Market Index</h1>
@@ -46,7 +54,7 @@ export default function AboutPage() {
       </main>
 
       <aside className="space-y-5">
-        <section className="rounded border border-line bg-panel p-5 shadow-market">
+        <section className="rmi-card p-5 shadow-market">
           <h2 className="text-sm font-black uppercase tracking-wide">Quick links</h2>
           <div className="mt-4 grid gap-3 text-sm font-bold text-cyan">
             <Link href="/markets">Now Trading</Link>
@@ -56,7 +64,7 @@ export default function AboutPage() {
           </div>
         </section>
 
-        <section className="rounded border border-line bg-panel p-5 shadow-market">
+        <section className="rmi-card p-5 shadow-market">
           <h2 className="text-sm font-black uppercase tracking-wide">Public beta</h2>
           <p className="mt-3 text-sm font-bold leading-6 text-paper/58">
             RMI is still being tested. The core goal is to make artist quotes and market history reliable before wider launch.

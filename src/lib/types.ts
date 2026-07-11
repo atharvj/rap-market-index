@@ -102,6 +102,8 @@ export type ShortPositionView = ShortPosition & {
 export type LeaderboardEntry = {
   id: string;
   username: string;
+  avatarUrl?: string;
+  rank?: number;
   portfolioValue: number;
   cashBalance: number;
   gainPercent: number;

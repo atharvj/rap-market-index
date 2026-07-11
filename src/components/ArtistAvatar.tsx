@@ -5,7 +5,7 @@ export function ArtistAvatar({ artist, size = "md" }: { artist: Artist; size?: "
     sm: "h-8 w-8 text-xs",
     md: "h-10 w-10 text-sm",
     lg: "h-12 w-12 text-base",
-    xl: "h-14 w-14 text-lg"
+    xl: "h-20 w-20 text-xl"
   }[size];
 
   return (
