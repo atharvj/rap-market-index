@@ -17,6 +17,7 @@ type PublicFavoriteArtist = {
   dailyChangePercent: number;
   hypeScore: number;
   accent: string;
+  imageUrl?: string | null;
 };
 
 type PublicProfile = {
@@ -28,9 +29,11 @@ type PublicProfile = {
   favoriteArtists: PublicFavoriteArtist[];
   holdings: PublicHolding[];
   isAdmin: boolean;
-  portfolioValue: number;
-  cashBalance: number;
-  gainPercent: number;
+  isPrivate: boolean;
+  portfolioIsPublic: boolean;
+  portfolioValue: number | null;
+  cashBalance: number | null;
+  gainPercent: number | null;
 };
 
 type PublicHolding = {
@@ -38,6 +41,7 @@ type PublicHolding = {
   name: string;
   ticker: string;
   accent: string;
+  imageUrl?: string | null;
   shares: number;
   currentPrice: number;
   dailyChangePercent: number;
@@ -106,6 +110,7 @@ export default function PublicUserProfilePage() {
     day: "numeric",
     year: "numeric"
   }).format(new Date(profile.createdAt));
+  const portfolioVisible = profile.portfolioIsPublic && profile.portfolioValue !== null;
 
   return (
     <div className="mx-auto max-w-5xl space-y-5">
@@ -119,16 +124,18 @@ export default function PublicUserProfilePage() {
             </div>
             <div className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
               <ProfileMetric icon={<CalendarDays className="h-4 w-4" />} label="Member since" value={memberSince} />
-              <ProfileMetric icon={<Trophy className="h-4 w-4" />} label="Rank" value="Public standings" />
-              <ProfileMetric icon={<WalletCards className="h-4 w-4" />} label="Net worth" value={formatCurrency(profile.portfolioValue)} />
-              <ProfileMetric icon={<WalletCards className="h-4 w-4" />} label="Cash" value={formatCurrency(profile.cashBalance)} />
+              <ProfileMetric icon={<Trophy className="h-4 w-4" />} label="Rank" value="Global standings" />
+              <ProfileMetric icon={<WalletCards className="h-4 w-4" />} label="Net worth" value={portfolioVisible ? formatCurrency(profile.portfolioValue ?? 0) : "Private"} />
+              <ProfileMetric icon={<WalletCards className="h-4 w-4" />} label="Cash" value={portfolioVisible ? formatCurrency(profile.cashBalance ?? 0) : "Private"} />
             </div>
             <p className="mt-5 max-w-3xl text-sm font-bold leading-6 text-paper/58">
-              {profile.bio || "This trader has not added a bio yet."}
+              {profile.isPrivate ? "This trader keeps their profile private." : profile.bio || "This trader has not added a bio yet."}
             </p>
-            <p className={clsx("mt-3 text-sm font-black number-tabular", profile.gainPercent >= 0 ? "text-mint" : "text-ember")}>
-              {formatPercent(profile.gainPercent)} all-time
-            </p>
+            {profile.gainPercent !== null ? (
+              <p className={clsx("mt-3 text-sm font-black number-tabular", profile.gainPercent >= 0 ? "text-mint" : "text-ember")}>
+                {formatPercent(profile.gainPercent)} all-time
+              </p>
+            ) : null}
           </div>
         </div>
       </section>
@@ -140,7 +147,9 @@ export default function PublicUserProfilePage() {
           <h2 className="text-xs font-black uppercase tracking-wide">Public portfolio</h2>
         </div>
         <div className="divide-y divide-line">
-          {profile.holdings.length ? (
+          {!profile.portfolioIsPublic ? (
+            <p className="p-4 text-sm font-bold text-paper/50">This trader keeps their portfolio private.</p>
+          ) : profile.holdings.length ? (
             profile.holdings.map((holding) => (
               <Link
                 key={holding.artistId}
@@ -148,9 +157,12 @@ export default function PublicUserProfilePage() {
                 className="grid gap-3 px-4 py-3 hover:bg-panelSoft/70 sm:grid-cols-[minmax(0,1fr)_120px_120px]"
               >
                 <span className="flex items-center gap-3">
-                  <span className={`grid h-10 w-10 place-items-center rounded bg-gradient-to-br ${holding.accent} text-sm font-black text-paper`}>
-                    {holding.ticker.slice(0, 2)}
-                  </span>
+                  <ProfileArtistImage
+                    name={holding.name}
+                    ticker={holding.ticker}
+                    accent={holding.accent}
+                    imageUrl={holding.imageUrl}
+                  />
                   <span className="min-w-0">
                     <span className="block truncate text-sm font-black">{holding.name}</span>
                     <span className="text-xs font-bold text-paper/50">
@@ -189,9 +201,12 @@ export default function PublicUserProfilePage() {
             profile.favoriteArtists.map((artist) => (
               <Link key={artist.id} href={`/artists/${artist.id}`} className="grid gap-3 p-4 hover:bg-panelSoft/70">
                 <span className="flex items-center gap-3">
-                  <span className={`grid h-10 w-10 place-items-center rounded bg-gradient-to-br ${artist.accent} text-sm font-black text-paper`}>
-                    {artist.ticker.slice(0, 2)}
-                  </span>
+                  <ProfileArtistImage
+                    name={artist.name}
+                    ticker={artist.ticker}
+                    accent={artist.accent}
+                    imageUrl={artist.imageUrl}
+                  />
                   <span className="min-w-0">
                     <span className="block truncate text-sm font-black">{artist.name}</span>
                     <span className="text-xs font-bold text-paper/50">
@@ -231,5 +246,39 @@ function StatusCard({ text }: { text: string }) {
     <section className="mx-auto max-w-xl rounded border border-line bg-panel p-5 text-sm font-bold text-paper/55 shadow-market">
       {text}
     </section>
+  );
+}
+
+function ProfileArtistImage({
+  name,
+  ticker,
+  accent,
+  imageUrl
+}: {
+  name: string;
+  ticker: string;
+  accent: string;
+  imageUrl?: string | null;
+}) {
+  return (
+    <span
+      className={`relative grid h-10 w-10 shrink-0 place-items-center overflow-hidden rounded-full border border-line bg-gradient-to-br ${accent} text-sm font-black text-paper`}
+      aria-label={name}
+      role="img"
+    >
+      <span aria-hidden="true">{ticker.slice(0, 2)}</span>
+      {imageUrl ? (
+        <img
+          src={imageUrl}
+          alt=""
+          className="absolute inset-0 h-full w-full object-cover"
+          loading="lazy"
+          referrerPolicy="no-referrer"
+          onError={(event) => {
+            event.currentTarget.style.display = "none";
+          }}
+        />
+      ) : null}
+    </span>
   );
 }

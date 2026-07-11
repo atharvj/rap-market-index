@@ -1,7 +1,10 @@
 "use client";
 
 import { ArtistAvatar } from "@/components/ArtistAvatar";
+import { useAuth } from "@/components/AuthProvider";
 import { useGame } from "@/components/GameProvider";
+import { MarketNewsFeed } from "@/components/MarketNewsFeed";
+import { SignedInGate } from "@/components/SignedInGate";
 import { ArtistIdentity, ChangeText, RmiButton, RmiLineChart, RmiSection } from "@/components/RmiPrimitives";
 import { WatchlistButton } from "@/components/WatchlistButton";
 import { formatCurrency, formatPercent } from "@/lib/formatters";
@@ -10,6 +13,7 @@ import Link from "next/link";
 import { useMemo } from "react";
 
 export default function WatchlistPage() {
+  const { session } = useAuth();
   const { watchlistArtists } = useGame();
   const watchlistIndex = useMemo(() => buildMarketIndexSeries(watchlistArtists), [watchlistArtists]);
   const indexChange = getSeriesChangePercent(watchlistIndex);
@@ -18,6 +22,15 @@ export default function WatchlistPage() {
     (first, second) => Math.abs(second.dailyChangePercent) - Math.abs(first.dailyChangePercent)
   )[0];
   const signalLeader = [...watchlistArtists].sort((first, second) => second.hypeScore - first.hypeScore)[0];
+
+  if (!session) {
+    return (
+      <SignedInGate
+        title="Log in to use a watchlist"
+        description="Saved artists and personalized catalyst updates belong to your account and are not available while signed out."
+      />
+    );
+  }
 
   return (
     <div className="space-y-5">
@@ -100,6 +113,18 @@ export default function WatchlistPage() {
           </div>
         )}
       </section>
+
+      {watchlistArtists.length ? (
+        <RmiSection
+          title="Watchlist News"
+          subtitle="Verified, price-relevant catalysts for the artists you follow."
+          action={<Link href="/news" className="text-xs font-bold text-cyan">All Market News</Link>}
+        >
+          <div className="px-4">
+            <MarketNewsFeed artistIds={watchlistArtists.map((artist) => artist.id)} limit={8} compact />
+          </div>
+        </RmiSection>
+      ) : null}
     </div>
   );
 }

@@ -6,7 +6,7 @@ import type { PricePoint } from "@/lib/types";
 import clsx from "clsx";
 import { useEffect, useMemo, useState } from "react";
 
-type HistoryRange = "1M" | "3M" | "6M" | "1Y";
+type HistoryRange = "1D" | "7D" | "1M" | "3M" | "6M" | "1Y" | "ALL";
 
 type HistoryResponse = {
   ok: boolean;
@@ -18,7 +18,7 @@ type HistoryResponse = {
   historyEnd?: string | null;
 };
 
-const ranges: HistoryRange[] = ["1M", "3M", "6M", "1Y"];
+const ranges: HistoryRange[] = ["1D", "7D", "1M", "3M", "6M", "1Y", "ALL"];
 
 export function ArtistPriceHistoryPanel({
   artistId,
@@ -84,7 +84,7 @@ export function ArtistPriceHistoryPanel({
           <h2 className="text-xl font-black">Chart</h2>
           <p className="mt-1 text-sm font-bold text-paper/50">{subtitle}</p>
         </div>
-        <div className="inline-flex rounded border border-line bg-panelSoft p-1">
+        <div className="inline-flex max-w-full overflow-x-auto rounded border border-line bg-panelSoft p-1 scrollbar-thin">
           {ranges.map((candidate) => (
             <button
               key={candidate}
@@ -103,6 +103,7 @@ export function ArtistPriceHistoryPanel({
         </div>
       </div>
       <PriceChart data={history} height={320} />
+      <p className="mt-2 text-xs text-paper/42">Hover, tap, or click the chart to inspect a recorded quote.</p>
       {status === "error" ? (
         <p className="mt-3 text-xs font-bold text-ember">Price history unavailable.</p>
       ) : null}

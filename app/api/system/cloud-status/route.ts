@@ -4,6 +4,7 @@ import {
   createServiceRoleClient,
   getSupabaseConfigStatus
 } from "@/lib/supabase/server";
+import { requireAdminRequest } from "@/server/admin-auth";
 
 export const dynamic = "force-dynamic";
 
@@ -14,7 +15,13 @@ type CloudCheck = {
   detail: string;
 };
 
-export async function GET() {
+export async function GET(request: Request) {
+  const auth = await requireAdminRequest(request, { allowMarketSecret: false });
+
+  if (!auth.ok) {
+    return auth.response;
+  }
+
   const config = getSupabaseConfigStatus();
   const checks: CloudCheck[] = [
     {

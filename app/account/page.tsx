@@ -10,7 +10,8 @@ import { formatCurrency } from "@/lib/formatters";
 import { getBrowserSupabaseClient } from "@/lib/supabase/client";
 import { Camera, CalendarDays, ImagePlus, LogOut, Plus, Search, Star, WalletCards, X } from "lucide-react";
 import Link from "next/link";
-import { ChangeEvent, FormEvent, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { ChangeEvent, FormEvent, Suspense, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
 type ProfileDetailsResponse = {
   ok: boolean;
@@ -24,6 +25,16 @@ type ProfileDetailsResponse = {
 };
 
 export default function AccountPage() {
+  return (
+    <Suspense fallback={<div className="mx-auto h-80 max-w-md rounded-xl bg-panelSoft motion-safe:animate-pulse" />}>
+      <AccountPageContent />
+    </Suspense>
+  );
+}
+
+function AccountPageContent() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const { configured, session, user, signIn, signOut, signUp } = useAuth();
   const { state, portfolioValue, holdings, isAdminUser, avatarUrl, refreshServerState } = useGame();
   const [mode, setMode] = useState<"signin" | "signup">("signin");
@@ -35,6 +46,7 @@ export default function AccountPage() {
   const [favoriteQuery, setFavoriteQuery] = useState("");
   const [message, setMessage] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [confirmationPending, setConfirmationPending] = useState(false);
   const fileRef = useRef<HTMLInputElement | null>(null);
   const displayName = session && state.username !== "Demo Guest" ? state.username : user?.email?.split("@")[0] ?? "Trader";
   const favoriteArtists = useMemo(
@@ -73,12 +85,8 @@ export default function AccountPage() {
   }, [favoriteArtistIds, favoriteQuery, state.artists]);
 
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-
-    if (params.get("mode") === "signup") {
-      setMode("signup");
-    }
-  }, []);
+    setMode(searchParams.get("mode") === "signup" ? "signup" : "signin");
+  }, [searchParams]);
 
   useEffect(() => {
     if (!configured || !session) {
@@ -108,10 +116,12 @@ export default function AccountPage() {
     setSubmitting(true);
     const result = mode === "signin" ? await signIn(email, password) : await signUp(email, password, username || email);
     setMessage(result.message);
+    setConfirmationPending(mode === "signup" && result.ok);
     setSubmitting(false);
 
-    if (result.ok) {
+    if (result.ok && mode === "signin") {
       await refreshServerState(username || undefined);
+      router.push("/onboarding");
     }
   }
 
@@ -130,7 +140,26 @@ export default function AccountPage() {
     setMessage(error ? error.message : "Password reset email sent.");
   }
 
-  async function saveProfile(nextAvatarUrl?: string, nextFavoriteArtistIds = favoriteArtistIds) {
+  async function resendConfirmation() {
+    const normalizedEmail = email.trim();
+
+    if (!normalizedEmail) {
+      setMessage("Enter your email address first.");
+      return;
+    }
+
+    const { error } = await getBrowserSupabaseClient().auth.resend({
+      type: "signup",
+      email: normalizedEmail,
+      options: {
+        emailRedirectTo: `${window.location.origin}/account`
+      }
+    });
+
+    setMessage(error ? error.message : "Confirmation email sent again.");
+  }
+
+  async function saveProfile(nextFavoriteArtistIds = favoriteArtistIds) {
     if (!session) {
       return;
     }
@@ -143,7 +172,6 @@ export default function AccountPage() {
       },
       body: JSON.stringify({
         profileBio: bio,
-        avatarUrl: nextAvatarUrl ?? avatarUrl,
         favoriteArtistIds: nextFavoriteArtistIds
       })
     });
@@ -160,27 +188,37 @@ export default function AccountPage() {
       return;
     }
 
-    if (!file.type.startsWith("image/") || file.size > 3 * 1024 * 1024) {
-      setMessage("Choose an image under 3 MB.");
+    const allowedTypes: Record<string, string> = {
+      "image/jpeg": "jpg",
+      "image/png": "png",
+      "image/webp": "webp",
+      "image/gif": "gif"
+    };
+    const extension = allowedTypes[file.type];
+
+    if (!extension || file.size > 3 * 1024 * 1024) {
+      setMessage("Choose a JPG, PNG, WebP, or GIF image under 3 MB.");
       return;
     }
 
-    const extension = file.name.split(".").pop()?.toLowerCase() || "jpg";
-    const filePath = `${session.user.id}/${Date.now()}.${extension}`;
-    const supabase = getBrowserSupabaseClient();
-    const { error } = await supabase.storage.from("profile-avatars").upload(filePath, file, {
-      cacheControl: "3600",
-      contentType: file.type,
-      upsert: false
+    const formData = new FormData();
+    formData.set("avatar", file, `avatar.${extension}`);
+    const response = await fetch("/api/profile/avatar", {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${session.access_token}`
+      },
+      body: formData
     });
+    const payload = await response.json();
 
-    if (error) {
-      setMessage(error.message);
+    if (!response.ok || !payload.ok) {
+      setMessage(payload.error ?? "Could not upload profile picture.");
       return;
     }
 
-    const { data } = supabase.storage.from("profile-avatars").getPublicUrl(filePath);
-    await saveProfile(data.publicUrl);
+    setMessage("Profile picture updated.");
+    await refreshServerState();
   }
 
   if (!configured || !session) {
@@ -198,6 +236,12 @@ export default function AccountPage() {
               onChange={(event) => setUsername(event.target.value)}
               className="h-11 rounded-lg border border-line bg-panelSoft px-3 text-sm font-bold outline-none focus:border-cyan"
               placeholder="Username"
+              autoComplete="username"
+              pattern="[A-Za-z0-9_.-]{2,32}"
+              title="Use 2-32 letters, numbers, periods, hyphens, or underscores."
+              minLength={2}
+              maxLength={32}
+              required
             />
           ) : null}
           <input
@@ -206,6 +250,7 @@ export default function AccountPage() {
             type="email"
             className="h-11 rounded-lg border border-line bg-panelSoft px-3 text-sm font-bold outline-none focus:border-cyan"
             placeholder="Email"
+            autoComplete="email"
             required
           />
           <input
@@ -214,6 +259,8 @@ export default function AccountPage() {
             type="password"
             className="h-11 rounded-lg border border-line bg-panelSoft px-3 text-sm font-bold outline-none focus:border-cyan"
             placeholder="Password"
+            autoComplete={mode === "signup" ? "new-password" : "current-password"}
+            minLength={mode === "signup" ? 8 : undefined}
             required
           />
           <button type="submit" disabled={submitting} className="h-11 rounded-lg bg-paper text-sm font-black text-ink disabled:opacity-60">
@@ -224,9 +271,14 @@ export default function AccountPage() {
               Forgot your password?
             </button>
           ) : null}
+          {confirmationPending ? (
+            <button type="button" onClick={resendConfirmation} className="text-sm text-paper/60 hover:text-cyan">
+              Resend confirmation email
+            </button>
+          ) : null}
           <button
             type="button"
-            onClick={() => setMode(mode === "signup" ? "signin" : "signup")}
+            onClick={() => router.push(mode === "signup" ? "/account?mode=signin" : "/account?mode=signup")}
             className="text-sm font-black text-cyan"
           >
             {mode === "signup" ? "Already have an account?" : "Create account"}
@@ -239,12 +291,15 @@ export default function AccountPage() {
 
   return (
     <div className="mx-auto max-w-5xl space-y-5">
-      <header className="flex items-start justify-between gap-4">
+      <header className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="text-3xl font-black">Player profile</h1>
           <p className="mt-1 text-sm font-bold text-paper/70">Manage your public RMI identity.</p>
         </div>
-        <RmiButton href="/settings" variant="secondary">Settings</RmiButton>
+        <div className="flex flex-wrap gap-2">
+          {state.userId ? <RmiButton href={`/users/${state.userId}`} variant="secondary">View public profile</RmiButton> : null}
+          <RmiButton href="/settings" variant="secondary">Settings</RmiButton>
+        </div>
       </header>
 
       <section className="rmi-card p-5">
@@ -256,7 +311,7 @@ export default function AccountPage() {
                 <Camera className="h-5 w-5" />
               </span>
             </button>
-            <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={uploadAvatar} />
+            <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp,image/gif" className="hidden" onChange={uploadAvatar} />
             <button type="button" onClick={() => fileRef.current?.click()} className="mt-3 flex items-center gap-2 text-sm font-black text-cyan">
               <ImagePlus className="h-4 w-4" />
               add image
@@ -363,7 +418,7 @@ export default function AccountPage() {
               ) : null}
               <button
                 type="button"
-                onClick={() => saveProfile(undefined, favoriteArtistIds)}
+                onClick={() => saveProfile(favoriteArtistIds)}
                 className="mt-3 h-10 w-full rounded-lg bg-paper px-4 text-sm font-black text-ink hover:bg-paper/90"
               >
                 Save favorite artists

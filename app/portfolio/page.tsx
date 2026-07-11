@@ -1,7 +1,9 @@
 "use client";
 
 import { ArtistAvatar } from "@/components/ArtistAvatar";
+import { useAuth } from "@/components/AuthProvider";
 import { useGame } from "@/components/GameProvider";
+import { SignedInGate } from "@/components/SignedInGate";
 import { ChangeText, RmiButton, RmiLineChart, RmiSection } from "@/components/RmiPrimitives";
 import { formatCurrency, formatDate, formatPercent, formatShares } from "@/lib/formatters";
 import { buildPortfolioQuoteSeries, getSeriesChangePercent } from "@/lib/market-analytics";
@@ -10,6 +12,7 @@ import Link from "next/link";
 import { useMemo } from "react";
 
 export default function PortfolioPage() {
+  const { session } = useAuth();
   const { holdings, shortPositions, portfolioValue, portfolioDayChange, state, gainPercent } = useGame();
   const invested = holdings.reduce((total, holding) => total + holding.currentValue, 0);
   const unrealizedProfitLoss = holdings.reduce((total, holding) => total + holding.profitLoss, 0) +
@@ -26,6 +29,15 @@ export default function PortfolioPage() {
   );
   const quoteHistoryChange = getSeriesChangePercent(chartData);
   const recentTransactions = state.transactions.slice(0, 6);
+
+  if (!session) {
+    return (
+      <SignedInGate
+        title="Your portfolio is private"
+        description="Log in to see cash, holdings, returns, and account activity. Signed-out visitors cannot access portfolio data."
+      />
+    );
+  }
 
   return (
     <div className="space-y-5">

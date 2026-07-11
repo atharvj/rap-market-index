@@ -15,6 +15,7 @@ import {
 import { estimateMarketMakerQuote } from "@/lib/trading";
 import type { Artist, GameState, HoldingView, LeaderboardEntry, ShortPositionView, TradeResult } from "@/lib/types";
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { usePathname, useRouter } from "next/navigation";
 
 type SyncMode = "demo" | "supabase";
 
@@ -34,6 +35,7 @@ type BootstrapResponse = {
     bio?: string;
     favoriteArtistIds?: string[];
     avatarUrl?: string;
+    onboardingCompleted?: boolean;
     isAdmin?: boolean;
   };
   holdings?: GameState["holdings"];
@@ -57,6 +59,7 @@ type GameContextValue = {
   state: GameState;
   hydrated: boolean;
   marketReady: boolean;
+  marketError: string;
   syncMode: SyncMode;
   syncStatus: string;
   serverRefreshing: boolean;
@@ -70,6 +73,7 @@ type GameContextValue = {
   watchlistArtists: Artist[];
   isAdminUser: boolean;
   avatarUrl: string;
+  onboardingCompleted: boolean;
   buyShares: (artistId: string, shares: number) => Promise<TradeResult>;
   sellShares: (artistId: string, shares: number) => Promise<TradeResult>;
   toggleWatchlist: (artistId: string) => Promise<TradeResult>;
@@ -85,10 +89,13 @@ type GameContextValue = {
 const GameContext = createContext<GameContextValue | null>(null);
 
 export function GameProvider({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname();
+  const router = useRouter();
   const { configured: authConfigured, loading: authLoading, session } = useAuth();
   const [state, setState] = useState<GameState>(() => createInitialGameState());
   const hydrated = true;
   const [marketReady, setMarketReady] = useState(false);
+  const [marketError, setMarketError] = useState("");
   const [syncMode, setSyncMode] = useState<SyncMode>("demo");
   const [syncStatus, setSyncStatus] = useState("Unsaved demo mode");
   const [serverRefreshing, setServerRefreshing] = useState(false);
@@ -96,6 +103,8 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
   const [watchlistArtistIds, setWatchlistArtistIds] = useState<string[]>([]);
   const [isAdminUser, setIsAdminUser] = useState(false);
   const [avatarUrl, setAvatarUrl] = useState("");
+  const [onboardingCompleted, setOnboardingCompleted] = useState(true);
+  const [profileLoaded, setProfileLoaded] = useState(false);
 
   useEffect(() => {
     if (!hydrated || !authConfigured) {
@@ -108,13 +117,23 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     let active = true;
 
     fetch("/api/market/snapshot")
-      .then((response) => response.json() as Promise<MarketSnapshotResponse>)
+      .then(async (response) => {
+        const payload = await response.json() as MarketSnapshotResponse;
+
+        if (!response.ok) {
+          throw new Error("Live market data is temporarily unavailable.");
+        }
+
+        return payload;
+      })
       .then((payload) => {
         if (!active) {
           return;
         }
 
         if (!payload.ok || payload.source !== "supabase" || !payload.state) {
+          setState((current) => clearMarketQuotes(current));
+          setMarketError("Live market data is temporarily unavailable. Quotes and trading are paused until the feed recovers.");
           setMarketReady(true);
           return;
         }
@@ -130,11 +149,14 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
           transactions: current.transactions
         }));
         setSyncStatus(session ? "Server market loaded" : "Server market loaded");
+        setMarketError("");
         setMarketReady(true);
       })
       .catch(() => {
         if (active) {
-          setSyncStatus("Unsaved demo mode");
+          setState((current) => clearMarketQuotes(current));
+          setMarketError("Live market data is temporarily unavailable. Quotes and trading are paused until the feed recovers.");
+          setSyncStatus("Market feed unavailable");
           setMarketReady(true);
         }
       });
@@ -245,6 +267,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       if (!authConfigured || authLoading || !session) {
         setSyncMode("demo");
         setSyncStatus(authConfigured ? "Signed out; unsaved demo mode" : "Unsaved demo mode");
+        setState((current) => clearPrivateGameState(current));
         setWatchlistArtistIds([]);
         setIsAdminUser(false);
         setAvatarUrl("");
@@ -282,11 +305,15 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
         const profileData = profile.profile;
         setIsAdminUser(Boolean(profileData.isAdmin));
         setAvatarUrl(profileData.avatarUrl ?? "");
+        setOnboardingCompleted(profileData.onboardingCompleted !== false);
+        setProfileLoaded(true);
         void refreshLeaderboard(profileData.id);
         void refreshWatchlist(session.access_token);
 
+        const snapshotAvailable = snapshotResponse.ok && snapshot.ok && snapshot.source === "supabase" && Boolean(snapshot.state);
+
         setState((current) => {
-          const baseState = snapshot.ok && snapshot.source === "supabase" && snapshot.state ? snapshot.state : current;
+          const baseState = snapshotAvailable && snapshot.state ? snapshot.state : clearMarketQuotes(current);
 
           return {
             ...baseState,
@@ -298,11 +325,13 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
             transactions: profile.transactions ?? []
           };
         });
+        setMarketError(snapshotAvailable ? "" : "Live market data is temporarily unavailable. Quotes and trading are paused until the feed recovers.");
         setSyncMode("supabase");
         setSyncStatus("Server profile synced");
         return true;
       } catch (error) {
         setSyncStatus(error instanceof Error ? error.message : "Server sync failed");
+        setProfileLoaded(false);
         return false;
       } finally {
         setServerRefreshing(false);
@@ -323,11 +352,26 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
 
     setSyncMode("demo");
     setSyncStatus(authConfigured ? "Signed out; unsaved demo mode" : "Unsaved demo mode");
+    setState((current) => clearPrivateGameState(current));
     setWatchlistArtistIds([]);
     setIsAdminUser(false);
     setAvatarUrl("");
+    setOnboardingCompleted(true);
+    setProfileLoaded(false);
     void refreshLeaderboard();
   }, [authConfigured, authLoading, hydrated, refreshLeaderboard, refreshServerState, session]);
+
+  useEffect(() => {
+    if (
+      session &&
+      profileLoaded &&
+      !onboardingCompleted &&
+      pathname !== "/onboarding" &&
+      pathname !== "/account/reset-password"
+    ) {
+      router.replace("/onboarding");
+    }
+  }, [onboardingCompleted, pathname, profileLoaded, router, session]);
 
   const buyShares = useCallback(
     async (artistId: string, shares: number) => {
@@ -486,6 +530,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       state,
       hydrated,
       marketReady,
+      marketError,
       syncMode,
       syncStatus,
       serverRefreshing,
@@ -499,6 +544,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       watchlistArtists,
       isAdminUser,
       avatarUrl,
+      onboardingCompleted,
       buyShares,
       sellShares,
       toggleWatchlist,
@@ -514,6 +560,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       state,
       hydrated,
       marketReady,
+      marketError,
       syncMode,
       syncStatus,
       serverRefreshing,
@@ -527,6 +574,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       watchlistArtists,
       isAdminUser,
       avatarUrl,
+      onboardingCompleted,
       buyShares,
       sellShares,
       toggleWatchlist,
@@ -541,6 +589,25 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
   );
 
   return <GameContext.Provider value={value}>{children}</GameContext.Provider>;
+}
+
+function clearPrivateGameState(state: GameState): GameState {
+  return {
+    ...state,
+    userId: "demo-user",
+    username: "Demo Guest",
+    cashBalance: STARTING_CASH,
+    holdings: [],
+    shortPositions: [],
+    transactions: []
+  };
+}
+
+function clearMarketQuotes(state: GameState): GameState {
+  return {
+    ...state,
+    artists: []
+  };
 }
 
 async function submitServerTrade({

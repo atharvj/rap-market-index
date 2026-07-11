@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createInitialGameState } from "@/lib/market";
 import { sanitizeMoveExplanation } from "@/lib/artist-explanations";
-import { createAnonServerClient, getSupabaseConfigStatus } from "@/lib/supabase/server";
+import { createServiceRoleClient, getSupabaseConfigStatus } from "@/lib/supabase/server";
 import type { Database } from "@/lib/supabase/database.types";
 import type { Artist, GameState, HypeStats, PricePoint } from "@/lib/types";
 import { loadArtistImageUrls } from "@/server/market/artist-images";
@@ -18,6 +18,7 @@ type PriceHistoryPoint = Pick<
 >;
 
 const PRICE_HISTORY_LOOKBACK_DAYS = 28;
+const CACHE_HEADERS = { "Cache-Control": "public, max-age=30, s-maxage=60, stale-while-revalidate=300" };
 
 export async function GET() {
   const config = getSupabaseConfigStatus();
@@ -26,13 +27,19 @@ export async function GET() {
     return NextResponse.json({
       ok: true,
       source: "mock",
-      config,
       state: createInitialGameState()
-    });
+    }, { headers: CACHE_HEADERS });
+  }
+
+  if (!config.serviceRoleConfigured) {
+    return NextResponse.json(
+      { ok: false, source: "supabase", error: "Market data is temporarily unavailable." },
+      { status: 503, headers: CACHE_HEADERS }
+    );
   }
 
   try {
-    const supabase = createAnonServerClient();
+    const supabase = createServiceRoleClient();
     const { data: artists, error: artistError } = await supabase
       .from("artists")
       .select("*")
@@ -54,7 +61,8 @@ export async function GET() {
     );
     const imageByArtistId = await loadArtistImageUrls(
       supabase,
-      typedArtists.map((artist) => artist.id)
+      typedArtists.map((artist) => artist.id),
+      Object.fromEntries(typedArtists.map((artist) => [artist.id, artist.name]))
     );
     const fallback = createInitialGameState();
     const state: GameState = {
@@ -76,25 +84,24 @@ export async function GET() {
     return NextResponse.json({
       ok: true,
       source: "supabase",
-      config,
       state
-    });
+    }, { headers: CACHE_HEADERS });
   } catch (error) {
+    console.error("Market snapshot request failed", error);
     return NextResponse.json(
       {
         ok: false,
         source: "supabase",
-        config,
-        error: error instanceof Error ? error.message : "Could not load market snapshot."
+        error: "Market data is temporarily unavailable."
       },
-      { status: 500 }
+      { status: 500, headers: CACHE_HEADERS }
     );
   }
 }
 
 async function loadStatsByArtist(
   artistIds: string[],
-  supabase: ReturnType<typeof createAnonServerClient>
+  supabase: ReturnType<typeof createServiceRoleClient>
 ): Promise<Record<string, ArtistStatsRow>> {
   if (!artistIds.length) {
     return {};
@@ -114,7 +121,7 @@ async function loadStatsByArtist(
 
 async function loadHistoryByArtist(
   artistIds: string[],
-  supabase: ReturnType<typeof createAnonServerClient>
+  supabase: ReturnType<typeof createServiceRoleClient>
 ): Promise<Record<string, PricePoint[]>> {
   if (!artistIds.length) {
     return {};

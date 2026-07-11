@@ -2,9 +2,10 @@
 
 import { useAuth } from "@/components/AuthProvider";
 import { useGame } from "@/components/GameProvider";
-import { ArtistIdentity, ArtistMiniCard, ChangeText, RmiButton, RmiLineChart, RmiSection } from "@/components/RmiPrimitives";
+import { ArtistIdentity, ArtistMiniCard, ChangeText, RmiButton, RmiSection } from "@/components/RmiPrimitives";
 import { ArtistAvatar } from "@/components/ArtistAvatar";
 import { MarketNewsFeed } from "@/components/MarketNewsFeed";
+import { PriceChart } from "@/components/PriceChart";
 import { formatCurrency, formatPercent } from "@/lib/formatters";
 import { buildMarketIndexSeries, getMarketBreadth, getSeriesChangePercent } from "@/lib/market-analytics";
 import type { Artist } from "@/lib/types";
@@ -123,7 +124,7 @@ export default function HomePage() {
       </section>
 
       <RmiSection
-        title="RMI Market Trend"
+        title="RMI Composite"
         subtitle="Equal-weight view of the listed artist market over recorded quote history."
         action={
           <span className={marketIndexChange >= 0 ? "text-sm font-black text-mint number-tabular" : "text-sm font-black text-ember number-tabular"}>
@@ -132,8 +133,8 @@ export default function HomePage() {
         }
       >
         <div className="grid gap-5 p-4 md:grid-cols-[minmax(0,1fr)_260px] md:items-center">
-          <div className="h-32">
-            <RmiLineChart data={marketIndex} positive={marketIndexChange >= 0} height={132} />
+          <div className="h-44">
+            <PriceChart data={marketIndex} height={176} compact />
           </div>
           <div className="grid grid-cols-3 gap-2 md:grid-cols-1">
             <MarketBreadthRow label="Advancing" value={breadth.advancers} tone="good" />

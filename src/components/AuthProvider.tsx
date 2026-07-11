@@ -34,14 +34,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const supabase = getBrowserSupabaseClient();
 
-    supabase.auth.getSession().then(({ data }) => {
-      setSession(data.session);
+    supabase.auth.getSession().then(async ({ data }) => {
+      if (data.session && !data.session.user.email_confirmed_at) {
+        await supabase.auth.signOut();
+        setSession(null);
+      } else {
+        setSession(data.session);
+      }
       setLoading(false);
     });
 
     const {
       data: { subscription }
     } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+      if (nextSession && !nextSession.user.email_confirmed_at) {
+        setSession(null);
+        void supabase.auth.signOut();
+        return;
+      }
+
       setSession(nextSession);
     });
 
@@ -59,6 +70,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (error) {
         return { ok: false, message: error.message };
+      }
+
+      if (!data.user.email_confirmed_at) {
+        await supabase.auth.signOut();
+        setSession(null);
+        return { ok: false, message: "Confirm your email address before logging in." };
       }
 
       setSession(data.session);
@@ -88,8 +105,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return { ok: false, message: error.message };
       }
 
-      setSession(data.session);
-      return { ok: true, message: "Account created. Check email settings if confirmation is enabled." };
+      if (data.session) {
+        await supabase.auth.signOut();
+      }
+
+      setSession(null);
+      return {
+        ok: true,
+        message: "Account created. Open the confirmation email and click the verification link before logging in."
+      };
     },
     [configured]
   );

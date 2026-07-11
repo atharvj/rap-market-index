@@ -1,24 +1,27 @@
 import { NextResponse } from "next/server";
 import { createInitialGameState } from "@/lib/market";
-import { createAnonServerClient, getSupabaseConfigStatus } from "@/lib/supabase/server";
+import { createServiceRoleClient, getSupabaseConfigStatus } from "@/lib/supabase/server";
 import type { Database } from "@/lib/supabase/database.types";
 import type { PricePoint } from "@/lib/types";
 import { getPacificMarketDate, getPacificMarketDayBoundsUtc, shiftMarketDate } from "@/server/market/market-date";
 
 export const dynamic = "force-dynamic";
 
-type HistoryRange = "1M" | "3M" | "6M" | "1Y" | "ALL";
+type HistoryRange = "1D" | "7D" | "1M" | "3M" | "6M" | "1Y" | "ALL";
 
 type ArtistRow = Pick<Database["public"]["Tables"]["artists"]["Row"], "id" | "current_price">;
 type PriceHistoryRow = Pick<Database["public"]["Tables"]["price_history"]["Row"], "price_date" | "price">;
 type PriceTickRow = Pick<Database["public"]["Tables"]["price_ticks"]["Row"], "observed_at" | "price">;
 
 const RANGE_DAYS: Record<Exclude<HistoryRange, "ALL">, number> = {
+  "1D": 1,
+  "7D": 7,
   "1M": 31,
   "3M": 93,
   "6M": 186,
   "1Y": 365
 };
+const CACHE_HEADERS = { "Cache-Control": "public, max-age=30, s-maxage=60, stale-while-revalidate=300" };
 
 export async function GET(request: Request, context: { params: Promise<{ artistId: string }> }) {
   const { artistId } = await context.params;
@@ -32,11 +35,18 @@ export async function GET(request: Request, context: { params: Promise<{ artistI
       artistId,
       range,
       ...getMockHistoryResponse(artistId, range)
-    });
+    }, { headers: CACHE_HEADERS });
+  }
+
+  if (!config.serviceRoleConfigured) {
+    return NextResponse.json(
+      { ok: false, error: "Price history is temporarily unavailable." },
+      { status: 503, headers: CACHE_HEADERS }
+    );
   }
 
   try {
-    const supabase = createAnonServerClient();
+    const supabase = createServiceRoleClient();
     const { data: artist, error: artistError } = await supabase
       .from("artists")
       .select("id,current_price")
@@ -48,9 +58,9 @@ export async function GET(request: Request, context: { params: Promise<{ artistI
       return NextResponse.json(
         {
           ok: false,
-          error: artistError?.message ?? "Artist not found."
+          error: "Artist not found."
         },
-        { status: 404 }
+        { status: 404, headers: CACHE_HEADERS }
       );
     }
 
@@ -79,13 +89,14 @@ export async function GET(request: Request, context: { params: Promise<{ artistI
       hasRealHistory: history.length > 0 || ticks.length > 0,
       historyStart: points[0]?.date ?? null,
       historyEnd: points[points.length - 1]?.date ?? null
-    });
+    }, { headers: CACHE_HEADERS });
   } catch (error) {
+    console.error("Artist history request failed", error);
     return NextResponse.json(
       {
         ok: false,
         source: "supabase",
-        error: error instanceof Error ? error.message : "Could not load artist history."
+        error: "Price history is temporarily unavailable."
       },
       { status: 500 }
     );
@@ -97,7 +108,7 @@ async function loadArtistHistory({
   artistId,
   range
 }: {
-  supabase: ReturnType<typeof createAnonServerClient>;
+  supabase: ReturnType<typeof createServiceRoleClient>;
   artistId: string;
   range: HistoryRange;
 }): Promise<PricePoint[]> {
@@ -128,11 +139,11 @@ async function loadArtistTicksIfAvailable({
   artistId,
   range
 }: {
-  supabase: ReturnType<typeof createAnonServerClient>;
+  supabase: ReturnType<typeof createServiceRoleClient>;
   artistId: string;
   range: HistoryRange;
 }): Promise<PricePoint[]> {
-  if (range !== "1M" && range !== "3M") {
+  if (range === "6M" || range === "1Y" || range === "ALL") {
     return [];
   }
 
@@ -170,7 +181,9 @@ function buildHistoryPoints({
   ticks: PricePoint[];
   currentPrice: number;
 }) {
-  const base = ticks.length ? ticks : dailyHistory;
+  const base = [...dailyHistory, ...ticks]
+    .filter((point) => Number.isFinite(point.price) && point.price > 0)
+    .sort((first, second) => new Date(first.date).getTime() - new Date(second.date).getTime());
   const livePoint = {
     date: new Date().toISOString(),
     price: currentPrice
@@ -180,7 +193,12 @@ function buildHistoryPoints({
     return [livePoint];
   }
 
-  return [...base, livePoint];
+  const deduplicated = base.filter((point, index) => {
+    const next = base[index + 1];
+    return !next || point.date !== next.date;
+  });
+
+  return [...deduplicated, livePoint];
 }
 
 function isMissingPriceTicksError(message: string) {
@@ -215,7 +233,7 @@ function getMockHistoryResponse(artistId: string, range: HistoryRange) {
 }
 
 function normalizeRange(value: string | null): HistoryRange {
-  if (value === "1M" || value === "3M" || value === "6M" || value === "1Y" || value === "ALL") {
+  if (value === "1D" || value === "7D" || value === "1M" || value === "3M" || value === "6M" || value === "1Y" || value === "ALL") {
     return value;
   }
 

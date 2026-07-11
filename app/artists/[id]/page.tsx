@@ -1,34 +1,22 @@
 "use client";
 
 import { ArtistAvatar } from "@/components/ArtistAvatar";
+import { ArtistPriceHistoryPanel } from "@/components/ArtistPriceHistoryPanel";
 import { useGame } from "@/components/GameProvider";
 import { MarketNewsFeed } from "@/components/MarketNewsFeed";
-import { ChangeText, RmiButton, RmiLineChart, RmiSection } from "@/components/RmiPrimitives";
+import { ChangeText, RmiButton, RmiSection } from "@/components/RmiPrimitives";
 import { TradeTicket } from "@/components/TradeTicket";
 import { WatchlistButton } from "@/components/WatchlistButton";
 import { sanitizeMoveExplanation } from "@/lib/artist-explanations";
 import { formatCurrency, formatShares } from "@/lib/formatters";
-import clsx from "clsx";
 import { BadgeCheck, CalendarDays, KeyRound, Trophy } from "lucide-react";
 import { useParams } from "next/navigation";
-import { useMemo, useState, type ReactNode } from "react";
-
-const ranges = ["7D", "1M", "3M", "1Y", "All"];
+import type { ReactNode } from "react";
 
 export default function ArtistDetailPage() {
   const params = useParams<{ id: string }>();
   const { getArtist, getHolding } = useGame();
   const artist = getArtist(params.id);
-  const [range, setRange] = useState("1M");
-
-  const visibleHistory = useMemo(() => {
-    if (!artist) {
-      return [];
-    }
-
-    const count = range === "7D" ? 7 : range === "1M" ? 30 : range === "3M" ? 90 : range === "1Y" ? 365 : Number.POSITIVE_INFINITY;
-    return artist.priceHistory.slice(-count);
-  }, [artist, range]);
 
   if (!artist) {
     return (
@@ -69,29 +57,12 @@ export default function ArtistDetailPage() {
               <p className="text-4xl font-black number-tabular">{formatCurrency(artist.currentPrice)}</p>
               <ChangeText value={artist.dailyChangePercent} suffix=" today" />
             </div>
-            <div className="mt-3 flex gap-2">
-              {ranges.map((item) => (
-                <button
-                  key={item}
-                  type="button"
-                  onClick={() => setRange(item)}
-                  className={clsx(
-                    "h-7 rounded-lg border px-3 text-xs font-black",
-                    range === item ? "border-paper bg-paper text-ink" : "border-line text-paper/75 hover:border-cyan"
-                  )}
-                >
-                  {item}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="h-36">
-            <RmiLineChart data={visibleHistory} positive={artist.dailyChangePercent >= 0} height={144} />
           </div>
         </section>
 
-        <section className="grid grid-cols-4 gap-3">
+        <ArtistPriceHistoryPanel artistId={artist.id} fallbackData={artist.priceHistory} />
+
+        <section className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           <QuoteStat label="previous close" value={formatCurrency(activeArtist.previousClose)} />
           <QuoteStat label="today's change" value={`${priceChange >= 0 ? "+" : ""}${formatCurrency(priceChange)}`} />
           <QuoteStat label="recorded high" value={formatCurrency(recordedHigh)} />

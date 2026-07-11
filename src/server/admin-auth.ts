@@ -72,13 +72,15 @@ export async function requireAdminRequest(
     const supabase = createAnonServerClient(`Bearer ${bearerToken}`);
     const { data, error } = await supabase.auth.getUser();
 
-    if (error || !data.user?.email) {
+    if (error || !data.user?.email || !data.user.email_confirmed_at) {
       return {
         ok: false,
         response: NextResponse.json(
           {
             ok: false,
-            error: "Admin session could not be verified."
+            error: data.user && !data.user.email_confirmed_at
+              ? "Confirm the admin email address before using operator controls."
+              : "Admin session could not be verified."
           },
           { status: 401 }
         )
@@ -108,13 +110,13 @@ export async function requireAdminRequest(
         email
       }
     };
-  } catch (error) {
+  } catch {
     return {
       ok: false,
       response: NextResponse.json(
         {
           ok: false,
-          error: error instanceof Error ? error.message : "Admin session check failed."
+          error: "Admin session check failed."
         },
         { status: 500 }
       )

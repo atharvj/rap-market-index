@@ -308,7 +308,13 @@ export type Database = {
           cash_balance: number;
           bio: string;
           favorite_artist_ids: string[];
+          favorite_genres: string[];
           avatar_url: string;
+          profile_is_public: boolean;
+          portfolio_is_public: boolean;
+          onboarding_completed: boolean;
+          market_impact_exempt: boolean;
+          is_admin: boolean;
           created_at: string;
           updated_at: string;
         };
@@ -318,7 +324,13 @@ export type Database = {
           cash_balance?: number;
           bio?: string;
           favorite_artist_ids?: string[];
+          favorite_genres?: string[];
           avatar_url?: string;
+          profile_is_public?: boolean;
+          portfolio_is_public?: boolean;
+          onboarding_completed?: boolean;
+          market_impact_exempt?: boolean;
+          is_admin?: boolean;
           created_at?: string;
           updated_at?: string;
         };

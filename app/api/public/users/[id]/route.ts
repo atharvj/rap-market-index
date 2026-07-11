@@ -1,9 +1,12 @@
 import { NextResponse } from "next/server";
 import { createServiceRoleClient, getSupabaseConfigStatus } from "@/lib/supabase/server";
 import type { Database } from "@/lib/supabase/database.types";
-import { getAdminEmails } from "@/server/admin-auth";
+import { loadArtistImageUrls } from "@/server/market/artist-images";
 
 export const dynamic = "force-dynamic";
+const PRIVATE_RESPONSE_HEADERS = {
+  "Cache-Control": "private, no-store, max-age=0"
+};
 
 type ProfileRow = Database["public"]["Tables"]["profiles"]["Row"];
 type LeaderboardRow = Database["public"]["Views"]["market_leaderboard"]["Row"];
@@ -42,7 +45,11 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     const supabase = createServiceRoleClient();
     const [{ data: profile, error: profileError }, { data: leaderboard, error: leaderboardError }] =
       await Promise.all([
-        supabase.from("profiles").select("*").eq("id", id).maybeSingle(),
+        supabase
+          .from("profiles")
+          .select("id,username,bio,avatar_url,created_at,favorite_artist_ids,cash_balance,profile_is_public,portfolio_is_public,is_admin")
+          .eq("id", id)
+          .maybeSingle(),
         supabase.from("market_leaderboard").select("*").eq("user_id", id).maybeSingle()
       ]);
 
@@ -66,36 +73,85 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
 
     const profileRow = profile as ProfileRow;
     const leaderboardRow = leaderboard as LeaderboardRow | null;
+
+    if (!profileRow.profile_is_public) {
+      return NextResponse.json(
+        {
+          ok: true,
+          profile: {
+          id: profileRow.id,
+          username: profileRow.username,
+          avatarUrl: profileRow.avatar_url ?? "",
+          createdAt: profileRow.created_at,
+          isAdmin: profileRow.is_admin,
+          isPrivate: true,
+          portfolioIsPublic: false,
+          bio: "",
+          favoriteArtists: [],
+          holdings: [],
+          portfolioValue: null,
+          cashBalance: null,
+          gainPercent: null
+          }
+        },
+        { headers: PRIVATE_RESPONSE_HEADERS }
+      );
+    }
+
     const favoriteArtistIds = Array.isArray(profileRow.favorite_artist_ids)
       ? profileRow.favorite_artist_ids.filter((artistId): artistId is string => typeof artistId === "string")
       : [];
     const favoriteArtists = favoriteArtistIds.length ? await loadFavoriteArtists(supabase, favoriteArtistIds) : [];
-    const publicHoldings = await loadPublicHoldings(supabase, profileRow.id);
-    const adminUserIds = await loadAdminUserIds(supabase);
+    const publicHoldings = profileRow.portfolio_is_public ? await loadPublicHoldings(supabase, profileRow.id) : [];
+    const imageArtistIds = Array.from(new Set([
+      ...favoriteArtists.map((artist) => artist.id),
+      ...publicHoldings.map((holding) => holding.artistId)
+    ]));
+    const imageNames = Object.fromEntries([
+      ...favoriteArtists.map((artist) => [artist.id, artist.name]),
+      ...publicHoldings.map((holding) => [holding.artistId, holding.name])
+    ]);
+    const imageByArtistId = await loadArtistImageUrls(supabase, imageArtistIds, imageNames);
 
-    return NextResponse.json({
-      ok: true,
-      profile: {
+    return NextResponse.json(
+      {
+        ok: true,
+        profile: {
         id: profileRow.id,
         username: profileRow.username,
         bio: profileRow.bio ?? "",
         avatarUrl: profileRow.avatar_url ?? "",
         createdAt: profileRow.created_at,
-        favoriteArtists,
-        holdings: publicHoldings,
-        isAdmin: adminUserIds.has(profileRow.id),
-        portfolioValue: leaderboardRow ? Number(leaderboardRow.portfolio_value) : Number(profileRow.cash_balance),
-        cashBalance: leaderboardRow ? Number(leaderboardRow.cash_balance) : Number(profileRow.cash_balance),
-        gainPercent: leaderboardRow ? Number(leaderboardRow.gain_percent) : 0
-      }
-    });
+        favoriteArtists: favoriteArtists.map((artist) => ({
+          ...artist,
+          imageUrl: imageByArtistId.get(artist.id) ?? null
+        })),
+        holdings: publicHoldings.map((holding) => ({
+          ...holding,
+          imageUrl: imageByArtistId.get(holding.artistId) ?? null
+        })),
+        isAdmin: profileRow.is_admin,
+        isPrivate: false,
+        portfolioIsPublic: profileRow.portfolio_is_public,
+        portfolioValue: profileRow.portfolio_is_public
+          ? leaderboardRow ? Number(leaderboardRow.portfolio_value) : Number(profileRow.cash_balance)
+          : null,
+        cashBalance: profileRow.portfolio_is_public
+          ? leaderboardRow ? Number(leaderboardRow.cash_balance) : Number(profileRow.cash_balance)
+          : null,
+        gainPercent: profileRow.portfolio_is_public ? leaderboardRow ? Number(leaderboardRow.gain_percent) : 0 : null
+        }
+      },
+      { headers: PRIVATE_RESPONSE_HEADERS }
+    );
   } catch (error) {
+    console.error("Public profile request failed", error);
     return NextResponse.json(
       {
         ok: false,
-        error: error instanceof Error ? error.message : "Could not load public profile."
+        error: "Could not load public profile."
       },
-      { status: 500 }
+      { status: 500, headers: PRIVATE_RESPONSE_HEADERS }
     );
   }
 }
@@ -192,32 +248,4 @@ async function loadFavoriteArtists(supabase: ReturnType<typeof createServiceRole
       hypeScore: Number(artist.hype_score),
       accent: artist.accent
     }));
-}
-
-async function loadAdminUserIds(supabase: ReturnType<typeof createServiceRoleClient>) {
-  const adminEmails = new Set(getAdminEmails());
-  const adminUserIds = new Set<string>();
-
-  if (!adminEmails.size) {
-    return adminUserIds;
-  }
-
-  const { data, error } = await supabase.auth.admin.listUsers({
-    page: 1,
-    perPage: 1000
-  });
-
-  if (error) {
-    return adminUserIds;
-  }
-
-  for (const user of data.users) {
-    const email = user.email?.trim().toLowerCase();
-
-    if (email && adminEmails.has(email)) {
-      adminUserIds.add(user.id);
-    }
-  }
-
-  return adminUserIds;
 }

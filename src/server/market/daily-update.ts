@@ -2,7 +2,7 @@ import { calculateHypeScore, calculateSignalDelta, clamp, getDailyChangePercent,
 import type { AdapterSignal, AdapterSignals, MarketSignalModifier } from "@/server/market/market-data";
 import { getMarketModelVersion } from "@/server/market/model-version";
 import type { ArtistCategory, HypeStats } from "@/lib/types";
-import { getAudienceScaleAdjustment } from "@/server/market/audience-scale";
+import { applyAudienceScaleRebase, getAudienceScaleAdjustment } from "@/server/market/audience-scale";
 
 export type MarketUpdateSource =
   | "mock"
@@ -304,6 +304,10 @@ function applyRelativePressure({
   marketContextConfidence: number;
   marketCoverageRatio: number;
 }): ArtistMarketUpdate {
+  if (update.rawPayload.audienceScaleRebaseApplied === true) {
+    return update;
+  }
+
   const relativeSignalDelta = update.signalDelta - marketMedianSignalDelta;
   const marketRelativeAdjustment = clamp(relativeSignalDelta * 0.55 * marketContextConfidence, -0.02, 0.02);
   const broadMarketDampener =
@@ -864,7 +868,12 @@ function calculateArtistUpdate({
     previousClose * (1 - dailyCap),
     previousClose * (1 + dailyCap)
   );
-  const currentPrice = roundPrice(cappedPrice);
+  const audienceScaleRebase = applyAudienceScaleRebase({
+    rawPayload: signals.rawPayload,
+    oldPrice: artist.currentPrice,
+    regularPrice: cappedPrice
+  });
+  const currentPrice = roundPrice(audienceScaleRebase.price);
   const dailyChangePercent = getDailyChangePercent(currentPrice, previousClose);
   const hypeScore = calculateHypeScore(stats);
   const catalystDiagnostics = buildCatalystDiagnostics(signals.modifiers, dailyChangePercent);
@@ -879,11 +888,13 @@ function calculateArtistUpdate({
     dailyChangePercent,
     hypeScore,
     stats,
-    explanation: audienceScaleDominant
-      ? explainAudienceScaleMove(artist.ticker, dailyChangePercent)
-      : signals.hasMomentumSignal
-        ? explainMove(artist.ticker, stats, dailyChangePercent, catalystDiagnostics, sourceAttribution)
-        : explainNoSignalMove(artist.ticker, source, dailyChangePercent, staleMomentumDecayDelta),
+    explanation: audienceScaleRebase.applied
+      ? `${artist.ticker} was rebased to the latest long-term audience valuation model.`
+      : audienceScaleDominant
+        ? explainAudienceScaleMove(artist.ticker, dailyChangePercent)
+        : signals.hasMomentumSignal
+          ? explainMove(artist.ticker, stats, dailyChangePercent, catalystDiagnostics, sourceAttribution)
+          : explainNoSignalMove(artist.ticker, source, dailyChangePercent, staleMomentumDecayDelta),
     signalDelta,
     modelVersion,
     rawPayload: {
@@ -905,7 +916,9 @@ function calculateArtistUpdate({
       technicalAdjustment,
       unsupportedEventMemoryAdjustment,
       audienceScaleAdjustment,
-      audienceScaleDominant,
+      audienceScaleDominant: audienceScaleDominant || audienceScaleRebase.applied,
+      audienceScaleRebase,
+      audienceScaleRebaseApplied: audienceScaleRebase.applied,
       catalystDiagnostics,
       sourceAttribution,
       credibleEventSupport,

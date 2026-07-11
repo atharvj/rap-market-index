@@ -816,7 +816,9 @@ export default function DevPage() {
     setCloudStatus({ status: "loading" });
 
     try {
-      const response = await fetch("/api/system/cloud-status");
+      const response = await fetch("/api/system/cloud-status", {
+        headers: adminHeaders
+      });
       const payload = await response.json();
 
       if (!response.ok || !payload.ok) {
@@ -2225,7 +2227,7 @@ function MarketHealthPanel({ data }: { data: MarketHealth }) {
 
   return (
     <div className="space-y-4">
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-7">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 2xl:grid-cols-7">
         <ReadinessTile
           label="Price history"
           ready={data.priceHistoryHealth.freshCoveragePercent >= 80}
@@ -4310,12 +4312,12 @@ function ReadinessTile({
   icon: React.ReactNode;
 }) {
   return (
-    <div className="rounded-md border border-line bg-black/20 p-4">
-      <div className="flex items-center gap-2 text-sm font-bold text-paper/55">
-        {icon}
-        {label}
+    <div className="min-w-0 overflow-hidden rounded-md border border-line bg-black/20 p-4">
+      <div className="flex min-w-0 items-center gap-2 text-sm font-bold text-paper/55">
+        <span className="shrink-0">{icon}</span>
+        <span className="min-w-0 break-words">{label}</span>
       </div>
-      <p className={`mt-2 text-xl font-black ${ready ? "text-mint" : "text-brass"}`}>
+      <p className={`mt-2 min-w-0 break-words text-base font-black leading-tight number-tabular ${ready ? "text-mint" : "text-brass"}`}>
         {ready ? readyText : pendingText}
       </p>
     </div>

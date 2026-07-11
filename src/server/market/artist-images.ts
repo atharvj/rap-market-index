@@ -1,5 +1,5 @@
-import { createAnonServerClient } from "@/lib/supabase/server";
 import type { Database } from "@/lib/supabase/database.types";
+import type { SupabaseClient } from "@supabase/supabase-js";
 
 type ExternalIdRow = Pick<
   Database["public"]["Tables"]["artist_external_ids"]["Row"],
@@ -18,13 +18,14 @@ type YoutubeChannelResponse = {
 const YOUTUBE_BATCH_SIZE = 50;
 
 export async function loadArtistImageUrls(
-  supabase: ReturnType<typeof createAnonServerClient>,
-  artistIds: string[]
+  supabase: SupabaseClient<Database>,
+  artistIds: string[],
+  artistNames: Record<string, string> = {}
 ) {
   const uniqueArtistIds = Array.from(new Set(artistIds.filter(Boolean)));
   const apiKey = process.env.YOUTUBE_API_KEY?.trim();
 
-  if (!apiKey || !uniqueArtistIds.length) {
+  if (!uniqueArtistIds.length) {
     return new Map<string, string>();
   }
 
@@ -46,7 +47,7 @@ export async function loadArtistImageUrls(
   const channelIds = Array.from(artistByChannelId.keys());
   const imageByArtistId = new Map<string, string>();
 
-  for (let offset = 0; offset < channelIds.length; offset += YOUTUBE_BATCH_SIZE) {
+  for (let offset = 0; apiKey && offset < channelIds.length; offset += YOUTUBE_BATCH_SIZE) {
     const batch = channelIds.slice(offset, offset + YOUTUBE_BATCH_SIZE);
     const params = new URLSearchParams({
       part: "snippet",
@@ -79,5 +80,78 @@ export async function loadArtistImageUrls(
     }
   }
 
+  const missingArtistIds = uniqueArtistIds.filter(
+    (artistId) => !imageByArtistId.has(artistId) && Boolean(artistNames[artistId])
+  );
+
+  for (let offset = 0; offset < missingArtistIds.length; offset += 6) {
+    const batch = missingArtistIds.slice(offset, offset + 6);
+    const results = await Promise.all(
+      batch.map(async (artistId) => ({
+        artistId,
+        imageUrl: await loadWikipediaPortrait(artistNames[artistId] ?? "")
+      }))
+    );
+
+    for (const result of results) {
+      if (result.imageUrl) {
+        imageByArtistId.set(result.artistId, result.imageUrl);
+      }
+    }
+  }
+
   return imageByArtistId;
+}
+
+async function loadWikipediaPortrait(artistName: string) {
+  if (!artistName) {
+    return null;
+  }
+
+  const params = new URLSearchParams({
+    action: "query",
+    format: "json",
+    origin: "*",
+    generator: "search",
+    gsrsearch: `${artistName} rapper musician`,
+    gsrnamespace: "0",
+    gsrlimit: "1",
+    prop: "pageimages",
+    piprop: "thumbnail",
+    pithumbsize: "360"
+  });
+
+  try {
+    const response = await fetch(`https://en.wikipedia.org/w/api.php?${params.toString()}`, {
+      next: { revalidate: 604_800 },
+      headers: {
+        "User-Agent": "RapMarketIndex/1.0 (artist portrait lookup)"
+      }
+    });
+
+    if (!response.ok) {
+      return null;
+    }
+
+    const payload = await response.json() as {
+      query?: {
+        pages?: Record<string, { title?: string; thumbnail?: { source?: string } }>;
+      };
+    };
+    const page = Object.values(payload.query?.pages ?? {})[0];
+    const normalizedArtistName = normalizeIdentityText(artistName);
+    const normalizedPageTitle = normalizeIdentityText(page?.title ?? "");
+    const identityMatches = normalizedArtistName.length >= 4 && (
+      normalizedPageTitle.includes(normalizedArtistName) || normalizedArtistName.includes(normalizedPageTitle)
+    );
+    const imageUrl = identityMatches ? page?.thumbnail?.source : null;
+
+    return imageUrl && imageUrl.startsWith("https://") ? imageUrl : null;
+  } catch {
+    return null;
+  }
+}
+
+function normalizeIdentityText(value: string) {
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, "").trim();
 }

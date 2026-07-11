@@ -47,6 +47,7 @@
 
 body {
   margin: 0;
+  overflow-x: hidden;
   background: rgb(var(--color-ink));
   color: rgb(var(--color-paper));
   font-family: Inter, Arial, Helvetica, sans-serif;
@@ -98,6 +99,15 @@ select {
 
 .market-tape-viewport:hover .market-tape-track {
   animation-play-state: paused;
+}
+
+.market-tape-viewport {
+  -webkit-mask-image: linear-gradient(to right, transparent, black 28px, black calc(100% - 14px), transparent);
+  mask-image: linear-gradient(to right, transparent, black 28px, black calc(100% - 14px), transparent);
+}
+
+.recharts-wrapper :focus-visible {
+  outline-color: rgb(var(--color-cyan));
 }
 
 @keyframes rmi-tape-scroll {

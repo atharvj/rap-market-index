@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createAnonServerClient, getSupabaseConfigStatus } from "@/lib/supabase/server";
+import { createServiceRoleClient, getSupabaseConfigStatus } from "@/lib/supabase/server";
 import type { Database } from "@/lib/supabase/database.types";
 import type { MarketObservationSeries } from "@/lib/types";
 import { getPacificMarketDate, shiftMarketDate } from "@/server/market/market-date";
@@ -19,6 +19,7 @@ const RANGE_DAYS: Record<Exclude<ObservationRange, "ALL">, number> = {
   "6M": 186,
   "1Y": 365
 };
+const CACHE_HEADERS = { "Cache-Control": "public, max-age=60, s-maxage=300, stale-while-revalidate=1800" };
 
 const SERIES_DEFINITIONS: Record<string, { label: string; unit: string }> = {
   "lastfm:listeners": {
@@ -198,11 +199,18 @@ export async function GET(request: Request, context: { params: Promise<{ artistI
       hasRealObservations: false,
       observationStart: null,
       observationEnd: null
-    });
+    }, { headers: CACHE_HEADERS });
+  }
+
+  if (!config.serviceRoleConfigured) {
+    return NextResponse.json(
+      { ok: false, error: "Market observations are temporarily unavailable." },
+      { status: 503, headers: CACHE_HEADERS }
+    );
   }
 
   try {
-    const supabase = createAnonServerClient();
+    const supabase = createServiceRoleClient();
     const { data: artist, error: artistError } = await supabase
       .from("artists")
       .select("id")
@@ -214,9 +222,9 @@ export async function GET(request: Request, context: { params: Promise<{ artistI
       return NextResponse.json(
         {
           ok: false,
-          error: artistError?.message ?? "Artist not found."
+          error: "Artist not found."
         },
-        { status: 404 }
+        { status: 404, headers: CACHE_HEADERS }
       );
     }
 
@@ -236,15 +244,16 @@ export async function GET(request: Request, context: { params: Promise<{ artistI
       hasRealObservations: series.some((item) => item.points.length > 0),
       observationStart: dates[0] ?? null,
       observationEnd: dates[dates.length - 1] ?? null
-    });
+    }, { headers: CACHE_HEADERS });
   } catch (error) {
+    console.error("Artist observations request failed", error);
     return NextResponse.json(
       {
         ok: false,
         source: "supabase",
-        error: error instanceof Error ? error.message : "Could not load market observations."
+        error: "Market observations are temporarily unavailable."
       },
-      { status: 500 }
+      { status: 500, headers: CACHE_HEADERS }
     );
   }
 }
@@ -254,7 +263,7 @@ async function loadObservationSeries({
   artistId,
   range
 }: {
-  supabase: ReturnType<typeof createAnonServerClient>;
+  supabase: ReturnType<typeof createServiceRoleClient>;
   artistId: string;
   range: ObservationRange;
 }): Promise<MarketObservationSeries[]> {

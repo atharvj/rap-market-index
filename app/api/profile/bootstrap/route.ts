@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
-import { createAnonServerClient, getSupabaseConfigStatus } from "@/lib/supabase/server";
+import { createAnonServerClient, createServiceRoleClient, getSupabaseConfigStatus } from "@/lib/supabase/server";
 import type { Database } from "@/lib/supabase/database.types";
 import type { Holding, ShortPosition, Transaction } from "@/lib/types";
 import { isAdminEmail } from "@/server/admin-auth";
+import { requireConfirmedUser } from "@/server/user-auth";
 
 export const dynamic = "force-dynamic";
 
@@ -10,7 +11,10 @@ type BootstrapBody = {
   username?: string;
   profileBio?: string;
   favoriteArtistIds?: string[];
-  avatarUrl?: string;
+  favoriteGenres?: string[];
+  profileIsPublic?: boolean;
+  portfolioIsPublic?: boolean;
+  onboardingCompleted?: boolean;
 };
 
 type ProfileRow = Database["public"]["Tables"]["profiles"]["Row"];
@@ -21,83 +25,84 @@ type TransactionRow = Database["public"]["Views"]["market_trade_events"]["Row"];
 export async function POST(request: Request) {
   const config = getSupabaseConfigStatus();
 
-  if (!config.readyForPublicReads) {
+  if (!config.readyForPublicReads || !config.serviceRoleConfigured) {
     return NextResponse.json(
       {
         ok: false,
-        error: "Supabase is not configured yet.",
-        config
+        error: "Secure account storage is temporarily unavailable."
       },
-      { status: 400 }
-    );
-  }
-
-  const authorization = request.headers.get("authorization");
-
-  if (!authorization) {
-    return NextResponse.json(
-      {
-        ok: false,
-        error: "Missing Supabase authorization token."
-      },
-      { status: 401 }
+      { status: 503 }
     );
   }
 
   try {
     const body = await parseBody(request);
-    const supabase = createAnonServerClient(authorization);
-    const { data: userData, error: userError } = await supabase.auth.getUser();
+    const auth = await requireConfirmedUser(request);
 
-    if (userError || !userData.user) {
-      return NextResponse.json(
-        {
-          ok: false,
-          error: userError?.message ?? "Could not resolve signed-in user."
-        },
-        { status: 401 }
-      );
+    if (!auth.ok) {
+      return auth.response;
     }
+
+    const { supabase, user } = auth;
+    const profileSupabase = createServiceRoleClient();
 
     const [profile, holdings, shortPositions, transactions] = await Promise.all([
       getOrCreateProfile({
-        supabase,
-        userId: userData.user.id,
-        email: userData.user.email,
-        username: body.username ?? userData.user.user_metadata?.username,
+        supabase: profileSupabase,
+        userId: user.id,
+        email: user.email,
+        username: body.username ?? user.user_metadata?.username,
         profileBio: body.profileBio,
         favoriteArtistIds: body.favoriteArtistIds,
-        avatarUrl: body.avatarUrl
+        favoriteGenres: body.favoriteGenres,
+        profileIsPublic: body.profileIsPublic,
+        portfolioIsPublic: body.portfolioIsPublic,
+        onboardingCompleted: body.onboardingCompleted,
+        isAdmin: isAdminEmail(user.email)
       }),
-      loadHoldings(supabase, userData.user.id),
-      loadShortPositions(supabase, userData.user.id),
-      loadTransactions(supabase, userData.user.id)
+      loadHoldings(supabase, user.id),
+      loadShortPositions(supabase, user.id),
+      loadTransactions(profileSupabase, user.id)
     ]);
 
-    return NextResponse.json({
-      ok: true,
-      profile: {
-        id: profile.id,
-        username: profile.username,
-        cashBalance: Number(profile.cash_balance),
-        bio: getProfileBio(profile),
-        favoriteArtistIds: getFavoriteArtistIds(profile),
-        avatarUrl: getAvatarUrl(profile),
-        isAdmin: isAdminEmail(userData.user.email)
+    return NextResponse.json(
+      {
+        ok: true,
+        profile: {
+          id: profile.id,
+          username: profile.username,
+          cashBalance: Number(profile.cash_balance),
+          bio: getProfileBio(profile),
+          favoriteArtistIds: getFavoriteArtistIds(profile),
+          favoriteGenres: getFavoriteGenres(profile),
+          avatarUrl: getAvatarUrl(profile),
+          profileIsPublic: profile.profile_is_public,
+          portfolioIsPublic: profile.portfolio_is_public,
+          onboardingCompleted: profile.onboarding_completed,
+          isAdmin: isAdminEmail(user.email)
+        },
+        holdings,
+        shortPositions,
+        transactions
       },
-      holdings,
-      shortPositions,
-      transactions,
-      config
-    });
+      { headers: { "Cache-Control": "private, no-store, max-age=0" } }
+    );
   } catch (error) {
+    console.error("Profile bootstrap failed", error);
+    const message = error instanceof Error ? error.message : "";
+    const migrationPending = /profile_is_public|portfolio_is_public|favorite_genres|onboarding_completed|market_impact_exempt|is_admin/i.test(message);
+    const safeValidationMessage = /^(That username is already taken\.|Username must be |Choose at least )/.test(message)
+      ? message
+      : null;
+
     return NextResponse.json(
       {
         ok: false,
-        error: error instanceof Error ? error.message : "Could not bootstrap profile.",
-        config
+        error: safeValidationMessage ?? (migrationPending
+          ? "Account privacy setup is incomplete. Run Supabase migration 022_account_privacy_and_onboarding.sql."
+          : "Could not load this account.")
       },
-      { status: 500 }
+      { status: 500, headers: { "Cache-Control": "private, no-store, max-age=0" } }
     );
   }
 }
@@ -109,15 +114,23 @@ async function getOrCreateProfile({
   username,
   profileBio,
   favoriteArtistIds,
-  avatarUrl
+  favoriteGenres,
+  profileIsPublic,
+  portfolioIsPublic,
+  onboardingCompleted,
+  isAdmin
 }: {
-  supabase: ReturnType<typeof createAnonServerClient>;
+  supabase: ReturnType<typeof createServiceRoleClient>;
   userId: string;
   email?: string;
   username?: string;
   profileBio?: string;
   favoriteArtistIds?: string[];
-  avatarUrl?: string;
+  favoriteGenres?: string[];
+  profileIsPublic?: boolean;
+  portfolioIsPublic?: boolean;
+  onboardingCompleted?: boolean;
+  isAdmin: boolean;
 }) {
   const existing = await supabase.from("profiles").select("*").eq("id", userId).maybeSingle();
 
@@ -131,6 +144,16 @@ async function getOrCreateProfile({
       typeof username === "string" && username.trim() ? normalizeUsername(username, undefined) : null;
     const update: Partial<ProfileRow> = {};
 
+    if (onboardingCompleted === true) {
+      await assertOnboardingSelection({
+        supabase,
+        favoriteGenres: Array.isArray(favoriteGenres) ? normalizeFavoriteGenres(favoriteGenres) : getFavoriteGenres(profile),
+        favoriteArtistIds: Array.isArray(favoriteArtistIds)
+          ? normalizeFavoriteArtistIds(favoriteArtistIds)
+          : getFavoriteArtistIds(profile)
+      });
+    }
+
     if (preferredUsername && preferredUsername !== profile.username) {
       update.username = preferredUsername;
     }
@@ -143,8 +166,28 @@ async function getOrCreateProfile({
       update.favorite_artist_ids = normalizeFavoriteArtistIds(favoriteArtistIds);
     }
 
-    if (typeof avatarUrl === "string") {
-      update.avatar_url = normalizeAvatarUrl(avatarUrl);
+    if (Array.isArray(favoriteGenres)) {
+      update.favorite_genres = normalizeFavoriteGenres(favoriteGenres);
+    }
+
+    if (typeof profileIsPublic === "boolean") {
+      update.profile_is_public = profileIsPublic;
+    }
+
+    if (typeof portfolioIsPublic === "boolean") {
+      update.portfolio_is_public = portfolioIsPublic;
+    }
+
+    if (typeof onboardingCompleted === "boolean") {
+      update.onboarding_completed = onboardingCompleted;
+    }
+
+    if (profile.market_impact_exempt !== isAdmin) {
+      update.market_impact_exempt = isAdmin;
+    }
+
+    if (profile.is_admin !== isAdmin) {
+      update.is_admin = isAdmin;
     }
 
     if (Object.keys(update).length) {
@@ -161,6 +204,15 @@ async function getOrCreateProfile({
   }
 
   const safeUsername = normalizeUsername(username, email);
+
+  if (onboardingCompleted === true) {
+    await assertOnboardingSelection({
+      supabase,
+      favoriteGenres: Array.isArray(favoriteGenres) ? normalizeFavoriteGenres(favoriteGenres) : [],
+      favoriteArtistIds: Array.isArray(favoriteArtistIds) ? normalizeFavoriteArtistIds(favoriteArtistIds) : []
+    });
+  }
+
   const inserted = await supabase
     .from("profiles")
     .insert({
@@ -168,7 +220,12 @@ async function getOrCreateProfile({
       username: safeUsername,
       bio: typeof profileBio === "string" ? normalizeBio(profileBio) : undefined,
       favorite_artist_ids: Array.isArray(favoriteArtistIds) ? normalizeFavoriteArtistIds(favoriteArtistIds) : undefined,
-      avatar_url: typeof avatarUrl === "string" ? normalizeAvatarUrl(avatarUrl) : undefined
+      favorite_genres: Array.isArray(favoriteGenres) ? normalizeFavoriteGenres(favoriteGenres) : undefined,
+      profile_is_public: typeof profileIsPublic === "boolean" ? profileIsPublic : true,
+      portfolio_is_public: typeof portfolioIsPublic === "boolean" ? portfolioIsPublic : true,
+      onboarding_completed: typeof onboardingCompleted === "boolean" ? onboardingCompleted : false,
+      market_impact_exempt: isAdmin,
+      is_admin: isAdmin
     })
     .select("*")
     .single();
@@ -222,7 +279,7 @@ async function loadShortPositions(
 }
 
 async function loadTransactions(
-  supabase: ReturnType<typeof createAnonServerClient>,
+  supabase: ReturnType<typeof createServiceRoleClient>,
   userId: string
 ): Promise<Transaction[]> {
   const { data, error } = await supabase
@@ -258,10 +315,17 @@ async function parseBody(request: Request): Promise<BootstrapBody> {
 }
 
 function normalizeUsername(username: unknown, email: string | undefined) {
-  const raw = typeof username === "string" && username.trim() ? username : email?.split("@")[0] ?? "trader";
-  const normalized = raw.trim().slice(0, 32);
+  const provided = typeof username === "string" && Boolean(username.trim());
+  const raw = provided ? username : email?.split("@")[0] ?? "trader";
+  const normalized = raw.normalize("NFKC").trim().slice(0, 32);
 
-  return normalized || "trader";
+  if (provided && !/^[A-Za-z0-9_.-]{2,32}$/.test(normalized)) {
+    throw new Error("Username must be 2-32 characters using letters, numbers, periods, hyphens, or underscores.");
+  }
+
+  const fallback = normalized.replace(/[^A-Za-z0-9_.-]/g, "");
+
+  return fallback.length >= 2 ? fallback : "trader";
 }
 
 function formatProfileWriteError(message: string) {
@@ -271,6 +335,17 @@ function formatProfileWriteError(message: string) {
 
   if (message.toLowerCase().includes("avatar_url")) {
     return "Profile pictures are not ready yet. Run Supabase migration 020_profile_avatar.sql first.";
+  }
+
+  if (
+    message.toLowerCase().includes("favorite_genres") ||
+    message.toLowerCase().includes("profile_is_public") ||
+    message.toLowerCase().includes("portfolio_is_public") ||
+    message.toLowerCase().includes("onboarding_completed") ||
+    message.toLowerCase().includes("market_impact_exempt") ||
+    message.toLowerCase().includes("is_admin")
+  ) {
+    return "Account preferences are not ready yet. Run Supabase migration 022_account_privacy_and_onboarding.sql first.";
   }
 
   if (message.toLowerCase().includes("bio") || message.toLowerCase().includes("favorite_artist_ids")) {
@@ -295,23 +370,54 @@ function normalizeFavoriteArtistIds(value: string[]) {
   ).slice(0, 12);
 }
 
-function normalizeAvatarUrl(value: string) {
-  const trimmed = value.trim().slice(0, 1000);
+const ALLOWED_GENRES = new Set([
+  "alternative",
+  "conscious",
+  "drill",
+  "experimental",
+  "mainstream",
+  "melodic",
+  "southern",
+  "trap",
+  "underground"
+]);
 
-  if (!trimmed) {
-    return "";
+function normalizeFavoriteGenres(value: string[]) {
+  return Array.from(
+    new Set(
+      value
+        .filter((genre) => typeof genre === "string")
+        .map((genre) => genre.trim().toLowerCase())
+        .filter((genre) => ALLOWED_GENRES.has(genre))
+    )
+  ).slice(0, 8);
+}
+
+async function assertOnboardingSelection({
+  supabase,
+  favoriteGenres,
+  favoriteArtistIds
+}: {
+  supabase: ReturnType<typeof createServiceRoleClient>;
+  favoriteGenres: string[];
+  favoriteArtistIds: string[];
+}) {
+  if (!favoriteGenres.length) {
+    throw new Error("Choose at least one rap lane before finishing account setup.");
   }
 
-  try {
-    const url = new URL(trimmed);
+  if (favoriteArtistIds.length < 3) {
+    throw new Error("Choose at least three artists before finishing account setup.");
+  }
 
-    if (url.protocol !== "https:" && url.protocol !== "http:") {
-      return "";
-    }
+  const { count, error } = await supabase
+    .from("artists")
+    .select("id", { count: "exact", head: true })
+    .in("id", favoriteArtistIds)
+    .eq("is_active", true);
 
-    return url.toString();
-  } catch {
-    return "";
+  if (error || (count ?? 0) < 3) {
+    throw new Error("Choose at least three active artists before finishing account setup.");
   }
 }
 
@@ -322,6 +428,12 @@ function getProfileBio(profile: ProfileRow) {
 function getFavoriteArtistIds(profile: ProfileRow) {
   return Array.isArray(profile.favorite_artist_ids)
     ? profile.favorite_artist_ids.filter((artistId): artistId is string => typeof artistId === "string")
+    : [];
+}
+
+function getFavoriteGenres(profile: ProfileRow) {
+  return Array.isArray(profile.favorite_genres)
+    ? profile.favorite_genres.filter((genre): genre is string => typeof genre === "string")
     : [];
 }
 

@@ -25,10 +25,12 @@ export function formatShares(value: number) {
 }
 
 export function formatDate(value: string) {
-  const date = value.includes("T") ? new Date(value) : new Date(`${value}T00:00:00`);
+  const includesTime = value.includes("T");
+  const date = includesTime ? new Date(value) : new Date(`${value}T00:00:00`);
 
   return new Intl.DateTimeFormat("en-US", {
     month: "short",
-    day: "numeric"
+    day: "numeric",
+    timeZone: includesTime ? "America/Los_Angeles" : undefined
   }).format(date);
 }

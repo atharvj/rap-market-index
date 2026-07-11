@@ -7,7 +7,7 @@ const sections = [
   },
   {
     title: "How prices move",
-    body: "Artist prices are updated by a market engine that looks for meaningful changes in audience momentum, video activity, public attention, releases, reviews, major events, and eligible trading demand. Durable listener, play, subscriber, and view scale also keeps long-term quote levels comparable. The exact weights are kept internal so the game is harder to manipulate."
+    body: "Artist prices are updated by a market engine that looks for meaningful changes in audience momentum, video activity, public attention, releases, reviews, major events, and eligible trading demand. Durable listener, play, subscriber, and view scale also keeps long-term quote levels comparable. Test activity is excluded and the exact weights are kept internal so the game is harder to manipulate."
   },
   {
     title: "What a quote means",
@@ -20,10 +20,6 @@ const sections = [
   {
     title: "Why it exists",
     body: "Rap fans already debate who is rising, falling, overhyped, underrated, or about to break out. RMI turns those debates into a structured fantasy market with prices, charts, watchlists, portfolios, and standings."
-  },
-  {
-    title: "Market integrity",
-    body: "Admin and test trades do not move prices. The platform also includes controls for trading pauses, artist halts, suspicious order-flow review, and data-quality checks before public scale."
   }
 ];
 

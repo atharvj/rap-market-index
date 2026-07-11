@@ -757,6 +757,58 @@ async function removeConflictingEventClassifications(supabase: Supabase, events:
   }
 }
 
+export async function loadPreviousSuccessfulMarketModelVersion({
+  supabase,
+  runDate
+}: {
+  supabase: Supabase;
+  runDate: string;
+}) {
+  const { data, error } = await supabase
+    .from("market_update_runs")
+    .select("model_version")
+    .eq("status", "succeeded")
+    .lt("run_date", runDate)
+    .order("run_date", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(`Could not load the previous market model: ${error.message}`);
+  }
+
+  return data?.model_version?.trim() || null;
+}
+
+export async function loadArtistsUpdatedWithModel({
+  supabase,
+  artistIds,
+  runDate,
+  modelVersion
+}: {
+  supabase: Supabase;
+  artistIds: string[];
+  runDate: string;
+  modelVersion: string;
+}) {
+  if (!artistIds.length) {
+    return new Set<string>();
+  }
+
+  const { data, error } = await supabase
+    .from("market_signal_snapshots")
+    .select("artist_id,model_version")
+    .in("artist_id", artistIds)
+    .eq("source_date", runDate)
+    .eq("model_version", modelVersion);
+
+  if (error) {
+    throw new Error(`Could not inspect current model snapshots: ${error.message}`);
+  }
+
+  return new Set((data ?? []).map((row) => row.artist_id));
+}
+
 export async function persistMarketUpdates({
   supabase,
   runDate,

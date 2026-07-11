@@ -11,6 +11,7 @@ type TradingStatusRow = {
   artist_halted: boolean;
   reason: string;
 };
+const CACHE_HEADERS = { "Cache-Control": "public, max-age=5, s-maxage=15, stale-while-revalidate=30" };
 
 export async function GET(request: Request) {
   const config = getSupabaseConfigStatus();
@@ -22,7 +23,7 @@ export async function GET(request: Request) {
       ok: true,
       source: "mock",
       status: buildFallbackStatus({ artistId })
-    });
+    }, { headers: CACHE_HEADERS });
   }
 
   try {
@@ -41,15 +42,25 @@ export async function GET(request: Request) {
       ok: true,
       source: "supabase",
       status: buildStatus(row, { artistId })
-    });
+    }, { headers: CACHE_HEADERS });
   } catch (error) {
+    console.error("Market status request failed", error);
     return NextResponse.json({
-      ok: true,
+      ok: false,
       source: "fallback",
-      warning: error instanceof Error ? error.message : "Market status controls are not installed yet.",
-      status: buildFallbackStatus({ artistId })
-    });
+      warning: "Market status is temporarily unavailable.",
+      status: buildUnavailableStatus({ artistId })
+    }, { status: 503, headers: CACHE_HEADERS });
   }
+}
+
+function buildUnavailableStatus({ artistId }: { artistId: string | null }) {
+  return {
+    ...buildFallbackStatus({ artistId }),
+    isOpen: false,
+    marketImpactEnabled: false,
+    statusNote: "Trading is temporarily paused while market status is unavailable."
+  };
 }
 
 function buildStatus(row: TradingStatusRow | null, { artistId }: { artistId: string | null }) {

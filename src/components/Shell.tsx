@@ -25,7 +25,7 @@ const navItems = [
 export function Shell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { portfolioValue, portfolioDayChange, state, isAdminUser, avatarUrl, marketReady } = useGame();
+  const { portfolioValue, portfolioDayChange, state, isAdminUser, avatarUrl, marketReady, marketError } = useGame();
   const { session, user, signOut } = useAuth();
   const [accountOpen, setAccountOpen] = useState(false);
   const [appearanceOpen, setAppearanceOpen] = useState(false);
@@ -157,16 +157,16 @@ export function Shell({ children }: { children: React.ReactNode }) {
                 <UserAvatar avatarUrl={avatarUrl} label={accountLabel} size="sm" />
               </button>
             ) : (
-              <div className="hidden items-center gap-2 sm:flex">
+              <div className="flex items-center gap-1.5 sm:gap-2">
                 <Link
                   href="/account"
-                  className="inline-flex min-h-9 items-center rounded-lg border border-line px-4 text-sm font-bold hover:border-cyan"
+                  className="inline-flex min-h-9 items-center rounded-lg border border-line px-3 text-xs font-bold hover:border-cyan sm:px-4 sm:text-sm"
                 >
                   Log in
                 </Link>
                 <Link
                   href="/account?mode=signup"
-                  className="inline-flex min-h-9 items-center rounded-lg bg-paper px-4 text-sm font-bold text-ink hover:bg-paper/90"
+                  className="inline-flex min-h-9 items-center rounded-lg bg-paper px-3 text-xs font-bold text-ink hover:bg-paper/90 sm:px-4 sm:text-sm"
                 >
                   Sign up
                 </Link>
@@ -253,30 +253,14 @@ export function Shell({ children }: { children: React.ReactNode }) {
       ) : null}
 
       <main className="mx-auto w-full max-w-[1440px] flex-1 px-4 py-8 sm:px-6 lg:px-8">
-        {marketReady ? children : <MarketLoadingState />}
+        {marketError ? (
+          <div className="mb-5 rounded-xl border border-ember/45 bg-ember/10 px-4 py-3 text-sm font-bold text-ember" role="alert">
+            {marketError}
+          </div>
+        ) : null}
+        {children}
       </main>
       <SiteFooter />
-    </div>
-  );
-}
-
-function MarketLoadingState() {
-  return (
-    <div className="space-y-5" aria-label="Loading market data" aria-busy="true">
-      <div className="h-8 w-44 rounded bg-panelSoft motion-safe:animate-pulse" />
-      <div className="h-12 rounded-xl bg-panelSoft motion-safe:animate-pulse" />
-      <div className="overflow-hidden rounded-xl border border-line">
-        {Array.from({ length: 7 }).map((_, index) => (
-          <div key={index} className="flex items-center gap-4 border-b border-line px-4 py-4 last:border-b-0">
-            <div className="h-10 w-10 rounded-full bg-panelSoft motion-safe:animate-pulse" />
-            <div className="min-w-0 flex-1 space-y-2">
-              <div className="h-3 w-32 rounded bg-panelSoft motion-safe:animate-pulse" />
-              <div className="h-2.5 w-20 rounded bg-panelSoft motion-safe:animate-pulse" />
-            </div>
-            <div className="h-3 w-20 rounded bg-panelSoft motion-safe:animate-pulse" />
-          </div>
-        ))}
-      </div>
     </div>
   );
 }
@@ -341,6 +325,10 @@ function SiteFooter() {
           <Link href="/about" className="mt-3 inline-flex text-sm font-black text-cyan hover:text-cyan/75">
             How the market works
           </Link>
+          <div className="mt-3 flex gap-4 text-xs font-bold text-paper/50">
+            <Link href="/privacy" className="hover:text-cyan">Privacy</Link>
+            <Link href="/terms" className="hover:text-cyan">Terms</Link>
+          </div>
         </div>
       </div>
     </footer>

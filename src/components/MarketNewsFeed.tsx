@@ -48,6 +48,7 @@ const eventLabels: Record<string, string> = {
 
 export function MarketNewsFeed({
   artistId,
+  artistIds,
   eventType,
   limit = 8,
   compact = false,
@@ -55,6 +56,7 @@ export function MarketNewsFeed({
   onItemsChange
 }: {
   artistId?: string;
+  artistIds?: string[];
   eventType?: string;
   limit?: number;
   compact?: boolean;
@@ -64,6 +66,7 @@ export function MarketNewsFeed({
   const [items, setItems] = useState<MarketNewsItem[]>([]);
   const [loading, setLoading] = useState(true);
   const resolvedVariant: MarketNewsVariant = variant ?? (compact ? "compact" : "full");
+  const artistIdsKey = (artistIds ?? []).join(",");
 
   useEffect(() => {
     const controller = new AbortController();
@@ -71,11 +74,15 @@ export function MarketNewsFeed({
     const params = new URLSearchParams({
       limit: String(limit),
       lookbackDays: "45",
-      feed: artistId ? "artist" : resolvedVariant === "home" ? "home" : "news"
+      feed: artistId || artistIdsKey ? "artist" : resolvedVariant === "home" ? "home" : "news"
     });
 
     if (artistId) {
       params.set("artistId", artistId);
+    }
+
+    if (artistIdsKey) {
+      params.set("artistIds", artistIdsKey);
     }
 
     if (eventType) {
@@ -106,7 +113,7 @@ export function MarketNewsFeed({
     return () => {
       controller.abort();
     };
-  }, [artistId, eventType, limit, onItemsChange, resolvedVariant]);
+  }, [artistId, artistIdsKey, eventType, limit, onItemsChange, resolvedVariant]);
 
   if (loading) {
     return <MarketNewsSkeleton compact={resolvedVariant === "compact"} />;
@@ -123,7 +130,7 @@ export function MarketNewsFeed({
           <p className="mt-1 max-w-xl text-sm leading-6 text-paper/55">
             No verified, price-relevant stories are available for this view right now. Routine posts and unconfirmed chatter stay out of the feed.
           </p>
-          {!artistId && resolvedVariant !== "compact" ? (
+          {!artistId && !artistIdsKey && resolvedVariant !== "compact" ? (
             <Link href="/markets" className="mt-3 inline-flex text-xs font-black text-cyan hover:text-cyan/75">
               Browse the market
             </Link>

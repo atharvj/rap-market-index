@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { createAnonServerClient, getSupabaseConfigStatus } from "@/lib/supabase/server";
+import { createAnonServerClient, createServiceRoleClient, getSupabaseConfigStatus } from "@/lib/supabase/server";
+import { requireConfirmedUser } from "@/server/user-auth";
 
 export const dynamic = "force-dynamic";
 
@@ -27,28 +28,21 @@ const PENDING_CATALYST_MIN_IMPACT = 35;
 const PENDING_CATALYST_MIN_CONFIDENCE = 0.65;
 
 export async function POST(request: Request) {
+  const auth = await requireConfirmedUser(request);
+
+  if (!auth.ok) {
+    return auth.response;
+  }
+
   const config = getSupabaseConfigStatus();
 
   if (!config.readyForPublicReads) {
     return NextResponse.json(
       {
         ok: false,
-        error: "Supabase is not configured yet. Signed-out demo trading is not saved.",
-        config
+        error: "Trading is temporarily unavailable."
       },
-      { status: 400 }
-    );
-  }
-
-  const authorization = request.headers.get("authorization");
-
-  if (!authorization) {
-    return NextResponse.json(
-      {
-        ok: false,
-        error: "Missing Supabase authorization token."
-      },
-      { status: 401 }
+      { status: 503 }
     );
   }
 
@@ -79,22 +73,28 @@ export async function POST(request: Request) {
     );
   }
 
-  const supabase = createAnonServerClient(authorization);
-  const user = await supabase.auth.getUser();
-
-  if (user.error || !user.data.user?.id || !user.data.user.email) {
-    return NextResponse.json(
-      {
-        ok: false,
-        error: "You must be signed in to trade."
-      },
-      { status: 401 }
-    );
-  }
-
-  const authUser = user.data.user;
+  const { supabase, user: authUser } = auth;
   const email = (authUser.email ?? "").toLowerCase();
-  const marketEligible = !isMarketImpactExemptEmail(email) && isAccountOldEnoughForMarketImpact(authUser.created_at);
+  const impactExempt = isMarketImpactExemptEmail(email);
+  const marketEligible = !impactExempt && isAccountOldEnoughForMarketImpact(authUser.created_at);
+
+  if (impactExempt) {
+    if (!config.serviceRoleConfigured) {
+      return NextResponse.json({ ok: false, error: "Exempt test trading is not configured safely." }, { status: 503 });
+    }
+
+    const { error: exemptionError } = await createServiceRoleClient()
+      .from("profiles")
+      .update({ market_impact_exempt: true })
+      .eq("id", authUser.id);
+
+    if (exemptionError) {
+      return NextResponse.json(
+        { ok: false, error: "Could not verify this test account's market exemption." },
+        { status: 500 }
+      );
+    }
+  }
   const tradingStatus = await loadTradingStatus(supabase, artistId);
 
   if (tradingStatus && !tradingStatus.market_open) {
@@ -108,7 +108,10 @@ export async function POST(request: Request) {
     );
   }
 
-  const pendingCatalyst = await loadPendingCatalyst(supabase, artistId);
+  const pendingCatalyst = await loadPendingCatalyst(
+    config.serviceRoleConfigured ? createServiceRoleClient() : supabase,
+    artistId
+  );
 
   if (pendingCatalyst) {
     return NextResponse.json(
@@ -129,10 +132,11 @@ export async function POST(request: Request) {
   });
 
   if (error) {
+    console.error("Trade RPC failed", { side, artistId, userId: authUser.id, error });
     return NextResponse.json(
       {
         ok: false,
-        error: error.message
+        error: getPublicTradeError(error.message)
       },
       { status: 400 }
     );
@@ -152,8 +156,42 @@ export async function POST(request: Request) {
   });
 }
 
+const SAFE_TRADE_ERRORS = [
+  "confirm your email before trading",
+  "complete account setup before trading",
+  "trading is currently paused",
+  "trading is halted for this artist",
+  "newly detected catalyst",
+  "shares must be greater than zero",
+  "share amount is too large",
+  "artist not found or inactive",
+  "order value must be at least",
+  "not enough cash",
+  "position limit is",
+  "exposure limit is",
+  "please wait before placing another order",
+  "daily buy limit reached",
+  "daily short limit reached",
+  "you cannot sell more shares than you own",
+  "you cannot cover more shares than you are short",
+  "sell long shares before shorting",
+  "cover the short position before buying"
+];
+
+function getPublicTradeError(message: string) {
+  const normalized = message.toLowerCase();
+  const safeMessage = SAFE_TRADE_ERRORS.find((candidate) => normalized.includes(candidate));
+
+  if (!safeMessage) {
+    return "Trade could not be completed.";
+  }
+
+  const firstLine = message.split("\n", 1)[0]?.trim();
+  return firstLine || "Trade could not be completed.";
+}
+
 async function loadPendingCatalyst(
-  supabase: ReturnType<typeof createAnonServerClient>,
+  supabase: ReturnType<typeof createAnonServerClient> | ReturnType<typeof createServiceRoleClient>,
   artistId: string
 ): Promise<PendingCatalyst | null> {
   const [eventResult, quoteResult] = await Promise.all([

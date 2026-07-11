@@ -42,6 +42,7 @@ import { collectYoutubeMarketSignals } from "@/server/market/youtube-source";
 import { collectYoutubeCommentMarketSignals } from "@/server/market/youtube-comments-source";
 import { collectYoutubeUploadEvents } from "@/server/market/youtube-upload-events-source";
 import { getPacificMarketDate } from "@/server/market/market-date";
+import { getMarketModelVersion } from "@/server/market/model-version";
 import { getMockMarketArtists } from "@/server/market/mock-source";
 import type {
   AdapterSignals,
@@ -54,12 +55,14 @@ import {
   loadActiveArtists,
   loadActiveArtistCount,
   loadActiveArtistsPage,
+  loadArtistsUpdatedWithModel,
   loadArtistExternalIds,
   loadExistingPriceHistoryArtistIds,
   loadObservationBaselines,
   loadPreviousClosePrices,
   loadPreviousSignalStats,
   loadPriceTrendContexts,
+  loadPreviousSuccessfulMarketModelVersion,
   loadRecentMarketEvents,
   persistMarketEvents,
   persistMarketObservations,
@@ -169,16 +172,40 @@ export async function POST(request: Request) {
       seedDetectedEventsByArtist: realSignals.detectedEventsByArtist,
       manualEvents: body.manualEvents
     });
+    const modelVersion = getMarketModelVersion();
+    const previousModelVersion = supabase && isRealExternalSource(source)
+      ? await loadPreviousSuccessfulMarketModelVersion({ supabase, runDate })
+      : null;
+    const valuationRebase = Boolean(previousModelVersion && previousModelVersion !== modelVersion);
+    const alreadyRebasedArtistIds = valuationRebase && supabase
+      ? await loadArtistsUpdatedWithModel({
+          supabase,
+          artistIds: artists.map((artist) => artist.id),
+          runDate,
+          modelVersion
+        })
+      : new Set<string>();
+    const rebaseArtistIds = valuationRebase
+      ? new Set(artists.map((artist) => artist.id).filter((artistId) => !alreadyRebasedArtistIds.has(artistId)))
+      : new Set<string>();
     const adapterSignals = attachAudienceScaleCalibration({
       artists,
       signals: mergeAdapterSignals(...realSignals.adapterSignalSources, eventSignals.adapterSignals),
-      snapshots: realSignals.audienceScaleSnapshots
+      snapshots: realSignals.audienceScaleSnapshots,
+      rebaseArtistIds
     });
-    const warnings = [...realSignals.warnings, ...eventSignals.warnings];
+    const warnings = [
+      ...realSignals.warnings,
+      ...eventSignals.warnings,
+      ...(rebaseArtistIds.size
+        ? [`Valuation model changed from ${previousModelVersion} to ${modelVersion}; applying one-time audience-scale rebasing to ${rebaseArtistIds.size} artists in this batch.`]
+        : [])
+    ];
     const result = calculateDailyMarketUpdates({
       artists,
       runDate,
       source,
+      modelVersion,
       manualSignals: sanitizeManualSignals(body.manualSignals),
       adapterSignals,
       marketCoverageRatio: getMarketCoverageRatio(batch)

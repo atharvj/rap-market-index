@@ -1,12 +1,13 @@
 import { NextResponse } from "next/server";
 import {
-  createAnonServerClient,
   createServiceRoleClient,
   getSupabaseConfigStatus
 } from "@/lib/supabase/server";
 import type { Database } from "@/lib/supabase/database.types";
+import { requireConfirmedUser } from "@/server/user-auth";
 
 export const dynamic = "force-dynamic";
+const PRIVATE_HEADERS = { "Cache-Control": "private, no-store, max-age=0" };
 
 type WatchlistBody = {
   artistId?: string;
@@ -40,7 +41,7 @@ export async function GET(request: Request) {
   return NextResponse.json({
     ok: true,
     watchlist: ((data ?? []) as WatchlistRow[]).map((row) => row.artist_id)
-  });
+  }, { headers: PRIVATE_HEADERS });
 }
 
 export async function POST(request: Request) {
@@ -96,7 +97,7 @@ export async function POST(request: Request) {
   return NextResponse.json({
     ok: true,
     artistId
-  });
+  }, { headers: PRIVATE_HEADERS });
 }
 
 export async function DELETE(request: Request) {
@@ -150,7 +151,7 @@ export async function DELETE(request: Request) {
   return NextResponse.json({
     ok: true,
     artistId
-  });
+  }, { headers: PRIVATE_HEADERS });
 }
 
 async function getRequestContext(request: Request) {
@@ -162,49 +163,26 @@ async function getRequestContext(request: Request) {
       response: NextResponse.json(
         {
           ok: false,
-          error: "Supabase watchlists are not fully configured yet.",
-          config
+          error: "Watchlists are temporarily unavailable."
         },
-        { status: 400 }
+        { status: 503, headers: PRIVATE_HEADERS }
       )
     };
   }
 
-  const authorization = request.headers.get("authorization");
+  const auth = await requireConfirmedUser(request);
 
-  if (!authorization) {
+  if (!auth.ok) {
     return {
       ok: false as const,
-      response: NextResponse.json(
-        {
-          ok: false,
-          error: "Missing Supabase authorization token."
-        },
-        { status: 401 }
-      )
-    };
-  }
-
-  const supabase = createAnonServerClient(authorization);
-  const { data, error } = await supabase.auth.getUser();
-
-  if (error || !data.user) {
-    return {
-      ok: false as const,
-      response: NextResponse.json(
-        {
-          ok: false,
-          error: error?.message ?? "Could not resolve signed-in user."
-        },
-        { status: 401 }
-      )
+      response: auth.response
     };
   }
 
   return {
     ok: true as const,
     adminSupabase: createServiceRoleClient(),
-    userId: data.user.id
+    userId: auth.user.id
   };
 }
 
@@ -231,5 +209,5 @@ function formatWatchlistError(message: string) {
     return "Watchlist storage needs setup. Run supabase/migrations/005_watchlist.sql in the Supabase SQL editor.";
   }
 
-  return message;
+  return "Could not update the watchlist.";
 }

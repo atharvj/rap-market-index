@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createAnonServerClient, getSupabaseConfigStatus } from "@/lib/supabase/server";
+import { createServiceRoleClient, getSupabaseConfigStatus } from "@/lib/supabase/server";
 import type { Database } from "@/lib/supabase/database.types";
 import { getPacificMarketDate, shiftMarketDate } from "@/server/market/market-date";
 import { getArtistStatusSubtype } from "@/server/market/status-events";
@@ -59,6 +59,7 @@ const DEFAULT_LOOKBACK_DAYS = 30;
 const MAX_LOOKBACK_DAYS = 365;
 const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 100;
+const CACHE_HEADERS = { "Cache-Control": "public, max-age=60, s-maxage=300, stale-while-revalidate=1800" };
 
 export async function GET(request: Request) {
   const config = getSupabaseConfigStatus();
@@ -68,9 +69,15 @@ export async function GET(request: Request) {
       ok: true,
       source: "mock",
       news: [],
-      eventCount: 0,
-      config
-    });
+      eventCount: 0
+    }, { headers: CACHE_HEADERS });
+  }
+
+  if (!config.serviceRoleConfigured) {
+    return NextResponse.json(
+      { ok: false, source: "supabase", error: "Market news is temporarily unavailable." },
+      { status: 503, headers: CACHE_HEADERS }
+    );
   }
 
   try {
@@ -79,17 +86,22 @@ export async function GET(request: Request) {
     const lookbackDays = getInteger(url.searchParams.get("lookbackDays"), DEFAULT_LOOKBACK_DAYS, 1, MAX_LOOKBACK_DAYS);
     const limit = getInteger(url.searchParams.get("limit"), DEFAULT_LIMIT, 1, MAX_LIMIT);
     const artistId = url.searchParams.get("artistId");
+    const requestedArtistIds = normalizeArtistIds(url.searchParams.get("artistIds"));
     const ticker = url.searchParams.get("ticker")?.toUpperCase() ?? null;
     const eventType = normalizeEventType(url.searchParams.get("eventType"));
     const feedMode = normalizeFeedMode(url.searchParams.get("feed"));
-    const supabase = createAnonServerClient();
+    const supabase = createServiceRoleClient();
     const artists = await loadArtists(supabase);
     const artistById = new Map(artists.map((artist) => [artist.id, artist]));
     const imageByArtistId = await loadArtistImageUrls(
       supabase,
-      artists.map((artist) => artist.id)
+      artists.map((artist) => artist.id),
+      Object.fromEntries(artists.map((artist) => [artist.id, artist.name]))
     );
     const selectedArtistId = artistId ?? (ticker ? artists.find((artist) => artist.ticker === ticker)?.id ?? null : null);
+    const selectedArtistIds = selectedArtistId
+      ? [selectedArtistId]
+      : requestedArtistIds.filter((candidate) => artistById.has(candidate));
 
     if (ticker && !selectedArtistId) {
       return NextResponse.json({
@@ -99,7 +111,7 @@ export async function GET(request: Request) {
         lookbackDays,
         eventCount: 0,
         news: []
-      });
+      }, { headers: CACHE_HEADERS });
     }
 
     const candidateLimit = Math.min(500, limit * 6);
@@ -112,8 +124,10 @@ export async function GET(request: Request) {
       .order("created_at", { ascending: false })
       .limit(candidateLimit);
 
-    if (selectedArtistId) {
-      query = query.eq("artist_id", selectedArtistId);
+    if (selectedArtistIds.length === 1) {
+      query = query.eq("artist_id", selectedArtistIds[0]);
+    } else if (selectedArtistIds.length > 1) {
+      query = query.in("artist_id", selectedArtistIds);
     }
 
     if (eventType) {
@@ -131,13 +145,13 @@ export async function GET(request: Request) {
         (event) =>
           artistById.has(event.artist_id) &&
           isPublicMarketNewsEvent(event, {
-            feedMode: selectedArtistId ? "artist" : feedMode,
+            feedMode: selectedArtistIds.length ? "artist" : feedMode,
             artist: artistById.get(event.artist_id) ?? null
           })
       )
       .sort((first, second) => getNewsImportanceScore(second, runDate) - getNewsImportanceScore(first, runDate));
     const eventNews = diversifyMarketNewsEvents(rankedEvents, {
-      feedMode: selectedArtistId ? "artist" : feedMode,
+      feedMode: selectedArtistIds.length ? "artist" : feedMode,
       limit
     }).map((event) => mapMarketEventToNewsItem(event, artistById));
     const sourcePreviewImages = await loadSourcePreviewImageUrls(
@@ -159,21 +173,21 @@ export async function GET(request: Request) {
       lookbackDays,
       eventCount: news.length,
       news
-    });
+    }, { headers: CACHE_HEADERS });
   } catch (error) {
+    console.error("Market news request failed", error);
     return NextResponse.json(
       {
         ok: false,
         source: "supabase",
-        config,
-        error: error instanceof Error ? error.message : "Could not load market news."
+        error: "Market news is temporarily unavailable."
       },
-      { status: 500 }
+      { status: 500, headers: CACHE_HEADERS }
     );
   }
 }
 
-async function loadArtists(supabase: ReturnType<typeof createAnonServerClient>) {
+async function loadArtists(supabase: ReturnType<typeof createServiceRoleClient>) {
   const { data, error } = await supabase
     .from("artists")
     .select("id,name,ticker,current_price,daily_change_percent,hype_score,last_move_explanation,updated_at")
@@ -192,7 +206,7 @@ function mapMarketEventToNewsItem(
 ): MarketNewsItem {
   const artist = artistById.get(event.artist_id) ?? null;
   const rawPayload = toRawPayload(event.raw_payload);
-  const sourceUrl = event.source_url ?? null;
+  const sourceUrl = event.source_url && isSafeHttpUrl(event.source_url) ? event.source_url : null;
   const sourceName = event.source_name ?? null;
   const sourceDomain = getSourceDomain(sourceUrl, sourceName);
 
@@ -240,6 +254,21 @@ function normalizeEventType(value: string | null): MarketNewsType | null {
 
 function normalizeFeedMode(value: string | null): NewsFeedMode {
   return value === "home" || value === "artist" ? value : "news";
+}
+
+function normalizeArtistIds(value: string | null) {
+  if (!value) {
+    return [];
+  }
+
+  return Array.from(
+    new Set(
+      value
+        .split(",")
+        .map((candidate) => candidate.trim())
+        .filter((candidate) => /^[a-z0-9][a-z0-9-]{0,79}$/i.test(candidate))
+    )
+  ).slice(0, 12);
 }
 
 function normalizeDate(value: string | null) {
@@ -945,10 +974,39 @@ function isSafeHttpUrl(value: string | undefined) {
 
   try {
     const url = new URL(value);
-    return url.protocol === "https:" || url.protocol === "http:";
+    const hostname = url.hostname.toLowerCase().replace(/^\[|\]$/g, "");
+
+    if (
+      (url.protocol !== "https:" && url.protocol !== "http:") ||
+      url.username ||
+      url.password ||
+      (url.port && url.port !== "80" && url.port !== "443") ||
+      hostname === "localhost" ||
+      hostname.endsWith(".localhost") ||
+      hostname === "0.0.0.0" ||
+      hostname === "::" ||
+      hostname === "::1" ||
+      hostname.startsWith("127.") ||
+      hostname.startsWith("10.") ||
+      hostname.startsWith("192.168.") ||
+      hostname.startsWith("169.254.") ||
+      isPrivate172Address(hostname) ||
+      (hostname.includes(":") && /^(?:fc|fd|fe[89ab])/.test(hostname))
+    ) {
+      return false;
+    }
+
+    return true;
   } catch {
     return false;
   }
+}
+
+function isPrivate172Address(hostname: string) {
+  const match = hostname.match(/^172\.(\d{1,3})\./);
+  const secondOctet = match ? Number(match[1]) : Number.NaN;
+
+  return Number.isInteger(secondOctet) && secondOctet >= 16 && secondOctet <= 31;
 }
 
 function isLowSignalSocialTitle(title: string) {

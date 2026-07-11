@@ -86,7 +86,11 @@ export default function LeaderboardPage() {
               {entry.isAdmin ? <AdminBadge compact /> : null}
             </span>
             <span className="text-right font-black number-tabular">{formatCurrency(entry.portfolioValue)}</span>
-            <span className="text-right font-black number-tabular">{formatCurrency(Math.max(0, entry.portfolioValue - entry.cashBalance))}</span>
+            <span className="text-right font-black number-tabular">
+              {entry.portfolioIsPublic === false
+                ? "Private"
+                : formatCurrency(Math.max(0, entry.portfolioValue - entry.cashBalance))}
+            </span>
             <span className={entry.gainPercent >= 0 ? "text-right font-black text-mint" : "text-right font-black text-ember"}>
               {formatPercent(entry.gainPercent)}
             </span>
