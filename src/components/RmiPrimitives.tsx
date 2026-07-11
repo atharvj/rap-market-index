@@ -69,14 +69,32 @@ export function RmiButton({
   );
 }
 
-export function ArtistIdentity({ artist, detail }: { artist: Artist; detail?: string }) {
-  return (
-    <Link href={`/artists/${artist.id}`} className="flex min-w-0 items-center gap-3">
+export function ArtistIdentity({
+  artist,
+  detail,
+  linked = true
+}: {
+  artist: Artist;
+  detail?: string;
+  linked?: boolean;
+}) {
+  const content = (
+    <>
       <ArtistAvatar artist={artist} />
       <span className="min-w-0">
         <span className="block truncate text-sm font-black">{artist.name}</span>
         <span className="block truncate text-xs font-bold text-paper/45">${artist.ticker}{detail ? ` · ${detail}` : ""}</span>
       </span>
+    </>
+  );
+
+  if (!linked) {
+    return <div className="flex min-w-0 items-center gap-3">{content}</div>;
+  }
+
+  return (
+    <Link href={`/artists/${artist.id}`} className="flex min-w-0 items-center gap-3">
+      {content}
     </Link>
   );
 }
@@ -129,7 +147,7 @@ export function RmiLineChart({
 export function ArtistMiniCard({ artist }: { artist: Artist }) {
   return (
     <Link href={`/artists/${artist.id}`} className="rmi-card grid min-w-0 gap-4 p-4 transition hover:-translate-y-0.5 hover:border-cyan/70">
-      <ArtistIdentity artist={artist} />
+      <ArtistIdentity artist={artist} linked={false} />
       <div>
         <p className="text-lg font-black number-tabular">{formatCurrency(artist.currentPrice)}</p>
         <ChangeText value={artist.dailyChangePercent} />

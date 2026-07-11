@@ -165,7 +165,7 @@ function MarketMoverCard({ artist }: { artist: ReturnType<typeof useGame>["state
   return (
     <Link href={`/artists/${artist.id}`} className="rmi-card p-4 transition hover:-translate-y-0.5 hover:border-cyan/60">
       <div className="flex items-start justify-between gap-3">
-        <ArtistIdentity artist={artist} />
+        <ArtistIdentity artist={artist} linked={false} />
         <ChangeText value={artist.dailyChangePercent} />
       </div>
       <div className="mt-4 h-16">
