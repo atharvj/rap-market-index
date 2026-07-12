@@ -67,6 +67,7 @@ export type GdeltMarketSignals = {
   signals: AdapterSignals;
   observations: MarketObservation[];
   eventsByArtist: Record<string, MarketEvent[]>;
+  warnings: string[];
 };
 
 const SOURCE = "gdelt";
@@ -88,6 +89,8 @@ export async function collectGdeltMarketSignals({
   const signals: AdapterSignals = {};
   const observations: MarketObservation[] = [];
   const eventsByArtist: Record<string, MarketEvent[]> = {};
+  const warnings: string[] = [];
+  let consecutiveRequestFailures = 0;
 
   for (const [index, artist] of artists.entries()) {
     if (index > 0 && delayMs > 0) {
@@ -104,6 +107,7 @@ export async function collectGdeltMarketSignals({
     });
 
     if (!result.ok) {
+      consecutiveRequestFailures += 1;
       signals[artist.id] = {
         stats: {},
         rawPayload: {
@@ -125,8 +129,18 @@ export async function collectGdeltMarketSignals({
           error: result.error
         }
       });
+
+      if (consecutiveRequestFailures >= 3) {
+        warnings.push(
+          `GDELT stopped after ${consecutiveRequestFailures} consecutive request failures; RSS and AI research remain active.`
+        );
+        break;
+      }
+
       continue;
     }
+
+    consecutiveRequestFailures = 0;
 
     const signal = buildGdeltSignal({
       artist,
@@ -154,7 +168,8 @@ export async function collectGdeltMarketSignals({
   return {
     signals,
     observations,
-    eventsByArtist
+    eventsByArtist,
+    warnings
   };
 }
 

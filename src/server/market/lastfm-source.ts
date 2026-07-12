@@ -253,6 +253,46 @@ async function fetchLastfmArtistInfo({
   timeoutMs: number;
   fetchImpl: typeof fetch;
 }): Promise<{ ok: true; info: LastfmArtistInfo } | { ok: false; error: string }> {
+  const primary = await requestLastfmArtistInfo({
+    apiKey,
+    artistName,
+    musicbrainzId,
+    timeoutMs,
+    fetchImpl
+  });
+
+  if (primary.ok || !musicbrainzId?.trim()) {
+    return primary;
+  }
+
+  const fallback = await requestLastfmArtistInfo({
+    apiKey,
+    artistName,
+    timeoutMs,
+    fetchImpl
+  });
+
+  return fallback.ok
+    ? fallback
+    : {
+        ok: false,
+        error: `${primary.error} Safe artist-name fallback also failed: ${fallback.error}`
+      };
+}
+
+async function requestLastfmArtistInfo({
+  apiKey,
+  artistName,
+  musicbrainzId,
+  timeoutMs,
+  fetchImpl
+}: {
+  apiKey: string;
+  artistName: string;
+  musicbrainzId?: string;
+  timeoutMs: number;
+  fetchImpl: typeof fetch;
+}): Promise<{ ok: true; info: LastfmArtistInfo } | { ok: false; error: string }> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
   const url = new URL("https://ws.audioscrobbler.com/2.0/");

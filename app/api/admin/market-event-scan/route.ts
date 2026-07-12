@@ -19,7 +19,7 @@ import {
 } from "@/server/market/supabase-repository";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 180;
+export const maxDuration = 300;
 
 type MarketEventScanBody = {
   dryRun?: boolean;
@@ -66,8 +66,8 @@ const DEFAULT_RSS_LOOKBACK_DAYS = 30;
 const DEFAULT_RSS_MAX_ITEMS_PER_FEED = 40;
 const DEFAULT_AI_RESEARCH_LOOKBACK_DAYS = 14;
 const DEFAULT_AI_RESEARCH_EVENTS_PER_ARTIST = 1;
-const DEFAULT_AI_RESEARCH_ARTIST_LIMIT = 6;
-const MAX_AI_RESEARCH_ARTIST_LIMIT = 25;
+const DEFAULT_AI_RESEARCH_ARTIST_LIMIT = 100;
+const MAX_AI_RESEARCH_ARTIST_LIMIT = 100;
 
 export async function GET(request: Request) {
   const auth = await requireAdminRequest(request);
@@ -173,8 +173,32 @@ export async function POST(request: Request) {
     const gdeltArtists = gdeltEnabled
       ? selectOldestSourceArtists(artists, latestGdeltDates, gdeltArtistLimit)
       : [];
-    const result = gdeltEnabled
-      ? await collectGdeltMarketSignals({
+    const aiResearchEnabled = body.includeAiResearch ?? getEnvBoolean("MARKET_AI_RESEARCH_ENABLED", config.aiResearchConfigured);
+    const aiResearchArtistLimit = normalizeInteger(
+      body.aiResearchArtistLimit,
+      getEnvInteger("MARKET_AI_RESEARCH_ARTIST_LIMIT", DEFAULT_AI_RESEARCH_ARTIST_LIMIT, 0, MAX_AI_RESEARCH_ARTIST_LIMIT),
+      0,
+      MAX_AI_RESEARCH_ARTIST_LIMIT
+    );
+    const aiResearchLookbackDays = normalizeInteger(
+      body.aiResearchLookbackDays,
+      getEnvInteger("MARKET_AI_RESEARCH_LOOKBACK_DAYS", DEFAULT_AI_RESEARCH_LOOKBACK_DAYS, 1, 30),
+      1,
+      30
+    );
+    const aiResearchMaxEventsPerArtist = normalizeInteger(
+      body.aiResearchMaxEventsPerArtist,
+      getEnvInteger("MARKET_AI_RESEARCH_EVENTS_PER_ARTIST", DEFAULT_AI_RESEARCH_EVENTS_PER_ARTIST, 1, 5),
+      1,
+      5
+    );
+    const aiResearchDelayMs = getEnvInteger("MARKET_AI_RESEARCH_DELAY_MS", 2200, 2000, 30000);
+    const aiResearchTimeoutMs = getEnvInteger("MARKET_AI_RESEARCH_TIMEOUT_MS", 25000, 5000, 30000);
+    const earlyAiResearchArtists = aiResearchEnabled && aiResearchArtistLimit >= artists.length
+      ? artists
+      : null;
+    const gdeltPromise = gdeltEnabled
+      ? collectGdeltMarketSignals({
           artists: gdeltArtists,
           runDate,
           externalIds,
@@ -186,9 +210,9 @@ export async function POST(request: Request) {
           maxRecords,
           timeoutMs
         })
-      : { signals: {}, observations: [], eventsByArtist: {} };
-    const mediaRss = mediaRssEnabled
-      ? await collectMediaRssMarketEvents({
+      : { signals: {}, observations: [], eventsByArtist: {}, warnings: [] };
+    const mediaRssPromise = mediaRssEnabled
+      ? collectMediaRssMarketEvents({
           artists,
           runDate,
           externalIds,
@@ -210,15 +234,27 @@ export async function POST(request: Request) {
           timeoutMs
         })
       : { observations: [], eventsByArtist: {}, warnings: [], scannedFeedCount: 0 };
-    const aiResearchEnabled = body.includeAiResearch ?? getEnvBoolean("MARKET_AI_RESEARCH_ENABLED", config.aiResearchConfigured);
-    const aiResearchArtistLimit = normalizeInteger(
-      body.aiResearchArtistLimit,
-      getEnvInteger("MARKET_AI_RESEARCH_ARTIST_LIMIT", DEFAULT_AI_RESEARCH_ARTIST_LIMIT, 0, MAX_AI_RESEARCH_ARTIST_LIMIT),
-      0,
-      MAX_AI_RESEARCH_ARTIST_LIMIT
-    );
+    const earlyAiResearchPromise = earlyAiResearchArtists
+      ? collectAiResearchMarketEvents({
+          artists: earlyAiResearchArtists,
+          runDate,
+          externalIds,
+          apiKey: process.env.GROQ_API_KEY,
+          model: process.env.MARKET_AI_RESEARCH_MODEL,
+          lookbackDays: aiResearchLookbackDays,
+          maxEventsPerArtist: aiResearchMaxEventsPerArtist,
+          delayMs: aiResearchDelayMs,
+          timeoutMs: aiResearchTimeoutMs
+        })
+      : null;
+    const [result, mediaRss, earlyAiResearch] = await Promise.all([
+      gdeltPromise,
+      mediaRssPromise,
+      earlyAiResearchPromise
+    ]);
     const aiResearchArtists = aiResearchEnabled
-      ? selectAiResearchArtists(
+      ? earlyAiResearchArtists ??
+        selectAiResearchArtists(
           artists,
           mergedEventsPreview(mediaRss.eventsByArtist, result.eventsByArtist),
           latestAiResearchDates,
@@ -226,27 +262,17 @@ export async function POST(request: Request) {
           aiResearchArtistLimit
         )
       : [];
-    const aiResearch = aiResearchEnabled
+    const aiResearch = earlyAiResearch ?? (aiResearchEnabled
       ? await collectAiResearchMarketEvents({
           artists: aiResearchArtists,
           runDate,
           externalIds,
           apiKey: process.env.GROQ_API_KEY,
           model: process.env.MARKET_AI_RESEARCH_MODEL,
-          lookbackDays: normalizeInteger(
-            body.aiResearchLookbackDays,
-            getEnvInteger("MARKET_AI_RESEARCH_LOOKBACK_DAYS", DEFAULT_AI_RESEARCH_LOOKBACK_DAYS, 1, 30),
-            1,
-            30
-          ),
-          maxEventsPerArtist: normalizeInteger(
-            body.aiResearchMaxEventsPerArtist,
-            getEnvInteger("MARKET_AI_RESEARCH_EVENTS_PER_ARTIST", DEFAULT_AI_RESEARCH_EVENTS_PER_ARTIST, 1, 5),
-            1,
-            5
-          ),
-          delayMs: getEnvInteger("MARKET_AI_RESEARCH_DELAY_MS", 12000, 0, 30000),
-          timeoutMs
+          lookbackDays: aiResearchLookbackDays,
+          maxEventsPerArtist: aiResearchMaxEventsPerArtist,
+          delayMs: aiResearchDelayMs,
+          timeoutMs: aiResearchTimeoutMs
         })
       : {
           observations: [],
@@ -254,7 +280,7 @@ export async function POST(request: Request) {
           warnings: config.aiResearchConfigured
             ? []
             : ["AI research key is missing; source-backed AI market discovery was skipped."]
-        };
+        });
     const mergedEventsByArtist = mergeEvents(
       mergeEvents(result.eventsByArtist, mediaRss.eventsByArtist),
       aiResearch.eventsByArtist
@@ -292,7 +318,7 @@ export async function POST(request: Request) {
       aiResearchScannedArtistCount: aiResearchArtists.length,
       aiResearchEventCount: flattenEvents(aiResearch.eventsByArtist).length,
       mediaRssScannedFeedCount: mediaRss.scannedFeedCount,
-      warnings: [...mediaRss.warnings, ...aiResearch.warnings],
+      warnings: [...result.warnings, ...mediaRss.warnings, ...aiResearch.warnings],
       autoHaltStatusEvents,
       statusHaltCandidateCount: statusHaltCandidates.length,
       statusHaltCandidates,

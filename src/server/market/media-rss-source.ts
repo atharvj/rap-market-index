@@ -132,13 +132,16 @@ export async function collectMediaRssMarketEvents({
 
   pushFeedWarnings(warnings, globalFeedResults);
 
-  for (const [index, artist] of artists.entries()) {
-    const query = buildArtistNewsQuery(artist, externalIds[artist.id]);
-    let artistSearchItems: MediaFeedItem[] = [];
+  const artistSearchResults = await Promise.all(
+    artists.map(async (artist, index) => {
+      const query = buildArtistNewsQuery(artist, externalIds[artist.id]);
 
-    if (includeGoogleNews) {
+      if (!includeGoogleNews) {
+        return { artist, query, result: null };
+      }
+
       if (index > 0 && delayMs > 0) {
-        await sleep(delayMs);
+        await sleep(index * delayMs);
       }
 
       const feedUrl = buildGoogleNewsFeedUrl(query, lookbackDays);
@@ -153,6 +156,14 @@ export async function collectMediaRssMarketEvents({
         fetchImpl
       });
 
+      return { artist, query, result };
+    })
+  );
+
+  for (const { artist, query, result } of artistSearchResults) {
+    let artistSearchItems: MediaFeedItem[] = [];
+
+    if (result) {
       scannedFeedCount += 1;
 
       if (result.ok) {
@@ -162,7 +173,7 @@ export async function collectMediaRssMarketEvents({
         observations.push(
           createObservation(artist.id, runDate, REQUEST_ERROR, 1, "flag", {
             source: SOURCE,
-            feedUrl,
+            feedUrl: result.feedUrl,
             query,
             error: result.error
           })

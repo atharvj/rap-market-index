@@ -19,7 +19,7 @@ const sections = [
   {
     id: "market-data",
     title: "Quotes and Market Data",
-    body: "Quotes are model-generated fantasy estimates based on available audience, media, event, and eligible order-flow signals. Sources can be delayed, incomplete, duplicated, or wrong. RMI may correct source data, update its model, or rebase quotes while preserving an audit trail of the change."
+    body: "Quotes are model-generated fantasy estimates based on available audience, media, event, and eligible order-flow signals. Sources can be delayed, incomplete, duplicated, or wrong. RMI may correct source data or update its model. Routine market runs remain subject to movement limits, while any exceptional baseline correction is handled separately from daily performance."
   },
   {
     id: "profiles",

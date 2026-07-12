@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import {
-  applyAudienceScaleRebase,
   attachAudienceScaleCalibration,
   buildAudienceScaleCalibration,
   getAudienceScaleAdjustment
@@ -74,39 +73,39 @@ describe("audience-scale valuation", () => {
     expect(onePlatform.confidence).toBeLessThan(corroborated.confidence);
   });
 
+  it("ranks comparable artists from the same universal audience formula", () => {
+    const tana = buildAudienceScaleCalibration(signal({
+      youtube: { subscriberCount: 310_000, viewCount: 90_955_691 },
+      wikimedia: { pageviews7d: 325 }
+    }));
+    const feng = buildAudienceScaleCalibration(signal({
+      lastfm: { listeners: 389_464, playcount: 33_307_338 },
+      youtube: { subscriberCount: 52_800, viewCount: 14_982_544 },
+      wikimedia: { pageviews7d: 36 }
+    }));
+    const molly = buildAudienceScaleCalibration(signal({
+      lastfm: { listeners: 206_371, playcount: 11_441_126 },
+      youtube: { subscriberCount: 83_000, viewCount: 16_724_624 }
+    }));
+
+    expect(tana.targetPrice ?? 0).toBeGreaterThan(feng.targetPrice ?? 0);
+    expect(feng.targetPrice ?? 0).toBeGreaterThan(molly.targetPrice ?? 0);
+    expect(tana.confidence).toBeLessThan(feng.confidence);
+  });
+
   it("caps normal daily valuation pressure at four percent", () => {
     const result = getAudienceScaleAdjustment({
       audienceScaleCalibration: {
         status: "ok",
         targetPrice: 140,
-        coverage: 1,
-        rebase: false
+        coverage: 1
       }
     }, 5);
 
     expect(result.adjustment).toBe(0.04);
   });
 
-  it("applies a one-time rebase toward the universal target", () => {
-    const result = applyAudienceScaleRebase({
-      rawPayload: {
-        audienceScaleCalibration: {
-          status: "ok",
-          targetPrice: 23,
-          coverage: 0.95,
-          rebase: true
-        }
-      },
-      oldPrice: 15,
-      regularPrice: 15.15
-    });
-
-    expect(result.applied).toBe(true);
-    expect(result.price).toBeGreaterThan(15);
-    expect(result.price).toBeLessThanOrEqual(23.23);
-  });
-
-  it("only rebases artists selected for the model transition", () => {
+  it("attaches the same valuation method without migration flags", () => {
     const signals = attachAudienceScaleCalibration({
       artists: [artist("one"), artist("two")],
       signals: {
@@ -118,11 +117,12 @@ describe("audience-scale valuation", () => {
           lastfm: { listeners: 600_000, playcount: 40_000_000 },
           youtube: { subscriberCount: 120_000, viewCount: 60_000_000 }
         })
-      },
-      rebaseArtistIds: new Set(["two"])
+      }
     });
 
-    expect((signals.one.rawPayload.audienceScaleCalibration as { rebase: boolean }).rebase).toBe(false);
-    expect((signals.two.rawPayload.audienceScaleCalibration as { rebase: boolean }).rebase).toBe(true);
+    expect(signals.one.rawPayload.audienceScaleCalibration).toMatchObject({ status: "ok" });
+    expect(signals.two.rawPayload.audienceScaleCalibration).toMatchObject({ status: "ok" });
+    expect(signals.one.rawPayload.audienceScaleCalibration).not.toHaveProperty("rebase");
+    expect(signals.two.rawPayload.audienceScaleCalibration).not.toHaveProperty("rebase");
   });
 });

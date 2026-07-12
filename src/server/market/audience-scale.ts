@@ -18,7 +18,6 @@ export type AudienceScaleCalibration = {
   metricCount: number;
   directSourceCount: number;
   metrics: AudienceMetric[];
-  rebase: boolean;
 };
 
 export type AudienceScaleSnapshots = Record<
@@ -41,23 +40,16 @@ const TOTAL_AVAILABLE_WEIGHT = 0.95;
 export function attachAudienceScaleCalibration({
   artists,
   signals,
-  snapshots = {},
-  rebase = false,
-  rebaseArtistIds
+  snapshots = {}
 }: {
   artists: MarketUpdateArtist[];
   signals: AdapterSignals;
   snapshots?: AudienceScaleSnapshots;
-  rebase?: boolean;
-  rebaseArtistIds?: ReadonlySet<string>;
 }): AdapterSignals {
   return Object.fromEntries(
     artists.map((artist) => {
       const signal = signals[artist.id] ?? { stats: {}, rawPayload: {} };
-      const calibration = {
-        ...buildAudienceScaleCalibration(signal, snapshots[artist.id]),
-        rebase: rebaseArtistIds ? rebaseArtistIds.has(artist.id) : rebase
-      };
+      const calibration = buildAudienceScaleCalibration(signal, snapshots[artist.id]);
 
       return [
         artist.id,
@@ -114,8 +106,7 @@ export function buildAudienceScaleCalibration(
       confidence: round(confidence),
       metricCount: metrics.length,
       directSourceCount,
-      metrics,
-      rebase: false
+      metrics
     };
   }
 
@@ -132,8 +123,7 @@ export function buildAudienceScaleCalibration(
     confidence: round(confidence),
     metricCount: metrics.length,
     directSourceCount,
-    metrics,
-    rebase: false
+    metrics
   };
 }
 
@@ -146,65 +136,23 @@ export function getAudienceScaleAdjustment(rawPayload: Record<string, unknown>, 
     0.25,
     0.9
   );
-  const rebase = calibration.rebase === true;
-
   if (!targetPrice || currentPrice <= 0 || calibration.status !== "ok") {
     return {
       adjustment: 0,
       targetPrice: null,
       coverage,
-      gapPercent: 0,
-      rebase
+      gapPercent: 0
     };
   }
 
   const logarithmicGap = Math.log(targetPrice / currentPrice);
-  const adjustment = rebase ? 0 : clamp(logarithmicGap * 0.085 * confidence, -0.04, 0.04);
+  const adjustment = clamp(logarithmicGap * 0.085 * confidence, -0.04, 0.04);
 
   return {
     adjustment,
     targetPrice,
     coverage,
-    gapPercent: round(((targetPrice - currentPrice) / currentPrice) * 100),
-    rebase
-  };
-}
-
-export function applyAudienceScaleRebase({
-  rawPayload,
-  oldPrice,
-  regularPrice
-}: {
-  rawPayload: Record<string, unknown>;
-  oldPrice: number;
-  regularPrice: number;
-}) {
-  const calibration = getRecord(rawPayload.audienceScaleCalibration);
-  const targetPrice = getPositiveNumber(calibration.targetPrice);
-
-  if (calibration.rebase !== true || calibration.status !== "ok" || !targetPrice || oldPrice <= 0) {
-    return {
-      applied: false,
-      price: regularPrice,
-      targetPrice: targetPrice ?? null,
-      rebaseMultiplier: 1
-    };
-  }
-
-  const coverage = clamp(getFiniteNumber(calibration.coverage) ?? 0, 0, 1);
-  const confidence = clamp(
-    getFiniteNumber(calibration.confidence) ?? (0.35 + coverage * 0.65),
-    0.25,
-    0.98
-  );
-  const valuationMultiplier = clamp(Math.exp(Math.log(targetPrice / oldPrice) * confidence), 0.35, 5);
-  const regularMarketMultiplier = clamp(regularPrice / oldPrice, 0.96, 1.04);
-
-  return {
-    applied: true,
-    price: oldPrice * valuationMultiplier * regularMarketMultiplier,
-    targetPrice,
-    rebaseMultiplier: round(valuationMultiplier)
+    gapPercent: round(((targetPrice - currentPrice) / currentPrice) * 100)
   };
 }
 

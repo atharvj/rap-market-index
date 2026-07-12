@@ -2,7 +2,7 @@ import { calculateHypeScore, calculateSignalDelta, clamp, getDailyChangePercent,
 import type { AdapterSignal, AdapterSignals, MarketSignalModifier } from "@/server/market/market-data";
 import { getMarketModelVersion } from "@/server/market/model-version";
 import type { ArtistCategory, HypeStats } from "@/lib/types";
-import { applyAudienceScaleRebase, getAudienceScaleAdjustment } from "@/server/market/audience-scale";
+import { getAudienceScaleAdjustment } from "@/server/market/audience-scale";
 
 export type MarketUpdateSource =
   | "mock"
@@ -304,10 +304,6 @@ function applyRelativePressure({
   marketContextConfidence: number;
   marketCoverageRatio: number;
 }): ArtistMarketUpdate {
-  if (update.rawPayload.audienceScaleRebaseApplied === true) {
-    return update;
-  }
-
   const relativeSignalDelta = update.signalDelta - marketMedianSignalDelta;
   const marketRelativeAdjustment = clamp(relativeSignalDelta * 0.55 * marketContextConfidence, -0.02, 0.02);
   const broadMarketDampener =
@@ -868,12 +864,7 @@ function calculateArtistUpdate({
     previousClose * (1 - dailyCap),
     previousClose * (1 + dailyCap)
   );
-  const audienceScaleRebase = applyAudienceScaleRebase({
-    rawPayload: signals.rawPayload,
-    oldPrice: artist.currentPrice,
-    regularPrice: cappedPrice
-  });
-  const currentPrice = roundPrice(audienceScaleRebase.price);
+  const currentPrice = roundPrice(cappedPrice);
   const dailyChangePercent = getDailyChangePercent(currentPrice, previousClose);
   const hypeScore = calculateHypeScore(stats);
   const catalystDiagnostics = buildCatalystDiagnostics(signals.modifiers, dailyChangePercent);
@@ -888,13 +879,11 @@ function calculateArtistUpdate({
     dailyChangePercent,
     hypeScore,
     stats,
-    explanation: audienceScaleRebase.applied
-      ? `${artist.ticker} was rebased to the latest long-term audience valuation model.`
-      : audienceScaleDominant
-        ? explainAudienceScaleMove(artist.ticker, dailyChangePercent)
-        : signals.hasMomentumSignal
-          ? explainMove(artist.ticker, stats, dailyChangePercent, catalystDiagnostics, sourceAttribution)
-          : explainNoSignalMove(artist.ticker, source, dailyChangePercent, staleMomentumDecayDelta),
+    explanation: audienceScaleDominant
+      ? explainAudienceScaleMove(artist.ticker, dailyChangePercent)
+      : signals.hasMomentumSignal
+        ? explainMove(artist.ticker, stats, dailyChangePercent, catalystDiagnostics, sourceAttribution)
+        : explainNoSignalMove(artist.ticker, source, dailyChangePercent, staleMomentumDecayDelta),
     signalDelta,
     modelVersion,
     rawPayload: {
@@ -916,9 +905,7 @@ function calculateArtistUpdate({
       technicalAdjustment,
       unsupportedEventMemoryAdjustment,
       audienceScaleAdjustment,
-      audienceScaleDominant: audienceScaleDominant || audienceScaleRebase.applied,
-      audienceScaleRebase,
-      audienceScaleRebaseApplied: audienceScaleRebase.applied,
+      audienceScaleDominant,
       catalystDiagnostics,
       sourceAttribution,
       credibleEventSupport,
@@ -1437,8 +1424,9 @@ function getSignalConfidence(signal: AdapterSignal, sourceName: string) {
 function getDefaultSignalConfidence(sourceName: string) {
   const defaults: Record<string, number> = {
     lastfm: 0.86,
+    listenbrainz: 0.62,
     youtube: 0.84,
-    youtube_comments: 0.68,
+    youtube_comments: 0.48,
     reddit: 0.64,
     bluesky: 0.28,
     spotify: 0.7,
@@ -1461,6 +1449,10 @@ function getStatSourceWeight(key: keyof HypeStats, sourceName: string) {
       streamingGrowth: 1,
       socialGrowth: 0.5
     },
+    listenbrainz: {
+      streamingGrowth: 0.42,
+      socialGrowth: 0.12
+    },
     spotify: {
       streamingGrowth: 0.75,
       searchGrowth: 0.55
@@ -1471,10 +1463,10 @@ function getStatSourceWeight(key: keyof HypeStats, sourceName: string) {
       newsScore: 0.25
     },
     youtube_comments: {
-      socialGrowth: 0.85,
-      newsScore: 0.45,
-      searchGrowth: 0.35,
-      youtubeGrowth: 0.25
+      socialGrowth: 0.35,
+      newsScore: 0.14,
+      searchGrowth: 0.12,
+      youtubeGrowth: 0.1
     },
     reddit: {
       socialGrowth: 0.88,
@@ -1802,6 +1794,7 @@ function buildSourceAttribution(
 function getSourceAttributionLabel(source: string) {
   const labels: Record<string, string> = {
     lastfm: "audience listening",
+    listenbrainz: "independent listening sample",
     spotify: "streaming platform",
     youtube: "video platform",
     youtube_comments: "video comment sentiment",

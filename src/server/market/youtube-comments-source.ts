@@ -359,6 +359,8 @@ function buildYoutubeCommentSignal({
     baselinePositiveShare: baseline[POSITIVE_COMMENT_SHARE] ?? null,
     baselineNegativeShare: baseline[NEGATIVE_COMMENT_SHARE] ?? null,
     videoIds: videos.map((video) => video.id),
+    selectionBias: "artist_owned_channel_core_fans",
+    interpretation: "confirmation_only_not_broad_fan_consensus",
     status: hasBaseline ? (hasEnoughComments ? "momentum" : "insufficient_comments") : "baseline_only"
   };
   const observations = [
@@ -628,7 +630,7 @@ function getCommentWeight(likeCount: number) {
 }
 
 function getSignalConfidence(commentCount: number, commentLikeCount: number) {
-  return clamp(0.42 + Math.min(commentCount, 100) / 100 * 0.25 + Math.log10(commentLikeCount + 1) * 0.035, 0.42, 0.82);
+  return clamp(0.3 + Math.min(commentCount, 100) / 100 * 0.16 + Math.log10(commentLikeCount + 1) * 0.02, 0.3, 0.58);
 }
 
 function buildErrorSignal(channelId: string, error: string, status = "error"): AdapterSignal {

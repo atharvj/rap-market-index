@@ -33,6 +33,7 @@ import {
   normalizeDomain
 } from "@/server/market/gdelt-source";
 import { collectLastfmMarketSignals } from "@/server/market/lastfm-source";
+import { collectListenBrainzMarketSignals } from "@/server/market/listenbrainz-source";
 import { collectMusicbrainzReleaseEvents } from "@/server/market/musicbrainz-releases";
 import { collectRedditMarketSignals } from "@/server/market/reddit-source";
 import { collectSpotifyMarketSignals } from "@/server/market/spotify-source";
@@ -42,7 +43,7 @@ import { collectYoutubeMarketSignals } from "@/server/market/youtube-source";
 import { collectYoutubeCommentMarketSignals } from "@/server/market/youtube-comments-source";
 import { collectYoutubeUploadEvents } from "@/server/market/youtube-upload-events-source";
 import { getPacificMarketDate } from "@/server/market/market-date";
-import { getMarketModelVersion, shouldRebaseAudienceValuation } from "@/server/market/model-version";
+import { getMarketModelVersion } from "@/server/market/model-version";
 import { getMockMarketArtists } from "@/server/market/mock-source";
 import type {
   AdapterSignals,
@@ -55,14 +56,12 @@ import {
   loadActiveArtists,
   loadActiveArtistCount,
   loadActiveArtistsPage,
-  loadArtistsUpdatedWithModel,
   loadArtistExternalIds,
   loadExistingPriceHistoryArtistIds,
   loadObservationBaselines,
   loadPreviousClosePrices,
   loadPreviousSignalStats,
   loadPriceTrendContexts,
-  loadPreviousSuccessfulMarketModelVersion,
   loadRecentMarketEvents,
   persistMarketEvents,
   persistMarketObservations,
@@ -173,33 +172,14 @@ export async function POST(request: Request) {
       manualEvents: body.manualEvents
     });
     const modelVersion = getMarketModelVersion();
-    const previousModelVersion = supabase && isRealExternalSource(source)
-      ? await loadPreviousSuccessfulMarketModelVersion({ supabase, runDate })
-      : null;
-    const valuationRebase = shouldRebaseAudienceValuation(previousModelVersion, modelVersion);
-    const alreadyRebasedArtistIds = valuationRebase && supabase
-      ? await loadArtistsUpdatedWithModel({
-          supabase,
-          artistIds: artists.map((artist) => artist.id),
-          runDate,
-          modelVersion
-        })
-      : new Set<string>();
-    const rebaseArtistIds = valuationRebase
-      ? new Set(artists.map((artist) => artist.id).filter((artistId) => !alreadyRebasedArtistIds.has(artistId)))
-      : new Set<string>();
     const adapterSignals = attachAudienceScaleCalibration({
       artists,
       signals: mergeAdapterSignals(...realSignals.adapterSignalSources, eventSignals.adapterSignals),
-      snapshots: realSignals.audienceScaleSnapshots,
-      rebaseArtistIds
+      snapshots: realSignals.audienceScaleSnapshots
     });
     const warnings = [
       ...realSignals.warnings,
-      ...eventSignals.warnings,
-      ...(rebaseArtistIds.size
-        ? [`Valuation model changed from ${previousModelVersion} to ${modelVersion}; applying one-time audience-scale rebasing to ${rebaseArtistIds.size} artists in this batch.`]
-        : [])
+      ...eventSignals.warnings
     ];
     const result = calculateDailyMarketUpdates({
       artists,
@@ -530,7 +510,10 @@ async function collectRealSignals({
   audienceScaleSnapshots: AudienceScaleSnapshots;
 }> {
   const useGdelt = source === "gdelt" || source === "blended";
-  const useLastfm = source === "lastfm" || source === "core" || source === "blended";
+  const useLastfm =
+    getEnvBoolean("MARKET_LASTFM_ENABLED", true) &&
+    (source === "lastfm" || source === "core" || source === "blended");
+  const useListenBrainz = source === "lastfm" || source === "core" || source === "blended";
   const useSpotify =
     source === "spotify" || ((source === "core" || source === "blended") && hasSpotifyCredentials());
   const useYoutube = source === "youtube" || source === "core" || source === "blended";
@@ -541,7 +524,16 @@ async function collectRealSignals({
   const useTradeFlow = Boolean(supabase) && isRealExternalSource(source);
   const warnings: string[] = [];
 
-  if (!useGdelt && !useLastfm && !useSpotify && !useYoutube && !useWikimedia && !useReddit && !useBluesky) {
+  if (
+    !useGdelt &&
+    !useLastfm &&
+    !useListenBrainz &&
+    !useSpotify &&
+    !useYoutube &&
+    !useWikimedia &&
+    !useReddit &&
+    !useBluesky
+  ) {
     return {
       adapterSignalSources: [],
       observations: [],
@@ -556,6 +548,7 @@ async function collectRealSignals({
   let externalIds: Record<string, ArtistExternalIds> = {};
   let gdeltBaselines: ObservationBaselines = {};
   let lastfmBaselines: ObservationBaselines = {};
+  let listenbrainzBaselines: ObservationBaselines = {};
   let spotifyBaselines: ObservationBaselines = {};
   let youtubeBaselines: ObservationBaselines = {};
   let youtubeCommentBaselines: ObservationBaselines = {};
@@ -569,6 +562,7 @@ async function collectRealSignals({
         externalIds,
         gdeltBaselines,
         lastfmBaselines,
+        listenbrainzBaselines,
         spotifyBaselines,
         youtubeBaselines,
         youtubeCommentBaselines,
@@ -593,6 +587,17 @@ async function collectRealSignals({
               artistIds,
               source: "lastfm",
               metrics: ["listeners", "playcount"],
+              beforeDate: runDate,
+              lookbackDays: 30,
+              strategy: "latest"
+            })
+          : Promise.resolve({}),
+        useListenBrainz
+          ? loadObservationBaselines({
+              supabase,
+              artistIds,
+              source: "listenbrainz",
+              metrics: ["listen_count", "listener_count"],
               beforeDate: runDate,
               lookbackDays: 30,
               strategy: "latest"
@@ -672,6 +677,7 @@ async function collectRealSignals({
       externalIds = {};
       gdeltBaselines = {};
       lastfmBaselines = {};
+      listenbrainzBaselines = {};
       spotifyBaselines = {};
       youtubeBaselines = {};
       youtubeCommentBaselines = {};
@@ -700,6 +706,7 @@ async function collectRealSignals({
       if (gdelt) {
         sources.push(gdelt.signals);
         observations.push(...gdelt.observations);
+        warnings.push(...gdelt.warnings);
         detectedEventsByArtist = mergeEvents(detectedEventsByArtist, gdelt.eventsByArtist);
       }
     })());
@@ -721,6 +728,25 @@ async function collectRealSignals({
         sources.push(lastfm.signals);
         observations.push(...lastfm.observations);
         warnings.push(...lastfm.warnings);
+      }
+    })());
+  }
+
+  if (useListenBrainz) {
+    sourceTasks.push((async () => {
+      const listenbrainz = await collectExternalSource("ListenBrainz", warnings, () =>
+        collectListenBrainzMarketSignals({
+          artists,
+          runDate,
+          externalIds,
+          baselines: listenbrainzBaselines
+        })
+      );
+
+      if (listenbrainz) {
+        sources.push(listenbrainz.signals);
+        observations.push(...listenbrainz.observations);
+        warnings.push(...listenbrainz.warnings);
       }
     })());
   }

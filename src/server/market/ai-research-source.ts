@@ -112,7 +112,7 @@ const REQUEST_ERROR = "request_error";
 const DEFAULT_MODEL = "groq/compound-mini";
 const DEFAULT_LOOKBACK_DAYS = 14;
 const DEFAULT_MAX_EVENTS_PER_ARTIST = 1;
-const DEFAULT_DELAY_MS = 12000;
+const DEFAULT_DELAY_MS = 2200;
 const DEFAULT_TIMEOUT_MS = 25000;
 const MAX_COMPLETION_TOKENS = 480;
 
@@ -168,10 +168,23 @@ export async function collectAiResearchMarketEvents({
   const eventsByArtist: Record<string, MarketEvent[]> = {};
   const warnings: string[] = [];
   const resolvedModel = normalizeAiResearchModel(model);
+  let requestCircuitOpen = false;
 
-  for (const [index, artist] of artists.entries()) {
+  await Promise.all(artists.map(async (artist, index) => {
     if (index > 0 && delayMs > 0) {
-      await sleep(delayMs);
+      await sleep(index * delayMs);
+    }
+
+    if (requestCircuitOpen) {
+      observations.push(
+        createObservation(artist.id, runDate, REQUEST_ERROR, 1, "flag", {
+          source: SOURCE,
+          provider,
+          model: resolvedModel,
+          error: "AI research skipped after the daily provider quota was exhausted."
+        })
+      );
+      return;
     }
 
     const artistExternalIds = externalIds[artist.id];
@@ -213,20 +226,27 @@ export async function collectAiResearchMarketEvents({
     }
 
     if (!result.ok && isRateLimitError(result.error)) {
-      await sleep(getRateLimitRetryDelayMs(result.error));
-      result = await fetchAiResearchEvents({
-        provider,
-        apiKey: cleanApiKey,
-        model: resolvedModel,
-        artist,
-        runDate,
-        query,
-        lookbackDays,
-        maxEventsPerArtist,
-        timeoutMs,
-        fetchImpl,
-        compactMode
-      });
+      const retryDelayMs = getRateLimitRetryDelayMs(result.error);
+
+      if (retryDelayMs === null) {
+        requestCircuitOpen = true;
+        warnings.push("AI research stopped because the provider's daily quota was exhausted.");
+      } else {
+        await sleep(retryDelayMs);
+        result = await fetchAiResearchEvents({
+          provider,
+          apiKey: cleanApiKey,
+          model: resolvedModel,
+          artist,
+          runDate,
+          query,
+          lookbackDays,
+          maxEventsPerArtist,
+          timeoutMs,
+          fetchImpl,
+          compactMode
+        });
+      }
     }
 
     if (!result.ok) {
@@ -240,7 +260,7 @@ export async function collectAiResearchMarketEvents({
           error: result.error
         })
       );
-      continue;
+      return;
     }
 
     const normalizedEvents = result.events
@@ -330,7 +350,7 @@ export async function collectAiResearchMarketEvents({
     if (uniqueEvents.length) {
       eventsByArtist[artist.id] = uniqueEvents;
     }
-  }
+  }));
 
   return {
     observations,
@@ -491,6 +511,7 @@ function buildResearchPrompt({
     "For releases and reviews, actively search for reception using the release title plus fan reaction, Reddit, review, and community discussion terms. Keep fanSentimentScore separate from criticSentimentScore. A critic score is not fan consensus, and comments on the artist's own channel are biased evidence.",
     "Set publicReactionConfirmed true only when at least two independent, accessible sources support the same direction. Put every corroborating URL in corroboratingSourceUrls; the application verifies those URLs against your actual web-search results. Count only those sources in fanReactionEvidenceCount. Detect sarcasm, stan brigading, recycled posts, and disagreement; put risks in riskFlags.",
     "Use sentimentAgreement=agree when critics and fans align, mixed when reception is divided, disagree when they clearly diverge, or unknown. Scale reach relative to the artist: a scene-wide underground event can matter without being mainstream.",
+    "Score sentimentScore, fanSentimentScore, criticSentimentScore, and impactScore as integers from -100 to 100. Score confidence as a decimal from 0 to 1. Do not return fractional -1 to 1 values for sentiment or impact. Use only a real calendar date in YYYY-MM-DD format.",
     "Keep title, summary, and whyItMatters concise so the complete JSON fits without truncation.",
     "Set artistRole to primary only when this artist owns or is the main subject of the event, featured when they are a credited guest/collaborator, and mentioned when they are merely named. Never call another artist's project this artist's release.",
     "An article about a guest credit is not proof that the feature moved demand. For featured artists, set musicDemandConfirmed true only when chart movement, direct listening growth, search growth, ticket demand, or broad corroborated reaction specifically connects the feature to that artist. Multiple articles repeating the credit do not count as music demand.",
@@ -516,6 +537,7 @@ function buildCompactResearchPrompt({
     "Prioritize the newest release or EP and its fan/critic reception, then major news, controversy, charts, tours, or viral performances. Classify marketConnection as direct_music, career_availability, or attention_only; set musicDemandConfirmed only with independent evidence connecting attention to music demand.",
     "Require a real accessible source URL. Search the newest release title with fan reaction, Reddit, review, and community terms. Fan sentiment needs two independent sources returned by web search; list them in corroboratingSourceUrls, otherwise set publicReactionConfirmed false and fanReactionEvidenceCount 0. Reject rumors, sarcasm, private posts, and low-view uploads.",
     "A guest credit alone is low signal. Confirm feature-driven demand with chart, listening, search, ticket, or broad corroborated reaction evidence; repeated articles about the same credit are not demand evidence. Do not infer decline merely from silence.",
+    "Score sentimentScore, fanSentimentScore, criticSentimentScore, and impactScore as integers from -100 to 100; confidence is a decimal from 0 to 1. Use a valid calendar date in YYYY-MM-DD format.",
     "Return compact JSON: {\"events\":[{\"title\":\"\",\"eventDate\":\"YYYY-MM-DD\",\"eventType\":\"release|review|news|controversy|award|tour|viral\",\"sourceName\":\"\",\"sourceUrl\":\"https://\",\"summary\":\"\",\"sentimentScore\":0,\"fanSentimentScore\":0,\"criticSentimentScore\":0,\"sentimentAgreement\":\"agree|mixed|disagree|unknown\",\"fanReactionEvidenceCount\":0,\"impactScore\":0,\"confidence\":0.0,\"artistRole\":\"primary|featured|mentioned\",\"sourceType\":\"music_publication|mainstream_news|review|official|community|social|video\",\"evidenceLevel\":\"confirmed|reported|rumor|low_signal\",\"reachScope\":\"underground|scene|broad|mainstream\",\"marketConnection\":\"direct_music|career_availability|attention_only\",\"musicDemandConfirmed\":false,\"corroboratingSourceUrls\":[\"https://\"],\"corroboratingSourceCount\":1,\"publicReactionConfirmed\":false,\"factualClaimConfirmed\":true,\"riskFlags\":[]}]}."
   ].join("\n");
 }
@@ -556,7 +578,9 @@ function normalizeAiResearchEvent({
     url: supportingMediaUrl,
     type: getString(value.supportingMediaType)
   });
-  const eventDate = normalizeDate(getString(value.eventDate)) ?? runDate;
+  const eventDate =
+    normalizeDate(getString(value.eventDate)) ??
+    getSearchResultPublishedDate(sourceUrl, searchResults);
   const domain = normalizeDomain(undefined, sourceUrl ?? undefined);
   const sourceWasFoundBySearch = hasSourceUrlInSearchResults(sourceUrl, searchResults);
   const eventType = normalizeEventType(getString(value.eventType));
@@ -587,21 +611,23 @@ function normalizeAiResearchEvent({
   );
   const publicReactionConfirmed =
     getBoolean(value.publicReactionConfirmed) && fanReactionEvidenceCount >= 2;
-  const fanSentimentScore = getOptionalNumber(value.fanSentimentScore);
-  const criticSentimentScore = getOptionalNumber(value.criticSentimentScore);
+  const fanSentimentScore = normalizeOptionalSignedScore(value.fanSentimentScore);
+  const criticSentimentScore = normalizeOptionalSignedScore(value.criticSentimentScore);
   const sentimentAgreement = normalizeSentimentAgreement(getString(value.sentimentAgreement));
   const rawSentimentScore = resolveEvidenceWeightedSentiment({
-    aggregateSentiment: getNumber(value.sentimentScore, classification?.sentimentScore ?? 0),
+    aggregateSentiment: normalizeSignedScore(
+      value.sentimentScore,
+      classification?.sentimentScore ?? 0
+    ),
     fanSentiment: fanSentimentScore,
     criticSentiment: criticSentimentScore,
     publicReactionConfirmed,
     fanReactionEvidenceCount,
     sentimentAgreement
   });
-  const rawImpactScore = clamp(
-    getNumber(value.impactScore, classification?.impactScore ?? rawSentimentScore),
-    -100,
-    100
+  const rawImpactScore = normalizeSignedScore(
+    value.impactScore,
+    classification?.impactScore ?? rawSentimentScore
   );
   const confidence = clamp(getNumber(value.confidence, classification?.confidence ?? 0.55), 0, 1);
   const relatedArtistNames = Array.isArray(value.relatedArtistNames)
@@ -622,7 +648,7 @@ function normalizeAiResearchEvent({
   const sentimentScore = clamp(rawSentimentScore * roleSentimentMultiplier, -100, 100);
   const impactScore = clamp(rawImpactScore * roleImpactMultiplier, -100, 100);
 
-  if (!title || !sourceUrl || !domain || !isSafeHttpUrl(sourceUrl) || !resolvedEventType) {
+  if (!title || !eventDate || !sourceUrl || !domain || !isSafeHttpUrl(sourceUrl) || !resolvedEventType) {
     return null;
   }
 
@@ -1386,6 +1412,19 @@ function getOptionalNumber(value: unknown) {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
+function normalizeSignedScore(value: unknown, fallback: number) {
+  const parsed = getNumber(value, fallback);
+  const scaled = parsed !== 0 && Math.abs(parsed) <= 1 ? parsed * 100 : parsed;
+
+  return clamp(scaled, -100, 100);
+}
+
+function normalizeOptionalSignedScore(value: unknown) {
+  const parsed = getOptionalNumber(value);
+
+  return parsed === null ? null : normalizeSignedScore(parsed, 0);
+}
+
 function getBoolean(value: unknown) {
   if (typeof value === "boolean") {
     return value;
@@ -1399,7 +1438,18 @@ function getBoolean(value: unknown) {
 }
 
 function normalizeDate(value: string | null) {
-  return value && /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : null;
+  if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return null;
+  }
+
+  const [year, month, day] = value.split("-").map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day));
+
+  return date.getUTCFullYear() === year &&
+    date.getUTCMonth() === month - 1 &&
+    date.getUTCDate() === day
+    ? value
+    : null;
 }
 
 function isDateInsideWindow(date: string, runDate: string, lookbackDays: number) {
@@ -1407,12 +1457,31 @@ function isDateInsideWindow(date: string, runDate: string, lookbackDays: number)
   const eventTime = Date.parse(`${date}T00:00:00.000Z`);
 
   if (!Number.isFinite(runTime) || !Number.isFinite(eventTime)) {
-    return true;
+    return false;
   }
 
   const distanceDays = Math.round((runTime - eventTime) / 86_400_000);
 
   return distanceDays >= -45 && distanceDays <= Math.max(1, lookbackDays);
+}
+
+function getSearchResultPublishedDate(sourceUrl: string | null, searchResults: GroqSearchResult[]) {
+  if (!sourceUrl) {
+    return null;
+  }
+
+  const sourceKey = normalizeUrlForComparison(sourceUrl);
+  const result = searchResults.find((candidate) => {
+    if (!candidate.url) {
+      return false;
+    }
+
+    const candidateKey = normalizeUrlForComparison(candidate.url);
+    return candidateKey === sourceKey || candidateKey.includes(sourceKey) || sourceKey.includes(candidateKey);
+  });
+  const publishedDate = result?.published_date?.slice(0, 10) ?? null;
+
+  return normalizeDate(publishedDate);
 }
 
 function isSafeHttpUrl(value: string) {
@@ -1448,14 +1517,25 @@ function isRequestTooLargeError(message: string) {
 }
 
 function getRateLimitRetryDelayMs(message: string) {
-  const match = message.match(/try again in\s+([\d.]+)\s*(ms|s)/i);
+  const match = message.match(/try again in\s+([\d.]+)\s*(ms|s|m|h)/i);
 
   if (!match) {
     return 16000;
   }
 
   const value = Number(match[1]);
-  const milliseconds = match[2].toLowerCase() === "ms" ? value : value * 1000;
+  const unit = match[2].toLowerCase();
+  const milliseconds = unit === "ms"
+    ? value
+    : unit === "s"
+      ? value * 1000
+      : unit === "m"
+        ? value * 60_000
+        : value * 3_600_000;
+
+  if (milliseconds > 120_000) {
+    return null;
+  }
 
   return clamp(Math.ceil(milliseconds + 1250), 5000, 30000);
 }

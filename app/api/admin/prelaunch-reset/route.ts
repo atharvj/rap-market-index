@@ -1,8 +1,11 @@
 import { NextResponse } from "next/server";
-import { calculateHypeScore } from "@/lib/pricing";
+import { calculateHypeScore, roundPrice } from "@/lib/pricing";
 import { createServiceRoleClient, getSupabaseConfigStatus } from "@/lib/supabase/server";
 import { requireAdminRequest } from "@/server/admin-auth";
+import { buildAudienceScaleCalibration } from "@/server/market/audience-scale";
+import { getPacificMarketDate, shiftMarketDate } from "@/server/market/market-date";
 import { getMarketModelVersion } from "@/server/market/model-version";
+import { loadObservationBaselines } from "@/server/market/supabase-repository";
 import type { HypeStats } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -18,6 +21,19 @@ type ResetBody = {
 type DeleteTarget = {
   table: string;
   column: string;
+};
+
+type ResetArtist = {
+  id: string;
+  ticker: string;
+  current_price: number;
+};
+
+type ResetCalibration = {
+  artists: ResetArtist[];
+  prices: Record<string, number>;
+  coverage: Record<string, number>;
+  targets: Array<{ artistId: string; ticker: string; price: number; coverage: number }>;
 };
 
 const CONFIRM_TEXT = "RESET RMI";
@@ -39,8 +55,6 @@ const MARKET_DELETE_TARGETS: DeleteTarget[] = [
   { table: "holdings", column: "user_id" },
   { table: "price_ticks", column: "id" },
   { table: "price_history", column: "id" },
-  { table: "market_events", column: "id" },
-  { table: "market_observations", column: "id" },
   { table: "market_signal_snapshots", column: "id" },
   { table: "market_update_runs", column: "id" }
 ];
@@ -100,6 +114,8 @@ export async function POST(request: Request) {
   const deletedRows: Record<string, number> = {};
 
   try {
+    const calibration = await buildResetCalibration(supabase);
+
     for (const target of deleteTargets) {
       deletedRows[target.table] = await deleteAllRows(supabase, target);
     }
@@ -112,7 +128,9 @@ export async function POST(request: Request) {
     }
 
     const resetProfileCount = await resetProfiles(supabase, startingCash);
-    const resetArtistCount = await resetArtists(supabase);
+    const resetArtistCount = await resetArtists(supabase, calibration);
+    const resetDate = getPacificMarketDate();
+    const seededHistoryCount = await seedResetHistory(supabase, calibration, resetDate);
 
     return NextResponse.json({
       ok: true,
@@ -120,9 +138,12 @@ export async function POST(request: Request) {
       startingCash,
       resetProfileCount,
       resetArtistCount,
+      seededHistoryCount,
+      calibratedPriceCount: calibration.targets.length,
+      calibratedPriceRange: getPriceRange(calibration.targets),
       deletedRows,
       modelVersion: getMarketModelVersion(),
-      note: "Prelaunch state reset. Run the market once to seed fresh price history from current source-backed data."
+      note: "Prelaunch state reset. Every active quote now starts at its latest source-backed audience baseline with a zero daily change. Raw source observations and verified news were preserved."
     });
   } catch (error) {
     return NextResponse.json(
@@ -191,28 +212,25 @@ async function resetProfiles(supabase: ReturnType<typeof createServiceRoleClient
   return data?.length ?? 0;
 }
 
-async function resetArtists(supabase: ReturnType<typeof createServiceRoleClient>) {
-  const { data: artists, error } = await supabase
-    .from("artists")
-    .select("id,ticker,current_price")
-    .eq("is_active", true);
+async function resetArtists(
+  supabase: ReturnType<typeof createServiceRoleClient>,
+  calibration: ResetCalibration
+) {
+  for (const artist of calibration.artists) {
+    const safePrice = calibration.prices[artist.id];
 
-  if (error) {
-    throw new Error(`Could not load artists for reset: ${error.message}`);
-  }
+    if (!safePrice) {
+      throw new Error(`Missing a reset valuation for ${artist.ticker}.`);
+    }
 
-  const activeArtists = artists ?? [];
-
-  for (const artist of activeArtists) {
-    const currentPrice = Number(artist.current_price);
-    const safePrice = Number.isFinite(currentPrice) && currentPrice > 0 ? currentPrice : 1;
     const { error: updateError } = await supabase
       .from("artists")
       .update({
+        current_price: safePrice,
         previous_close: safePrice,
         daily_change_percent: 0,
         hype_score: calculateHypeScore(NEUTRAL_STATS),
-        last_move_explanation: `${artist.ticker} is waiting for fresh source-backed market data.`
+        last_move_explanation: `${artist.ticker} opened at its source-backed audience baseline.`
       })
       .eq("id", artist.id);
 
@@ -221,9 +239,9 @@ async function resetArtists(supabase: ReturnType<typeof createServiceRoleClient>
     }
   }
 
-  if (activeArtists.length) {
+  if (calibration.artists.length) {
     const { error: statsError } = await supabase.from("artist_stats").upsert(
-      activeArtists.map((artist) => ({
+      calibration.artists.map((artist) => ({
         artist_id: artist.id,
         streaming_growth: NEUTRAL_STATS.streamingGrowth,
         youtube_growth: NEUTRAL_STATS.youtubeGrowth,
@@ -240,5 +258,143 @@ async function resetArtists(supabase: ReturnType<typeof createServiceRoleClient>
     }
   }
 
-  return activeArtists.length;
+  return calibration.artists.length;
+}
+
+async function buildResetCalibration(
+  supabase: ReturnType<typeof createServiceRoleClient>
+): Promise<ResetCalibration> {
+  const { data, error } = await supabase
+    .from("artists")
+    .select("id,ticker,current_price")
+    .eq("is_active", true)
+    .order("id");
+
+  if (error) {
+    throw new Error(`Could not load artists for reset: ${error.message}`);
+  }
+
+  const artists = (data ?? []) as ResetArtist[];
+  const artistIds = artists.map((artist) => artist.id);
+  const beforeDate = shiftMarketDate(getPacificMarketDate(), 1);
+  const [lastfm, youtube, wikimedia] = await Promise.all([
+    loadObservationBaselines({
+      supabase,
+      artistIds,
+      source: "lastfm",
+      metrics: ["listeners", "playcount"],
+      beforeDate,
+      lookbackDays: 60,
+      strategy: "latest"
+    }),
+    loadObservationBaselines({
+      supabase,
+      artistIds,
+      source: "youtube",
+      metrics: ["subscriber_count", "channel_views"],
+      beforeDate,
+      lookbackDays: 60,
+      strategy: "latest"
+    }),
+    loadObservationBaselines({
+      supabase,
+      artistIds,
+      source: "wikimedia",
+      metrics: ["pageviews_7d"],
+      beforeDate,
+      lookbackDays: 60,
+      strategy: "latest"
+    })
+  ]);
+  const prices: Record<string, number> = {};
+  const coverage: Record<string, number> = {};
+  const targets: ResetCalibration["targets"] = [];
+  const missing: string[] = [];
+
+  for (const artist of artists) {
+    const calibration = buildAudienceScaleCalibration({
+      stats: {},
+      rawPayload: {
+        lastfm: {
+          listeners: lastfm[artist.id]?.listeners,
+          playcount: lastfm[artist.id]?.playcount
+        },
+        youtube: {
+          subscriberCount: youtube[artist.id]?.subscriber_count,
+          viewCount: youtube[artist.id]?.channel_views
+        },
+        wikimedia: {
+          pageviews7d: wikimedia[artist.id]?.pageviews_7d
+        }
+      }
+    });
+
+    if (calibration.status !== "ok" || !calibration.targetPrice) {
+      missing.push(artist.ticker);
+      continue;
+    }
+
+    const price = roundPrice(calibration.targetPrice);
+    prices[artist.id] = price;
+    coverage[artist.id] = calibration.coverage;
+    targets.push({ artistId: artist.id, ticker: artist.ticker, price, coverage: calibration.coverage });
+  }
+
+  if (missing.length) {
+    throw new Error(
+      `Reset stopped before deleting data because ${missing.length} active artist${missing.length === 1 ? "" : "s"} ` +
+      `lack enough direct audience evidence: ${missing.join(", ")}.`
+    );
+  }
+
+  return { artists, prices, coverage, targets };
+}
+
+async function seedResetHistory(
+  supabase: ReturnType<typeof createServiceRoleClient>,
+  calibration: ResetCalibration,
+  resetDate: string
+) {
+  const modelVersion = getMarketModelVersion();
+  const historyRows = calibration.artists.map((artist) => ({
+    artist_id: artist.id,
+    price_date: resetDate,
+    price: calibration.prices[artist.id],
+    hype_score: calculateHypeScore(NEUTRAL_STATS),
+    model_version: modelVersion,
+    explanation: `${artist.ticker} opened at its source-backed audience baseline.`
+  }));
+  const { error: historyError } = await supabase.from("price_history").insert(historyRows);
+
+  if (historyError) {
+    throw new Error(`Could not seed reset price history: ${historyError.message}`);
+  }
+
+  const { error: tickError } = await supabase.from("price_ticks").insert(
+    calibration.artists.map((artist) => ({
+      artist_id: artist.id,
+      price: calibration.prices[artist.id],
+      source: "manual",
+      model_version: modelVersion,
+      raw_payload: {
+        reason: "prelaunch_source_backed_reset",
+        audienceScaleCoverage: calibration.coverage[artist.id]
+      }
+    }))
+  );
+
+  if (tickError) {
+    throw new Error(`Could not seed reset price ticks: ${tickError.message}`);
+  }
+
+  return historyRows.length;
+}
+
+function getPriceRange(targets: ResetCalibration["targets"]) {
+  const prices = targets.map((target) => target.price);
+
+  return {
+    min: prices.length ? Math.min(...prices) : null,
+    max: prices.length ? Math.max(...prices) : null
+  };
 }

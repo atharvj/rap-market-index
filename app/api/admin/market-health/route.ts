@@ -117,6 +117,8 @@ const SOURCE_ID_FIELDS = [
 const OBSERVATION_SERIES = [
   { source: "lastfm", metric: "listeners", label: "Audience listeners", warningThreshold: 80 },
   { source: "lastfm", metric: "playcount", label: "Audience plays", warningThreshold: 80 },
+  { source: "listenbrainz", metric: "listener_count", label: "Independent listeners", warningThreshold: 70 },
+  { source: "listenbrainz", metric: "listen_count", label: "Independent listens", warningThreshold: 70 },
   { source: "wikimedia", metric: "pageviews_7d", label: "Public attention 7-day views", warningThreshold: null },
   { source: "wikimedia", metric: "pageviews_1d", label: "Public attention 1-day views", warningThreshold: null },
   { source: "youtube", metric: "channel_views", label: "Video views", warningThreshold: null },

@@ -15,7 +15,7 @@ const sections = [
   },
   {
     title: "What the RMI Score means",
-    body: "RMI Score is a normalized 1-99 reading of current signal strength across audience momentum, public attention, verified catalysts, reception, and eligible trading demand. It is not a price target, forecast, or daily percentage change, so the strongest signal and the day's top gainer can be different artists."
+    body: "RMI Score is a 1-99 reading of current signal strength across audience momentum, public attention, verified catalysts, reception, and eligible trading demand. Scores near 50 are neutral or mixed, scores below 40 are weakening, and scores above 60 are strengthening. It is not a price target, forecast, or daily percentage change, so the strongest signal and the day's top gainer can be different artists."
   },
   {
     title: "Why audience size is not the whole price",

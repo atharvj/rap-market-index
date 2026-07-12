@@ -636,6 +636,42 @@ type MarketIntegrity = {
   warnings: string[];
 };
 
+type ModelValidationState =
+  | {
+      status: "idle";
+    }
+  | {
+      status: "loading";
+    }
+  | {
+      status: "ready";
+      data: {
+        runDate: string;
+        lookbackDays: number;
+        snapshotRowCount: number;
+        observationRowCount: number;
+        validation: {
+          status: "collecting" | "provisional" | "measured";
+          horizonDays: number;
+          sampleCount: number;
+          distinctArtistCount: number;
+          distinctSignalDateCount: number;
+          rankCorrelation: number | null;
+          directionalAccuracyPercent: number | null;
+          directionalSampleCount: number;
+          topBottomAudienceLift: number | null;
+          averageMetricsPerSample: number;
+          minimumRecommendedSamples: number;
+          minimumRecommendedDates: number;
+          note: string;
+        };
+      };
+    }
+  | {
+      status: "error";
+      message: string;
+    };
+
 type UserSupportDirectory = {
   userCount: number;
   users: Array<{
@@ -729,6 +765,7 @@ export default function DevPage() {
   const [haltArtistId, setHaltArtistId] = useState("");
   const [haltReason, setHaltReason] = useState("Trading halted for data review.");
   const [marketIntegrity, setMarketIntegrity] = useState<AsyncState<MarketIntegrity>>({ status: "loading" });
+  const [modelValidation, setModelValidation] = useState<ModelValidationState>({ status: "idle" });
   const [preview, setPreview] = useState<PreviewState>({ status: "idle" });
   const [runNow, setRunNow] = useState<RunNowState>({ status: "idle" });
   const [eventScan, setEventScan] = useState<EventScanState>({ status: "idle" });
@@ -942,6 +979,31 @@ export default function DevPage() {
       setMarketControls({
         status: "error",
         message: error instanceof Error ? error.message : "Market controls check failed."
+      });
+    }
+  }
+
+  async function measureModelValidation() {
+    setModelValidation({ status: "loading" });
+
+    try {
+      const response = await fetch("/api/admin/model-validation", {
+        headers: adminHeaders
+      });
+      const payload = await readJsonResponse(response);
+
+      if (!response.ok || !payload.ok) {
+        throw new Error(payload.error ?? "Model validation failed.");
+      }
+
+      setModelValidation({
+        status: "ready",
+        data: payload as Extract<ModelValidationState, { status: "ready" }>["data"]
+      });
+    } catch (error) {
+      setModelValidation({
+        status: "error",
+        message: error instanceof Error ? error.message : "Model validation failed."
       });
     }
   }
@@ -2034,6 +2096,23 @@ export default function DevPage() {
         {marketIntegrity.status === "ready" ? <MarketIntegrityPanel data={marketIntegrity.data} /> : null}
       </Panel>
 
+      <Panel
+        title="Out-of-sample model validation"
+        eyebrow="Accuracy evidence"
+        actionLabel="Measure"
+        onAction={measureModelValidation}
+      >
+        {modelValidation.status === "idle" ? (
+          <p className="text-sm leading-6 text-paper/55">
+            Compare each saved signal with subsequent audience-growth acceleration. This does not alter quotes or
+            model weights.
+          </p>
+        ) : null}
+        {modelValidation.status === "loading" ? <LoadingText text="Measuring historical outcomes..." /> : null}
+        {modelValidation.status === "error" ? <ErrorText text={modelValidation.message} /> : null}
+        {modelValidation.status === "ready" ? <ModelValidationPanel data={modelValidation.data} /> : null}
+      </Panel>
+
       <section className="grid gap-6 xl:grid-cols-2">
         <section className="rounded-md border border-ember/30 bg-panel/88 p-5 shadow-market">
           <div className="flex items-start gap-3">
@@ -2809,6 +2888,83 @@ function MarketHealthPanel({ data }: { data: MarketHealth }) {
           label: "Recent event types",
           value: String(Object.keys(data.eventHealth.typeCounts).length),
           detail: formatEventTypeCounts(data.eventHealth.typeCounts)
+        }
+      ]} />
+    </div>
+  );
+}
+
+function ModelValidationPanel({
+  data
+}: {
+  data: Extract<ModelValidationState, { status: "ready" }>["data"];
+}) {
+  const validation = data.validation;
+  const statusClassName =
+    validation.status === "measured"
+      ? "text-mint"
+      : validation.status === "provisional"
+        ? "text-brass"
+        : "text-paper/55";
+
+  return (
+    <div className="space-y-4">
+      <div className="rounded-md border border-line bg-black/20 p-4">
+        <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+          <div>
+            <p className="text-xs font-black uppercase tracking-wide text-paper/45">Validation status</p>
+            <p className={`mt-1 text-xl font-black capitalize ${statusClassName}`}>{validation.status}</p>
+            <p className="mt-2 max-w-3xl text-sm leading-6 text-paper/58">{validation.note}</p>
+          </div>
+          <div className="rounded border border-line bg-panel/70 px-3 py-2 text-right">
+            <p className="text-[10px] font-black uppercase tracking-wide text-paper/42">Measured through</p>
+            <p className="mt-1 text-sm font-black number-tabular">{formatDate(data.runDate)}</p>
+          </div>
+        </div>
+      </div>
+
+      <CoverageGrid title="Forward outcome scorecard" items={[
+        {
+          key: "validation:samples",
+          label: "Usable samples",
+          value: String(validation.sampleCount),
+          detail: `${validation.minimumRecommendedSamples} recommended before a measured claim`
+        },
+        {
+          key: "validation:dates",
+          label: "Signal dates",
+          value: String(validation.distinctSignalDateCount),
+          detail: `${validation.minimumRecommendedDates} recommended; ${validation.distinctArtistCount} artists represented`
+        },
+        {
+          key: "validation:correlation",
+          label: "Rank correlation",
+          value: validation.rankCorrelation === null ? "--" : validation.rankCorrelation.toFixed(3),
+          detail: "Whether stronger signals rank ahead of later audience acceleration"
+        },
+        {
+          key: "validation:direction",
+          label: "Directional accuracy",
+          value:
+            validation.directionalAccuracyPercent === null
+              ? "--"
+              : formatPercent(validation.directionalAccuracyPercent),
+          detail: `${validation.directionalSampleCount} non-trivial up/down predictions`
+        },
+        {
+          key: "validation:lift",
+          label: "Top / bottom lift",
+          value:
+            validation.topBottomAudienceLift === null
+              ? "--"
+              : `${validation.topBottomAudienceLift > 0 ? "+" : ""}${validation.topBottomAudienceLift.toFixed(3)}`,
+          detail: "Later audience acceleration for top-ranked signals minus bottom-ranked signals"
+        },
+        {
+          key: "validation:coverage",
+          label: "Outcome depth",
+          value: validation.averageMetricsPerSample.toFixed(2),
+          detail: `${data.snapshotRowCount} signal rows and ${data.observationRowCount} audience observations scanned`
         }
       ]} />
     </div>

@@ -1,0 +1,35 @@
+name: Refresh market news
+
+on:
+  schedule:
+    - cron: "15 */6 * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: market-news-refresh
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - name: Verify configuration
+        env:
+          MARKET_UPDATE_SECRET: ${{ secrets.MARKET_UPDATE_SECRET }}
+        run: |
+          if [ -z "$MARKET_UPDATE_SECRET" ]; then
+            echo "Add MARKET_UPDATE_SECRET in GitHub repository Settings > Secrets and variables > Actions."
+            exit 1
+          fi
+
+      - name: Discover and persist market news
+        env:
+          MARKET_UPDATE_SECRET: ${{ secrets.MARKET_UPDATE_SECRET }}
+        run: |
+          curl --fail-with-body --silent --show-error --max-time 295 \
+            --request POST \
+            --header "content-type: application/json" \
+            --header "x-market-update-secret: $MARKET_UPDATE_SECRET" \
+            --data '{"dryRun":false,"artistLimit":100,"includeGdelt":false,"includeMediaRss":true,"includeAiResearch":false}' \
+            https://rap-market-index.vercel.app/api/admin/market-event-scan

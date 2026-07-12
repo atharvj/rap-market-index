@@ -76,7 +76,7 @@ export default function ArtistDetailPage() {
                 <WatchlistButton artistId={artist.id} />
               </div>
               <p className="mt-1 flex flex-wrap items-center gap-1.5 text-sm font-bold text-paper/60">
-                <span>${artist.ticker} · rap market · {artist.hypeScore}/100 RMI Score</span>
+                <span>${artist.ticker} · {artist.hypeScore}/100 RMI Score</span>
                 <ScoreInfo />
               </p>
               <p className="mt-1 text-xs text-paper/40">Latest recorded quote · {state.artists.length} active listings</p>
