@@ -14,7 +14,9 @@ export type AudienceScaleCalibration = {
   score: number | null;
   targetPrice: number | null;
   coverage: number;
+  confidence: number;
   metricCount: number;
+  directSourceCount: number;
   metrics: AudienceMetric[];
   rebase: boolean;
 };
@@ -99,6 +101,9 @@ export function buildAudienceScaleCalibration(
   const directMetrics = metrics.filter((metric) => metric.key !== "public_attention");
   const observedWeight = metrics.reduce((total, metric) => total + metric.weight, 0);
   const coverage = clamp(observedWeight / TOTAL_AVAILABLE_WEIGHT, 0, 1);
+  const directSourceCount = new Set(directMetrics.map((metric) => getMetricSource(metric.key))).size;
+  const sourceDiversityMultiplier = directSourceCount >= 2 ? 1 : 0.7;
+  const confidence = clamp((0.35 + coverage * 0.65) * sourceDiversityMultiplier, 0.25, 0.98);
 
   if (directMetrics.length < 2 || observedWeight < 0.35) {
     return {
@@ -106,7 +111,9 @@ export function buildAudienceScaleCalibration(
       score: null,
       targetPrice: null,
       coverage: round(coverage),
+      confidence: round(confidence),
       metricCount: metrics.length,
+      directSourceCount,
       metrics,
       rebase: false
     };
@@ -122,7 +129,9 @@ export function buildAudienceScaleCalibration(
     score: round(audienceScore * 100),
     targetPrice: round(targetPrice),
     coverage: round(coverage),
+    confidence: round(confidence),
     metricCount: metrics.length,
+    directSourceCount,
     metrics,
     rebase: false
   };
@@ -132,6 +141,11 @@ export function getAudienceScaleAdjustment(rawPayload: Record<string, unknown>, 
   const calibration = getRecord(rawPayload.audienceScaleCalibration);
   const targetPrice = getPositiveNumber(calibration.targetPrice);
   const coverage = getFiniteNumber(calibration.coverage) ?? 0;
+  const confidence = clamp(
+    getFiniteNumber(calibration.confidence) ?? (0.35 + coverage * 0.55),
+    0.25,
+    0.9
+  );
   const rebase = calibration.rebase === true;
 
   if (!targetPrice || currentPrice <= 0 || calibration.status !== "ok") {
@@ -145,7 +159,6 @@ export function getAudienceScaleAdjustment(rawPayload: Record<string, unknown>, 
   }
 
   const logarithmicGap = Math.log(targetPrice / currentPrice);
-  const confidence = clamp(0.35 + coverage * 0.55, 0.35, 0.9);
   const adjustment = rebase ? 0 : clamp(logarithmicGap * 0.085 * confidence, -0.04, 0.04);
 
   return {
@@ -179,7 +192,11 @@ export function applyAudienceScaleRebase({
   }
 
   const coverage = clamp(getFiniteNumber(calibration.coverage) ?? 0, 0, 1);
-  const confidence = clamp(0.35 + coverage * 0.65, 0.35, 1);
+  const confidence = clamp(
+    getFiniteNumber(calibration.confidence) ?? (0.35 + coverage * 0.65),
+    0.25,
+    0.98
+  );
   const valuationMultiplier = clamp(Math.exp(Math.log(targetPrice / oldPrice) * confidence), 0.35, 5);
   const regularMarketMultiplier = clamp(regularPrice / oldPrice, 0.96, 1.04);
 
@@ -208,6 +225,18 @@ function buildMetric(key: string, rawValue: unknown, low: number, high: number, 
     score: round(score),
     weight
   };
+}
+
+function getMetricSource(key: string) {
+  if (key.startsWith("lastfm_")) {
+    return "listening";
+  }
+
+  if (key.startsWith("youtube_")) {
+    return "video";
+  }
+
+  return key;
 }
 
 function getRecord(value: unknown): Record<string, unknown> {

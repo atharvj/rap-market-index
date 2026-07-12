@@ -14,7 +14,7 @@ export function MiniSparkline({
   const points = data.slice(-18);
 
   if (points.length < 2) {
-    return <div className="h-[34px] w-[116px] rounded bg-panelSoft" />;
+    return <div className="rounded bg-panelSoft" style={{ width, height }} />;
   }
 
   const prices = points.map((point) => point.price);

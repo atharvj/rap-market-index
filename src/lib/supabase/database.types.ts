@@ -337,6 +337,28 @@ export type Database = {
         Update: Partial<Database["public"]["Tables"]["profiles"]["Insert"]>;
         Relationships: [];
       };
+      admin_action_log: {
+        Row: {
+          id: string;
+          actor_user_id: string | null;
+          target_user_id: string | null;
+          action: string;
+          reason: string;
+          details: Json;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          actor_user_id?: string | null;
+          target_user_id?: string | null;
+          action: string;
+          reason?: string;
+          details?: Json;
+          created_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["admin_action_log"]["Insert"]>;
+        Relationships: [];
+      };
       holdings: {
         Row: {
           user_id: string;
@@ -509,6 +531,15 @@ export type Database = {
       };
     };
     Functions: {
+      admin_reset_user_portfolio: {
+        Args: {
+          p_target_user_id: string;
+          p_starting_cash?: number;
+          p_actor_user_id?: string | null;
+          p_reason?: string;
+        };
+        Returns: Json;
+      };
       buy_artist_shares: {
         Args: {
           p_artist_id: string;

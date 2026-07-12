@@ -98,7 +98,7 @@ export default function MarketsPage() {
         <div className="flex items-center gap-1 rounded-lg border border-line bg-panel p-1" aria-label="Sort markets">
           <SortButton active={sortKey === "name"} onClick={() => chooseSort("name")}>Name</SortButton>
           <SortButton active={sortKey === "price"} onClick={() => chooseSort("price")}>Price</SortButton>
-          <SortButton active={sortKey === "change"} onClick={() => chooseSort("change")}>24H</SortButton>
+          <SortButton active={sortKey === "change"} onClick={() => chooseSort("change")}>24h</SortButton>
           <button
             type="button"
             onClick={() => setSortDescending((current) => !current)}
@@ -119,7 +119,7 @@ export default function MarketsPage() {
         <div className="grid grid-cols-[minmax(0,1fr)_104px_84px_44px] gap-x-4 border-b border-line px-4 py-3 text-xs font-bold text-paper/45">
           <span>Artist</span>
           <span className="text-right">Price</span>
-          <span className="text-right">24H</span>
+          <span className="text-right">24h</span>
           <span className="sr-only">watchlist</span>
         </div>
         {artists.map((artist) => (

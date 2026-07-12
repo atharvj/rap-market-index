@@ -104,7 +104,7 @@ export default function WatchlistPage() {
         <div className="grid grid-cols-[minmax(0,1fr)_78px_64px_40px] gap-x-3 border-b border-line px-4 py-3 text-xs font-bold text-paper/45 sm:grid-cols-[minmax(0,1fr)_96px_76px_60px_40px]">
           <span>Artist</span>
           <span className="text-right">Price</span>
-          <span className="text-right">24H</span>
+          <span className="text-right">24h</span>
           <span className="hidden text-right sm:block">Signal</span>
           <span className="sr-only">remove from watchlist</span>
         </div>

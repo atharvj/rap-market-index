@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createServiceRoleClient, getSupabaseConfigStatus } from "@/lib/supabase/server";
-import type { Database } from "@/lib/supabase/database.types";
+import type { Database, Json } from "@/lib/supabase/database.types";
 import { requireAdminRequest } from "@/server/admin-auth";
 
 export const dynamic = "force-dynamic";
@@ -166,6 +166,12 @@ export async function PATCH(request: Request) {
       }
     }
 
+    await recordMarketControlAction({
+      supabase,
+      actorUserId: auth.user?.id ?? null,
+      body
+    });
+
     return NextResponse.json({
       ok: true
     });
@@ -180,6 +186,35 @@ export async function PATCH(request: Request) {
   }
 }
 
+async function recordMarketControlAction({
+  supabase,
+  actorUserId,
+  body
+}: {
+  supabase: ReturnType<typeof createServiceRoleClient>;
+  actorUserId: string | null;
+  body: MarketControlBody;
+}) {
+  const hasControlChange = Boolean(
+    body.tradingMode ||
+    typeof body.allowTrading === "boolean" ||
+    typeof body.allowMarketImpact === "boolean" ||
+    typeof body.statusNote === "string"
+  );
+  const action = hasControlChange ? "update_market_controls" : "update_artist_halts";
+  const { error } = await supabase.from("admin_action_log").insert({
+    actor_user_id: actorUserId,
+    target_user_id: null,
+    action,
+    reason: body.statusNote?.trim().slice(0, 500) ?? body.artistHalts?.[0]?.reason?.trim().slice(0, 500) ?? "",
+    details: body as unknown as Json
+  });
+
+  if (error && !error.message.toLowerCase().includes("admin_action_log")) {
+    throw new Error(`Market controls changed, but the operator audit log failed: ${error.message}`);
+  }
+}
+
 async function parseBody(request: Request): Promise<MarketControlBody> {
   try {
     return (await request.json()) as MarketControlBody;
@@ -189,6 +224,18 @@ async function parseBody(request: Request): Promise<MarketControlBody> {
 }
 
 function validateBody(body: MarketControlBody): { ok: true } | { ok: false; error: string } {
+  const hasChange = Boolean(
+    body.tradingMode ||
+    typeof body.allowTrading === "boolean" ||
+    typeof body.allowMarketImpact === "boolean" ||
+    typeof body.statusNote === "string" ||
+    body.artistHalts?.length
+  );
+
+  if (!hasChange) {
+    return { ok: false, error: "At least one market control change is required." };
+  }
+
   if (
     body.tradingMode &&
     body.tradingMode !== "continuous" &&

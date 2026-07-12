@@ -29,7 +29,7 @@ const sections = [
   {
     id: "availability",
     title: "Availability and Changes",
-    body: "RMI may change features, pause an artist or the full market, remove unreliable data, or discontinue beta functionality. The service is provided without a guarantee of uninterrupted availability or a guarantee that any quote will match public opinion."
+    body: "RMI may change features, pause an artist or the full market, remove unreliable data, or discontinue functionality. The service is provided without a guarantee of uninterrupted availability or a guarantee that any quote will match public opinion."
   }
 ];
 

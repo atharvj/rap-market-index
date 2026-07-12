@@ -21,11 +21,13 @@ type ChartInteraction = {
 export function PriceChart({
   data,
   height = 270,
-  compact = false
+  compact = false,
+  timeScale = "auto"
 }: {
   data: PricePoint[];
   height?: number;
   compact?: boolean;
+  timeScale?: "auto" | "intraday" | "daily";
 }) {
   const normalized = useMemo(() => data.filter((point) => Number.isFinite(point.price)), [data]);
   const positive = normalized.length < 2 || normalized[normalized.length - 1].price >= normalized[0].price;
@@ -35,11 +37,17 @@ export function PriceChart({
   const gradientId = `quote-${chartId}-${positive ? "up" : "down"}`;
   const firstTimestamp = normalized.length ? new Date(normalized[0].date).getTime() : 0;
   const lastTimestamp = normalized.length ? new Date(normalized[normalized.length - 1].date).getTime() : 0;
-  const intraday = Number.isFinite(firstTimestamp) && Number.isFinite(lastTimestamp) && lastTimestamp - firstTimestamp <= 48 * 60 * 60 * 1000;
+  const intraday = timeScale === "intraday" || (
+    timeScale === "auto" &&
+    Number.isFinite(firstTimestamp) &&
+    Number.isFinite(lastTimestamp) &&
+    lastTimestamp - firstTimestamp <= 48 * 60 * 60 * 1000
+  );
   const prices = normalized.map((point) => point.price);
   const minimumPrice = Math.min(...prices);
   const maximumPrice = Math.max(...prices);
   const visibleRange = maximumPrice - minimumPrice;
+  const axisPrecision = maximumPrice < 10 || visibleRange < 1 ? 2 : visibleRange < 10 ? 1 : 0;
   const verticalPadding = Math.max(visibleRange * 0.14, maximumPrice * 0.0015, 0.02);
   const yDomain: [number, number] = [
     Math.max(0, minimumPrice - verticalPadding),
@@ -63,12 +71,16 @@ export function PriceChart({
       }).format(date);
     }
 
+    const dailyDate = /^\d{4}-\d{2}-\d{2}$/.test(value)
+      ? new Date(`${value}T12:00:00Z`)
+      : date;
+
     return new Intl.DateTimeFormat("en-US", {
       month: "short",
       day: "numeric",
       year: detailed ? "numeric" : undefined,
-      timeZone: "America/Los_Angeles"
-    }).format(date);
+      timeZone: /^\d{4}-\d{2}-\d{2}$/.test(value) ? "UTC" : "America/Los_Angeles"
+    }).format(dailyDate);
   }
 
   function selectPoint(state: ChartInteraction | null) {
@@ -97,7 +109,7 @@ export function PriceChart({
         <ResponsiveContainer width="100%" height="100%">
           <AreaChart
             data={normalized}
-            margin={{ top: 10, right: compact ? 4 : 16, bottom: 0, left: compact ? 4 : 0 }}
+            margin={{ top: 10, right: compact ? 4 : 16, bottom: compact ? 0 : 8, left: compact ? 4 : 2 }}
             onMouseMove={(state) => selectPoint(state as ChartInteraction)}
             onClick={(state) => selectPoint(state as ChartInteraction)}
           >
@@ -114,6 +126,8 @@ export function PriceChart({
               tickFormatter={(value) => formatChartDate(String(value))}
               axisLine={false}
               tickLine={false}
+              height={compact ? 0 : 28}
+              tickMargin={8}
               minTickGap={28}
               tick={{ fill: "rgb(var(--color-paper) / 0.45)", fontSize: 11 }}
             />
@@ -122,8 +136,9 @@ export function PriceChart({
               width={58}
               axisLine={false}
               tickLine={false}
+              tickMargin={8}
               domain={yDomain}
-              tickFormatter={(value) => `$${Number(value).toFixed(0)}`}
+              tickFormatter={(value) => `$${Number(value).toFixed(axisPrecision)}`}
               tick={{ fill: "rgb(var(--color-paper) / 0.45)", fontSize: 11 }}
             />
             <Tooltip
@@ -140,12 +155,12 @@ export function PriceChart({
               formatter={(value) => [formatCurrency(Number(value)), "RMI quote"]}
             />
             <Area
-              type="monotone"
+              type="linear"
               dataKey="price"
               stroke={color}
               strokeWidth={compact ? 2 : 2.5}
               fill={`url(#${gradientId})`}
-              dot={false}
+              dot={normalized.length === 1 ? { r: 3, fill: color, strokeWidth: 0 } : false}
               activeDot={{ r: 5, strokeWidth: 2, stroke: "rgb(var(--color-panel))", fill: color }}
               isAnimationActive={false}
             />

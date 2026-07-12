@@ -14,6 +14,8 @@ type HistoryResponse = {
   range?: HistoryRange;
   points?: PricePoint[];
   hasRealHistory?: boolean;
+  hasMovement?: boolean;
+  granularity?: "intraday" | "daily";
   historyStart?: string | null;
   historyEnd?: string | null;
 };
@@ -31,6 +33,8 @@ export function ArtistPriceHistoryPanel({
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
   const [history, setHistory] = useState<PricePoint[]>(fallbackData);
   const [hasRealHistory, setHasRealHistory] = useState(fallbackData.length > 0);
+  const [hasMovement, setHasMovement] = useState(false);
+  const [granularity, setGranularity] = useState<"intraday" | "daily">("daily");
 
   useEffect(() => {
     const controller = new AbortController();
@@ -48,6 +52,8 @@ export function ArtistPriceHistoryPanel({
 
         setHistory(payload.points);
         setHasRealHistory(Boolean(payload.hasRealHistory));
+        setHasMovement(Boolean(payload.hasMovement));
+        setGranularity(payload.granularity === "intraday" ? "intraday" : "daily");
         setStatus("ready");
       })
       .catch((error) => {
@@ -57,6 +63,8 @@ export function ArtistPriceHistoryPanel({
 
         setHistory(fallbackData);
         setHasRealHistory(false);
+        setHasMovement(false);
+        setGranularity("daily");
         setStatus(error instanceof Error ? "error" : "error");
       });
 
@@ -81,7 +89,7 @@ export function ArtistPriceHistoryPanel({
     <section className="rmi-card p-4 shadow-market sm:p-5">
       <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h2 className="text-xl font-black">Chart</h2>
+          <h2 className="text-xl font-black">Price History</h2>
           <p className="mt-1 text-sm font-bold text-paper/50">{subtitle}</p>
         </div>
         <div className="inline-flex max-w-full overflow-x-auto rounded-lg border border-line bg-panelSoft p-1 scrollbar-thin">
@@ -102,8 +110,16 @@ export function ArtistPriceHistoryPanel({
           ))}
         </div>
       </div>
-      <PriceChart data={history} height={320} />
-      <p className="mt-2 text-xs text-paper/42">Hover, tap, or click the chart to inspect a recorded quote.</p>
+      <PriceChart data={history} height={290} timeScale={granularity} />
+      <p className="mt-2 text-xs text-paper/42">
+        {status === "ready" && !hasMovement
+          ? range === "1D"
+            ? "No intraday movement yet. A new quote is recorded when the market runs or an eligible order changes the price."
+            : "No recorded price change in this range."
+          : range === "1D"
+            ? "The 1D view uses recorded market refreshes and eligible trade quotes. Hover, tap, or click to inspect one."
+            : "Longer ranges use one recorded close per market day. Hover, tap, or click to inspect one."}
+      </p>
       {status === "error" ? (
         <p className="mt-3 text-xs font-bold text-ember">Price history unavailable.</p>
       ) : null}

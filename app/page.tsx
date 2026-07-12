@@ -126,9 +126,9 @@ export default function HomePage() {
         </div>
 
         <div className="grid divide-y divide-line border-t border-line bg-panelSoft lg:border-l lg:border-t-0">
-          {marketLeader ? <PulseArtist label="Market leader" artist={marketLeader} /> : null}
+          {marketLeader ? <PulseArtist label="Top gainer" artist={marketLeader} /> : null}
           {underPressure ? <PulseArtist label="Under pressure" artist={underPressure} /> : null}
-          {signalLeader ? <PulseArtist label="Signal leader" artist={signalLeader} score /> : null}
+          {signalLeader ? <PulseArtist label="Strongest signal" artist={signalLeader} score /> : null}
         </div>
       </section>
 

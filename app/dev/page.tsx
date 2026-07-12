@@ -68,6 +68,11 @@ type RunNowState =
       processedArtistCount: number;
     }
   | {
+      status: "skipped";
+      runDate: string;
+      reason: string;
+    }
+  | {
       status: "success";
       runDate: string | null;
       source: string | null;
@@ -631,17 +636,58 @@ type MarketIntegrity = {
   warnings: string[];
 };
 
+type UserSupportDirectory = {
+  userCount: number;
+  users: Array<{
+    id: string;
+    email: string | null;
+    emailDomainWarning: string | null;
+    username: string;
+    createdAt: string;
+    lastSignInAt: string | null;
+    emailConfirmedAt: string | null;
+    suspendedUntil: string | null;
+    isSuspended: boolean;
+    isAdmin: boolean;
+    onboardingCompleted: boolean;
+    cashBalance: number;
+    portfolioValue: number;
+    gainPercent: number;
+    positionCount: number;
+    tradeCount: number;
+  }>;
+  recentOrders: Array<{
+    id: string;
+    userId: string;
+    username: string;
+    artistId: string;
+    artistName: string;
+    ticker: string;
+    type: "buy" | "sell" | "short" | "cover";
+    shares: number;
+    price: number;
+    commission: number;
+    marketEligible: boolean;
+    createdAt: string;
+  }>;
+  recentAdminActions: Array<{
+    id: string;
+    actorUserId: string | null;
+    actorUsername: string;
+    targetUserId: string | null;
+    targetUsername: string | null;
+    action: string;
+    reason: string;
+    details: unknown;
+    createdAt: string;
+  }>;
+};
+
 const plannedPowers = [
   {
-    title: "User management",
-    detail: "Admin access is environment-controlled and leaderboard/admin badges are visible. User freeze/reset tools are next.",
-    status: "Partial",
-    icon: Users
-  },
-  {
     title: "Trade support",
-    detail: "Trade audit is visible through integrity views. One-click order reversal still needs a dedicated support flow.",
-    status: "Partial",
+    detail: "Account-level order inspection and atomic portfolio resets are available. Individual order reversal remains intentionally disabled because it can invalidate later cost-basis calculations.",
+    status: "Guarded",
     icon: FileWarning
   },
   {
@@ -700,6 +746,10 @@ export default function DevPage() {
   const [prelaunchReset, setPrelaunchReset] = useState<AdminActionState>({ status: "idle" });
   const [adminCashValue, setAdminCashValue] = useState("100000");
   const [adminCashAction, setAdminCashAction] = useState<AdminActionState>({ status: "idle" });
+  const [userSupport, setUserSupport] = useState<AsyncState<UserSupportDirectory>>({ status: "loading" });
+  const [userSupportAction, setUserSupportAction] = useState<AdminActionState>({ status: "idle" });
+  const [userSupportReason, setUserSupportReason] = useState("");
+  const [userResetCash, setUserResetCash] = useState("100000");
   const adminHeaders = useMemo<Record<string, string>>(() => {
     if (!session) {
       return {} as Record<string, string>;
@@ -780,6 +830,7 @@ export default function DevPage() {
     void refreshMarketIntegrity();
     void refreshArtistRoster();
     void refreshSourceIds();
+    void refreshUserSupport();
   }, [adminAccess.status]);
 
   const latestRunLabel = useMemo(() => {
@@ -998,6 +1049,89 @@ export default function DevPage() {
     }
   }
 
+  async function refreshUserSupport() {
+    setUserSupport({ status: "loading" });
+
+    try {
+      const response = await fetch("/api/admin/user-support", {
+        headers: adminHeaders
+      });
+      const payload = await readJsonResponse(response);
+
+      if (!response.ok || !payload.ok) {
+        throw new Error(payload.error ?? "User support directory failed to load.");
+      }
+
+      setUserSupport({
+        status: "ready",
+        data: {
+          userCount: Number(payload.userCount ?? 0),
+          users: payload.users ?? [],
+          recentOrders: payload.recentOrders ?? [],
+          recentAdminActions: payload.recentAdminActions ?? []
+        }
+      });
+    } catch (error) {
+      setUserSupport({
+        status: "error",
+        message: error instanceof Error ? error.message : "User support directory failed to load."
+      });
+    }
+  }
+
+  async function runUserSupportAction(
+    action: "suspend" | "restore" | "reset_portfolio" | "delete_unconfirmed",
+    user: UserSupportDirectory["users"][number]
+  ) {
+    const actionLabel = action === "reset_portfolio"
+      ? `Reset ${user.username}'s portfolio`
+      : action === "delete_unconfirmed"
+        ? `Permanently remove ${user.email ?? user.username}`
+        : `${action === "suspend" ? "Suspend" : "Restore"} ${user.username}`;
+
+    if (
+      (action === "suspend" || action === "reset_portfolio" || action === "delete_unconfirmed") &&
+      !window.confirm(
+        action === "delete_unconfirmed"
+          ? `${actionLabel}? This is only for abandoned accounts that never confirmed or signed in. This cannot be undone.`
+          : `${actionLabel}? This action will be recorded in the operator audit log.`
+      )
+    ) {
+      return;
+    }
+
+    setUserSupportAction({ status: "loading", label: actionLabel });
+
+    try {
+      const response = await fetch("/api/admin/user-support", {
+        method: "PATCH",
+        headers: {
+          "content-type": "application/json",
+          ...adminHeaders
+        },
+        body: JSON.stringify({
+          action,
+          userId: user.id,
+          reason: userSupportReason,
+          startingCash: Number(userResetCash)
+        })
+      });
+      const payload = await readJsonResponse(response);
+
+      if (!response.ok || !payload.ok) {
+        throw new Error(payload.error ?? `${actionLabel} failed.`);
+      }
+
+      setUserSupportAction({ status: "success", message: `${actionLabel} completed.` });
+      await Promise.all([refreshUserSupport(), refreshMarketIntegrity()]);
+    } catch (error) {
+      setUserSupportAction({
+        status: "error",
+        message: error instanceof Error ? error.message : `${actionLabel} failed.`
+      });
+    }
+  }
+
   async function refreshArtistRoster() {
     setArtistRoster({ status: "loading" });
 
@@ -1096,78 +1230,53 @@ export default function DevPage() {
     setRunNow({ status: "loading", completedBatchCount: 0, processedArtistCount: 0 });
 
     try {
-      const batchSize = 100;
-      const maxLoopCount = 5;
-      let nextOffset: number | null = 0;
-      let completedBatchCount = 0;
-      let processedArtistCount = 0;
-      let observationCount = 0;
-      let eventCount = 0;
-      let detectedEventCount = 0;
-      let latestPayload: Record<string, any> | null = null;
-      let hasMore = true;
-      const warnings = new Set<string>();
+      const response = await fetch("/api/admin/market-run-now", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          ...adminHeaders
+        },
+        body: JSON.stringify({
+          force: false,
+          artistLimit: 100,
+          artistOffset: 0,
+          maxBatches: 10
+        })
+      });
+      const payload = await readJsonResponse(response);
 
-      for (let loopIndex = 0; loopIndex < maxLoopCount && hasMore && nextOffset !== null; loopIndex += 1) {
-        const response = await fetch("/api/admin/market-run-now", {
-          method: "POST",
-          headers: {
-            "content-type": "application/json",
-            ...adminHeaders
-          },
-          body: JSON.stringify({
-            force: true,
-            artistLimit: batchSize,
-            artistOffset: nextOffset,
-            maxBatches: 1
-          })
-        });
-        const payload = await readJsonResponse(response);
+      if (!response.ok || !payload.ok) {
+        throw new Error(payload.error ?? "Market run failed.");
+      }
 
-        if (!response.ok || !payload.ok) {
-          throw new Error(payload.error ?? "Market run failed.");
-        }
-
-        const result = payload.result ?? {};
-        latestPayload = payload;
-        completedBatchCount += result.completedBatchCount ?? 0;
-        processedArtistCount += result.processedArtistCount ?? 0;
-        observationCount += result.observationCount ?? 0;
-        eventCount += result.eventCount ?? 0;
-        detectedEventCount += result.detectedEventCount ?? 0;
-        (result.warnings ?? []).forEach((warning: string) => warnings.add(warning));
-        hasMore = Boolean(result.hasMore);
-        nextOffset = typeof result.nextOffset === "number" ? result.nextOffset : null;
-
+      if (payload.skipped) {
         setRunNow({
-          status: "loading",
-          completedBatchCount,
-          processedArtistCount
+          status: "skipped",
+          runDate: payload.runDate ?? "today",
+          reason: payload.reason ?? "Today's market session is already complete."
         });
+        await refreshMarketHealth();
+        return;
       }
 
-      if (!latestPayload) {
-        throw new Error("Market run did not process any batches.");
-      }
-
-      const latestResult = latestPayload.result ?? {};
+      const latestResult = payload.result ?? {};
       const summary = latestResult.summary ?? null;
 
       setRunNow({
         status: "success",
-        runDate: latestPayload.runDate ?? null,
-        source: latestPayload.source ?? null,
-        persisted: Boolean(latestPayload.persisted),
-        forced: Boolean(latestPayload.forced),
-        completedBatchCount,
-        processedArtistCount,
-        observationCount,
-        eventCount,
-        detectedEventCount,
-        hasMore,
-        nextOffset,
+        runDate: payload.runDate ?? null,
+        source: payload.source ?? null,
+        persisted: Boolean(payload.persisted),
+        forced: Boolean(payload.forced),
+        completedBatchCount: latestResult.completedBatchCount ?? 0,
+        processedArtistCount: latestResult.processedArtistCount ?? 0,
+        observationCount: latestResult.observationCount ?? 0,
+        eventCount: latestResult.eventCount ?? 0,
+        detectedEventCount: latestResult.detectedEventCount ?? 0,
+        hasMore: Boolean(latestResult.hasMore),
+        nextOffset: typeof latestResult.nextOffset === "number" ? latestResult.nextOffset : null,
         summary,
-        warnings: Array.from(warnings),
+        warnings: latestResult.warnings ?? [],
         eventScanStatus: "Use event scan card"
       });
 
@@ -1792,8 +1901,8 @@ export default function DevPage() {
           <p className="text-xs font-bold uppercase tracking-wide text-brass">Operator console</p>
           <h1 className="mt-2 text-4xl font-black">Market operations</h1>
           <p className="mt-3 max-w-3xl text-sm leading-6 text-paper/55">
-            This page should become the internal control room for market health, data coverage, integrity alerts,
-            and protected admin actions. Demo-only market reset controls do not belong here once Supabase is live.
+            Internal control room for market health, data coverage, integrity alerts, account support, and protected
+            operator actions.
           </p>
         </div>
         <div className="rounded-md border border-mint/35 bg-mint/10 p-4 text-sm font-bold leading-6 text-mint">
@@ -1960,8 +2069,7 @@ export default function DevPage() {
             <p className="text-xs font-bold uppercase tracking-wide text-paper/45">Admin account</p>
             <h2 className="mt-1 text-2xl font-black">Set my cash balance</h2>
             <p className="mt-2 text-sm leading-6 text-paper/55">
-              Updates only your signed-in admin profile. Admin trades remain excluded from market impact by the
-              protected trade path.
+              Updates only your signed-in operator profile and does not alter artist quotes or other accounts.
             </p>
           </div>
           <div className="mt-4 grid gap-3 sm:grid-cols-[1fr_auto]">
@@ -1988,14 +2096,35 @@ export default function DevPage() {
         </section>
       </section>
 
+      <Panel
+        title="User support"
+        eyebrow="Accounts and orders"
+        actionLabel="Refresh"
+        onAction={refreshUserSupport}
+      >
+        {userSupport.status === "loading" ? <LoadingText text="Loading account support data..." /> : null}
+        {userSupport.status === "error" ? <ErrorText text={userSupport.message} /> : null}
+        {userSupport.status === "ready" ? (
+          <UserSupportPanel
+            data={userSupport.data}
+            actionState={userSupportAction}
+            reason={userSupportReason}
+            resetCash={userResetCash}
+            onReasonChange={setUserSupportReason}
+            onResetCashChange={setUserResetCash}
+            onAction={runUserSupportAction}
+          />
+        ) : null}
+      </Panel>
+
       <section className="rounded-md border border-line bg-panel/88 p-5 shadow-market">
         <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
           <div>
             <p className="text-xs font-bold uppercase tracking-wide text-paper/45">Market operation</p>
             <h2 className="mt-1 text-2xl font-black">Run market now</h2>
             <p className="mt-2 text-sm leading-6 text-paper/55">
-              Writes today's prices, observations, and history in short core batches. The daily cron normally handles
-              this automatically, so use this only when you want an immediate production run.
+              Writes today's prices, observations, events, and history once. If today's session is already running or
+              complete, this safely skips without repeating source calls or quote writes.
             </p>
           </div>
           <button
@@ -2005,13 +2134,13 @@ export default function DevPage() {
             className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md border border-mint/45 bg-mint/10 px-4 text-sm font-black text-mint disabled:cursor-wait disabled:opacity-55"
           >
             <ServerCog className="h-4 w-4" />
-            Run now
+            Run today's market
           </button>
         </div>
         <RunNowResult run={runNow} />
       </section>
 
-      <AdvancedTestingPanel
+      <DiagnosticToolsPanel
         preview={preview}
         eventScan={eventScan}
         runCorePreview={runCorePreview}
@@ -2077,8 +2206,8 @@ export default function DevPage() {
 
       <section className="rounded-md border border-line bg-panel/88 p-5 shadow-market">
         <div>
-          <p className="text-xs font-bold uppercase tracking-wide text-paper/45">Operator controls</p>
-          <h2 className="mt-1 text-2xl font-black">Prelaunch admin powers</h2>
+          <p className="text-xs font-bold uppercase tracking-wide text-paper/45">Deliberately deferred</p>
+          <h2 className="mt-1 text-2xl font-black">Systems not required for initial launch</h2>
         </div>
         <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
           {plannedPowers.map((item) => {
@@ -2103,6 +2232,223 @@ export default function DevPage() {
       </section>
     </div>
   );
+}
+
+function UserSupportPanel({
+  data,
+  actionState,
+  reason,
+  resetCash,
+  onReasonChange,
+  onResetCashChange,
+  onAction
+}: {
+  data: UserSupportDirectory;
+  actionState: AdminActionState;
+  reason: string;
+  resetCash: string;
+  onReasonChange: (value: string) => void;
+  onResetCashChange: (value: string) => void;
+  onAction: (
+    action: "suspend" | "restore" | "reset_portfolio" | "delete_unconfirmed",
+    user: UserSupportDirectory["users"][number]
+  ) => void;
+}) {
+  const [query, setQuery] = useState("");
+  const normalizedQuery = query.trim().toLowerCase();
+  const filteredUsers = data.users.filter((user) =>
+    !normalizedQuery ||
+    user.username.toLowerCase().includes(normalizedQuery) ||
+    user.email?.toLowerCase().includes(normalizedQuery)
+  );
+  const actionPending = actionState.status === "loading";
+
+  return (
+    <div className="space-y-5">
+      <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(220px,0.55fr)_180px]">
+        <label className="space-y-2">
+          <span className="text-xs font-black uppercase tracking-wide text-paper/45">Find account</span>
+          <input
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            className="h-11 w-full rounded-md border border-line bg-ink px-3 text-sm font-bold outline-none focus:border-cyan"
+            placeholder="Username or email"
+          />
+        </label>
+        <label className="space-y-2">
+          <span className="text-xs font-black uppercase tracking-wide text-paper/45">Action reason</span>
+          <input
+            value={reason}
+            onChange={(event) => onReasonChange(event.target.value)}
+            maxLength={500}
+            className="h-11 w-full rounded-md border border-line bg-ink px-3 text-sm font-bold outline-none focus:border-cyan"
+            placeholder="Optional operator note"
+          />
+        </label>
+        <label className="space-y-2">
+          <span className="text-xs font-black uppercase tracking-wide text-paper/45">Reset cash</span>
+          <input
+            value={resetCash}
+            onChange={(event) => onResetCashChange(event.target.value)}
+            inputMode="decimal"
+            className="h-11 w-full rounded-md border border-line bg-ink px-3 text-sm font-bold outline-none focus:border-cyan"
+          />
+        </label>
+      </div>
+
+      <div className="overflow-hidden rounded-md border border-line">
+        <div className="grid grid-cols-[minmax(0,1fr)_110px] gap-3 border-b border-line bg-black/20 px-4 py-3 text-xs font-black uppercase tracking-wide text-paper/45 md:grid-cols-[minmax(220px,1fr)_130px_150px_150px_220px]">
+          <span>Account</span>
+          <span>Status</span>
+          <span className="hidden md:block">Portfolio</span>
+          <span className="hidden md:block">Activity</span>
+          <span className="text-right">Actions</span>
+        </div>
+        <div className="max-h-[560px] divide-y divide-line overflow-y-auto scrollbar-thin">
+          {filteredUsers.length ? filteredUsers.map((user) => (
+            <div
+              key={user.id}
+              className="grid grid-cols-[minmax(0,1fr)_110px] gap-3 px-4 py-4 text-sm md:grid-cols-[minmax(220px,1fr)_130px_150px_150px_220px] md:items-center"
+            >
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2 font-black">
+                  <span className="truncate">{user.username}</span>
+                  {user.isAdmin ? (
+                    <span className="rounded border border-brass/35 bg-brass/10 px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-brass">Admin</span>
+                  ) : null}
+                </div>
+                <p className="mt-1 break-all font-mono text-[11px] text-paper/50">{user.email ?? "No email"}</p>
+                {user.emailDomainWarning ? (
+                  <p className="mt-1 text-xs font-black text-brass">{user.emailDomainWarning}</p>
+                ) : null}
+                <p className="mt-1 text-xs text-paper/35">Joined {formatDate(user.createdAt)}</p>
+              </div>
+              <div>
+                <p className={user.isSuspended ? "font-black text-ember" : "font-black text-mint"}>
+                  {user.isSuspended ? "Suspended" : "Active"}
+                </p>
+                <p className="mt-1 text-xs text-paper/40">{user.emailConfirmedAt ? "Email confirmed" : "Unconfirmed"}</p>
+              </div>
+              <div className="hidden md:block">
+                <p className="font-black number-tabular">{formatCurrency(user.portfolioValue)}</p>
+                <p className={user.gainPercent >= 0 ? "mt-1 text-xs font-black text-mint" : "mt-1 text-xs font-black text-ember"}>
+                  {formatPercent(user.gainPercent)}
+                </p>
+              </div>
+              <div className="hidden md:block text-xs leading-5 text-paper/50">
+                <p>{user.positionCount} positions</p>
+                <p>{user.tradeCount} recent orders</p>
+                <p>{user.lastSignInAt ? `Seen ${formatDate(user.lastSignInAt)}` : "No sign-in recorded"}</p>
+              </div>
+              <div className="flex flex-wrap justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => onAction(user.isSuspended ? "restore" : "suspend", user)}
+                  disabled={actionPending || user.isAdmin}
+                  className={user.isSuspended
+                    ? "min-h-9 rounded-md border border-mint/40 px-3 text-xs font-black text-mint disabled:opacity-35"
+                    : "min-h-9 rounded-md border border-ember/40 px-3 text-xs font-black text-ember disabled:opacity-35"
+                  }
+                >
+                  {user.isSuspended ? "Restore" : "Suspend"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onAction("reset_portfolio", user)}
+                  disabled={actionPending}
+                  className="min-h-9 rounded-md border border-line px-3 text-xs font-black text-paper/65 hover:border-cyan hover:text-paper disabled:opacity-35"
+                >
+                  Reset portfolio
+                </button>
+                {!user.emailConfirmedAt && !user.lastSignInAt && !user.isAdmin ? (
+                  <button
+                    type="button"
+                    onClick={() => onAction("delete_unconfirmed", user)}
+                    disabled={actionPending}
+                    className="min-h-9 rounded-md border border-ember/40 px-3 text-xs font-black text-ember hover:bg-ember/10 disabled:opacity-35"
+                  >
+                    Remove unconfirmed
+                  </button>
+                ) : null}
+              </div>
+            </div>
+          )) : (
+            <p className="px-4 py-8 text-center text-sm text-paper/45">No accounts match this search.</p>
+          )}
+        </div>
+      </div>
+
+      <AdminActionResult state={actionState} />
+
+      <div>
+        <div className="flex items-end justify-between gap-3">
+          <div>
+            <p className="text-xs font-black uppercase tracking-wide text-paper/45">Recent order audit</p>
+            <p className="mt-1 text-sm text-paper/50">Latest saved long and short orders across all accounts.</p>
+          </div>
+          <span className="text-xs font-black text-paper/45">{data.userCount} accounts</span>
+        </div>
+        <div className="mt-3 overflow-x-auto rounded-md border border-line scrollbar-thin">
+          <table className="min-w-[760px] w-full border-collapse text-left text-xs">
+            <thead className="bg-black/20 uppercase tracking-wide text-paper/45">
+              <tr>
+                <th className="px-3 py-2.5">Trader</th>
+                <th className="px-3 py-2.5">Artist</th>
+                <th className="px-3 py-2.5">Order</th>
+                <th className="px-3 py-2.5">Execution</th>
+                <th className="px-3 py-2.5">Commission</th>
+                <th className="px-3 py-2.5">Demand signal</th>
+                <th className="px-3 py-2.5">Time</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-line">
+              {data.recentOrders.length ? data.recentOrders.map((order) => (
+                <tr key={order.id}>
+                  <td className="px-3 py-2.5 font-black">{order.username}</td>
+                  <td className="px-3 py-2.5"><span className="font-black">{order.ticker}</span> <span className="text-paper/40">{order.artistName}</span></td>
+                  <td className="px-3 py-2.5 uppercase">{order.type} {order.shares}</td>
+                  <td className="px-3 py-2.5 number-tabular">{formatCurrency(order.price)}</td>
+                  <td className="px-3 py-2.5 number-tabular">{formatCurrency(order.commission)}</td>
+                  <td className={order.marketEligible ? "px-3 py-2.5 font-black text-mint" : "px-3 py-2.5 font-black text-paper/40"}>
+                    {order.marketEligible ? "Included" : "Excluded"}
+                  </td>
+                  <td className="px-3 py-2.5 text-paper/45">{formatOperatorTime(order.createdAt)}</td>
+                </tr>
+              )) : (
+                <tr><td colSpan={7} className="px-3 py-8 text-center text-paper/45">No orders recorded yet.</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {data.recentAdminActions.length ? (
+        <div>
+          <p className="text-xs font-black uppercase tracking-wide text-paper/45">Operator audit trail</p>
+          <div className="mt-3 divide-y divide-line overflow-hidden rounded-md border border-line">
+            {data.recentAdminActions.slice(0, 12).map((entry) => (
+              <div key={entry.id} className="grid gap-1 px-4 py-3 text-xs sm:grid-cols-[180px_minmax(0,1fr)_150px] sm:items-center">
+                <span className="font-black">{formatAdminAction(entry.action)}</span>
+                <span className="min-w-0 text-paper/50">
+                  {entry.actorUsername}{entry.targetUsername ? ` -> ${entry.targetUsername}` : ""}
+                  {entry.reason ? ` · ${entry.reason}` : ""}
+                </span>
+                <span className="text-paper/38 sm:text-right">{formatOperatorTime(entry.createdAt)}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function formatAdminAction(value: string) {
+  return value
+    .split("_")
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
 }
 
 function AdminAccessGate({ state }: { state: AdminAccessState }) {
@@ -2861,7 +3207,7 @@ function MarketIntegrityPanel({ data }: { data: MarketIntegrity }) {
         },
         {
           key: "integrity:excluded-trades",
-          label: "Excluded test/admin trades",
+          label: "Excluded orders",
           value: String(data.summary.excludedTradeCount),
           detail: `${formatCurrency(data.summary.excludedGrossOrderValue)} ignored by trade-flow`
         },
@@ -2963,8 +3309,8 @@ function MarketIntegrityPanel({ data }: { data: MarketIntegrity }) {
 
       {data.excludedTradeSummary.tradeCount > 0 ? (
         <div className="rounded-md border border-mint/25 bg-mint/10 p-3 text-sm leading-6 text-paper/62">
-          <span className="font-black text-mint">{data.excludedTradeSummary.tradeCount} test/admin trades</span> were
-          excluded from market impact across {data.excludedTradeSummary.artistCount} artists.
+          <span className="font-black text-mint">{data.excludedTradeSummary.tradeCount} orders</span> were excluded by
+          market-eligibility rules across {data.excludedTradeSummary.artistCount} artists.
         </div>
       ) : null}
     </div>
@@ -3063,7 +3409,7 @@ function CoverageGrid({
   );
 }
 
-function AdvancedTestingPanel({
+function DiagnosticToolsPanel({
   preview,
   eventScan,
   runCorePreview,
@@ -3079,7 +3425,7 @@ function AdvancedTestingPanel({
   return (
     <details className="rounded-md border border-line bg-panel/75 p-5 shadow-market">
       <summary className="cursor-pointer text-sm font-black uppercase tracking-wide text-paper/55">
-        Advanced testing
+        Diagnostic tools
       </summary>
       <div className="mt-4 grid gap-4 xl:grid-cols-2">
         <div className="rounded-md border border-line bg-black/20 p-4">
@@ -3222,6 +3568,14 @@ function RunNowResult({ run }: { run: RunNowState }) {
 
   if (run.status === "error") {
     return <ErrorText text={run.message} />;
+  }
+
+  if (run.status === "skipped") {
+    return (
+      <div className="mt-4 rounded-md border border-cyan/30 bg-cyan/10 p-4 text-sm font-bold text-paper/65">
+        {run.reason} No additional source requests or quote writes were made.
+      </div>
+    );
   }
 
   return (
@@ -4267,6 +4621,22 @@ function getEventScanStatus(value: unknown) {
   const events = scan.payload?.eventCount ?? 0;
 
   return `${scanned} artists, ${events} events`;
+}
+
+function formatOperatorTime(value: string) {
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    timeZone: "America/Los_Angeles"
+  }).format(date);
 }
 
 async function readJsonResponse(response: Response) {

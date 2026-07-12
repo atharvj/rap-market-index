@@ -5,7 +5,8 @@ import { useAuth } from "@/components/AuthProvider";
 import { useGame } from "@/components/GameProvider";
 import { RmiButton } from "@/components/RmiPrimitives";
 import { formatCurrency } from "@/lib/formatters";
-import { Check, Search, Trophy, WalletCards } from "lucide-react";
+import { MAX_FAVORITE_ARTISTS, MAX_FAVORITE_GENRES, MIN_FAVORITE_ARTISTS } from "@/lib/onboarding";
+import { Search, Trophy, WalletCards } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
@@ -52,8 +53,7 @@ export default function OnboardingPage() {
           artist.name.toLowerCase().includes(normalized) ||
           artist.ticker.toLowerCase().includes(normalized)
       )
-      .sort((first, second) => second.hypeScore - first.hypeScore)
-      .slice(0, normalized ? 18 : 12);
+      .sort((first, second) => second.hypeScore - first.hypeScore);
   }, [query, state.artists]);
 
   useEffect(() => {
@@ -81,8 +81,8 @@ export default function OnboardingPage() {
           return;
         }
 
-        setSelectedGenres(payload.profile.favoriteGenres ?? []);
-        setSelectedArtists((payload.profile.favoriteArtistIds ?? []).slice(0, 5));
+        setSelectedGenres((payload.profile.favoriteGenres ?? []).slice(0, MAX_FAVORITE_GENRES));
+        setSelectedArtists((payload.profile.favoriteArtistIds ?? []).slice(0, MAX_FAVORITE_ARTISTS));
       })
       .catch((error) => setMessage(error instanceof Error ? error.message : "Could not load onboarding."))
       .finally(() => setLoading(false));
@@ -107,7 +107,9 @@ export default function OnboardingPage() {
     setSelectedGenres((current) =>
       current.includes(normalized)
         ? current.filter((candidate) => candidate !== normalized)
-        : [...current, normalized].slice(0, 8)
+        : current.length < MAX_FAVORITE_GENRES
+          ? [...current, normalized]
+          : current
     );
   }
 
@@ -115,7 +117,7 @@ export default function OnboardingPage() {
     setSelectedArtists((current) =>
       current.includes(artistId)
         ? current.filter((id) => id !== artistId)
-        : current.length < 5
+        : current.length < MAX_FAVORITE_ARTISTS
           ? [...current, artistId]
           : current
     );
@@ -166,7 +168,11 @@ export default function OnboardingPage() {
     }
   }
 
-  const canContinue = step === 0 ? selectedGenres.length > 0 : step === 1 ? selectedArtists.length >= 3 : true;
+  const canContinue = step === 0
+    ? selectedGenres.length > 0
+    : step === 1
+      ? selectedArtists.length >= MIN_FAVORITE_ARTISTS
+      : true;
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
@@ -179,19 +185,30 @@ export default function OnboardingPage() {
 
       {step === 0 ? (
         <OnboardingStep eyebrow="Step 1 of 4" title="Choose your rap lanes" description="RMI uses these to shape discovery and your first market view.">
+          <div className="flex items-center justify-between text-xs font-bold text-paper/50">
+            <span>Choose up to {MAX_FAVORITE_GENRES}</span>
+            <span className="number-tabular">{selectedGenres.length} of {MAX_FAVORITE_GENRES} selected</span>
+          </div>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
             {genres.map((genre) => {
               const active = selectedGenres.includes(genre.toLowerCase());
+              const unavailable = !active && selectedGenres.length >= MAX_FAVORITE_GENRES;
 
               return (
                 <button
                   key={genre}
                   type="button"
                   onClick={() => toggleGenre(genre)}
-                  className={active ? "rmi-card flex min-h-14 items-center justify-between border-cyan p-4 text-left" : "rmi-card flex min-h-14 items-center justify-between p-4 text-left"}
+                  disabled={unavailable}
+                  aria-pressed={active}
+                  className={active
+                    ? "rmi-card min-h-14 border-cyan bg-cyan/10 p-4 text-left ring-2 ring-cyan/45 transition"
+                    : unavailable
+                      ? "rmi-card min-h-14 cursor-not-allowed p-4 text-left opacity-40"
+                      : "rmi-card min-h-14 p-4 text-left transition hover:-translate-y-0.5 hover:border-cyan/70 hover:bg-panelSoft"
+                  }
                 >
                   <span className="text-sm font-bold">{genre}</span>
-                  {active ? <Check className="h-4 w-4 text-cyan" /> : null}
                 </button>
               );
             })}
@@ -200,7 +217,7 @@ export default function OnboardingPage() {
       ) : null}
 
       {step === 1 ? (
-        <OnboardingStep eyebrow="Step 2 of 4" title="Pick artists to follow" description="Choose 3 to 5. They will appear in your watchlist and on your public profile.">
+        <OnboardingStep eyebrow="Step 2 of 4" title="Pick artists to follow" description={`Choose ${MIN_FAVORITE_ARTISTS} to ${MAX_FAVORITE_ARTISTS}. They will appear in your watchlist and on your public profile.`}>
           <div className="relative mb-3">
             <Search className="pointer-events-none absolute left-3 top-3 h-4 w-4 text-paper/35" />
             <input
@@ -210,16 +227,28 @@ export default function OnboardingPage() {
               placeholder="Search artists"
             />
           </div>
-          <section className="grid max-h-[420px] gap-3 overflow-y-auto pr-1 sm:grid-cols-2 scrollbar-thin">
+          <div className="mb-3 flex items-center justify-between text-xs font-bold text-paper/50">
+            <span>{artists.length} artists shown</span>
+            <span className="number-tabular">{selectedArtists.length} of {MAX_FAVORITE_ARTISTS} selected</span>
+          </div>
+          <section className="grid max-h-[480px] gap-3 overflow-y-auto pr-1 sm:grid-cols-2 scrollbar-thin">
             {artists.map((artist) => {
               const active = selectedArtists.includes(artist.id);
+              const unavailable = !active && selectedArtists.length >= MAX_FAVORITE_ARTISTS;
 
               return (
                 <button
                   key={artist.id}
                   type="button"
                   onClick={() => toggleArtist(artist.id)}
-                  className={active ? "rmi-card flex items-center justify-between gap-3 border-cyan p-4 text-left" : "rmi-card flex items-center justify-between gap-3 p-4 text-left"}
+                  disabled={unavailable}
+                  aria-pressed={active}
+                  className={active
+                    ? "rmi-card flex items-center gap-3 border-cyan bg-cyan/10 p-4 text-left ring-2 ring-cyan/45 transition"
+                    : unavailable
+                      ? "rmi-card flex cursor-not-allowed items-center gap-3 p-4 text-left opacity-40"
+                      : "rmi-card flex items-center gap-3 p-4 text-left transition hover:-translate-y-0.5 hover:border-cyan/70 hover:bg-panelSoft"
+                  }
                 >
                   <span className="flex min-w-0 items-center gap-3">
                     <ArtistAvatar artist={artist} />
@@ -228,12 +257,10 @@ export default function OnboardingPage() {
                       <span className="text-xs text-paper/45">${artist.ticker}</span>
                     </span>
                   </span>
-                  {active ? <Check className="h-4 w-4 shrink-0 text-cyan" /> : null}
                 </button>
               );
             })}
           </section>
-          <p className="mt-3 text-center text-sm text-paper/55">{selectedArtists.length} of 5 selected</p>
         </OnboardingStep>
       ) : null}
 

@@ -170,7 +170,11 @@ function mapArtist(row: ArtistRow, stats: ArtistStatsRow | null, history: PriceP
     accent: row.accent,
     stats: mapStats(stats),
     priceHistory: history.length ? history.slice(-PRICE_HISTORY_LOOKBACK_DAYS) : fallbackHistory,
-    lastMoveExplanation: sanitizeMoveExplanation(row.ticker, row.last_move_explanation)
+    lastMoveExplanation: sanitizeMoveExplanation(
+      row.ticker,
+      row.last_move_explanation,
+      Number(row.daily_change_percent)
+    )
   };
 }
 

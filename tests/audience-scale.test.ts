@@ -59,6 +59,21 @@ describe("audience-scale valuation", () => {
     expect(larger.targetPrice ?? 0).toBeGreaterThan(smaller.targetPrice ?? 0);
   });
 
+  it("assigns less confidence when all scale evidence comes from one platform", () => {
+    const onePlatform = buildAudienceScaleCalibration(signal({
+      youtube: { subscriberCount: 310_000, viewCount: 91_000_000 }
+    }));
+    const corroborated = buildAudienceScaleCalibration(signal({
+      lastfm: { listeners: 206_000, playcount: 11_400_000 },
+      youtube: { subscriberCount: 82_900, viewCount: 16_700_000 }
+    }));
+
+    expect(onePlatform.status).toBe("ok");
+    expect(onePlatform.directSourceCount).toBe(1);
+    expect(corroborated.directSourceCount).toBe(2);
+    expect(onePlatform.confidence).toBeLessThan(corroborated.confidence);
+  });
+
   it("caps normal daily valuation pressure at four percent", () => {
     const result = getAudienceScaleAdjustment({
       audienceScaleCalibration: {

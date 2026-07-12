@@ -7,7 +7,7 @@ const sections = [
   },
   {
     title: "How prices move",
-    body: "Artist prices are updated by a market engine that looks for meaningful changes in audience momentum, video activity, public attention, releases, reviews, major events, and eligible trading demand. Durable listener, play, subscriber, and view scale also keeps long-term quote levels comparable. Test activity is excluded and the exact weights are kept internal so the game is harder to manipulate."
+    body: "Artist prices are updated by a market engine that looks for meaningful changes in audience momentum, video activity, public attention, releases, reviews, major events, and eligible trading demand. Durable listener, play, subscriber, and view scale also keeps long-term quote levels comparable. The exact weights are kept internal so the game is harder to manipulate."
   },
   {
     title: "What a quote means",
@@ -61,14 +61,18 @@ export default function AboutPage() {
             <Link href="/news">News and Events</Link>
             <Link href="/leaderboard">Leaderboard</Link>
             <Link href="/portfolio">My Portfolio</Link>
+            <Link href="/help">Help Center</Link>
           </div>
         </section>
 
         <section className="rmi-card p-5 shadow-market">
-          <h2 className="text-sm font-black uppercase tracking-wide">Public beta</h2>
+          <h2 className="text-sm font-black uppercase tracking-wide">Need help?</h2>
           <p className="mt-3 text-sm font-bold leading-6 text-paper/58">
-            RMI is still being tested. The core goal is to make artist quotes and market history reliable before wider launch.
+            Find answers about accounts, trading, artist quotes, portfolios, privacy, and common problems.
           </p>
+          <Link href="/help" className="mt-4 inline-flex text-sm font-black text-cyan hover:text-cyan/75">
+            Open Help Center
+          </Link>
         </section>
       </aside>
     </div>

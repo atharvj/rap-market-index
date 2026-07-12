@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { MAX_FAVORITE_ARTISTS, MAX_FAVORITE_GENRES, MIN_FAVORITE_ARTISTS } from "@/lib/onboarding";
 import { createAnonServerClient, createServiceRoleClient, getSupabaseConfigStatus } from "@/lib/supabase/server";
 import type { Database } from "@/lib/supabase/database.types";
 import type { Holding, ShortPosition, Transaction } from "@/lib/types";
@@ -390,7 +391,7 @@ function normalizeFavoriteGenres(value: string[]) {
         .map((genre) => genre.trim().toLowerCase())
         .filter((genre) => ALLOWED_GENRES.has(genre))
     )
-  ).slice(0, 8);
+  ).slice(0, MAX_FAVORITE_GENRES);
 }
 
 async function assertOnboardingSelection({
@@ -406,8 +407,12 @@ async function assertOnboardingSelection({
     throw new Error("Choose at least one rap lane before finishing account setup.");
   }
 
-  if (favoriteArtistIds.length < 3) {
+  if (favoriteArtistIds.length < MIN_FAVORITE_ARTISTS) {
     throw new Error("Choose at least three artists before finishing account setup.");
+  }
+
+  if (favoriteArtistIds.length > MAX_FAVORITE_ARTISTS) {
+    throw new Error("Choose no more than five artists before finishing account setup.");
   }
 
   const { count, error } = await supabase
@@ -416,7 +421,7 @@ async function assertOnboardingSelection({
     .in("id", favoriteArtistIds)
     .eq("is_active", true);
 
-  if (error || (count ?? 0) < 3) {
+  if (error || (count ?? 0) < MIN_FAVORITE_ARTISTS) {
     throw new Error("Choose at least three active artists before finishing account setup.");
   }
 }

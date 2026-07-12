@@ -651,9 +651,7 @@ async function submitServerTrade({
         shares,
         ticker: payload.trade?.ticker,
         executionPrice: payload.trade?.execution_price ?? payload.trade?.executionPrice,
-        commission: payload.trade?.commission,
-        marketEligible: payload.marketEligibility?.eligible ?? payload.trade?.market_eligible ?? payload.trade?.marketEligible,
-        marketEligibilityReason: payload.marketEligibility?.reason
+        commission: payload.trade?.commission
       })
   };
 }
@@ -663,17 +661,13 @@ function formatTradeMessage({
   shares,
   ticker,
   executionPrice,
-  commission,
-  marketEligible,
-  marketEligibilityReason
+  commission
 }: {
   side: "buy" | "sell" | "short" | "cover";
   shares: number;
   ticker?: string;
   executionPrice?: number;
   commission?: number;
-  marketEligible?: boolean;
-  marketEligibilityReason?: "eligible" | "new_account_cooldown" | "market_impact_exempt_account";
 }) {
   const executionText =
     typeof executionPrice === "number" && Number.isFinite(executionPrice)
@@ -683,24 +677,7 @@ function formatTradeMessage({
     typeof commission === "number" && Number.isFinite(commission)
       ? ` Commission ${new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(commission)}.`
       : "";
-  const eligibilityText = getTradeEligibilityText(marketEligible, marketEligibilityReason);
-
-  return `${getTradeVerb(side)} ${shares} ${ticker ?? "shares"}${executionText}.${commissionText}${eligibilityText}`;
-}
-
-function getTradeEligibilityText(
-  marketEligible?: boolean,
-  reason?: "eligible" | "new_account_cooldown" | "market_impact_exempt_account"
-) {
-  if (marketEligible !== false) {
-    return "";
-  }
-
-  if (reason === "new_account_cooldown") {
-    return " This order is recorded normally. New accounts do not influence market prices during their first 24 hours.";
-  }
-
-  return " Admin/test order: excluded from market-demand signals.";
+  return `${getTradeVerb(side)} ${shares} ${ticker ?? "shares"}${executionText}.${commissionText}`;
 }
 
 function getTradeVerb(side: "buy" | "sell" | "short" | "cover") {

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
-import { getSupabaseConfigStatus } from "@/lib/supabase/server";
+import { createServiceRoleClient, getSupabaseConfigStatus } from "@/lib/supabase/server";
 import { requireAdminRequest } from "@/server/admin-auth";
+import { getPacificMarketDate } from "@/server/market/market-date";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
@@ -66,6 +67,16 @@ type MarketBatchRunResponse = {
   };
 };
 
+type ExistingRun = {
+  run_date: string;
+  status: "running" | "succeeded" | "failed";
+  source: string;
+  started_at: string;
+  completed_at: string | null;
+  summary: unknown;
+  error_message: string | null;
+};
+
 const DEFAULT_RUN_NOW_ARTIST_LIMIT = 100;
 const DEFAULT_RUN_NOW_MAX_BATCHES = 1;
 const DEFAULT_RUN_NOW_EVENT_SCAN_LIMIT = 100;
@@ -109,8 +120,10 @@ export async function POST(request: Request) {
 
   const body = await parseBody(request);
   const dryRun = body.dryRun === true;
-  const force = body.force !== false;
-  const runDate = body.runDate && /^\d{4}-\d{2}-\d{2}$/.test(body.runDate) ? body.runDate : undefined;
+  const force = body.force === true;
+  const runDate = body.runDate && /^\d{4}-\d{2}-\d{2}$/.test(body.runDate)
+    ? body.runDate
+    : getPacificMarketDate();
   const artistLimit = normalizeInteger(body.artistLimit, DEFAULT_RUN_NOW_ARTIST_LIMIT, 1, MAX_RUN_NOW_ARTIST_LIMIT);
   const artistOffset = normalizeInteger(body.artistOffset, 0, 0, Number.MAX_SAFE_INTEGER);
   const maxBatches = normalizeInteger(body.maxBatches, DEFAULT_RUN_NOW_MAX_BATCHES, 1, MAX_RUN_NOW_MAX_BATCHES);
@@ -121,6 +134,25 @@ export async function POST(request: Request) {
     1,
     MAX_RUN_NOW_EVENT_SCAN_MAX_RECORDS
   );
+
+  if (!dryRun && !force) {
+    const existing = await loadExistingRun(runDate);
+
+    if (existing && (existing.status === "running" || existing.status === "succeeded")) {
+      return NextResponse.json({
+        ok: true,
+        skipped: true,
+        forced: false,
+        dryRun: false,
+        persisted: false,
+        runDate,
+        source: existing.source,
+        reason: `The ${runDate} market session is already ${existing.status}.`,
+        existing
+      });
+    }
+  }
+
   const eventScan = await runEventScan({
     request,
     marketSecret,
@@ -263,4 +295,18 @@ function normalizeInteger(value: unknown, fallback: number, min: number, max: nu
   }
 
   return Math.min(max, Math.max(min, value));
+}
+
+async function loadExistingRun(runDate: string): Promise<ExistingRun | null> {
+  const { data, error } = await createServiceRoleClient()
+    .from("market_update_runs")
+    .select("run_date,status,source,started_at,completed_at,summary,error_message")
+    .eq("run_date", runDate)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(`Could not inspect the current market session: ${error.message}`);
+  }
+
+  return (data as ExistingRun | null) ?? null;
 }

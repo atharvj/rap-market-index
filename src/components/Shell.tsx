@@ -214,9 +214,13 @@ export function Shell({ children }: { children: React.ReactNode }) {
                     </span>
                     <span className="text-xs font-black text-paper/45">{themeLabel}</span>
                   </button>
-                  <Link href="/about" onClick={() => setAccountOpen(false)} className="flex items-center gap-3 rounded-lg px-3 py-2 hover:bg-panelSoft">
+                  <Link href="/help" onClick={() => setAccountOpen(false)} className="flex items-center gap-3 rounded-lg px-3 py-2 hover:bg-panelSoft">
                     <CircleHelp className="h-4 w-4 text-paper/45" aria-hidden="true" />
-                    Help & About
+                    Help Center
+                  </Link>
+                  <Link href="/about" onClick={() => setAccountOpen(false)} className="flex items-center gap-3 rounded-lg px-3 py-2 hover:bg-panelSoft">
+                    <AudioLines className="h-4 w-4 text-paper/45" aria-hidden="true" />
+                    About RMI
                   </Link>
                 </div>
 
@@ -330,6 +334,7 @@ function SiteFooter() {
             How the market works
           </Link>
           <div className="mt-3 flex gap-4 text-xs font-bold text-paper/50">
+            <Link href="/help" className="hover:text-cyan">Help</Link>
             <Link href="/privacy" className="hover:text-cyan">Privacy</Link>
             <Link href="/terms" className="hover:text-cyan">Terms</Link>
           </div>

@@ -1,6 +1,6 @@
 # Rap Market Index Backend Roadmap
 
-This app still runs in development with unsaved demo data, but the backend foundation is now shaped around Supabase, cloud accounts, continuous portfolios, and a server-side daily market update job.
+The production app uses Supabase for confirmed cloud accounts, saved portfolios, protected admin operations, market history, and server-side market updates. Mock state remains only as a local fallback when cloud configuration is absent.
 
 ## Supabase setup
 
@@ -23,8 +23,13 @@ This app still runs in development with unsaved demo data, but the backend found
 17. Run `supabase/migrations/016_market_integrity_guardrails.sql`.
 18. Run `supabase/migrations/017_market_operation_controls.sql`.
 19. Run `supabase/migrations/018_short_selling_foundation.sql`.
-17. Run `supabase/seed.sql` for the starter artists.
-18. Create `.env.local` in the project root and fill in:
+20. Run `supabase/migrations/019_profile_details.sql`.
+21. Run `supabase/migrations/020_profile_avatar.sql`.
+22. Run `supabase/migrations/021_profile_avatar_storage.sql`.
+23. Run `supabase/migrations/022_account_privacy_and_onboarding.sql`.
+24. Run `supabase/migrations/023_admin_user_support.sql`.
+25. Run `supabase/seed.sql` for the starter artists.
+26. Create `.env.local` in the project root and fill in:
    - `NEXT_PUBLIC_SUPABASE_URL`
    - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
    - `SUPABASE_SERVICE_ROLE_KEY`
@@ -44,6 +49,7 @@ This app still runs in development with unsaved demo data, but the backend found
    - `MARKET_BLUESKY_LOOKBACK_DAYS=7`
    - `MARKET_BLUESKY_DELAY_MS=250`
    - `ADMIN_EMAILS=<comma-separated admin emails>`
+   - `GROQ_API_KEY` for optional source-backed AI event extraction and verification
    - `LASTFM_API_KEY` for optional Last.fm listener/playcount signals
    - `SPOTIFY_CLIENT_ID` and `SPOTIFY_CLIENT_SECRET` for optional Spotify popularity/follower signals
    - `YOUTUBE_API_KEY` for optional YouTube channel view/subscriber/video-count and comment-reaction signals
@@ -145,7 +151,7 @@ Use the admin integrity endpoint to audit recent trade demand before trusting tr
 GET /api/admin/market-integrity
 ```
 
-It reports total recent trades, market-eligible trades, excluded admin/test trades, commission totals, concentrated order flow, and rapid repeated trading. The `/dev` console displays the same audit in the Market integrity panel. Admin emails are excluded from market impact by default so test orders can verify the product without polluting public price history or daily trade-flow demand.
+It reports total recent trades, market-eligible trades, excluded orders, commission totals, concentrated order flow, and rapid repeated trading. The `/dev` console displays the same audit in the Market integrity panel. Designated operator accounts are excluded from market impact by default so operational checks cannot pollute public price history or daily trade-flow demand.
 
 ## Go-live checklist
 
@@ -172,6 +178,8 @@ For production, add these environment variables to the deployment host before re
 After deployment, manually call `/api/cron/daily-market-update?dryRun=1` with `Authorization: Bearer <CRON_SECRET>` once. Then run one persisted `core` batch and recheck `/api/admin/market-health`. From that point forward, Vercel Cron can keep the graph history growing each day.
 
 `MARKET_MODEL_VERSION` is an optional internal audit override, not a required environment variable and not a prominent user-facing product label. Leave it unset in normal deployments so the code default is used. The resolved version is saved on market runs, signal snapshots, and price-history rows so future algorithm changes can be traced without rewriting historical prices. Normal market pages should keep broad language such as audience momentum, market activity, release signals, and media movement. Admin/health/debug views can show the exact model version.
+
+`rmi-core-v24` adds a cross-source audience-scale anchor. Long-run quote levels use listening, owned-video audience, and public-attention totals separately from daily momentum. A single platform can still provide useful scale evidence, but receives lower confidence than corroborated listening plus video coverage. A model transition applies the resulting scale correction once across the full roster; later runs only apply capped daily pressure toward the anchor. This prevents a missing source from acting like confirmation and prevents a temporary feature-driven exposure spike from being treated as permanent owned audience before retention appears in independent sources.
 
 `rmi-core-v14` tightens official YouTube upload event quality. Upload title matching now uses whole normalized terms, so short strings such as `ep` cannot accidentally match words like `explorepage`. The upload event path also fetches lightweight video duration/statistics, ignores weak short-form or low-reach snippet/performance uploads, and dampens modest-reach uploads instead of treating every recent official-channel upload as a major catalyst. The saved-event scoring path applies the same quality gate, so older low-signal upload events already stored in Supabase cannot keep moving prices as legacy catalysts.
 
@@ -256,7 +264,7 @@ The combined source path is:
 }
 ```
 
-That combines GDELT coverage, Last.fm audience momentum, public-attention pageview momentum, Spotify popularity/follower momentum, YouTube channel momentum, YouTube comment reaction, MusicBrainz release detection, and the market event/review layer. If optional source credentials are missing, the job returns a warning and skips that source instead of failing the whole dry run.
+That combines GDELT coverage, Last.fm audience momentum, public-attention pageview momentum, YouTube channel momentum, YouTube comment reaction, MusicBrainz release detection, and the market event/review layer. Spotify monthly listeners are not available through the official Web API, and Spotify removed the artist popularity/follower fields from its supported artist object in February 2026, so Spotify is not treated as a dependable production valuation source. If optional source credentials are missing, the job skips that source instead of failing the whole dry run.
 
 The production daily source is:
 
@@ -293,7 +301,7 @@ The `core` and `blended` paths also detect recent MusicBrainz release groups for
 
 The `gdelt` and `blended` paths can also create article-based market events. This detector is intentionally conservative: it requires the title to mention the artist or a quoted alias from the artist's GDELT query, only treats reviews as reviews when the title has review/rating language, recognizes release, chart, tour/festival, award, viral, public-conflict, and controversy terms, weighs trusted music/business/news domains higher, and limits detected events to the strongest few articles per artist per run.
 
-Real-source market runs also include trade flow from saved buy/sell transactions. Individual market-eligible trades already apply a small immediate market-maker impact; the daily trade-flow adapter summarizes the previous day's net buy-vs-sell gross order value, trade count, and trader breadth into the `traderDemand` model input. Admin/test trades can be marked `market_eligible=false`, which lets the order execute in the tester's portfolio without moving public prices or counting as trade-flow demand. Trade-flow observations are included in the admin health endpoint so the operator can verify whether real trading demand is being measured.
+Real-source market runs also include trade flow from saved buy/sell transactions. Individual market-eligible trades already apply a small immediate market-maker impact; the daily trade-flow adapter summarizes the previous day's net buy-vs-sell gross order value, trade count, and trader breadth into the `traderDemand` model input. Designated orders can be marked `market_eligible=false`, which lets the order execute without moving public prices or counting as trade-flow demand. Trade-flow observations are included in the admin health endpoint so the operator can verify whether real trading demand is being measured.
 
 ## MVP product scope
 
@@ -352,11 +360,11 @@ GET /api/cron/daily-market-update
 ```json
 {
   "path": "/api/cron/daily-market-update",
-  "schedule": "0 9 * * *"
+  "schedule": "0 13 * * *"
 }
 ```
 
-Vercel schedules cron in UTC, so this runs around 2 AM Pacific during daylight saving time. Hobby accounts support once-daily cron jobs, with per-hour scheduling precision. The route verifies `Authorization: Bearer <CRON_SECRET>`, then calls the protected batch runner with:
+Vercel schedules cron in UTC, so this runs in the early morning: around 6 AM Pacific during daylight saving time and 5 AM Pacific during standard time. Hobby accounts support once-daily cron jobs, with per-hour scheduling precision. The route verifies `Authorization: Bearer <CRON_SECRET>`, then calls the protected batch runner with:
 
 - `source`: `MARKET_CRON_SOURCE`, default `core`
 - `artistLimit`: `MARKET_CRON_ARTIST_LIMIT`, default `100`
@@ -376,7 +384,7 @@ Before pricing, the cron route calls `POST /api/admin/market-event-scan` unless 
 
 Event ingestion should be automatic in normal operation. The free automatic event sources are rotating GDELT news scans, media RSS/Google News RSS scans, official YouTube upload detection, public Bluesky social-catalyst detection, Reddit community-hype detection when credentials are configured, and MusicBrainz release detection.
 
-The route skips duplicate same-day runs when a successful or running `core` run already exists. This matters because cron delivery is best-effort and can occasionally miss or duplicate invocations. For manual local testing, call the cron route with `x-market-update-secret: <MARKET_UPDATE_SECRET>`. Add `?dryRun=1` to exercise the full path without persisting another market run.
+The cron and protected admin runner skip duplicate same-day runs when a successful or running `core` run already exists. This prevents repeat clicks or duplicate delivery from spending source quota and creating extra quote ticks. A failed run can be retried. For manual local testing, call the cron route with `x-market-update-secret: <MARKET_UPDATE_SECRET>`. Add `?dryRun=1` to exercise the full path without persisting another market run.
 
 The market event layer stores releases, reviews, news, controversies, awards, tour announcements, and viral moments. These events can adjust the final price movement after raw momentum is calculated, so a stream spike with weak reviews can still rise, but by less than a stream spike with strong reviews.
 
@@ -423,7 +431,7 @@ The protected event scanner endpoint is:
 POST /api/admin/market-event-scan
 ```
 
-The normal market workflow runs this automatically through cron. The `/dev` console keeps the scanner under `Advanced testing`; use `Preview` for a small dry scan, then `Save scan` to persist GDELT article-count observations and classified market events for a small least-recently-scanned artist batch while debugging.
+The normal market workflow runs this automatically through cron. The `/dev` console keeps the scanner under `Diagnostic tools`; use `Preview` for a small dry scan, then `Save scan` to persist GDELT article-count observations and classified market events for a small least-recently-scanned artist batch while diagnosing data issues.
 
 It accepts a body such as:
 
@@ -501,7 +509,7 @@ For launch, the honest product behavior should be "since listing" until enough r
 Rap Market Index should follow an HSX-style virtual specialist model instead of a real brokerage schedule:
 
 - Trading is continuous while the market is open. There is no stock-market-style 9:30 AM to 4:00 PM session for the first version.
-- The daily source run creates the previous-close anchor and resets the daily change around midnight Pacific time.
+- The daily source run creates the previous-close anchor and resets the session change during the morning refresh.
 - Eligible user trades can move the live quote intraday, but only inside capped quote/liquidity limits.
 - Market notes are catalyst summaries, not proof of exact causation. Finance sites and HSX-style markets show news, events, and ticker context; they do not prove a single cause for every tick.
 - Shorting should stay disabled until collateral, cover orders, exposure limits, and liquidation checks exist.
@@ -555,7 +563,7 @@ It expects a Supabase-authenticated `Authorization` header and a body like:
 }
 ```
 
-The database function handles the important atomic work: cash balance, holdings, average buy price, transaction record, commission, trading demand, and small market-maker price impact. Trades charge a 1% commission with a minimum of 2 cents per share. `market_eligible=false` is used for admin/test trades so the order still executes but does not move public prices or feed the trade-flow market signal.
+The database function handles the important atomic work: cash balance, holdings, average buy price, transaction record, commission, trading demand, and small market-maker price impact. Trades charge a 1% commission with a minimum of 2 cents per share. `market_eligible=false` is used for designated excluded orders so the order still executes but does not move public prices or feed the trade-flow market signal.
 
 Migration `017_market_operation_controls.sql` adds the market-operations layer:
 
@@ -584,7 +592,7 @@ Migration `018_short_selling_foundation.sql` adds the conservative short-selling
 - `public.short_position_risk` exposes current short liability and equity for account/admin views.
 - Short proceeds are not spendable cash; users post collateral and realize P/L only when covering.
 - A user cannot hold long and short exposure in the same artist at the same time.
-- Short/cover trades use the same trading halts, market-impact pause, admin/test exclusion, commission, quote, slippage, daily limit, and anti-spam controls as long trades.
+- Short/cover trades use the same trading halts, market-impact pause, market-eligibility rules, commission, quote, slippage, daily limit, and anti-spam controls as long trades.
 
 ## Frontend bridge
 
@@ -594,7 +602,7 @@ The app can now ask for a server-side market snapshot:
 GET /api/market/snapshot
 ```
 
-Without Supabase credentials, it returns the demo market in memory. With Supabase configured, it returns active artists, stats, and price history from the database.
+Without Supabase credentials, local development can return an in-memory fallback. With Supabase configured, production returns active artists, stats, and price history from the database; it does not silently substitute fake quotes when the live feed fails.
 
 ## Auth/profile bridge
 
@@ -610,4 +618,4 @@ When Supabase is configured, the client uses Supabase Auth directly. After sign-
 POST /api/profile/bootstrap
 ```
 
-That route creates or loads the player profile and returns the user's cash balance, holdings, and recent transactions. Until Supabase is configured, the app remains in unsaved demo mode.
+That route requires a confirmed Supabase user, creates or loads the player profile, and returns only that user's cash balance, holdings, and recent transactions. Public profile endpoints never return email addresses and honor profile/portfolio visibility settings.

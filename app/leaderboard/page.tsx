@@ -167,7 +167,7 @@ export default function LeaderboardPage() {
 
         <div className="flex items-start gap-2 px-1 text-xs leading-5 text-paper/45">
           <ShieldCheck className="mt-0.5 h-3.5 w-3.5 shrink-0 text-mint" aria-hidden="true" />
-          <p>Admin trades are excluded from price-demand signals and cannot move artist quotes.</p>
+          <p>Only orders that pass RMI's market-integrity rules contribute to artist demand signals.</p>
         </div>
       </aside>
     </div>

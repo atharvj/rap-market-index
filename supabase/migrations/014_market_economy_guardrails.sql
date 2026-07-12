@@ -1,7 +1,7 @@
 -- HSX-style base economy upgrades:
 -- - larger starter bankroll for new accounts
 -- - 1% trade commission with a two-cent/share minimum
--- - market eligibility flag so admin/test trades can execute without moving public prices
+-- - market eligibility flag so designated orders can execute without moving public prices
 
 alter table if exists public.profiles
   alter column cash_balance set default 100000;
