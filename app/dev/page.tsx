@@ -1080,14 +1080,28 @@ export default function DevPage() {
   }
 
   async function runUserSupportAction(
-    action: "suspend" | "restore" | "reset_portfolio" | "delete_unconfirmed",
+    action: "suspend" | "restore" | "reset_portfolio" | "delete_unconfirmed" | "delete_account",
     user: UserSupportDirectory["users"][number]
   ) {
     const actionLabel = action === "reset_portfolio"
       ? `Reset ${user.username}'s portfolio`
-      : action === "delete_unconfirmed"
-        ? `Permanently remove ${user.email ?? user.username}`
-        : `${action === "suspend" ? "Suspend" : "Restore"} ${user.username}`;
+      : action === "delete_account"
+        ? `Permanently delete ${user.email ?? user.username}`
+        : action === "delete_unconfirmed"
+          ? `Permanently remove ${user.email ?? user.username}`
+          : `${action === "suspend" ? "Suspend" : "Restore"} ${user.username}`;
+
+    let confirmationEmail: string | undefined;
+
+    if (action === "delete_account") {
+      confirmationEmail = window.prompt(
+        `This permanently deletes the suspended account and its owned data. Type ${user.email ?? "the account email"} to continue.`
+      )?.trim();
+
+      if (!user.email || confirmationEmail?.toLowerCase() !== user.email.toLowerCase()) {
+        return;
+      }
+    }
 
     if (
       (action === "suspend" || action === "reset_portfolio" || action === "delete_unconfirmed") &&
@@ -1113,7 +1127,8 @@ export default function DevPage() {
           action,
           userId: user.id,
           reason: userSupportReason,
-          startingCash: Number(userResetCash)
+          startingCash: Number(userResetCash),
+          confirmationEmail
         })
       });
       const payload = await readJsonResponse(response);
@@ -2250,7 +2265,7 @@ function UserSupportPanel({
   onReasonChange: (value: string) => void;
   onResetCashChange: (value: string) => void;
   onAction: (
-    action: "suspend" | "restore" | "reset_portfolio" | "delete_unconfirmed",
+    action: "suspend" | "restore" | "reset_portfolio" | "delete_unconfirmed" | "delete_account",
     user: UserSupportDirectory["users"][number]
   ) => void;
 }) {
@@ -2286,7 +2301,7 @@ function UserSupportPanel({
           />
         </label>
         <label className="space-y-2">
-          <span className="text-xs font-black uppercase tracking-wide text-paper/45">Reset cash</span>
+          <span className="text-xs font-black uppercase tracking-wide text-paper/45">Reset starting cash</span>
           <input
             value={resetCash}
             onChange={(event) => onResetCashChange(event.target.value)}
@@ -2360,6 +2375,16 @@ function UserSupportPanel({
                 >
                   Reset portfolio
                 </button>
+                {user.isSuspended && user.emailConfirmedAt && !user.isAdmin ? (
+                  <button
+                    type="button"
+                    onClick={() => onAction("delete_account", user)}
+                    disabled={actionPending}
+                    className="min-h-9 rounded-md border border-ember/40 px-3 text-xs font-black text-ember hover:bg-ember/10 disabled:opacity-35"
+                  >
+                    Delete account
+                  </button>
+                ) : null}
                 {!user.emailConfirmedAt && !user.lastSignInAt && !user.isAdmin ? (
                   <button
                     type="button"
@@ -2377,6 +2402,10 @@ function UserSupportPanel({
           )}
         </div>
       </div>
+
+      <p className="text-xs leading-5 text-paper/45">
+        Portfolio reset removes long and short positions and saved orders, then restores the chosen cash balance. It keeps the login, profile, onboarding choices, and watchlist.
+      </p>
 
       <AdminActionResult state={actionState} />
 

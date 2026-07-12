@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { getEmailDomainWarning } from "@/lib/email-address";
 import type { Json } from "@/lib/supabase/database.types";
 import { createServiceRoleClient } from "@/lib/supabase/server";
 import { isAdminEmail, requireAdminRequest } from "@/server/admin-auth";
@@ -8,7 +9,7 @@ export const dynamic = "force-dynamic";
 
 const NO_STORE_HEADERS = { "Cache-Control": "private, no-store, max-age=0" };
 
-type SupportAction = "suspend" | "restore" | "reset_portfolio" | "delete_unconfirmed";
+type SupportAction = "suspend" | "restore" | "reset_portfolio" | "delete_unconfirmed" | "delete_account";
 
 export async function GET(request: Request) {
   const auth = await requireAdminRequest(request, { allowMarketSecret: false });
@@ -196,12 +197,13 @@ export async function PATCH(request: Request) {
       userId?: string;
       reason?: string;
       startingCash?: number;
+      confirmationEmail?: string;
     };
     const action = body.action;
     const userId = body.userId?.trim();
     const reason = body.reason?.trim().slice(0, 500) ?? "";
 
-    if (!action || !["suspend", "restore", "reset_portfolio", "delete_unconfirmed"].includes(action) || !userId) {
+    if (!action || !["suspend", "restore", "reset_portfolio", "delete_unconfirmed", "delete_account"].includes(action) || !userId) {
       return NextResponse.json(
         { ok: false, error: "A valid support action and user are required." },
         { status: 400, headers: NO_STORE_HEADERS }
@@ -220,7 +222,7 @@ export async function PATCH(request: Request) {
     }
 
     if (
-      (action === "suspend" || action === "restore" || action === "delete_unconfirmed") &&
+      (action === "suspend" || action === "restore" || action === "delete_unconfirmed" || action === "delete_account") &&
       (userId === auth.user?.id || isAdminEmail(target.email))
     ) {
       return NextResponse.json(
@@ -252,6 +254,43 @@ export async function PATCH(request: Request) {
         details: {
           deletedUserId: userId,
           email: target.email ?? null
+        }
+      });
+
+      return NextResponse.json({ ok: true, action, userId }, { headers: NO_STORE_HEADERS });
+    }
+
+    if (action === "delete_account") {
+      if (!target.banned_until || new Date(target.banned_until).getTime() <= Date.now()) {
+        return NextResponse.json(
+          { ok: false, error: "Suspend the account before permanently deleting it." },
+          { status: 400, headers: NO_STORE_HEADERS }
+        );
+      }
+
+      if (!target.email || body.confirmationEmail?.trim().toLowerCase() !== target.email.toLowerCase()) {
+        return NextResponse.json(
+          { ok: false, error: "Enter the account email exactly to confirm permanent deletion." },
+          { status: 400, headers: NO_STORE_HEADERS }
+        );
+      }
+
+      const deletedEmail = target.email;
+      const { error } = await supabase.auth.admin.deleteUser(userId, false);
+
+      if (error) {
+        throw new Error(`Could not delete account: ${error.message}`);
+      }
+
+      await recordAdminAction({
+        supabase,
+        actorUserId: auth.user?.id ?? null,
+        targetUserId: null,
+        action,
+        reason,
+        details: {
+          deletedUserId: userId,
+          email: deletedEmail
         }
       });
 
@@ -320,25 +359,6 @@ export async function PATCH(request: Request) {
       { status: 500, headers: NO_STORE_HEADERS }
     );
   }
-}
-
-function getEmailDomainWarning(email: string | undefined) {
-  const domain = email?.split("@")[1]?.trim().toLowerCase();
-
-  if (!domain) {
-    return null;
-  }
-
-  const likelyTypos: Record<string, string> = {
-    "gamil.com": "Did you mean gmail.com?",
-    "gmali.com": "Did you mean gmail.com?",
-    "gmai.com": "Did you mean gmail.com?",
-    "gnail.com": "Did you mean gmail.com?",
-    "hotnail.com": "Did you mean hotmail.com?",
-    "outlok.com": "Did you mean outlook.com?"
-  };
-
-  return likelyTypos[domain] ?? null;
 }
 
 async function recordAdminAction({

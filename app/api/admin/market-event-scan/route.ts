@@ -342,7 +342,8 @@ function selectAiResearchArtists(
     return [];
   }
 
-  const prioritySlotCount = Math.min(limit, Math.max(1, Math.ceil(limit * 0.25)));
+  // Verify timely article candidates first while preserving a rotating discovery slot.
+  const prioritySlotCount = Math.min(limit, Math.max(1, Math.ceil(limit * 0.75)));
   const priorityArtists = [...artists]
     .filter(
       (artist) =>

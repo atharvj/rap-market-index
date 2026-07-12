@@ -273,6 +273,7 @@ export function isLowValueMarketArticleTitle(title: string) {
     /\bholds?\s+up\s+fans?\s+sign\b/.test(normalized) ||
     /\b(?:thinks?|believes?|says?)\b.*\bwon\b.*\b(?:beef|diss|feud)\b/.test(normalized) ||
     /\b(?:sneakers?|shoes?)\s+(?:we|you)\s+want\s+to\s+see\b/.test(normalized) ||
+    /\b(?:needs?|wants?|calls?\s+for)\b.*\bcollab(?:oration)?\s+album\b/.test(normalized) ||
     /\b(?:rumou?red|set to)\b.*\b(?:album|collab|song)\b.*\bwhat we know\b/.test(normalized) ||
     /\bhow\b.*\bbecame\b.*\b(?:star|viral|famous|popular)\b/.test(normalized) ||
     /\bviral\s+chaos\b/.test(normalized) ||

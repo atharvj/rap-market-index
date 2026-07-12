@@ -57,7 +57,9 @@ export default function HomePage() {
   }, [query, state.artists]);
   const marketLeader = [...state.artists].sort((a, b) => b.dailyChangePercent - a.dailyChangePercent)[0];
   const underPressure = [...state.artists].sort((a, b) => a.dailyChangePercent - b.dailyChangePercent)[0];
-  const signalLeader = [...state.artists].sort((a, b) => b.hypeScore - a.hypeScore)[0];
+  const signalLeader = [...state.artists]
+    .filter((artist) => artist.id !== marketLeader?.id)
+    .sort((a, b) => b.hypeScore - a.hypeScore)[0] ?? marketLeader;
   const breadth = getMarketBreadth(state.artists);
   const portfolioDayPercent = portfolioValue - portfolioDayChange > 0
     ? (portfolioDayChange / (portfolioValue - portfolioDayChange)) * 100

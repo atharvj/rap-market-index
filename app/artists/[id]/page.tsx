@@ -7,6 +7,7 @@ import { useGame } from "@/components/GameProvider";
 import { MarketSideRail } from "@/components/MarketSideRail";
 import { MarketNewsFeed } from "@/components/MarketNewsFeed";
 import { ChangeText, RmiButton, RmiSection } from "@/components/RmiPrimitives";
+import { ScoreInfo } from "@/components/ScoreInfo";
 import { TradeTicket } from "@/components/TradeTicket";
 import { WatchlistButton } from "@/components/WatchlistButton";
 import { sanitizeMoveExplanation } from "@/lib/artist-explanations";
@@ -74,7 +75,10 @@ export default function ArtistDetailPage() {
                 <BadgeCheck className="h-4 w-4 text-cyan" aria-hidden="true" />
                 <WatchlistButton artistId={artist.id} />
               </div>
-              <p className="mt-1 text-sm font-bold text-paper/60">${artist.ticker} · rap market · {artist.hypeScore}/100 score</p>
+              <p className="mt-1 flex flex-wrap items-center gap-1.5 text-sm font-bold text-paper/60">
+                <span>${artist.ticker} · rap market · {artist.hypeScore}/100 RMI Score</span>
+                <ScoreInfo />
+              </p>
               <p className="mt-1 text-xs text-paper/40">Latest recorded quote · {state.artists.length} active listings</p>
             </div>
           </div>

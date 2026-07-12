@@ -1,6 +1,7 @@
 "use client";
 
 import { getBrowserSupabaseClient, isBrowserSupabaseConfigured } from "@/lib/supabase/client";
+import { getEmailDomainSuggestion } from "@/lib/email-address";
 import type { Session, User } from "@supabase/supabase-js";
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 
@@ -35,11 +36,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const supabase = getBrowserSupabaseClient();
 
     supabase.auth.getSession().then(async ({ data }) => {
-      if (data.session && !data.session.user.email_confirmed_at) {
+      if (!data.session) {
+        setSession(null);
+        setLoading(false);
+        return;
+      }
+
+      const { data: verified, error } = await supabase.auth.getUser();
+      const verifiedUser = verified.user;
+      const verifiedSession = error || !verifiedUser ? null : data.session;
+
+      if (verifiedSession && verifiedUser && !verifiedUser.email_confirmed_at) {
         await supabase.auth.signOut();
         setSession(null);
       } else {
-        setSession(data.session);
+        setSession(verifiedSession);
       }
       setLoading(false);
     });
@@ -69,7 +80,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const { data, error } = await supabase.auth.signInWithPassword({ email, password });
 
       if (error) {
-        return { ok: false, message: error.message };
+        const message = /banned|suspend/i.test(error.message)
+          ? "This account is suspended. Contact RMI support if you believe this is a mistake."
+          : error.message;
+
+        return { ok: false, message };
       }
 
       if (!data.user.email_confirmed_at) {
@@ -88,6 +103,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     async (email: string, password: string, username: string) => {
       if (!configured) {
         return { ok: false, message: "Supabase is not configured yet." };
+      }
+
+      const suggestedEmail = getEmailDomainSuggestion(email);
+
+      if (suggestedEmail) {
+        return {
+          ok: false,
+          message: `Check the email address. Did you mean ${suggestedEmail}?`
+        };
       }
 
       const supabase = getBrowserSupabaseClient();

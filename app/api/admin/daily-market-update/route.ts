@@ -42,7 +42,7 @@ import { collectYoutubeMarketSignals } from "@/server/market/youtube-source";
 import { collectYoutubeCommentMarketSignals } from "@/server/market/youtube-comments-source";
 import { collectYoutubeUploadEvents } from "@/server/market/youtube-upload-events-source";
 import { getPacificMarketDate } from "@/server/market/market-date";
-import { getMarketModelVersion } from "@/server/market/model-version";
+import { getMarketModelVersion, shouldRebaseAudienceValuation } from "@/server/market/model-version";
 import { getMockMarketArtists } from "@/server/market/mock-source";
 import type {
   AdapterSignals,
@@ -176,7 +176,7 @@ export async function POST(request: Request) {
     const previousModelVersion = supabase && isRealExternalSource(source)
       ? await loadPreviousSuccessfulMarketModelVersion({ supabase, runDate })
       : null;
-    const valuationRebase = Boolean(previousModelVersion && previousModelVersion !== modelVersion);
+    const valuationRebase = shouldRebaseAudienceValuation(previousModelVersion, modelVersion);
     const alreadyRebasedArtistIds = valuationRebase && supabase
       ? await loadArtistsUpdatedWithModel({
           supabase,

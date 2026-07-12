@@ -7,6 +7,7 @@ import { useGame } from "@/components/GameProvider";
 import { UserAvatar } from "@/components/UserAvatar";
 import { RmiButton } from "@/components/RmiPrimitives";
 import { formatCurrency } from "@/lib/formatters";
+import { getEmailDomainWarning } from "@/lib/email-address";
 import { getBrowserSupabaseClient } from "@/lib/supabase/client";
 import { Camera, CalendarDays, Eye, EyeOff, ImagePlus, LogOut, Plus, Search, Star, WalletCards, X } from "lucide-react";
 import Link from "next/link";
@@ -50,6 +51,7 @@ function AccountPageContent() {
   const [confirmationPending, setConfirmationPending] = useState(false);
   const fileRef = useRef<HTMLInputElement | null>(null);
   const displayName = session && state.username !== "Demo Guest" ? state.username : user?.email?.split("@")[0] ?? "Trader";
+  const emailDomainWarning = mode === "signup" ? getEmailDomainWarning(email) : null;
   const favoriteArtists = useMemo(
     () =>
       favoriteArtistIds
@@ -270,6 +272,9 @@ function AccountPageContent() {
             autoComplete="email"
             required
           />
+          {emailDomainWarning ? (
+            <p className="-mt-1 text-xs font-bold text-brass">{emailDomainWarning}</p>
+          ) : null}
           <div className="relative">
             <input
               value={password}

@@ -14,6 +14,10 @@ const sections = [
     body: "An RMI quote is a fantasy index value, not an artist's net worth, revenue, or literal market capitalization. A larger established audience generally supports a higher long-term range, while verified momentum and catalysts determine how the quote moves from one market session to the next."
   },
   {
+    title: "What the RMI Score means",
+    body: "RMI Score is a normalized 1-99 reading of current signal strength across audience momentum, public attention, verified catalysts, reception, and eligible trading demand. It is not a price target, forecast, or daily percentage change, so the strongest signal and the day's top gainer can be different artists."
+  },
+  {
     title: "Why audience size is not the whole price",
     body: "Monthly reach can jump temporarily after a feature or playlist placement. RMI treats that as momentum first and waits for durable listening, direct-channel growth, and broader attention before allowing it to become a permanent valuation change."
   },

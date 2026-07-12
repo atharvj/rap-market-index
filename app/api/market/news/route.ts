@@ -389,6 +389,17 @@ function isStoredMediaEventStillValid(
   const storedReason = getRawString(rawPayload.classificationReason);
   const sourceTier = getRawNumber(rawPayload.sourceTier) ?? 0;
   const corroboratingSourceCount = getRawNumber(rawPayload.corroboratingSourceCount) ?? 0;
+  const artistRole = getRawString(rawPayload.artistRole);
+  const isFeatureCredit =
+    artistRole === "featured" || titleCreditsArtistAsFeature(event.title, artist.name);
+
+  if (
+    isFeatureCredit &&
+    !getRawBoolean(rawPayload.musicDemandConfirmed) &&
+    !getRawBoolean(rawPayload.publicReactionConfirmed)
+  ) {
+    return false;
+  }
 
   if (
     !classification ||
@@ -469,10 +480,15 @@ function isPublicAiResearchEvent(
   const sourceUrl = event.source_url ?? (getRawText(rawPayload.sourceUrl) || getRawText(rawPayload.url));
   const corroboratingSourceCount = getRawNumber(rawPayload.corroboratingSourceCount) ?? 1;
   const publicReactionConfirmed = getRawBoolean(rawPayload.publicReactionConfirmed);
+  const musicDemandConfirmed = getRawBoolean(rawPayload.musicDemandConfirmed);
   const factualClaimConfirmed = getRawBoolean(rawPayload.factualClaimConfirmed);
   const artistRole = getRawString(rawPayload.artistRole);
 
   if (artistRole === "mentioned") {
+    return false;
+  }
+
+  if (artistRole === "featured" && !musicDemandConfirmed && !publicReactionConfirmed) {
     return false;
   }
 

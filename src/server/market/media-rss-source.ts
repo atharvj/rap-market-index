@@ -716,6 +716,12 @@ function buildArtistNewsQuery(artist: MarketUpdateArtist, externalIds?: ArtistEx
     "viral",
     "snippet",
     "performance",
+    "surprise guest",
+    "headline",
+    "festival",
+    "sold out",
+    "chart",
+    "streams",
     "tour"
   ].join(" OR ");
 

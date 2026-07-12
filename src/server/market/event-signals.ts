@@ -1179,36 +1179,58 @@ function getFeatureEvidenceAdjustment(event: ScoredMarketEvent) {
   }
 
   const publicReactionConfirmed = getRawBoolean(event.event.rawPayload.publicReactionConfirmed);
+  const musicDemandConfirmed = getRawBoolean(event.event.rawPayload.musicDemandConfirmed);
   const corroboratingSourceCount = getRawOptionalNumber(event.event.rawPayload.corroboratingSourceCount) ?? 1;
   const fanReactionEvidenceCount = getRawOptionalNumber(event.event.rawPayload.fanReactionEvidenceCount) ?? 0;
   const reachScope = getRawString(event.event.rawPayload.reachScope) ?? "";
   const broadReach = reachScope === "broad" || reachScope === "mainstream";
   const sourceCount = Math.max(event.clusterSourceCount, corroboratingSourceCount);
 
+  if (musicDemandConfirmed && publicReactionConfirmed && fanReactionEvidenceCount >= 2 && sourceCount >= 2) {
+    return {
+      label: "feature_with_confirmed_demand_and_public_reaction",
+      multiplier: 1
+    };
+  }
+
+  if (musicDemandConfirmed && broadReach && sourceCount >= 2) {
+    return {
+      label: "feature_with_confirmed_demand_and_broad_reach",
+      multiplier: event.eventSubtype === "major_feature" ? 0.82 : 0.68
+    };
+  }
+
+  if (musicDemandConfirmed && sourceCount >= 2) {
+    return {
+      label: "feature_with_confirmed_demand",
+      multiplier: event.eventSubtype === "major_feature" ? 0.58 : 0.42
+    };
+  }
+
   if (publicReactionConfirmed && fanReactionEvidenceCount >= 2 && sourceCount >= 2) {
     return {
-      label: "feature_with_confirmed_public_reaction",
-      multiplier: 1
+      label: "feature_with_reaction_but_unconfirmed_music_demand",
+      multiplier: event.eventSubtype === "major_feature" ? 0.38 : 0.25
     };
   }
 
   if (broadReach && sourceCount >= 2) {
     return {
-      label: "feature_with_broad_confirmed_reach",
-      multiplier: event.eventSubtype === "major_feature" ? 0.82 : 0.68
+      label: "feature_coverage_without_demand_confirmation",
+      multiplier: event.eventSubtype === "major_feature" ? 0.22 : 0.14
     };
   }
 
   if (sourceCount >= 2) {
     return {
-      label: "feature_confirmed_without_broad_reaction",
-      multiplier: event.eventSubtype === "major_feature" ? 0.62 : 0.48
+      label: "feature_credit_corroborated_without_demand",
+      multiplier: event.eventSubtype === "major_feature" ? 0.14 : 0.08
     };
   }
 
   return {
-    label: "feature_credit_without_reaction_confirmation",
-    multiplier: event.eventSubtype === "major_feature" ? 0.42 : 0.28
+    label: "feature_credit_without_demand_confirmation",
+    multiplier: event.eventSubtype === "major_feature" ? 0.08 : 0.04
   };
 }
 

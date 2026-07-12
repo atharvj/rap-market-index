@@ -10,12 +10,12 @@ type ObservationsResponse = {
 };
 
 const preferredSeries = [
-  { key: "youtube:subscriber_count", label: "Video Subscribers" },
+  { key: "youtube:subscriber_count", label: "Video Audience" },
   { key: "youtube:channel_views", label: "Channel Views" },
-  { key: "lastfm:listeners", label: "Last.fm Listeners" },
-  { key: "lastfm:playcount", label: "Last.fm Plays" },
+  { key: "wikimedia:pageviews_7d", label: "Public Attention (7d)" },
   { key: "media_rss:source_count", label: "Recent Media Sources" },
-  { key: "trade_flow:unique_trader_count", label: "Active Traders" }
+  { key: "trade_flow:unique_trader_count", label: "Active Traders" },
+  { key: "trade_flow:trade_count", label: "Recent Orders" }
 ];
 
 export function ArtistAudienceSnapshot({ artistId }: { artistId: string }) {
@@ -68,8 +68,8 @@ export function ArtistAudienceSnapshot({ artistId }: { artistId: string }) {
   return (
     <section className="rmi-card overflow-hidden">
       <div className="border-b border-line px-4 py-3">
-        <h2 className="text-base font-black">Audience &amp; Activity</h2>
-        <p className="mt-1 text-xs font-bold text-paper/48">Latest recorded public indicators. These are context, not direct price formulas.</p>
+        <h2 className="text-base font-black">Public Market Indicators</h2>
+        <p className="mt-1 text-xs font-bold text-paper/48">High-level audience, attention, media, and trading context. No single indicator sets the quote.</p>
       </div>
       <div
         className="grid divide-x divide-y divide-line"

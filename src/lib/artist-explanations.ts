@@ -1,5 +1,5 @@
 export const MARKET_SCORE_EXPLANATION =
-  "RMI Score is a 1-99 market signal built from audience momentum, video activity, public attention, releases, reviews, and trading demand.";
+  "RMI Score is a normalized 1-99 measure of current signal strength across audience momentum, public attention, verified catalysts, reception, and eligible trading demand. It is not a price target, forecast, or daily return.";
 
 const LOW_SIGNAL_EXPLANATION_TERMS = [
   "#explorepage",
