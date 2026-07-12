@@ -12,6 +12,7 @@ import {
 } from "@/server/market/artist-event-disambiguation";
 import { classifyArticleEvent, normalizeDomain } from "@/server/market/gdelt-source";
 import { loadSourcePreviewImageUrls } from "@/server/market/source-preview-images";
+import { groupNewsStoryEvents, resolveNewsStoryArtists } from "@/server/market/news-story-groups";
 
 export const dynamic = "force-dynamic";
 
@@ -35,6 +36,11 @@ type MarketNewsItem = {
   artistId: string;
   artistName: string;
   ticker: string;
+  relatedArtists: Array<{
+    artistId: string;
+    artistName: string;
+    ticker: string;
+  }>;
   eventDate: string;
   eventType: string;
   eventLabel: string | null;
@@ -140,7 +146,16 @@ export async function GET(request: Request) {
       throw new Error(`Could not load market news: ${error.message}`);
     }
 
-    const rankedEvents = ((data ?? []) as MarketEventRow[])
+    const initialEvents = (data ?? []) as MarketEventRow[];
+    const candidateEvents = selectedArtistIds.length
+      ? await loadRelatedStoryEvents({
+          supabase,
+          initialEvents,
+          startDate: shiftMarketDate(runDate, -lookbackDays),
+          runDate
+        })
+      : initialEvents;
+    const rankedEvents = candidateEvents
       .filter(
         (event) =>
           artistById.has(event.artist_id) &&
@@ -150,10 +165,27 @@ export async function GET(request: Request) {
           })
       )
       .sort((first, second) => getNewsImportanceScore(second, runDate) - getNewsImportanceScore(first, runDate));
-    const eventNews = diversifyMarketNewsEvents(rankedEvents, {
-      feedMode: selectedArtistIds.length ? "artist" : feedMode,
-      limit
-    }).map((event) => mapMarketEventToNewsItem(event, artistById));
+    const preferredArtistIds = new Set(selectedArtistIds);
+    const storyGroups = groupNewsStoryEvents(rankedEvents, preferredArtistIds).filter(
+      (group) =>
+        !selectedArtistIds.length ||
+        group.events.some((event) => preferredArtistIds.has(event.artist_id))
+    );
+    const storyByPrimaryId = new Map(storyGroups.map((group) => [group.primary.id, group]));
+    const selectedEvents = diversifyMarketNewsEvents(
+      storyGroups.map((group) => group.primary),
+      {
+        feedMode: selectedArtistIds.length ? "artist" : feedMode,
+        limit
+      }
+    );
+    const eventNews = selectedEvents.map((event) =>
+      mapMarketEventToNewsItem(
+        event,
+        artistById,
+        storyByPrimaryId.get(event.id)?.events ?? [event]
+      )
+    );
     const sourcePreviewImages = await loadSourcePreviewImageUrls(
       eventNews.filter((item) => !item.thumbnailUrl).map((item) => item.sourceUrl)
     );
@@ -200,9 +232,75 @@ async function loadArtists(supabase: ReturnType<typeof createServiceRoleClient>)
   return (data ?? []) as ArtistRow[];
 }
 
+async function loadRelatedStoryEvents({
+  supabase,
+  initialEvents,
+  startDate,
+  runDate
+}: {
+  supabase: ReturnType<typeof createServiceRoleClient>;
+  initialEvents: MarketEventRow[];
+  startDate: string;
+  runDate: string;
+}) {
+  if (!initialEvents.length) {
+    return [];
+  }
+
+  const sourceUrls = Array.from(
+    new Set(initialEvents.map((event) => event.source_url).filter((value): value is string => Boolean(value)))
+  );
+  const titles = Array.from(new Set(initialEvents.map((event) => event.title).filter(Boolean)));
+  const requests = [
+    ...chunkValues(sourceUrls, 12).map((batch) =>
+      supabase
+        .from("market_events")
+        .select("*")
+        .in("source_url", batch)
+        .gte("event_date", startDate)
+        .lte("event_date", runDate)
+        .limit(500)
+    ),
+    ...chunkValues(titles, 30).map((batch) =>
+      supabase
+        .from("market_events")
+        .select("*")
+        .in("title", batch)
+        .gte("event_date", startDate)
+        .lte("event_date", runDate)
+        .limit(500)
+    )
+  ];
+  const results = await Promise.all(requests);
+  const eventsById = new Map(initialEvents.map((event) => [event.id, event]));
+
+  for (const result of results) {
+    if (result.error) {
+      throw new Error(`Could not load related market-news artists: ${result.error.message}`);
+    }
+
+    for (const event of (result.data ?? []) as MarketEventRow[]) {
+      eventsById.set(event.id, event);
+    }
+  }
+
+  return [...eventsById.values()];
+}
+
+function chunkValues<T>(values: T[], size: number) {
+  const chunks: T[][] = [];
+
+  for (let index = 0; index < values.length; index += size) {
+    chunks.push(values.slice(index, index + size));
+  }
+
+  return chunks;
+}
+
 function mapMarketEventToNewsItem(
   event: MarketEventRow,
-  artistById: Map<string, ArtistRow>
+  artistById: Map<string, ArtistRow>,
+  storyEvents: MarketEventRow[]
 ): MarketNewsItem {
   const artist = artistById.get(event.artist_id) ?? null;
   const rawPayload = toRawPayload(event.raw_payload);
@@ -215,6 +313,7 @@ function mapMarketEventToNewsItem(
     artistId: event.artist_id,
     artistName: artist?.name ?? event.artist_id,
     ticker: artist?.ticker ?? event.artist_id,
+    relatedArtists: getRelatedNewsArtists(event, storyEvents, artistById),
     eventDate: event.event_date,
     eventType: event.event_type,
     eventLabel: getPublicEventLabel(event, rawPayload, artist?.name ?? null),
@@ -234,6 +333,26 @@ function mapMarketEventToNewsItem(
     statusSeverity: typeof rawPayload.statusSeverity === "string" ? rawPayload.statusSeverity : null,
     createdAt: event.created_at
   };
+}
+
+function getRelatedNewsArtists(
+  primaryEvent: MarketEventRow,
+  storyEvents: MarketEventRow[],
+  artistById: Map<string, ArtistRow>
+) {
+  return resolveNewsStoryArtists({
+    primary: primaryEvent,
+    events: storyEvents,
+    artists: [...artistById.values()].map((artist) => ({
+      id: artist.id,
+      name: artist.name,
+      ticker: artist.ticker
+    }))
+  }).map((artist) => ({
+    artistId: artist.id,
+    artistName: artist.name,
+    ticker: artist.ticker
+  }));
 }
 
 function normalizeEventType(value: string | null): MarketNewsType | null {

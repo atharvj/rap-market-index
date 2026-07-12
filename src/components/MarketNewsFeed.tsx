@@ -11,6 +11,11 @@ export type MarketNewsItem = {
   artistId: string;
   artistName: string;
   ticker: string;
+  relatedArtists?: Array<{
+    artistId: string;
+    artistName: string;
+    ticker: string;
+  }>;
   eventDate: string;
   eventType: string;
   eventLabel?: string | null;
@@ -213,12 +218,7 @@ function HomeLeadStory({ item }: { item: MarketNewsItem }) {
         <div className="grid content-between gap-5 p-5 sm:p-6">
           <div>
             <div className="flex flex-wrap items-center gap-2 text-xs font-black text-paper/55">
-              <Link
-                href={`/artists/${item.artistId}`}
-                className="rounded bg-cyan/10 px-2 py-1 text-cyan hover:bg-cyan/15"
-              >
-                {item.ticker}
-              </Link>
+              <NewsTickerLinks item={item} />
               <EventBadge item={item} positive={positive} />
               <span>{formatDate(item.eventDate)}</span>
               <SourceMeta item={item} />
@@ -227,7 +227,7 @@ function HomeLeadStory({ item }: { item: MarketNewsItem }) {
               {trimTitle(item.title, 132)}
             </h2>
             <p className="mt-3 text-sm font-bold leading-6 text-paper/58">
-              {source} catalyst ranked by impact, confidence, and recency for {item.artistName}.
+              {source} catalyst ranked by impact, confidence, and recency for {formatNewsArtistNames(item)}.
             </p>
           </div>
 
@@ -262,17 +262,15 @@ function HomeStoryCard({ item }: { item: MarketNewsItem }) {
       <NewsThumbnail item={item} size="card" />
       <div className="grid gap-3 p-3.5">
         <div className="flex flex-wrap items-center gap-2 text-[11px] font-black text-paper/50">
-          <Link href={`/artists/${item.artistId}`} className="rounded bg-panelSoft px-2 py-1 text-cyan hover:bg-cyan/10">
-            {item.ticker}
-          </Link>
+          <NewsTickerLinks item={item} />
           <EventBadge item={item} positive={positive} />
           <span>{formatDate(item.eventDate)}</span>
+          <SourceMeta item={item} />
         </div>
         <h3 className="min-h-[3.2rem] text-sm font-black leading-snug text-paper">
           {trimTitle(item.title, 88)}
         </h3>
-        <div className="flex items-center justify-between gap-3 border-t border-line pt-3">
-          <SourceMeta item={item} />
+        <div className="flex items-center justify-end gap-3 border-t border-line pt-3">
           <div className="flex items-center gap-2">
             <MediaLink item={item} compact />
             <SourceLink item={item} />
@@ -292,14 +290,12 @@ function HomeBrief({ item }: { item: MarketNewsItem }) {
         <NewsThumbnail item={item} size="small" />
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2 text-[11px] font-black text-paper/50">
+            <NewsTickerLinks item={item} />
             <span>{formatDate(item.eventDate)}</span>
             <EventBadge item={item} positive={positive} />
             <SourceMeta item={item} />
           </div>
           <h3 className="mt-1 truncate text-sm font-black text-paper">{item.title}</h3>
-          <Link href={`/artists/${item.artistId}`} className="mt-1 inline-flex text-xs font-black text-cyan hover:text-cyan/75">
-            {item.ticker}
-          </Link>
         </div>
         <SourceLink item={item} />
       </div>
@@ -322,6 +318,7 @@ function MarketNewsArticle({
   const title = item.title.length > titleLimit ? `${item.title.slice(0, titleLimit - 3)}...` : item.title;
   const meta = (
     <div className="flex flex-wrap items-center gap-2 text-xs font-bold text-paper/50">
+      <NewsTickerLinks item={item} />
       <span>{formatDate(item.eventDate)}</span>
       <span
         className={clsx(
@@ -341,13 +338,7 @@ function MarketNewsArticle({
         <div className="grid gap-4 md:grid-cols-[160px_minmax(0,1fr)]">
           <NewsThumbnail item={item} size="featured" />
           <div className="min-w-0">
-            <div className="mb-2 flex items-center justify-between gap-3">
-              <Link
-                href={`/artists/${item.artistId}`}
-                className="rounded bg-panelSoft px-2 py-1 text-xs font-black text-cyan hover:bg-cyan/10"
-              >
-                {item.ticker}
-              </Link>
+            <div className="mb-2 flex items-center justify-end gap-3">
               <div className="flex items-center gap-2">
                 <MediaLink item={item} compact />
                 <SourceLink item={item} />
@@ -372,9 +363,7 @@ function MarketNewsArticle({
           {meta}
           <h3 className="mt-1 text-sm font-black leading-snug text-paper">{title}</h3>
           {!compact ? (
-            <Link href={`/artists/${item.artistId}`} className="mt-2 inline-flex text-xs font-black text-cyan hover:text-cyan/75">
-              {item.artistName} · {item.ticker}
-            </Link>
+            <p className="mt-2 text-xs font-bold text-paper/45">{formatNewsArtistNames(item)}</p>
           ) : null}
         </div>
         <div className="flex flex-col items-end gap-2">
@@ -384,6 +373,41 @@ function MarketNewsArticle({
       </div>
     </article>
   );
+}
+
+function NewsTickerLinks({ item }: { item: MarketNewsItem }) {
+  const artists = getNewsArtists(item);
+
+  return (
+    <span className="inline-flex flex-wrap items-center gap-1" aria-label="Artists involved in this story">
+      {artists.map((artist) => (
+        <Link
+          key={artist.artistId}
+          href={`/artists/${artist.artistId}`}
+          className="rounded bg-cyan/10 px-2 py-1 text-cyan hover:bg-cyan/15"
+          title={artist.artistName}
+        >
+          {artist.ticker}
+        </Link>
+      ))}
+    </span>
+  );
+}
+
+function getNewsArtists(item: MarketNewsItem) {
+  return item.relatedArtists?.length
+    ? item.relatedArtists
+    : [{ artistId: item.artistId, artistName: item.artistName, ticker: item.ticker }];
+}
+
+function formatNewsArtistNames(item: MarketNewsItem) {
+  const names = getNewsArtists(item).map((artist) => artist.artistName);
+
+  if (names.length <= 1) {
+    return names[0] ?? item.artistName;
+  }
+
+  return `${names.slice(0, -1).join(", ")} and ${names.at(-1)}`;
 }
 
 function NewsThumbnail({ item, size = "row" }: { item: MarketNewsItem; size?: "hero" | "featured" | "card" | "row" | "small" }) {
