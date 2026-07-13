@@ -92,7 +92,8 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const { configured: authConfigured, loading: authLoading, session } = useAuth();
-  const [state, setState] = useState<GameState>(() => createInitialGameState());
+  // Never present bundled seed quotes as live data while the Supabase snapshot loads.
+  const [state, setState] = useState<GameState>(() => clearMarketQuotes(createInitialGameState()));
   const hydrated = true;
   const [marketReady, setMarketReady] = useState(false);
   const [marketError, setMarketError] = useState("");

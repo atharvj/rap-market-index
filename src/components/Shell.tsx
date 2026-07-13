@@ -27,7 +27,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const { portfolioValue, portfolioDayChange, state, isAdminUser, avatarUrl, marketReady, marketError } = useGame();
-  const { session, user, signOut } = useAuth();
+  const { loading: authLoading, session, user, signOut } = useAuth();
   const [accountOpen, setAccountOpen] = useState(false);
   const [appearanceOpen, setAppearanceOpen] = useState(false);
   const [themePreference, setThemePreference] = useState<ThemePreference>("system");
@@ -131,7 +131,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
 
           <GlobalArtistSearch className="ml-auto hidden w-52 lg:block xl:w-64" />
 
-          {session ? (
+          {!authLoading && session ? (
             <Link
               href="/portfolio"
               className="hidden items-center gap-4 rounded-lg border border-line bg-panel px-3 py-2 text-xs hover:border-cyan xl:flex"
@@ -148,7 +148,12 @@ export function Shell({ children }: { children: React.ReactNode }) {
           ) : null}
 
           <div ref={accountMenuRef} className="relative ml-auto lg:ml-0">
-            {session ? (
+            {authLoading ? (
+              <div
+                className="h-10 w-24 rounded-lg bg-panelSoft motion-safe:animate-pulse"
+                aria-label="Checking account session"
+              />
+            ) : session ? (
               <button
                 type="button"
                 onClick={() => setAccountOpen((open) => !open)}
@@ -266,9 +271,43 @@ export function Shell({ children }: { children: React.ReactNode }) {
             {marketError}
           </div>
         ) : null}
-        {children}
+        {marketReady ? <>{children}</> : <MarketBootPlaceholder />}
       </main>
       <SiteFooter />
+    </div>
+  );
+}
+
+function MarketBootPlaceholder() {
+  return (
+    <div className="space-y-6" aria-busy="true" aria-label="Loading current market data">
+      <div className="grid min-h-[230px] overflow-hidden rounded-lg border border-line bg-panel lg:grid-cols-[minmax(0,1.45fr)_minmax(290px,0.55fr)]">
+        <div className="grid content-center gap-4 px-5 py-8 sm:px-8">
+          <div className="h-3 w-32 rounded bg-panelSoft motion-safe:animate-pulse" />
+          <div className="h-10 w-full max-w-lg rounded bg-panelSoft motion-safe:animate-pulse" />
+          <div className="h-4 w-full max-w-md rounded bg-panelSoft motion-safe:animate-pulse" />
+          <div className="h-11 w-full max-w-xl rounded-lg bg-panelSoft motion-safe:animate-pulse" />
+        </div>
+        <div className="grid divide-y divide-line border-t border-line bg-panelSoft/45 lg:border-l lg:border-t-0">
+          {[0, 1, 2].map((item) => (
+            <div key={item} className="grid content-center gap-3 p-5">
+              <div className="h-3 w-24 rounded bg-panel motion-safe:animate-pulse" />
+              <div className="h-8 w-full rounded bg-panel motion-safe:animate-pulse" />
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        {[0, 1, 2, 3].map((item) => (
+          <div key={item} className="h-20 rounded-lg bg-panelSoft motion-safe:animate-pulse" />
+        ))}
+      </div>
+
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,1.55fr)_minmax(300px,0.65fr)]">
+        <div className="h-72 rounded-lg border border-line bg-panel motion-safe:animate-pulse" />
+        <div className="h-72 rounded-lg border border-line bg-panel motion-safe:animate-pulse" />
+      </div>
     </div>
   );
 }
