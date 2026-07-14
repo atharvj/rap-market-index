@@ -84,7 +84,7 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const auth = await requireAdminRequest(request);
+  const auth = await requireAdminRequest(request, { allowMarketSecret: true });
 
   if (!auth.ok) {
     return auth.response;

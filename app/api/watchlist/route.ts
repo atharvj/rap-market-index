@@ -4,6 +4,7 @@ import {
   getSupabaseConfigStatus
 } from "@/lib/supabase/server";
 import type { Database } from "@/lib/supabase/database.types";
+import { enforceRateLimit } from "@/server/rate-limit";
 import { requireConfirmedUser } from "@/server/user-auth";
 
 export const dynamic = "force-dynamic";
@@ -49,6 +50,18 @@ export async function POST(request: Request) {
 
   if (!context.ok) {
     return context.response;
+  }
+
+  const limited = await enforceRateLimit({
+    request,
+    identifier: context.userId,
+    scope: "watchlist-write",
+    limit: 60,
+    windowSeconds: 60
+  });
+
+  if (limited) {
+    return limited;
   }
 
   const body = await parseBody(request);
@@ -105,6 +118,18 @@ export async function DELETE(request: Request) {
 
   if (!context.ok) {
     return context.response;
+  }
+
+  const limited = await enforceRateLimit({
+    request,
+    identifier: context.userId,
+    scope: "watchlist-write",
+    limit: 60,
+    windowSeconds: 60
+  });
+
+  if (limited) {
+    return limited;
   }
 
   const body = await parseBody(request);
@@ -195,7 +220,11 @@ async function parseBody(request: Request): Promise<WatchlistBody> {
 }
 
 function validateBody(body: WatchlistBody): { ok: true } | { ok: false; error: string } {
-  if (!body.artistId) {
+  if (
+    !body.artistId
+    || body.artistId.length > 128
+    || /[\u0000-\u001f\u007f]/.test(body.artistId)
+  ) {
     return { ok: false, error: "artistId is required." };
   }
 

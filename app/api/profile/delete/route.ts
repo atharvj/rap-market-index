@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createAnonServerClient, createServiceRoleClient, getSupabaseConfigStatus } from "@/lib/supabase/server";
 import { isAdminEmail } from "@/server/admin-auth";
+import { enforceRateLimit } from "@/server/rate-limit";
 import { requireConfirmedUser } from "@/server/user-auth";
 
 export const dynamic = "force-dynamic";
@@ -21,6 +22,18 @@ export async function DELETE(request: Request) {
 
   if (!auth.ok) {
     return auth.response;
+  }
+
+  const limited = await enforceRateLimit({
+    request,
+    identifier: auth.user.id,
+    scope: "account-delete",
+    limit: 5,
+    windowSeconds: 3600
+  });
+
+  if (limited) {
+    return limited;
   }
 
   if (isAdminEmail(auth.user.email)) {

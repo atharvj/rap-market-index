@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createAnonServerClient, createServiceRoleClient, getSupabaseConfigStatus } from "@/lib/supabase/server";
+import { enforceRateLimit } from "@/server/rate-limit";
 import { requireConfirmedUser } from "@/server/user-auth";
 
 export const dynamic = "force-dynamic";
@@ -32,6 +33,18 @@ export async function POST(request: Request) {
 
   if (!auth.ok) {
     return auth.response;
+  }
+
+  const userLimit = await enforceRateLimit({
+    request,
+    identifier: auth.user.id,
+    scope: "trade-user",
+    limit: 30,
+    windowSeconds: 60
+  });
+
+  if (userLimit) {
+    return userLimit;
   }
 
   const config = getSupabaseConfigStatus();
@@ -303,11 +316,16 @@ function validateTradeBody(body: TradeBody): { ok: true } | { ok: false; error: 
     return { ok: false, error: "Trade side must be buy, sell, short, or cover." };
   }
 
-  if (!body.artistId) {
+  if (!body.artistId || body.artistId.length > 128 || /[\u0000-\u001f\u007f]/.test(body.artistId)) {
     return { ok: false, error: "artistId is required." };
   }
 
-  if (typeof body.shares !== "number" || !Number.isFinite(body.shares) || body.shares <= 0) {
+  if (
+    typeof body.shares !== "number"
+    || !Number.isFinite(body.shares)
+    || body.shares <= 0
+    || body.shares > 1_000_000
+  ) {
     return { ok: false, error: "shares must be a positive number." };
   }
 

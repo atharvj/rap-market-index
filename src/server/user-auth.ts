@@ -1,3 +1,4 @@
+import "server-only";
 import { NextResponse } from "next/server";
 import { createAnonServerClient } from "@/lib/supabase/server";
 import type { User } from "@supabase/supabase-js";

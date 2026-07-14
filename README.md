@@ -25,3 +25,8 @@ Rap Market Index is in active development. Current work is focused on the backen
 ## Developer Notes
 
 Implementation notes live in [`docs/`](docs/) for migration order, backend setup, and market-engine operations.
+
+Production security, deployment hardening, incident response, and capacity checks
+are documented in [`docs/security-and-scaling.md`](docs/security-and-scaling.md).
+Security issues should be reported privately as described in
+[`SECURITY.md`](SECURITY.md).

@@ -568,6 +568,19 @@ export type Database = {
           liquidity_score: number;
         }>;
       };
+      consume_api_rate_limit: {
+        Args: {
+          p_key_hash: string;
+          p_scope: string;
+          p_limit: number;
+          p_window_seconds: number;
+        };
+        Returns: Array<{
+          allowed: boolean;
+          remaining: number;
+          retry_after_seconds: number;
+        }>;
+      };
       calculate_artist_market_quote: {
         Args: {
           p_artist_id: string;

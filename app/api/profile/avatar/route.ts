@@ -1,26 +1,26 @@
 import { NextResponse } from "next/server";
+import sharp from "sharp";
 import { createServiceRoleClient, getSupabaseConfigStatus } from "@/lib/supabase/server";
+import { enforceRateLimit } from "@/server/rate-limit";
 import { requireConfirmedUser } from "@/server/user-auth";
 
 export const dynamic = "force-dynamic";
 
 const MAX_AVATAR_BYTES = 3 * 1024 * 1024;
 const AVATAR_UPLOAD_COOLDOWN_MS = 10_000;
-const ALLOWED_TYPES: Record<string, { extension: string; valid: (bytes: Uint8Array) => boolean }> = {
+const MAX_AVATAR_PIXELS = 4096 * 4096;
+const AVATAR_DIMENSION = 512;
+const ALLOWED_TYPES: Record<string, { valid: (bytes: Uint8Array) => boolean }> = {
   "image/jpeg": {
-    extension: "jpg",
     valid: (bytes) => bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff
   },
   "image/png": {
-    extension: "png",
     valid: (bytes) => [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a].every((value, index) => bytes[index] === value)
   },
   "image/webp": {
-    extension: "webp",
     valid: (bytes) => readAscii(bytes, 0, 4) === "RIFF" && readAscii(bytes, 8, 12) === "WEBP"
   },
   "image/gif": {
-    extension: "gif",
     valid: (bytes) => readAscii(bytes, 0, 6) === "GIF87a" || readAscii(bytes, 0, 6) === "GIF89a"
   }
 };
@@ -36,6 +36,18 @@ export async function POST(request: Request) {
 
   if (!auth.ok) {
     return auth.response;
+  }
+
+  const limited = await enforceRateLimit({
+    request,
+    identifier: auth.user.id,
+    scope: "avatar-upload",
+    limit: 8,
+    windowSeconds: 3600
+  });
+
+  if (limited) {
+    return limited;
   }
 
   let formData: FormData;
@@ -59,7 +71,7 @@ export async function POST(request: Request) {
   }
 
   const service = createServiceRoleClient();
-  const path = `${auth.user.id}/avatar.${type.extension}`;
+  const path = `${auth.user.id}/avatar.webp`;
   const { data: existing } = await service.storage.from("profile-avatars").list(auth.user.id, { limit: 20 });
   const latestWriteAt = Math.max(
     0,
@@ -76,6 +88,26 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: "Choose a valid JPG, PNG, WebP, or GIF image." }, { status: 400 });
   }
 
+  let normalizedImage: Buffer;
+
+  try {
+    normalizedImage = await sharp(bytes, {
+      animated: false,
+      failOn: "warning",
+      limitInputPixels: MAX_AVATAR_PIXELS,
+      sequentialRead: true
+    })
+      .rotate()
+      .resize(AVATAR_DIMENSION, AVATAR_DIMENSION, { fit: "cover" })
+      .webp({ effort: 4, quality: 82 })
+      .toBuffer();
+  } catch {
+    return NextResponse.json(
+      { ok: false, error: "The image could not be processed safely. Try a smaller JPG, PNG, WebP, or GIF." },
+      { status: 400 }
+    );
+  }
+
   const stalePaths = (existing ?? [])
     .map((object) => `${auth.user.id}/${object.name}`)
     .filter((candidate) => candidate !== path);
@@ -84,9 +116,9 @@ export async function POST(request: Request) {
     await service.storage.from("profile-avatars").remove(stalePaths);
   }
 
-  const { error: uploadError } = await service.storage.from("profile-avatars").upload(path, bytes, {
+  const { error: uploadError } = await service.storage.from("profile-avatars").upload(path, normalizedImage, {
     cacheControl: "86400",
-    contentType: file.type,
+    contentType: "image/webp",
     upsert: true
   });
 

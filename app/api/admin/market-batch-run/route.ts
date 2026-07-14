@@ -5,6 +5,8 @@ import { requireAdminRequest } from "@/server/admin-auth";
 import type { MarketUpdateSource } from "@/server/market/daily-update";
 import { getPacificMarketDate } from "@/server/market/market-date";
 import { getMarketModelVersion } from "@/server/market/model-version";
+import { enforceRateLimit, getRequestIp } from "@/server/rate-limit";
+import { secureCompare } from "@/server/secrets";
 
 export const dynamic = "force-dynamic";
 
@@ -143,7 +145,7 @@ export async function POST(request: Request) {
   const providedSecret = request.headers.get("x-market-update-secret");
   const config = getSupabaseConfigStatus();
 
-  if (!secret || providedSecret !== secret) {
+  if (!providedSecret || !secret || !secureCompare(providedSecret, secret)) {
     return NextResponse.json(
       {
         ok: false,
@@ -151,6 +153,18 @@ export async function POST(request: Request) {
       },
       { status: 401 }
     );
+  }
+
+  const limited = await enforceRateLimit({
+    request,
+    identifier: getRequestIp(request),
+    scope: "market-batch-run",
+    limit: 120,
+    windowSeconds: 300
+  });
+
+  if (limited) {
+    return limited;
   }
 
   if (!config.readyForAdminWrites) {
@@ -180,7 +194,7 @@ export async function POST(request: Request) {
       method: "POST",
       headers: {
         "content-type": "application/json",
-        "x-market-update-secret": secret
+        "x-market-update-secret": providedSecret
       },
       body: JSON.stringify({
         dryRun,

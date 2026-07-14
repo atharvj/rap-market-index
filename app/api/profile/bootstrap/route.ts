@@ -4,6 +4,7 @@ import { createAnonServerClient, createServiceRoleClient, getSupabaseConfigStatu
 import type { Database } from "@/lib/supabase/database.types";
 import type { Holding, ShortPosition, Transaction } from "@/lib/types";
 import { isAdminEmail } from "@/server/admin-auth";
+import { enforceRateLimit } from "@/server/rate-limit";
 import { requireConfirmedUser } from "@/server/user-auth";
 
 export const dynamic = "force-dynamic";
@@ -42,6 +43,18 @@ export async function POST(request: Request) {
 
     if (!auth.ok) {
       return auth.response;
+    }
+
+    const limited = await enforceRateLimit({
+      request,
+      identifier: auth.user.id,
+      scope: "profile-bootstrap",
+      limit: 120,
+      windowSeconds: 300
+    });
+
+    if (limited) {
+      return limited;
     }
 
     const { supabase, user } = auth;

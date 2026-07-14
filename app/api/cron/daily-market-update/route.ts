@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { createServiceRoleClient, getSupabaseConfigStatus } from "@/lib/supabase/server";
 import type { MarketUpdateSource } from "@/server/market/daily-update";
 import { getPacificMarketDate } from "@/server/market/market-date";
+import { enforceRateLimit, getRequestIp } from "@/server/rate-limit";
+import { secureCompare } from "@/server/secrets";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
@@ -68,6 +70,18 @@ export async function GET(request: Request) {
       },
       { status: 401 }
     );
+  }
+
+  const limited = await enforceRateLimit({
+    request,
+    identifier: getRequestIp(request),
+    scope: "market-cron",
+    limit: 30,
+    windowSeconds: 3600
+  });
+
+  if (limited) {
+    return limited;
   }
 
   const config = getSupabaseConfigStatus();
@@ -244,13 +258,14 @@ function validateCronRequest(request: Request): { ok: true } | { ok: false; erro
   const cronSecret = process.env.CRON_SECRET;
   const marketSecret = process.env.MARKET_UPDATE_SECRET;
 
-  if (cronSecret && authHeader === `Bearer ${cronSecret}`) {
+  if (secureCompare(authHeader, cronSecret ? `Bearer ${cronSecret}` : null)) {
     return { ok: true };
   }
 
   if (
     marketSecret &&
-    (request.headers.get("x-market-update-secret") === marketSecret || authHeader === `Bearer ${marketSecret}`)
+    (secureCompare(request.headers.get("x-market-update-secret"), marketSecret)
+      || secureCompare(authHeader, `Bearer ${marketSecret}`))
   ) {
     return { ok: true };
   }

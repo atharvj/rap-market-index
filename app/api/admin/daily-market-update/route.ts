@@ -108,7 +108,7 @@ export async function POST(request: Request) {
   const source = normalizeSource(body.source);
   const runDate = body.runDate ?? getPacificMarketDate();
   const config = getSupabaseConfigStatus();
-  const auth = await requireAdminRequest(request);
+  const auth = await requireAdminRequest(request, { allowMarketSecret: true });
 
   if (!auth.ok) {
     return auth.response;

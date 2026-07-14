@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import { createAnonServerClient } from "@/lib/supabase/server";
+import { enforceRateLimit, getRequestIp } from "@/server/rate-limit";
+import { secureCompare } from "@/server/secrets";
 
 type AdminAuthSource = "admin-email" | "market-secret";
 
@@ -25,15 +27,31 @@ export async function requireAdminRequest(
   request: Request,
   options: AdminAuthOptions = {}
 ): Promise<AdminAuthSuccess | AdminAuthFailure> {
-  const allowMarketSecret = options.allowMarketSecret ?? true;
+  const allowMarketSecret = options.allowMarketSecret ?? false;
   const bearerToken = getBearerToken(request);
   const marketSecret = process.env.MARKET_UPDATE_SECRET?.trim();
 
   if (
     allowMarketSecret &&
     marketSecret &&
-    (request.headers.get("x-market-update-secret") === marketSecret || bearerToken === marketSecret)
+    (secureCompare(request.headers.get("x-market-update-secret"), marketSecret)
+      || secureCompare(bearerToken, marketSecret))
   ) {
+    const limited = await enforceRateLimit({
+      request,
+      identifier: `market-automation:${getRequestIp(request)}`,
+      scope: "admin-automation",
+      limit: 300,
+      windowSeconds: 300
+    });
+
+    if (limited) {
+      return {
+        ok: false,
+        response: limited
+      };
+    }
+
     return {
       ok: true,
       source: "market-secret"
@@ -99,6 +117,21 @@ export async function requireAdminRequest(
           },
           { status: 403 }
         )
+      };
+    }
+
+    const limited = await enforceRateLimit({
+      request,
+      identifier: data.user.id,
+      scope: "admin-user",
+      limit: 300,
+      windowSeconds: 300
+    });
+
+    if (limited) {
+      return {
+        ok: false,
+        response: limited
       };
     }
 
