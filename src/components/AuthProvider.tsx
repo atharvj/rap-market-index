@@ -15,8 +15,9 @@ type AuthContextValue = {
   loading: boolean;
   session: Session | null;
   user: User | null;
-  signIn: (email: string, password: string) => Promise<AuthResult>;
-  signUp: (email: string, password: string, username: string) => Promise<AuthResult>;
+  signIn: (email: string, password: string, captchaToken?: string) => Promise<AuthResult>;
+  signUp: (email: string, password: string, username: string, captchaToken?: string) => Promise<AuthResult>;
+  signInWithGoogle: () => Promise<AuthResult>;
   signOut: () => Promise<void>;
 };
 
@@ -71,13 +72,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [configured]);
 
   const signIn = useCallback(
-    async (email: string, password: string) => {
+    async (email: string, password: string, captchaToken?: string) => {
       if (!configured) {
         return { ok: false, message: "Supabase is not configured yet." };
       }
 
       const supabase = getBrowserSupabaseClient();
-      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+        options: captchaToken ? { captchaToken } : undefined
+      });
 
       if (error) {
         const message = /banned|suspend/i.test(error.message)
@@ -100,7 +105,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   );
 
   const signUp = useCallback(
-    async (email: string, password: string, username: string) => {
+    async (email: string, password: string, username: string, captchaToken?: string) => {
       if (!configured) {
         return { ok: false, message: "Supabase is not configured yet." };
       }
@@ -120,6 +125,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         password,
         options: {
           emailRedirectTo: `${window.location.origin}/account?confirmed=1`,
+          captchaToken,
           data: {
             username
           }
@@ -143,6 +149,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     [configured]
   );
 
+  const signInWithGoogle = useCallback(async () => {
+    if (!configured) {
+      return { ok: false, message: "Supabase is not configured yet." };
+    }
+
+    const { error } = await getBrowserSupabaseClient().auth.signInWithOAuth({
+      provider: "google",
+      options: {
+        redirectTo: `${window.location.origin}/onboarding`,
+        scopes: "openid email profile",
+        queryParams: {
+          prompt: "select_account"
+        }
+      }
+    });
+
+    return error
+      ? { ok: false, message: error.message }
+      : { ok: true, message: "Redirecting to Google..." };
+  }, [configured]);
+
   const signOut = useCallback(async () => {
     if (!configured) {
       return;
@@ -159,9 +186,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       user: session?.user ?? null,
       signIn,
       signUp,
+      signInWithGoogle,
       signOut
     }),
-    [configured, loading, session, signIn, signOut, signUp]
+    [configured, loading, session, signIn, signInWithGoogle, signOut, signUp]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

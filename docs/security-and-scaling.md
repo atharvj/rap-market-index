@@ -22,6 +22,9 @@ authentication, database, or deployment changes.
    `GROQ_API_KEY`, API client secrets, and `RATE_LIMIT_SECRET` server-only.
 5. Configure `NEXT_PUBLIC_SITE_URL` as `https://rap-market-index.vercel.app` in
    production. It is used when validating browser mutation origins.
+6. Add `NEXT_PUBLIC_TURNSTILE_SITE_KEY` to Vercel using the public site key from
+   the Cloudflare Turnstile widget. This key is intentionally browser-visible;
+   never put the Turnstile secret key in Vercel or source control.
 
 If migration 024 has not been run, the application uses an instance-local rate
 limiter. That fallback is useful during development but is not sufficient for a
@@ -33,13 +36,20 @@ multi-instance production deployment.
   Security Advisor** after every migration and resolve all unexpected findings.
 - Keep email confirmation required. Disable anonymous sign-ins unless the
   product intentionally adds anonymous accounts.
-- Enable CAPTCHA for sign-up, sign-in, and password recovery. Cloudflare
-  Turnstile is suitable for a free initial deployment.
+- Configure CAPTCHA in this order: deploy the application with
+  `NEXT_PUBLIC_TURNSTILE_SITE_KEY`, verify the widget appears on the account
+  page, and only then enable Cloudflare Turnstile under Supabase Auth bot and
+  abuse protection using the Turnstile secret key. Reversing this order can
+  block password authentication.
 - Review **Authentication > Rate Limits** and keep conservative limits for OTP,
   password recovery, sign-up, and token refresh endpoints.
 - Set the Site URL to `https://rap-market-index.vercel.app`. Add only required
   redirect URLs. Keep localhost redirects for local development and avoid broad
   production wildcards.
+- If Google sign-in is enabled, add
+  `https://rap-market-index.vercel.app/onboarding` to the Supabase redirect URL
+  allowlist. The Google OAuth client must use Supabase's provider callback URL,
+  not a Vercel page, as its authorized redirect URI.
 - Require MFA on the Supabase project owner account and every GitHub/Vercel
   account with production access.
 - Use a password manager and unique passwords. Enable leaked-password

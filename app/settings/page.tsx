@@ -5,11 +5,14 @@ import { useAuth } from "@/components/AuthProvider";
 import { useGame } from "@/components/GameProvider";
 import { UserAvatar } from "@/components/UserAvatar";
 import { RmiButton } from "@/components/RmiPrimitives";
+import { TurnstileWidget } from "@/components/TurnstileWidget";
 import { getBrowserSupabaseClient } from "@/lib/supabase/client";
 import { applyThemePreference, getStoredThemePreference, type ThemePreference } from "@/lib/theme";
 import { Eye, EyeOff, Trash2, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
+
+const turnstileSiteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY?.trim() ?? "";
 
 export default function SettingsPage() {
   const router = useRouter();
@@ -20,10 +23,15 @@ export default function SettingsPage() {
   const [theme, setTheme] = useState<ThemePreference>("system");
   const [profileIsPublic, setProfileIsPublic] = useState(true);
   const [portfolioIsPublic, setPortfolioIsPublic] = useState(true);
+  const [passwordResetOpen, setPasswordResetOpen] = useState(false);
+  const [passwordCaptchaToken, setPasswordCaptchaToken] = useState<string | null>(null);
+  const [passwordCaptchaResetKey, setPasswordCaptchaResetKey] = useState(0);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deletePassword, setDeletePassword] = useState("");
   const [showDeletePassword, setShowDeletePassword] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [deleteCaptchaToken, setDeleteCaptchaToken] = useState<string | null>(null);
+  const [deleteCaptchaResetKey, setDeleteCaptchaResetKey] = useState(0);
   const displayName = state.username === "Demo Guest" ? user?.email?.split("@")[0] ?? "Guest" : state.username;
 
   useEffect(() => {
@@ -96,11 +104,23 @@ export default function SettingsPage() {
       return;
     }
 
+    if (turnstileSiteKey && !passwordCaptchaToken) {
+      setMessage("Complete the security check before requesting a reset email.");
+      return;
+    }
+
     const { error } = await getBrowserSupabaseClient().auth.resetPasswordForEmail(user.email, {
-      redirectTo: `${window.location.origin}/account/reset-password`
+      redirectTo: `${window.location.origin}/account/reset-password`,
+      captchaToken: passwordCaptchaToken ?? undefined
     });
 
     setMessage(error ? error.message : "Password reset email sent.");
+    setPasswordCaptchaToken(null);
+    setPasswordCaptchaResetKey((current) => current + 1);
+
+    if (!error) {
+      setPasswordResetOpen(false);
+    }
   }
 
   function chooseTheme(value: ThemePreference) {
@@ -140,13 +160,19 @@ export default function SettingsPage() {
         "content-type": "application/json",
         authorization: `Bearer ${session.access_token}`
       },
-      body: JSON.stringify({ confirmation: displayName, password: deletePassword })
+      body: JSON.stringify({
+        confirmation: displayName,
+        password: deletePassword,
+        captchaToken: deleteCaptchaToken ?? undefined
+      })
     });
     const payload = await response.json();
 
     if (!response.ok || !payload.ok) {
       setMessage(payload.error ?? "Could not delete account.");
       setDeleting(false);
+      setDeleteCaptchaToken(null);
+      setDeleteCaptchaResetKey((current) => current + 1);
       return;
     }
 
@@ -192,9 +218,40 @@ export default function SettingsPage() {
           <span className="font-black text-paper/70">{user?.email}</span>
         </SettingsRow>
         <SettingsRow label="Password">
-          <button type="button" onClick={sendPasswordReset} className="rounded-lg border border-line px-3 py-1.5 text-sm font-black hover:border-cyan">
-            Change
-          </button>
+          <div className="flex w-full flex-col items-end gap-3">
+            <button
+              type="button"
+              onClick={() => {
+                if (turnstileSiteKey) {
+                  setPasswordResetOpen((open) => !open);
+                  return;
+                }
+
+                void sendPasswordReset();
+              }}
+              className="rounded-lg border border-line px-3 py-1.5 text-sm font-black hover:border-cyan"
+            >
+              Change
+            </button>
+            {passwordResetOpen ? (
+              <div className="grid justify-items-end gap-2">
+                <TurnstileWidget
+                  siteKey={turnstileSiteKey}
+                  onTokenChange={setPasswordCaptchaToken}
+                  resetKey={passwordCaptchaResetKey}
+                  action="rmi_password_reset"
+                />
+                <button
+                  type="button"
+                  onClick={sendPasswordReset}
+                  disabled={!passwordCaptchaToken}
+                  className="rounded-lg bg-paper px-3 py-2 text-sm font-black text-ink disabled:opacity-40"
+                >
+                  Send Reset Email
+                </button>
+              </div>
+            ) : null}
+          </div>
         </SettingsRow>
       </SettingsGroup>
 
@@ -244,7 +301,11 @@ export default function SettingsPage() {
             {isAdminUser ? <span className="text-xs text-paper/45">Protected operator account</span> : null}
             <button
               type="button"
-              onClick={() => setDeleteOpen(true)}
+              onClick={() => {
+                setDeleteCaptchaToken(null);
+                setDeleteCaptchaResetKey((current) => current + 1);
+                setDeleteOpen(true);
+              }}
               disabled={isAdminUser}
               className="inline-flex items-center gap-2 rounded-lg border border-ember/60 px-3 py-1.5 text-sm font-black text-ember disabled:cursor-not-allowed disabled:opacity-40"
               title={isAdminUser ? "Administrator accounts must be removed by another administrator." : "Delete account"}
@@ -289,12 +350,20 @@ export default function SettingsPage() {
                 {showDeletePassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
               </button>
             </div>
+            <div className="mt-4">
+              <TurnstileWidget
+                siteKey={turnstileSiteKey}
+                onTokenChange={setDeleteCaptchaToken}
+                resetKey={deleteCaptchaResetKey}
+                action="rmi_account_delete"
+              />
+            </div>
             <div className="mt-5 flex justify-end gap-2">
               <button type="button" onClick={() => setDeleteOpen(false)} className="min-h-10 rounded-lg border border-line px-4 text-sm font-black">Cancel</button>
               <button
                 type="button"
                 onClick={deleteAccount}
-                disabled={deleting || deletePassword.length < 8}
+                disabled={deleting || deletePassword.length < 8 || Boolean(turnstileSiteKey && !deleteCaptchaToken)}
                 className="min-h-10 rounded-lg bg-ember px-4 text-sm font-black text-white disabled:opacity-40"
               >
                 {deleting ? "Deleting..." : "Delete Permanently"}

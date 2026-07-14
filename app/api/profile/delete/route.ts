@@ -9,6 +9,7 @@ export const dynamic = "force-dynamic";
 type DeleteProfileBody = {
   confirmation?: string;
   password?: string;
+  captchaToken?: string;
 };
 
 export async function DELETE(request: Request) {
@@ -75,7 +76,8 @@ export async function DELETE(request: Request) {
 
   const { data: reauthentication, error: reauthenticationError } = await createAnonServerClient().auth.signInWithPassword({
     email: auth.user.email,
-    password: body.password
+    password: body.password,
+    options: body.captchaToken ? { captchaToken: body.captchaToken } : undefined
   });
 
   if (reauthenticationError || reauthentication.user?.id !== auth.user.id) {

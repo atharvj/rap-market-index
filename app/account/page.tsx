@@ -6,6 +6,7 @@ import { useAuth } from "@/components/AuthProvider";
 import { useGame } from "@/components/GameProvider";
 import { UserAvatar } from "@/components/UserAvatar";
 import { RmiButton } from "@/components/RmiPrimitives";
+import { TurnstileWidget } from "@/components/TurnstileWidget";
 import { formatCurrency } from "@/lib/formatters";
 import { getEmailDomainWarning } from "@/lib/email-address";
 import { getBrowserSupabaseClient } from "@/lib/supabase/client";
@@ -25,6 +26,8 @@ type ProfileDetailsResponse = {
   };
 };
 
+const turnstileSiteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY?.trim() ?? "";
+
 export default function AccountPage() {
   return (
     <Suspense fallback={<div className="mx-auto h-80 max-w-md rounded-lg bg-panelSoft motion-safe:animate-pulse" />}>
@@ -36,7 +39,7 @@ export default function AccountPage() {
 function AccountPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { configured, session, user, signIn, signOut, signUp } = useAuth();
+  const { configured, session, user, signIn, signInWithGoogle, signOut, signUp } = useAuth();
   const { state, portfolioValue, holdings, isAdminUser, avatarUrl, refreshServerState } = useGame();
   const [mode, setMode] = useState<"signin" | "signup">("signin");
   const [email, setEmail] = useState("");
@@ -49,6 +52,8 @@ function AccountPageContent() {
   const [message, setMessage] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [confirmationPending, setConfirmationPending] = useState(false);
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  const [captchaResetKey, setCaptchaResetKey] = useState(0);
   const fileRef = useRef<HTMLInputElement | null>(null);
   const displayName = session && state.username !== "Demo Guest" ? state.username : user?.email?.split("@")[0] ?? "Trader";
   const emailDomainWarning = mode === "signup" ? getEmailDomainWarning(email) : null;
@@ -89,6 +94,8 @@ function AccountPageContent() {
 
   useEffect(() => {
     setMode(searchParams.get("mode") === "signup" ? "signup" : "signin");
+    setCaptchaToken(null);
+    setCaptchaResetKey((current) => current + 1);
   }, [searchParams]);
 
   useEffect(() => {
@@ -132,11 +139,23 @@ function AccountPageContent() {
 
   async function submitAuth(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+
+    if (turnstileSiteKey && !captchaToken) {
+      setMessage("Complete the security check before continuing.");
+      return;
+    }
+
     setSubmitting(true);
-    const result = mode === "signin" ? await signIn(email, password) : await signUp(email, password, username || email);
+    const normalizedEmail = email.trim();
+    const result =
+      mode === "signin"
+        ? await signIn(normalizedEmail, password, captchaToken ?? undefined)
+        : await signUp(normalizedEmail, password, username || normalizedEmail, captchaToken ?? undefined);
     setMessage(result.message);
     setConfirmationPending(mode === "signup" && result.ok);
     setSubmitting(false);
+    setCaptchaToken(null);
+    setCaptchaResetKey((current) => current + 1);
 
     if (result.ok && mode === "signin") {
       await refreshServerState(username || undefined);
@@ -152,11 +171,19 @@ function AccountPageContent() {
       return;
     }
 
+    if (turnstileSiteKey && !captchaToken) {
+      setMessage("Complete the security check before requesting a reset email.");
+      return;
+    }
+
     const { error } = await getBrowserSupabaseClient().auth.resetPasswordForEmail(normalizedEmail, {
-      redirectTo: `${window.location.origin}/account/reset-password`
+      redirectTo: `${window.location.origin}/account/reset-password`,
+      captchaToken: captchaToken ?? undefined
     });
 
     setMessage(error ? error.message : "Password reset email sent.");
+    setCaptchaToken(null);
+    setCaptchaResetKey((current) => current + 1);
   }
 
   async function resendConfirmation() {
@@ -167,15 +194,33 @@ function AccountPageContent() {
       return;
     }
 
+    if (turnstileSiteKey && !captchaToken) {
+      setMessage("Complete the security check before resending the confirmation email.");
+      return;
+    }
+
     const { error } = await getBrowserSupabaseClient().auth.resend({
       type: "signup",
       email: normalizedEmail,
       options: {
-        emailRedirectTo: `${window.location.origin}/account?confirmed=1`
+        emailRedirectTo: `${window.location.origin}/account?confirmed=1`,
+        captchaToken: captchaToken ?? undefined
       }
     });
 
     setMessage(error ? error.message : "Confirmation email sent again.");
+    setCaptchaToken(null);
+    setCaptchaResetKey((current) => current + 1);
+  }
+
+  async function continueWithGoogle() {
+    setSubmitting(true);
+    const result = await signInWithGoogle();
+    setMessage(result.message);
+
+    if (!result.ok) {
+      setSubmitting(false);
+    }
   }
 
   async function saveProfile(nextFavoriteArtistIds = favoriteArtistIds) {
@@ -296,8 +341,27 @@ function AccountPageContent() {
               {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
             </button>
           </div>
+          <TurnstileWidget
+            siteKey={turnstileSiteKey}
+            onTokenChange={setCaptchaToken}
+            resetKey={captchaResetKey}
+            action={mode === "signup" ? "rmi_signup" : "rmi_login"}
+          />
           <button type="submit" disabled={submitting} className="h-11 rounded-lg bg-paper text-sm font-black text-ink disabled:opacity-60">
             {mode === "signup" ? "Sign up" : "Log in"}
+          </button>
+          <div className="flex items-center gap-3 text-xs font-bold uppercase tracking-wide text-paper/35" aria-hidden="true">
+            <span className="h-px flex-1 bg-line" />
+            or
+            <span className="h-px flex-1 bg-line" />
+          </div>
+          <button
+            type="button"
+            onClick={continueWithGoogle}
+            disabled={submitting}
+            className="h-11 rounded-lg border border-line bg-panelSoft text-sm font-black transition hover:border-cyan disabled:opacity-60"
+          >
+            Continue with Google
           </button>
           {mode === "signin" ? (
             <button type="button" onClick={sendPasswordReset} className="text-sm text-paper/60 hover:text-cyan">
