@@ -155,12 +155,18 @@ export function PriceChart({
               formatter={(value) => [formatCurrency(Number(value)), "RMI quote"]}
             />
             <Area
-              type="linear"
+              type={intraday ? "linear" : "stepAfter"}
               dataKey="price"
               stroke={color}
               strokeWidth={compact ? 2 : 2.5}
               fill={`url(#${gradientId})`}
-              dot={normalized.length === 1 ? { r: 3, fill: color, strokeWidth: 0 } : false}
+              dot={
+                normalized.length === 1
+                  ? { r: 3, fill: color, strokeWidth: 0 }
+                  : !compact && !intraday && normalized.length <= 14
+                    ? { r: 2.5, fill: color, strokeWidth: 0 }
+                    : false
+              }
               activeDot={{ r: 5, strokeWidth: 2, stroke: "rgb(var(--color-panel))", fill: color }}
               isAnimationActive={false}
             />

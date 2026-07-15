@@ -3,12 +3,14 @@
 import { useGame } from "@/components/GameProvider";
 import { MarketNewsFeed, type MarketNewsItem } from "@/components/MarketNewsFeed";
 import { ArtistIdentity, ChangeText, RmiButton } from "@/components/RmiPrimitives";
-import { Music, ShieldCheck } from "lucide-react";
+import type { MarketNewsSort } from "@/lib/market-news-sort";
+import { ArrowUpDown, Music, ShieldCheck } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
 
 export default function NewsPage() {
   const { state } = useGame();
   const [newsArtistIds, setNewsArtistIds] = useState<Set<string>>(new Set());
+  const [newsSort, setNewsSort] = useState<MarketNewsSort>("top");
   const movers = useMemo(
     () => [...state.artists]
       .filter((artist) => newsArtistIds.has(artist.id) && Math.abs(artist.dailyChangePercent) >= 0.01)
@@ -17,16 +19,38 @@ export default function NewsPage() {
     [newsArtistIds, state.artists]
   );
   const handleNewsItems = useCallback((items: MarketNewsItem[]) => {
-    setNewsArtistIds(new Set(items.map((item) => item.artistId)));
+    setNewsArtistIds(new Set(items.flatMap((item) => [
+      item.artistId,
+      ...(item.relatedArtists ?? []).map((artist) => artist.artistId)
+    ])));
   }, []);
 
   return (
     <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_280px] xl:grid-cols-[minmax(0,1fr)_320px]">
       <main className="min-w-0">
-        <h1 className="text-3xl font-black">Market News</h1>
-        <p className="mt-1 text-sm text-paper/65">The most important verified catalysts, ranked by impact, confidence, and recency.</p>
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <h1 className="text-3xl font-black">Market News</h1>
+            <p className="mt-1 text-sm text-paper/65">Verified catalysts with source, relevance, and evidence checks.</p>
+          </div>
+          <label className="flex w-full items-center gap-2 rounded-lg border border-line bg-panel px-3 py-2 text-xs font-bold text-paper/55 sm:w-auto">
+            <ArrowUpDown className="h-4 w-4" aria-hidden="true" />
+            <span>Sort</span>
+            <select
+              value={newsSort}
+              onChange={(event) => setNewsSort(event.target.value as MarketNewsSort)}
+              className="min-w-32 bg-transparent font-black text-paper outline-none"
+              aria-label="Sort market news"
+            >
+              <option value="top">Top Stories</option>
+              <option value="latest">Latest</option>
+              <option value="impact">Highest Impact</option>
+              <option value="confidence">Most Verified</option>
+            </select>
+          </label>
+        </div>
         <div className="mt-5 rmi-card px-5">
-          <MarketNewsFeed limit={40} variant="full" onItemsChange={handleNewsItems} />
+          <MarketNewsFeed limit={40} variant="full" sort={newsSort} onItemsChange={handleNewsItems} />
         </div>
       </main>
 

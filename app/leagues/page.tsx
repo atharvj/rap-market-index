@@ -18,7 +18,7 @@ export default function LeaguesPage() {
             <span className="inline-flex rounded-full bg-cyan/12 px-3 py-1 text-xs font-black text-cyan">Coming Soon</span>
             <h1 className="mt-4 text-3xl font-black sm:text-4xl">Trade With Your Friends</h1>
             <p className="mt-3 max-w-xl text-sm leading-6 text-paper/65">
-              Private leagues will arrive after the public market is stable and there are enough active traders to make competition meaningful.
+              Create private groups, compare returns, and compete with friends. Leagues are coming after the core market launch.
             </p>
             <div className="mt-6 flex flex-wrap gap-3">
               <RmiButton href="/leaderboard">View Global Rankings</RmiButton>

@@ -118,7 +118,7 @@ export function ArtistPriceHistoryPanel({
             : "No recorded price change in this range."
           : range === "1D"
             ? "The 1D view uses recorded market refreshes and eligible trade quotes. Hover, tap, or click to inspect one."
-            : "Longer ranges use one recorded close per market day. Hover, tap, or click to inspect one."}
+            : "Longer ranges show recorded daily closes as steps; RMI does not invent movement between runs. Hover, tap, or click to inspect one."}
       </p>
       {status === "error" ? (
         <p className="mt-3 text-xs font-bold text-ember">Price history unavailable.</p>

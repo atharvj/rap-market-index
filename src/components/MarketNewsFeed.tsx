@@ -1,6 +1,7 @@
 "use client";
 
 import { formatDate } from "@/lib/formatters";
+import type { MarketNewsSort } from "@/lib/market-news-sort";
 import clsx from "clsx";
 import { ArrowRight, ExternalLink, Headphones, Newspaper, PlayCircle, Radio } from "lucide-react";
 import Link from "next/link";
@@ -58,6 +59,7 @@ export function MarketNewsFeed({
   limit = 8,
   compact = false,
   variant,
+  sort = "top",
   onItemsChange
 }: {
   artistId?: string;
@@ -66,6 +68,7 @@ export function MarketNewsFeed({
   limit?: number;
   compact?: boolean;
   variant?: MarketNewsVariant;
+  sort?: MarketNewsSort;
   onItemsChange?: (items: MarketNewsItem[]) => void;
 }) {
   const [items, setItems] = useState<MarketNewsItem[]>([]);
@@ -81,6 +84,7 @@ export function MarketNewsFeed({
       lookbackDays: "45",
       feed: artistId || artistIdsKey ? "artist" : resolvedVariant === "home" ? "home" : "news"
     });
+    params.set("sort", sort);
 
     if (artistId) {
       params.set("artistId", artistId);
@@ -118,7 +122,7 @@ export function MarketNewsFeed({
     return () => {
       controller.abort();
     };
-  }, [artistId, artistIdsKey, eventType, limit, onItemsChange, resolvedVariant]);
+  }, [artistId, artistIdsKey, eventType, limit, onItemsChange, resolvedVariant, sort]);
 
   if (loading) {
     return <MarketNewsSkeleton compact={resolvedVariant === "compact"} />;

@@ -3,6 +3,7 @@
 import { getBrowserSupabaseClient, isBrowserSupabaseConfigured } from "@/lib/supabase/client";
 import { formatAuthErrorMessage } from "@/lib/auth-errors";
 import { getEmailDomainSuggestion, isDisposableEmailAddress } from "@/lib/email-address";
+import { isObfuscatedExistingSignup } from "@/lib/auth-signup";
 import type { Session, User } from "@supabase/supabase-js";
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 
@@ -141,6 +142,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return { ok: false, message: formatAuthErrorMessage(error.message) };
       }
 
+      if (isObfuscatedExistingSignup(data.user)) {
+        return {
+          ok: false,
+          message: "This email is already registered. Log in or reset your password."
+        };
+      }
+
       if (data.session) {
         await supabase.auth.signOut();
       }
@@ -148,8 +156,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setSession(null);
       return {
         ok: true,
-        message:
-          "If this email is new, RMI sent a confirmation link. If you already have an account, log in or reset your password."
+        message: "RMI sent a confirmation link. Open it to finish creating your account."
       };
     },
     [configured]

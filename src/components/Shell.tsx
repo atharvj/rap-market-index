@@ -17,6 +17,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 const navItems = [
   { href: "/markets", label: "Markets" },
   { href: "/scout", label: "Scout" },
+  { href: "/leagues", label: "Leagues" },
   { href: "/news", label: "News" },
   { href: "/watchlist", label: "Watchlist" },
   { href: "/portfolio", label: "Portfolio" },
@@ -190,7 +191,6 @@ export function Shell({ children }: { children: React.ReactNode }) {
                       <p className="truncate text-sm font-black">{accountLabel}</p>
                       {isAdminUser ? <AdminBadge compact /> : null}
                     </div>
-                    <p className="truncate text-xs font-bold text-paper/45">RMI trader</p>
                   </div>
                 </div>
 

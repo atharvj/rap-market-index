@@ -13,6 +13,10 @@ import {
 import { classifyArticleEvent, normalizeDomain } from "@/server/market/gdelt-source";
 import { loadSourcePreviewImageUrls } from "@/server/market/source-preview-images";
 import { groupNewsStoryEvents, resolveNewsStoryArtists } from "@/server/market/news-story-groups";
+import {
+  normalizeMarketNewsSort,
+  sortMarketNewsEvents
+} from "@/lib/market-news-sort";
 
 export const dynamic = "force-dynamic";
 
@@ -96,6 +100,7 @@ export async function GET(request: Request) {
     const ticker = url.searchParams.get("ticker")?.toUpperCase() ?? null;
     const eventType = normalizeEventType(url.searchParams.get("eventType"));
     const feedMode = normalizeFeedMode(url.searchParams.get("feed"));
+    const newsSort = normalizeMarketNewsSort(url.searchParams.get("sort"));
     const supabase = createServiceRoleClient();
     const artists = await loadArtists(supabase);
     const artistById = new Map(artists.map((artist) => [artist.id, artist]));
@@ -155,16 +160,18 @@ export async function GET(request: Request) {
           runDate
         })
       : initialEvents;
-    const rankedEvents = candidateEvents
-      .filter(
+    const rankedEvents = sortMarketNewsEvents(
+      candidateEvents.filter(
         (event) =>
           artistById.has(event.artist_id) &&
           isPublicMarketNewsEvent(event, {
             feedMode: selectedArtistIds.length ? "artist" : feedMode,
             artist: artistById.get(event.artist_id) ?? null
           })
-      )
-      .sort((first, second) => getNewsImportanceScore(second, runDate) - getNewsImportanceScore(first, runDate));
+      ),
+      newsSort,
+      (event) => getNewsImportanceScore(event, runDate)
+    );
     const preferredArtistIds = new Set(selectedArtistIds);
     const storyGroups = groupNewsStoryEvents(rankedEvents, preferredArtistIds).filter(
       (group) =>
@@ -172,13 +179,17 @@ export async function GET(request: Request) {
         group.events.some((event) => preferredArtistIds.has(event.artist_id))
     );
     const storyByPrimaryId = new Map(storyGroups.map((group) => [group.primary.id, group]));
-    const selectedEvents = diversifyMarketNewsEvents(
-      storyGroups.map((group) => group.primary),
-      {
-        feedMode: selectedArtistIds.length ? "artist" : feedMode,
-        limit
-      }
-    );
+    const groupedEvents = storyGroups.map((group) => group.primary);
+    const selectedEvents = newsSort === "top"
+      ? diversifyMarketNewsEvents(groupedEvents, {
+          feedMode: selectedArtistIds.length ? "artist" : feedMode,
+          limit
+        })
+      : sortMarketNewsEvents(
+          groupedEvents,
+          newsSort,
+          (event) => getNewsImportanceScore(event, runDate)
+        ).slice(0, limit);
     const eventNews = selectedEvents.map((event) =>
       mapMarketEventToNewsItem(
         event,
@@ -203,6 +214,7 @@ export async function GET(request: Request) {
       source: "supabase",
       runDate,
       lookbackDays,
+      sort: newsSort,
       eventCount: news.length,
       news
     }, { headers: CACHE_HEADERS });
