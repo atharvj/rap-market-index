@@ -10,6 +10,54 @@ const COMMON_DOMAIN_CORRECTIONS: Record<string, string> = {
   "yahooo.com": "yahoo.com"
 };
 
+const DISPOSABLE_EMAIL_DOMAINS = new Set([
+  "10minutemail.com",
+  "discard.email",
+  "dispostable.com",
+  "emailondeck.com",
+  "fakeinbox.com",
+  "getnada.com",
+  "grr.la",
+  "guerrillamail.com",
+  "guerrillamailblock.com",
+  "mail.tm",
+  "maildrop.cc",
+  "mailinator.com",
+  "minuteinbox.com",
+  "mohmal.com",
+  "sharklasers.com",
+  "spamgourmet.com",
+  "temp-mail.org",
+  "tempail.com",
+  "tempmail.com",
+  "throwawaymail.com",
+  "trashmail.com",
+  "yopmail.com"
+]);
+
+export function getEmailDomain(email: string | null | undefined) {
+  const normalized = email?.trim().toLowerCase();
+  const separator = normalized?.lastIndexOf("@") ?? -1;
+
+  if (!normalized || separator <= 0 || separator === normalized.length - 1) {
+    return null;
+  }
+
+  return normalized.slice(separator + 1).replace(/\.$/, "");
+}
+
+export function isDisposableEmailAddress(email: string | null | undefined) {
+  const domain = getEmailDomain(email);
+
+  if (!domain) {
+    return false;
+  }
+
+  return Array.from(DISPOSABLE_EMAIL_DOMAINS).some(
+    (blockedDomain) => domain === blockedDomain || domain.endsWith(`.${blockedDomain}`)
+  );
+}
+
 export function getEmailDomainSuggestion(email: string | null | undefined) {
   const normalized = email?.trim().toLowerCase();
   const separator = normalized?.lastIndexOf("@") ?? -1;
@@ -28,5 +76,11 @@ export function getEmailDomainSuggestion(email: string | null | undefined) {
 export function getEmailDomainWarning(email: string | null | undefined) {
   const suggestion = getEmailDomainSuggestion(email);
 
-  return suggestion ? `Check this address. Did you mean ${suggestion}?` : null;
+  if (suggestion) {
+    return `Check this address. Did you mean ${suggestion}?`;
+  }
+
+  return isDisposableEmailAddress(email)
+    ? "Use a permanent email address. Temporary email services are not allowed."
+    : null;
 }

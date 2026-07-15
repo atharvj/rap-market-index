@@ -8,6 +8,7 @@ import { UserAvatar } from "@/components/UserAvatar";
 import { RmiButton } from "@/components/RmiPrimitives";
 import { TurnstileWidget } from "@/components/TurnstileWidget";
 import { formatCurrency } from "@/lib/formatters";
+import { formatAuthErrorMessage } from "@/lib/auth-errors";
 import { getEmailDomainWarning } from "@/lib/email-address";
 import { getBrowserSupabaseClient } from "@/lib/supabase/client";
 import { Camera, CalendarDays, Eye, EyeOff, ImagePlus, LogOut, Plus, Search, Star, WalletCards, X } from "lucide-react";
@@ -39,7 +40,7 @@ export default function AccountPage() {
 function AccountPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { configured, session, user, signIn, signInWithGoogle, signOut, signUp } = useAuth();
+  const { configured, loading: authLoading, session, user, signIn, signInWithGoogle, signOut, signUp } = useAuth();
   const { state, portfolioValue, holdings, isAdminUser, avatarUrl, refreshServerState } = useGame();
   const [mode, setMode] = useState<"signin" | "signup">("signin");
   const [email, setEmail] = useState("");
@@ -110,9 +111,28 @@ function AccountPageContent() {
     }
 
     if (searchParams.get("confirmed") === "1") {
-      setMessage("Email confirmed. You can log in now.");
+      setMessage("Finishing email confirmation...");
     }
   }, [searchParams]);
+
+  useEffect(() => {
+    if (searchParams.get("confirmed") !== "1" || !session) {
+      return;
+    }
+
+    let active = true;
+    setMessage("Email confirmed. Signing you in...");
+
+    void refreshServerState().then(() => {
+      if (active) {
+        router.replace("/");
+      }
+    });
+
+    return () => {
+      active = false;
+    };
+  }, [refreshServerState, router, searchParams, session]);
 
   useEffect(() => {
     if (!configured || !session) {
@@ -159,7 +179,7 @@ function AccountPageContent() {
 
     if (result.ok && mode === "signin") {
       await refreshServerState(username || undefined);
-      router.push("/onboarding");
+      router.replace("/");
     }
   }
 
@@ -181,7 +201,11 @@ function AccountPageContent() {
       captchaToken: captchaToken ?? undefined
     });
 
-    setMessage(error ? error.message : "Password reset email sent.");
+    setMessage(
+      error
+        ? formatAuthErrorMessage(error.message)
+        : "If an RMI account uses this email, a password reset link has been sent."
+    );
     setCaptchaToken(null);
     setCaptchaResetKey((current) => current + 1);
   }
@@ -208,7 +232,11 @@ function AccountPageContent() {
       }
     });
 
-    setMessage(error ? error.message : "Confirmation email sent again.");
+    setMessage(
+      error
+        ? formatAuthErrorMessage(error.message)
+        : "If this address has an unconfirmed RMI account, a new confirmation link has been sent."
+    );
     setCaptchaToken(null);
     setCaptchaResetKey((current) => current + 1);
   }
@@ -283,6 +311,10 @@ function AccountPageContent() {
 
     setMessage("Profile picture updated.");
     await refreshServerState();
+  }
+
+  if (configured && authLoading) {
+    return <div className="mx-auto h-80 max-w-md rounded-lg bg-panelSoft motion-safe:animate-pulse" />;
   }
 
   if (!configured || !session) {

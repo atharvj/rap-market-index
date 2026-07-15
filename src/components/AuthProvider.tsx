@@ -1,7 +1,8 @@
 "use client";
 
 import { getBrowserSupabaseClient, isBrowserSupabaseConfigured } from "@/lib/supabase/client";
-import { getEmailDomainSuggestion } from "@/lib/email-address";
+import { formatAuthErrorMessage } from "@/lib/auth-errors";
+import { getEmailDomainSuggestion, isDisposableEmailAddress } from "@/lib/email-address";
 import type { Session, User } from "@supabase/supabase-js";
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 
@@ -85,11 +86,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       });
 
       if (error) {
-        const message = /banned|suspend/i.test(error.message)
-          ? "This account is suspended. Contact RMI support if you believe this is a mistake."
-          : error.message;
-
-        return { ok: false, message };
+        return { ok: false, message: formatAuthErrorMessage(error.message) };
       }
 
       if (!data.user.email_confirmed_at) {
@@ -119,6 +116,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         };
       }
 
+      if (isDisposableEmailAddress(email)) {
+        return {
+          ok: false,
+          message: "Use a permanent email address. Temporary email services are not allowed."
+        };
+      }
+
       const supabase = getBrowserSupabaseClient();
       const { data, error } = await supabase.auth.signUp({
         email,
@@ -127,13 +131,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           emailRedirectTo: `${window.location.origin}/account?confirmed=1`,
           captchaToken,
           data: {
-            username
+            username,
+            username_is_user_selected: true
           }
         }
       });
 
       if (error) {
-        return { ok: false, message: error.message };
+        return { ok: false, message: formatAuthErrorMessage(error.message) };
       }
 
       if (data.session) {
@@ -143,7 +148,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setSession(null);
       return {
         ok: true,
-        message: "Account created. Open the confirmation email and click the verification link before logging in."
+        message:
+          "If this email is new, RMI sent a confirmation link. If you already have an account, log in or reset your password."
       };
     },
     [configured]
@@ -157,7 +163,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const { error } = await getBrowserSupabaseClient().auth.signInWithOAuth({
       provider: "google",
       options: {
-        redirectTo: `${window.location.origin}/onboarding`,
+        redirectTo: `${window.location.origin}/`,
         scopes: "openid email profile",
         queryParams: {
           prompt: "select_account"
@@ -166,7 +172,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     });
 
     return error
-      ? { ok: false, message: error.message }
+      ? { ok: false, message: formatAuthErrorMessage(error.message) }
       : { ok: true, message: "Redirecting to Google..." };
   }, [configured]);
 

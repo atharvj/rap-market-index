@@ -1,5 +1,6 @@
 import "server-only";
 import { NextResponse } from "next/server";
+import { isDisposableEmailAddress } from "@/lib/email-address";
 import { createAnonServerClient } from "@/lib/supabase/server";
 import type { User } from "@supabase/supabase-js";
 
@@ -42,6 +43,16 @@ export async function requireConfirmedUser(request: Request): Promise<ConfirmedU
       ok: false,
       response: NextResponse.json(
         { ok: false, error: "Confirm your email address before using this account." },
+        { status: 403 }
+      )
+    };
+  }
+
+  if (isDisposableEmailAddress(data.user.email)) {
+    return {
+      ok: false,
+      response: NextResponse.json(
+        { ok: false, error: "Use a permanent email address. Temporary email services are not allowed." },
         { status: 403 }
       )
     };

@@ -58,7 +58,9 @@ export async function POST(request: Request) {
     }
 
     const { supabase, user } = auth;
+
     const profileSupabase = createServiceRoleClient();
+    const bodyHasUsername = typeof body.username === "string" && Boolean(body.username.trim());
 
     const [profile, holdings, shortPositions, transactions] = await Promise.all([
       getOrCreateProfile({
@@ -72,7 +74,8 @@ export async function POST(request: Request) {
         profileIsPublic: body.profileIsPublic,
         portfolioIsPublic: body.portfolioIsPublic,
         onboardingCompleted: body.onboardingCompleted,
-        isAdmin: isAdminEmail(user.email)
+        isAdmin: isAdminEmail(user.email),
+        usernameWasSelected: bodyHasUsername || user.user_metadata?.username_is_user_selected === true
       }),
       loadHoldings(supabase, user.id),
       loadShortPositions(supabase, user.id),
@@ -102,12 +105,15 @@ export async function POST(request: Request) {
       { headers: { "Cache-Control": "private, no-store, max-age=0" } }
     );
   } catch (error) {
-    console.error("Profile bootstrap failed", error);
     const message = error instanceof Error ? error.message : "";
     const migrationPending = /profile_is_public|portfolio_is_public|favorite_genres|onboarding_completed|market_impact_exempt|is_admin/i.test(message);
     const safeValidationMessage = /^(That username is already taken\.|Username must be |Choose at least )/.test(message)
       ? message
       : null;
+
+    if (!safeValidationMessage) {
+      console.error("Profile bootstrap failed", error);
+    }
 
     return NextResponse.json(
       {
@@ -116,7 +122,7 @@ export async function POST(request: Request) {
           ? "Account privacy setup is incomplete. Run Supabase migration 022_account_privacy_and_onboarding.sql."
           : "Could not load this account.")
       },
-      { status: 500, headers: { "Cache-Control": "private, no-store, max-age=0" } }
+      { status: safeValidationMessage ? 409 : 500, headers: { "Cache-Control": "private, no-store, max-age=0" } }
     );
   }
 }
@@ -132,7 +138,8 @@ async function getOrCreateProfile({
   profileIsPublic,
   portfolioIsPublic,
   onboardingCompleted,
-  isAdmin
+  isAdmin,
+  usernameWasSelected
 }: {
   supabase: ReturnType<typeof createServiceRoleClient>;
   userId: string;
@@ -145,6 +152,7 @@ async function getOrCreateProfile({
   portfolioIsPublic?: boolean;
   onboardingCompleted?: boolean;
   isAdmin: boolean;
+  usernameWasSelected: boolean;
 }) {
   const existing = await supabase.from("profiles").select("*").eq("id", userId).maybeSingle();
 
@@ -227,24 +235,50 @@ async function getOrCreateProfile({
     });
   }
 
-  const inserted = await supabase
-    .from("profiles")
-    .insert({
-      id: userId,
-      username: safeUsername,
-      bio: typeof profileBio === "string" ? normalizeBio(profileBio) : undefined,
-      favorite_artist_ids: Array.isArray(favoriteArtistIds) ? normalizeFavoriteArtistIds(favoriteArtistIds) : undefined,
-      favorite_genres: Array.isArray(favoriteGenres) ? normalizeFavoriteGenres(favoriteGenres) : undefined,
-      profile_is_public: typeof profileIsPublic === "boolean" ? profileIsPublic : true,
-      portfolio_is_public: typeof portfolioIsPublic === "boolean" ? portfolioIsPublic : true,
-      onboarding_completed: typeof onboardingCompleted === "boolean" ? onboardingCompleted : false,
-      market_impact_exempt: isAdmin,
-      is_admin: isAdmin
-    })
-    .select("*")
-    .single();
+  const insertProfile = (profileUsername: string) =>
+    supabase
+      .from("profiles")
+      .insert({
+        id: userId,
+        username: profileUsername,
+        bio: typeof profileBio === "string" ? normalizeBio(profileBio) : undefined,
+        favorite_artist_ids: Array.isArray(favoriteArtistIds) ? normalizeFavoriteArtistIds(favoriteArtistIds) : undefined,
+        favorite_genres: Array.isArray(favoriteGenres) ? normalizeFavoriteGenres(favoriteGenres) : undefined,
+        profile_is_public: typeof profileIsPublic === "boolean" ? profileIsPublic : true,
+        portfolio_is_public: typeof portfolioIsPublic === "boolean" ? portfolioIsPublic : true,
+        onboarding_completed: typeof onboardingCompleted === "boolean" ? onboardingCompleted : false,
+        market_impact_exempt: isAdmin,
+        is_admin: isAdmin
+      })
+      .select("*")
+      .single();
+
+  const inserted = await insertProfile(safeUsername);
 
   if (inserted.error) {
+    if (isDuplicateKeyError(inserted.error.message)) {
+      const racedProfile = await supabase.from("profiles").select("*").eq("id", userId).maybeSingle();
+
+      if (racedProfile.error) {
+        throw new Error(`Could not verify profile creation: ${racedProfile.error.message}`);
+      }
+
+      if (racedProfile.data) {
+        return racedProfile.data as ProfileRow;
+      }
+
+      if (!usernameWasSelected) {
+        const fallbackUsername = buildFallbackUsername(safeUsername, userId);
+        const retried = await insertProfile(fallbackUsername);
+
+        if (!retried.error) {
+          return retried.data as ProfileRow;
+        }
+
+        throw new Error(`Could not create profile: ${formatProfileWriteError(retried.error.message)}`);
+      }
+    }
+
     throw new Error(`Could not create profile: ${formatProfileWriteError(inserted.error.message)}`);
   }
 
@@ -343,7 +377,7 @@ function normalizeUsername(username: unknown, email: string | undefined) {
 }
 
 function formatProfileWriteError(message: string) {
-  if (message.toLowerCase().includes("duplicate key")) {
+  if (isDuplicateKeyError(message)) {
     return "That username is already taken.";
   }
 
@@ -367,6 +401,17 @@ function formatProfileWriteError(message: string) {
   }
 
   return message;
+}
+
+function isDuplicateKeyError(message: string) {
+  return message.toLowerCase().includes("duplicate key") || message.includes("23505");
+}
+
+function buildFallbackUsername(username: string, userId: string) {
+  const suffix = userId.replace(/[^A-Za-z0-9]/g, "").slice(0, 6).toLowerCase();
+  const base = username.slice(0, Math.max(2, 31 - suffix.length)).replace(/[_.-]+$/, "") || "trader";
+
+  return `${base}_${suffix}`.slice(0, 32);
 }
 
 function normalizeBio(value: string) {
