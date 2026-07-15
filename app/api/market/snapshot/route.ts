@@ -51,19 +51,16 @@ export async function GET() {
     }
 
     const typedArtists = (artists ?? []) as ArtistRow[];
-    const statsByArtist = await loadStatsByArtist(
-      typedArtists.map((artist) => artist.id),
-      supabase
-    );
-    const historyByArtist = await loadHistoryByArtist(
-      typedArtists.map((artist) => artist.id),
-      supabase
-    );
-    const imageByArtistId = await loadArtistImageUrls(
-      supabase,
-      typedArtists.map((artist) => artist.id),
-      Object.fromEntries(typedArtists.map((artist) => [artist.id, artist.name]))
-    );
+    const artistIds = typedArtists.map((artist) => artist.id);
+    const [statsByArtist, historyByArtist, imageByArtistId] = await Promise.all([
+      loadStatsByArtist(artistIds, supabase),
+      loadHistoryByArtist(artistIds, supabase),
+      loadArtistImageUrls(
+        supabase,
+        artistIds,
+        Object.fromEntries(typedArtists.map((artist) => [artist.id, artist.name]))
+      )
+    ]);
     const fallback = createInitialGameState();
     const state: GameState = {
       ...fallback,

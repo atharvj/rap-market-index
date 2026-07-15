@@ -149,7 +149,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
           shortPositions: current.shortPositions,
           transactions: current.transactions
         }));
-        setSyncStatus(session ? "Server market loaded" : "Server market loaded");
+        setSyncStatus("Server market loaded");
         setMarketError("");
         setMarketReady(true);
       })
@@ -165,7 +165,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     return () => {
       active = false;
     };
-  }, [authConfigured, hydrated, session]);
+  }, [authConfigured, hydrated]);
 
   const holdings = useMemo(() => getHoldingViews(state), [state]);
   const shortPositions = useMemo(() => getShortPositionViews(state), [state]);
@@ -285,20 +285,16 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       setServerRefreshing(true);
 
       try {
-        const [snapshotResponse, profileResponse] = await Promise.all([
-          fetch("/api/market/snapshot"),
-          fetch("/api/profile/bootstrap", {
-            method: "POST",
-            headers: {
-              "content-type": "application/json",
-              authorization: `Bearer ${session.access_token}`
-            },
-            body: JSON.stringify({
-              username: preferredUsername
-            })
+        const profileResponse = await fetch("/api/profile/bootstrap", {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            authorization: `Bearer ${session.access_token}`
+          },
+          body: JSON.stringify({
+            username: preferredUsername
           })
-        ]);
-        const snapshot = (await snapshotResponse.json()) as MarketSnapshotResponse;
+        });
         const profile = (await profileResponse.json()) as BootstrapResponse;
 
         if (!profileResponse.ok || !profile.ok || !profile.profile) {
@@ -313,13 +309,9 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
         void refreshLeaderboard(profileData.id, session.access_token);
         void refreshWatchlist(session.access_token);
 
-        const snapshotAvailable = snapshotResponse.ok && snapshot.ok && snapshot.source === "supabase" && Boolean(snapshot.state);
-
         setState((current) => {
-          const baseState = snapshotAvailable && snapshot.state ? snapshot.state : clearMarketQuotes(current);
-
           return {
-            ...baseState,
+            ...current,
             userId: profileData.id,
             username: profileData.username,
             cashBalance: profileData.cashBalance,
@@ -328,7 +320,6 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
             transactions: profile.transactions ?? []
           };
         });
-        setMarketError(snapshotAvailable ? "" : "Live market data is temporarily unavailable. Quotes and trading are paused until the feed recovers.");
         setSyncMode("supabase");
         setSyncStatus("Server profile synced");
         return true;

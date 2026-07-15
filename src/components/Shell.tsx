@@ -17,11 +17,11 @@ import { useEffect, useMemo, useRef, useState } from "react";
 const navItems = [
   { href: "/markets", label: "Markets" },
   { href: "/scout", label: "Scout" },
-  { href: "/leagues", label: "Leagues" },
   { href: "/news", label: "News" },
   { href: "/watchlist", label: "Watchlist" },
   { href: "/portfolio", label: "Portfolio" },
-  { href: "/leaderboard", label: "Rankings" }
+  { href: "/leaderboard", label: "Rankings" },
+  { href: "/leagues", label: "Leagues" }
 ];
 
 export function Shell({ children }: { children: React.ReactNode }) {
@@ -107,14 +107,16 @@ export function Shell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex min-h-screen flex-col bg-ink text-paper">
-      <header className="border-b border-line/70">
+      <header className="sticky top-0 z-[80] border-b border-line/70 bg-ink/95 shadow-[0_12px_30px_rgba(0,0,0,0.08)] backdrop-blur-xl">
         <div className="mx-auto flex max-w-[1280px] items-center gap-4 px-4 py-4 sm:px-6 lg:px-8">
           <Link href="/" className="flex shrink-0 items-center gap-2 font-black" aria-label="RMI home">
-            <AudioLines className="h-5 w-5 text-cyan" aria-hidden="true" />
-            <span>RMI</span>
+            <span className="grid h-8 w-8 place-items-center rounded-lg border border-cyan/30 bg-cyan/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]">
+              <AudioLines className="h-4 w-4 text-cyan" aria-hidden="true" />
+            </span>
+            <span className="tracking-[0.04em]">RMI</span>
           </Link>
 
-          <nav className="ml-3 hidden items-center gap-4 text-sm font-bold text-paper/70 md:flex" aria-label="Primary">
+          <nav className="ml-3 hidden items-center gap-5 text-sm font-bold text-paper/70 md:flex" aria-label="Primary">
             {navItems.map((item) => {
               const active = pathname === item.href || (item.href === "/leaderboard" && pathname === "/rankings");
 
@@ -122,7 +124,10 @@ export function Shell({ children }: { children: React.ReactNode }) {
                 <Link
                   key={item.href}
                   href={item.href}
-                  className={clsx("hover:text-paper", active ? "text-paper" : "text-paper/70")}
+                  className={clsx(
+                    "relative py-1 transition-colors after:absolute after:inset-x-0 after:-bottom-1.5 after:h-0.5 after:origin-center after:rounded-full after:bg-cyan after:transition-transform hover:text-paper",
+                    active ? "text-paper after:scale-x-100" : "text-paper/65 after:scale-x-0"
+                  )}
                 >
                   {item.label}
                 </Link>
@@ -191,6 +196,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
                       <p className="truncate text-sm font-black">{accountLabel}</p>
                       {isAdminUser ? <AdminBadge compact /> : null}
                     </div>
+                    <p className="mt-0.5 text-xs font-bold text-paper/45">RMI Trader</p>
                   </div>
                 </div>
 
