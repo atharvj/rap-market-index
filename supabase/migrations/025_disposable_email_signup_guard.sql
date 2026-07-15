@@ -69,5 +69,6 @@ begin
 end;
 $$;
 
+grant usage on schema public to supabase_auth_admin;
 grant execute on function public.hook_reject_disposable_email(jsonb) to supabase_auth_admin;
 revoke execute on function public.hook_reject_disposable_email(jsonb) from authenticated, anon, public;
