@@ -15,8 +15,25 @@ import {
 
 type ChartInteraction = {
   activeLabel?: string | number;
-  activePayload?: Array<{ value?: number | string }>;
+  activePayload?: Array<{
+    value?: number | string;
+    payload?: ChartPoint;
+  }>;
 };
+
+type ChartPoint = PricePoint & {
+  timestamp: number;
+};
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+function getChartTimestamp(value: string) {
+  const timestamp = /^\d{4}-\d{2}-\d{2}$/.test(value)
+    ? new Date(`${value}T12:00:00Z`).getTime()
+    : new Date(value).getTime();
+
+  return Number.isFinite(timestamp) ? timestamp : null;
+}
 
 export function PriceChart({
   data,
@@ -29,14 +46,21 @@ export function PriceChart({
   compact?: boolean;
   timeScale?: "auto" | "intraday" | "daily";
 }) {
-  const normalized = useMemo(() => data.filter((point) => Number.isFinite(point.price)), [data]);
+  const normalized = useMemo<ChartPoint[]>(
+    () => data
+      .filter((point) => Number.isFinite(point.price))
+      .map((point) => ({ ...point, timestamp: getChartTimestamp(point.date) }))
+      .filter((point): point is ChartPoint => point.timestamp !== null)
+      .sort((first, second) => first.timestamp - second.timestamp),
+    [data]
+  );
   const positive = normalized.length < 2 || normalized[normalized.length - 1].price >= normalized[0].price;
   const [selected, setSelected] = useState<PricePoint | null>(null);
   const color = positive ? "rgb(var(--color-mint))" : "rgb(var(--color-ember))";
   const chartId = useId().replace(/:/g, "");
   const gradientId = `quote-${chartId}-${positive ? "up" : "down"}`;
-  const firstTimestamp = normalized.length ? new Date(normalized[0].date).getTime() : 0;
-  const lastTimestamp = normalized.length ? new Date(normalized[normalized.length - 1].date).getTime() : 0;
+  const firstTimestamp = normalized[0]?.timestamp ?? 0;
+  const lastTimestamp = normalized[normalized.length - 1]?.timestamp ?? 0;
   const intraday = timeScale === "intraday" || (
     timeScale === "auto" &&
     Number.isFinite(firstTimestamp) &&
@@ -53,12 +77,16 @@ export function PriceChart({
     Math.max(0, minimumPrice - verticalPadding),
     maximumPrice + verticalPadding
   ];
+  const singlePointPadding = intraday ? 60 * 60 * 1000 : DAY_MS;
+  const xDomain: [number, number] = normalized.length === 1
+    ? [firstTimestamp - singlePointPadding, firstTimestamp + singlePointPadding]
+    : [firstTimestamp, lastTimestamp];
 
-  function formatChartDate(value: string, detailed = false) {
+  function formatChartDate(value: string | number, detailed = false) {
     const date = new Date(value);
 
     if (Number.isNaN(date.getTime())) {
-      return formatDate(value);
+      return formatDate(String(value));
     }
 
     if (intraday) {
@@ -71,25 +99,21 @@ export function PriceChart({
       }).format(date);
     }
 
-    const dailyDate = /^\d{4}-\d{2}-\d{2}$/.test(value)
-      ? new Date(`${value}T12:00:00Z`)
-      : date;
-
     return new Intl.DateTimeFormat("en-US", {
       month: "short",
       day: "numeric",
       year: detailed ? "numeric" : undefined,
-      timeZone: /^\d{4}-\d{2}-\d{2}$/.test(value) ? "UTC" : "America/Los_Angeles"
-    }).format(dailyDate);
+      timeZone: "UTC"
+    }).format(date);
   }
 
   function selectPoint(state: ChartInteraction | null) {
-    const date = typeof state?.activeLabel === "string" ? state.activeLabel : null;
+    const point = state?.activePayload?.[0]?.payload;
     const rawPrice = state?.activePayload?.[0]?.value;
     const price = typeof rawPrice === "number" ? rawPrice : Number(rawPrice);
 
-    if (date && Number.isFinite(price)) {
-      setSelected({ date, price });
+    if (point && Number.isFinite(price)) {
+      setSelected({ date: point.date, price });
     }
   }
 
@@ -121,9 +145,12 @@ export function PriceChart({
             </defs>
             {!compact ? <CartesianGrid stroke="rgb(var(--color-line))" strokeOpacity={0.6} vertical={false} /> : null}
             <XAxis
-              dataKey="date"
+              dataKey="timestamp"
+              type="number"
+              scale="time"
+              domain={xDomain}
               hide={compact}
-              tickFormatter={(value) => formatChartDate(String(value))}
+              tickFormatter={(value) => formatChartDate(Number(value))}
               axisLine={false}
               tickLine={false}
               height={compact ? 0 : 28}
@@ -151,11 +178,11 @@ export function PriceChart({
                 boxShadow: "0 12px 30px rgb(0 0 0 / 0.18)",
                 fontSize: 12
               }}
-              labelFormatter={(value) => formatChartDate(String(value), true)}
+              labelFormatter={(value) => formatChartDate(Number(value), true)}
               formatter={(value) => [formatCurrency(Number(value)), "RMI quote"]}
             />
             <Area
-              type={intraday ? "linear" : "stepAfter"}
+              type="linear"
               dataKey="price"
               stroke={color}
               strokeWidth={compact ? 2 : 2.5}
@@ -163,7 +190,7 @@ export function PriceChart({
               dot={
                 normalized.length === 1
                   ? { r: 3, fill: color, strokeWidth: 0 }
-                  : !compact && !intraday && normalized.length <= 14
+                  : !compact && !intraday && normalized.length <= 20
                     ? { r: 2.5, fill: color, strokeWidth: 0 }
                     : false
               }
