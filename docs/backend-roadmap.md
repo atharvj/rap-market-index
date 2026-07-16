@@ -368,13 +368,11 @@ GET /api/cron/daily-market-update
 }
 ```
 
-Vercel schedules cron in UTC, so this runs in the early morning: around 6 AM Pacific during daylight saving time and 5 AM Pacific during standard time. Hobby accounts support once-daily cron jobs, with per-hour scheduling precision. The route verifies `Authorization: Bearer <CRON_SECRET>`, then calls the protected batch runner with:
+Vercel schedules this fallback in UTC, so it runs around 6 AM Pacific during daylight saving time and 5 AM Pacific during standard time. The GitHub Actions workflow is the primary scheduler and uses two idempotent early-morning attempts; GitHub can delay scheduled jobs, so neither attempt requires an exact local start hour. The route verifies `Authorization: Bearer <CRON_SECRET>`, then calls the protected batch runner with:
 
 - `source`: `MARKET_CRON_SOURCE`, default `core`
 - `artistLimit`: `MARKET_CRON_ARTIST_LIMIT`, default `100`
 - `maxBatches`: `MARKET_CRON_MAX_BATCHES`, default `1`
-- `eventScanLimit`: `MARKET_EVENT_SCAN_LIMIT`, default `20`
-- `eventScanMaxRecords`: `MARKET_EVENT_SCAN_MAX_RECORDS`, default `12`
 - `autoHaltDeathEvents`: `MARKET_AUTO_HALT_DEATH_EVENTS`, default `true`
 - `mediaRssGoogleNews`: `MARKET_RSS_GOOGLE_NEWS`, default `true`
 - `mediaRssLookbackDays`: `MARKET_RSS_LOOKBACK_DAYS`, default `30`
@@ -384,11 +382,11 @@ Vercel schedules cron in UTC, so this runs in the early morning: around 6 AM Pac
 - `redditPostLimit`: `MARKET_REDDIT_POST_LIMIT`, default `25`
 - YouTube comments are quota-guarded separately. `MARKET_YOUTUBE_COMMENT_VIDEOS=0` keeps comment sentiment off; set it to `1` for limited comment sampling.
 
-Before pricing, the cron route calls `POST /api/admin/market-event-scan` unless `MARKET_EVENT_SCAN_LIMIT=0`. That scanner uses the free GDELT news endpoint plus media RSS/Google News RSS search on the least-recently-scanned artists, stores `gdelt:article_count` and `media_rss:*` observations, and persists classified `market_events` for releases, reviews, tracklists, snippets, controversies, awards, tours, viral moments, and major news. The pricing job then reads those saved events through the `market_events` adapter, so news can affect the normal daily move without turning the whole production job into a slow full-GDELT run.
+News ingestion runs independently every six hours through the dedicated `market-news-refresh` workflow. That scanner uses the free GDELT news endpoint plus media RSS/Google News RSS search, stores source observations, and persists classified `market_events` for releases, reviews, tracklists, snippets, controversies, awards, tours, viral moments, and major news. The daily pricing job reads those saved events without repeating the expensive scan in its critical path.
 
 Event ingestion should be automatic in normal operation. The free automatic event sources are rotating GDELT news scans, media RSS/Google News RSS scans, official YouTube upload detection, public Bluesky social-catalyst detection, Reddit community-hype detection when credentials are configured, and MusicBrainz release detection.
 
-The cron and protected admin runner skip duplicate same-day runs when a successful or running `core` run already exists. This prevents repeat clicks or duplicate delivery from spending source quota and creating extra quote ticks. A failed run can be retried. For manual local testing, call the cron route with `x-market-update-secret: <MARKET_UPDATE_SECRET>`. Add `?dryRun=1` to exercise the full path without persisting another market run.
+The cron skips a successful same-day run only after every active artist has a persisted close. A recent running job is protected from duplicate execution, while a stale running job, failed job, or incomplete nominally successful job is retried. The aggregate batch runner marks an exhausted partial run as failed instead of presenting it as complete. These checks make duplicate scheduler delivery idempotent without allowing missing closes to block recovery. For manual local testing, call the cron route with `x-market-update-secret: <MARKET_UPDATE_SECRET>`. Add `?dryRun=1` to exercise the full path without persisting another market run.
 
 The market event layer stores releases, reviews, news, controversies, awards, tour announcements, and viral moments. These events can adjust the final price movement after raw momentum is calculated, so a stream spike with weak reviews can still rise, but by less than a stream spike with strong reviews.
 

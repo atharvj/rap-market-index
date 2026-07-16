@@ -4,6 +4,11 @@ import type { MarketUpdateSource } from "@/server/market/daily-update";
 import { getPacificMarketDate } from "@/server/market/market-date";
 import { enforceRateLimit, getRequestIp } from "@/server/rate-limit";
 import { secureCompare } from "@/server/secrets";
+import {
+  getMarketRunSkipDecision,
+  type ExistingMarketRun,
+  type MarketRunCoverage
+} from "@/server/market/run-guard";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
@@ -25,39 +30,9 @@ type MarketBatchRunResponse = {
   hasMore?: boolean;
 };
 
-type MarketEventScanResponse = {
-  ok: boolean;
-  error?: string;
-  dryRun?: boolean;
-  persisted?: boolean;
-  runDate?: string;
-  scannedArtistCount?: number;
-  observationCount?: number;
-  eventCount?: number;
-  gdeltEventCount?: number;
-  mediaRssEventCount?: number;
-  aiResearchEnabled?: boolean;
-  aiResearchEventCount?: number;
-  eventTypeCounts?: Record<string, number>;
-};
-
-type ExistingRun = {
-  run_date: string;
-  status: "running" | "succeeded" | "failed";
-  source: string;
-  started_at: string;
-  completed_at: string | null;
-  summary: unknown;
-  error_message: string | null;
-};
-
 const DEFAULT_SOURCE: MarketUpdateSource = "core";
 const DEFAULT_ARTIST_LIMIT = 100;
 const DEFAULT_MAX_BATCHES = 1;
-const DEFAULT_EVENT_SCAN_LIMIT = 100;
-const DEFAULT_EVENT_SCAN_MAX_RECORDS = 12;
-const MAX_EVENT_SCAN_LIMIT = 100;
-const MAX_EVENT_SCAN_MAX_RECORDS = 50;
 
 export async function GET(request: Request) {
   const auth = validateCronRequest(request);
@@ -104,24 +79,27 @@ export async function GET(request: Request) {
   const source = normalizeSource(process.env.MARKET_CRON_SOURCE);
   const artistLimit = getInteger(process.env.MARKET_CRON_ARTIST_LIMIT, DEFAULT_ARTIST_LIMIT, 1, 100);
   const maxBatches = getInteger(process.env.MARKET_CRON_MAX_BATCHES, DEFAULT_MAX_BATCHES, 1, 10);
-  const eventScanLimit = getInteger(process.env.MARKET_EVENT_SCAN_LIMIT, DEFAULT_EVENT_SCAN_LIMIT, 0, MAX_EVENT_SCAN_LIMIT);
-  const eventScanMaxRecords = getInteger(
-    process.env.MARKET_EVENT_SCAN_MAX_RECORDS,
-    DEFAULT_EVENT_SCAN_MAX_RECORDS,
-    1,
-    MAX_EVENT_SCAN_MAX_RECORDS
-  );
   const existing = await loadExistingRun(runDate);
+  const coverage = await loadRunCoverage(runDate);
 
-  if (!dryRun && !force && existing && shouldSkipExistingRun(existing, source)) {
-    return NextResponse.json({
-      ok: true,
-      skipped: true,
-      reason: `A ${source} market update is already ${existing.status} for ${runDate}.`,
-      runDate,
+  if (!dryRun && !force && existing) {
+    const decision = getMarketRunSkipDecision({
+      run: existing,
       source,
-      existing
+      coverage
     });
+
+    if (decision.skip) {
+      return NextResponse.json({
+        ok: true,
+        skipped: true,
+        reason: decision.reason,
+        runDate,
+        source,
+        coverage,
+        existing
+      });
+    }
   }
 
   const secret = process.env.MARKET_UPDATE_SECRET;
@@ -136,14 +114,11 @@ export async function GET(request: Request) {
     );
   }
 
-  const eventScan = await runEventScan({
-    request,
-    secret,
-    runDate,
-    dryRun,
-    artistLimit: eventScanLimit,
-    maxRecords: eventScanMaxRecords
-  });
+  const eventScan = {
+    ok: true,
+    disabled: true,
+    reason: "Market news is refreshed by the dedicated six-hour news scheduler."
+  } as const;
 
   const response = await fetch(new URL("/api/admin/market-batch-run", request.url), {
     method: "POST",
@@ -184,73 +159,10 @@ export async function GET(request: Request) {
     source,
     artistLimit,
     maxBatches,
+    coverageBeforeRun: coverage,
     eventScan,
     result: payload
   });
-}
-
-async function runEventScan({
-  request,
-  secret,
-  runDate,
-  dryRun,
-  artistLimit,
-  maxRecords
-}: {
-  request: Request;
-  secret: string;
-  runDate: string;
-  dryRun: boolean;
-  artistLimit: number;
-  maxRecords: number;
-}): Promise<
-  | {
-      ok: true;
-      disabled: true;
-      reason: string;
-    }
-  | {
-      ok: boolean;
-      disabled?: false;
-      error?: string;
-      payload?: MarketEventScanResponse;
-    }
-> {
-  if (artistLimit <= 0) {
-    return {
-      ok: true,
-      disabled: true,
-      reason: "MARKET_EVENT_SCAN_LIMIT is 0."
-    };
-  }
-
-  try {
-    const response = await fetch(new URL("/api/admin/market-event-scan", request.url), {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        "x-market-update-secret": secret
-      },
-      body: JSON.stringify({
-        dryRun,
-        runDate,
-        artistLimit,
-        maxRecords
-      })
-    });
-    const payload = (await response.json()) as MarketEventScanResponse;
-
-    return {
-      ok: response.ok && payload.ok,
-      error: response.ok && payload.ok ? undefined : payload.error ?? "Market event scan failed.",
-      payload
-    };
-  } catch (error) {
-    return {
-      ok: false,
-      error: error instanceof Error ? error.message : "Market event scan failed."
-    };
-  }
 }
 
 function validateCronRequest(request: Request): { ok: true } | { ok: false; error: string } {
@@ -283,7 +195,7 @@ function validateCronRequest(request: Request): { ok: true } | { ok: false; erro
   };
 }
 
-async function loadExistingRun(runDate: string): Promise<ExistingRun | null> {
+async function loadExistingRun(runDate: string): Promise<ExistingMarketRun | null> {
   const supabase = createServiceRoleClient();
   const { data, error } = await supabase
     .from("market_update_runs")
@@ -295,15 +207,43 @@ async function loadExistingRun(runDate: string): Promise<ExistingRun | null> {
     throw new Error(`Could not check existing market run: ${error.message}`);
   }
 
-  return (data ?? null) as ExistingRun | null;
+  return (data ?? null) as ExistingMarketRun | null;
 }
 
-function shouldSkipExistingRun(run: ExistingRun, source: MarketUpdateSource) {
-  if (run.source !== source) {
-    return false;
+async function loadRunCoverage(runDate: string): Promise<MarketRunCoverage> {
+  const supabase = createServiceRoleClient();
+  const { data: artists, error: artistsError } = await supabase
+    .from("artists")
+    .select("id")
+    .eq("is_active", true);
+
+  if (artistsError) {
+    throw new Error(`Could not count active artists for market recovery: ${artistsError.message}`);
   }
 
-  return run.status === "succeeded" || run.status === "running";
+  const artistIds = (artists ?? []).map((artist) => artist.id);
+
+  if (!artistIds.length) {
+    return {
+      activeArtistCount: 0,
+      completedArtistCount: 0
+    };
+  }
+
+  const { data: history, error: historyError } = await supabase
+    .from("price_history")
+    .select("artist_id")
+    .eq("price_date", runDate)
+    .in("artist_id", artistIds);
+
+  if (historyError) {
+    throw new Error(`Could not inspect market close coverage: ${historyError.message}`);
+  }
+
+  return {
+    activeArtistCount: artistIds.length,
+    completedArtistCount: new Set((history ?? []).map((row) => row.artist_id)).size
+  };
 }
 
 function normalizeSource(value: string | undefined): MarketUpdateSource {

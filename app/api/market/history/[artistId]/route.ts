@@ -82,7 +82,12 @@ export async function GET(request: Request, context: { params: Promise<{ artistI
     const currentPrice = Number((artist as ArtistRow).current_price);
     const points = range === "1D"
       ? buildIntradayPriceSeries({ ticks, currentPrice })
-      : buildDailyPriceSeries({ dailyHistory: history, currentPrice, marketDate: getPacificMarketDate() });
+      : buildDailyPriceSeries({
+          dailyHistory: history,
+          currentPrice,
+          marketDate: getPacificMarketDate(),
+          includeCurrentQuote: false
+        });
 
     return NextResponse.json({
       ok: true,
@@ -92,6 +97,7 @@ export async function GET(request: Request, context: { params: Promise<{ artistI
       granularity: range === "1D" ? "intraday" : "daily",
       points,
       hasRealHistory: range === "1D" ? ticks.length > 0 : history.length > 0,
+      recordedCloseCount: range === "1D" ? 0 : history.length,
       hasMovement: hasPriceMovement(points),
       historyStart: points[0]?.date ?? null,
       historyEnd: points[points.length - 1]?.date ?? null
@@ -202,6 +208,7 @@ function getMockHistoryResponse(artistId: string, range: HistoryRange) {
     return {
       points: [],
       hasRealHistory: false,
+      recordedCloseCount: 0,
       historyStart: null,
       historyEnd: null
     };
@@ -215,6 +222,7 @@ function getMockHistoryResponse(artistId: string, range: HistoryRange) {
   return {
     points,
     hasRealHistory: false,
+    recordedCloseCount: points.length,
     granularity: "daily",
     hasMovement: hasPriceMovement(points),
     historyStart: points[0]?.date ?? null,

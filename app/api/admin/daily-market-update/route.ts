@@ -69,6 +69,7 @@ import {
 } from "@/server/market/supabase-repository";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 300;
 
 type DailyUpdateBody = {
   dryRun?: boolean;

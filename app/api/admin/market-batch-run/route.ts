@@ -9,6 +9,7 @@ import { enforceRateLimit, getRequestIp } from "@/server/rate-limit";
 import { secureCompare } from "@/server/secrets";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 300;
 
 type MarketBatchRunBody = {
   dryRun?: boolean;
@@ -210,6 +211,15 @@ export async function POST(request: Request) {
     payload.warnings?.forEach((warning) => warnings.add(warning));
 
     if (!response.ok || !payload.ok) {
+      if (!dryRun) {
+        await persistBatchRunFailure({
+          runDate,
+          modelVersion,
+          errorMessage: payload.error ?? "Market batch update failed.",
+          runs
+        });
+      }
+
       return NextResponse.json(
         {
           ok: false,
@@ -239,6 +249,39 @@ export async function POST(request: Request) {
     artistLimit,
     maxBatches
   });
+  const incomplete = Boolean(lastRun?.batch?.hasMore);
+
+  if (incomplete) {
+    const errorMessage = `Market run stopped after ${runs.length} batch${runs.length === 1 ? "" : "es"} with ${summary.batch.processedArtistCount} of ${lastRun?.batch?.totalArtists ?? "unknown"} artists processed.`;
+
+    if (!dryRun) {
+      await persistBatchRunFailure({
+        runDate,
+        modelVersion,
+        errorMessage,
+        runs,
+        summary
+      });
+    }
+
+    return NextResponse.json(
+      {
+        ok: false,
+        dryRun,
+        persisted: false,
+        source,
+        runDate,
+        error: errorMessage,
+        completedBatchCount: runs.length,
+        processedArtistCount: summary.batch.processedArtistCount,
+        nextOffset: summary.batch.nextOffset,
+        hasMore: true,
+        summary,
+        runs
+      },
+      { status: 503 }
+    );
+  }
 
   if (!dryRun) {
     await persistBatchRunSummary(runDate, summary);
@@ -476,5 +519,38 @@ async function persistBatchRunSummary(runDate: string, summary: BatchRunSummary)
 
   if (error) {
     throw new Error(`Could not save aggregate market run summary: ${error.message}`);
+  }
+}
+
+async function persistBatchRunFailure({
+  runDate,
+  modelVersion,
+  errorMessage,
+  runs,
+  summary
+}: {
+  runDate: string;
+  modelVersion: string;
+  errorMessage: string;
+  runs: DailyUpdateResponse[];
+  summary?: BatchRunSummary;
+}) {
+  const partialSummary = summary ?? {
+    completedBatchCount: runs.length,
+    processedArtistCount: runs.reduce((total, run) => total + (run.batch?.artistCount ?? 0), 0)
+  };
+  const { error } = await createServiceRoleClient()
+    .from("market_update_runs")
+    .update({
+      status: "failed",
+      model_version: modelVersion,
+      completed_at: new Date().toISOString(),
+      summary: partialSummary as unknown as Json,
+      error_message: errorMessage
+    })
+    .eq("run_date", runDate);
+
+  if (error) {
+    throw new Error(`Could not save failed aggregate market run: ${error.message}`);
   }
 }

@@ -793,9 +793,7 @@ export async function persistMarketUpdates({
   }
 
   try {
-    for (const update of updates) {
-      await persistOneUpdate(supabase, runDate, update);
-    }
+    await persistUpdateBatch(supabase, runDate, updates);
 
     const completed = await supabase
       .from("market_update_runs")
@@ -825,122 +823,104 @@ export async function persistMarketUpdates({
   }
 }
 
-async function persistOneUpdate(supabase: Supabase, runDate: string, update: ArtistMarketUpdate) {
-  const artistUpdate = await supabase
-    .from("artists")
-    .update({
-      previous_close: update.previousClose,
-      current_price: update.currentPrice,
-      daily_change_percent: update.dailyChangePercent,
-      hype_score: update.hypeScore,
-      last_move_explanation: update.explanation
-    })
-    .eq("id", update.artistId);
-
-  if (artistUpdate.error) {
-    throw new Error(`Could not update ${update.ticker}: ${artistUpdate.error.message}`);
+async function persistUpdateBatch(
+  supabase: Supabase,
+  runDate: string,
+  updates: ArtistMarketUpdate[]
+) {
+  if (!updates.length) {
+    return;
   }
 
-  const statsUpsert = await supabase.from("artist_stats").upsert(
-    {
-      artist_id: update.artistId,
-      streaming_growth: update.stats.streamingGrowth,
-      youtube_growth: update.stats.youtubeGrowth,
-      search_growth: update.stats.searchGrowth,
-      social_growth: update.stats.socialGrowth,
-      news_score: update.stats.newsScore,
-      trader_demand: update.stats.traderDemand
-    },
-    { onConflict: "artist_id" }
-  );
-
-  if (statsUpsert.error) {
-    throw new Error(`Could not save stats for ${update.ticker}: ${statsUpsert.error.message}`);
-  }
-
-  const signalUpsert = await supabase.from("market_signal_snapshots").upsert(
-    {
-      artist_id: update.artistId,
-      source_date: runDate,
-      streaming_growth: update.stats.streamingGrowth,
-      youtube_growth: update.stats.youtubeGrowth,
-      search_growth: update.stats.searchGrowth,
-      social_growth: update.stats.socialGrowth,
-      news_score: update.stats.newsScore,
-      trader_demand: update.stats.traderDemand,
-      model_version: update.modelVersion,
-      raw_payload: update.rawPayload as Json
-    },
-    { onConflict: "artist_id,source_date" }
-  );
-
-  if (signalUpsert.error) {
-    throw new Error(`Could not save signal snapshot for ${update.ticker}: ${signalUpsert.error.message}`);
-  }
-
-  const historyUpsert = await supabase.from("price_history").upsert(
-    {
-      artist_id: update.artistId,
-      price_date: runDate,
-      price: update.currentPrice,
-      hype_score: update.hypeScore,
-      model_version: update.modelVersion,
-      explanation: update.explanation
-    },
-    { onConflict: "artist_id,price_date" }
-  );
-
-  if (historyUpsert.error) {
-    throw new Error(`Could not save price history for ${update.ticker}: ${historyUpsert.error.message}`);
-  }
-
-  await persistPriceTickIfAvailable({
-    supabase,
-    artistId: update.artistId,
+  const statsRows = updates.map((update) => ({
+    artist_id: update.artistId,
+    streaming_growth: update.stats.streamingGrowth,
+    youtube_growth: update.stats.youtubeGrowth,
+    search_growth: update.stats.searchGrowth,
+    social_growth: update.stats.socialGrowth,
+    news_score: update.stats.newsScore,
+    trader_demand: update.stats.traderDemand
+  }));
+  const signalRows = updates.map((update) => ({
+    artist_id: update.artistId,
+    source_date: runDate,
+    streaming_growth: update.stats.streamingGrowth,
+    youtube_growth: update.stats.youtubeGrowth,
+    search_growth: update.stats.searchGrowth,
+    social_growth: update.stats.socialGrowth,
+    news_score: update.stats.newsScore,
+    trader_demand: update.stats.traderDemand,
+    model_version: update.modelVersion,
+    raw_payload: update.rawPayload as Json
+  }));
+  const historyRows = updates.map((update) => ({
+    artist_id: update.artistId,
+    price_date: runDate,
     price: update.currentPrice,
-    source: "market_run",
-    modelVersion: update.modelVersion,
-    rawPayload: {
+    hype_score: update.hypeScore,
+    model_version: update.modelVersion,
+    explanation: update.explanation
+  }));
+  const tickRows = updates.map((update) => ({
+    artist_id: update.artistId,
+    price: update.currentPrice,
+    source: "market_run" as const,
+    model_version: update.modelVersion,
+    raw_payload: {
       source: "market_run",
       runDate,
       ticker: update.ticker,
       dailyChangePercent: update.dailyChangePercent
-    }
-  });
-}
+    } as Json
+  }));
 
-async function persistPriceTickIfAvailable({
-  supabase,
-  artistId,
-  price,
-  source,
-  modelVersion,
-  rawPayload
-}: {
-  supabase: Supabase;
-  artistId: string;
-  price: number;
-  source: "market_run" | "trade" | "migration" | "manual";
-  modelVersion?: string | null;
-  rawPayload: Record<string, unknown>;
-}) {
-  const { error } = await supabase.from("price_ticks").insert({
-    artist_id: artistId,
-    price,
-    source,
-    model_version: modelVersion ?? null,
-    raw_payload: rawPayload as Json
-  });
+  const [statsUpsert, signalUpsert, historyUpsert] = await Promise.all([
+    supabase.from("artist_stats").upsert(statsRows, { onConflict: "artist_id" }),
+    supabase.from("market_signal_snapshots").upsert(signalRows, {
+      onConflict: "artist_id,source_date"
+    }),
+    supabase.from("price_history").upsert(historyRows, {
+      onConflict: "artist_id,price_date"
+    })
+  ]);
 
-  if (!error) {
-    return;
+  if (statsUpsert.error) {
+    throw new Error(`Could not save market stats: ${statsUpsert.error.message}`);
+  }
+  if (signalUpsert.error) {
+    throw new Error(`Could not save signal snapshots: ${signalUpsert.error.message}`);
+  }
+  if (historyUpsert.error) {
+    throw new Error(`Could not save price history: ${historyUpsert.error.message}`);
   }
 
-  if (isMissingPriceTicksError(error.message)) {
-    return;
+  for (let offset = 0; offset < updates.length; offset += 12) {
+    const chunk = updates.slice(offset, offset + 12);
+    await Promise.all(
+      chunk.map(async (update) => {
+        const { error } = await supabase
+          .from("artists")
+          .update({
+            previous_close: update.previousClose,
+            current_price: update.currentPrice,
+            daily_change_percent: update.dailyChangePercent,
+            hype_score: update.hypeScore,
+            last_move_explanation: update.explanation
+          })
+          .eq("id", update.artistId);
+
+        if (error) {
+          throw new Error(`Could not update ${update.ticker}: ${error.message}`);
+        }
+      })
+    );
   }
 
-  throw new Error(`Could not save price tick for ${artistId}: ${error.message}`);
+  const tickInsert = await supabase.from("price_ticks").insert(tickRows);
+
+  if (tickInsert.error && !isMissingPriceTicksError(tickInsert.error.message)) {
+    throw new Error(`Could not save market price ticks: ${tickInsert.error.message}`);
+  }
 }
 
 function isMissingPriceTicksError(message: string) {

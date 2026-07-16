@@ -57,6 +57,23 @@ describe("price series", () => {
     ]);
   });
 
+  it("does not present a live quote as a recorded daily close when disabled", () => {
+    const points = buildDailyPriceSeries({
+      dailyHistory: [
+        { date: "2026-07-11", price: 20.12 },
+        { date: "2026-07-14", price: 20.54 }
+      ],
+      currentPrice: 20.54,
+      marketDate: "2026-07-16",
+      includeCurrentQuote: false
+    });
+
+    expect(points).toEqual([
+      { date: "2026-07-11", price: 20.12 },
+      { date: "2026-07-14", price: 20.54 }
+    ]);
+  });
+
   it("removes superseded same-day market runs while preserving trade ticks", () => {
     expect(
       keepLatestMarketRunPerDate([

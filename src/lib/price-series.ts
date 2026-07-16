@@ -58,11 +58,13 @@ export function buildIntradayPriceSeries({
 export function buildDailyPriceSeries({
   dailyHistory,
   currentPrice,
-  marketDate
+  marketDate,
+  includeCurrentQuote = true
 }: {
   dailyHistory: PricePoint[];
   currentPrice: number;
   marketDate: string;
+  includeCurrentQuote?: boolean;
 }) {
   const byDate = new Map<string, PricePoint>();
 
@@ -78,7 +80,7 @@ export function buildDailyPriceSeries({
     }
   }
 
-  if (isValidPrice(currentPrice) && normalizeMarketDate(marketDate)) {
+  if (includeCurrentQuote && isValidPrice(currentPrice) && normalizeMarketDate(marketDate)) {
     byDate.set(marketDate, { date: marketDate, price: currentPrice });
   }
 

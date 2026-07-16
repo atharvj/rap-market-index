@@ -14,6 +14,7 @@ type HistoryResponse = {
   range?: HistoryRange;
   points?: PricePoint[];
   hasRealHistory?: boolean;
+  recordedCloseCount?: number;
   hasMovement?: boolean;
   granularity?: "intraday" | "daily";
   historyStart?: string | null;
@@ -33,6 +34,7 @@ export function ArtistPriceHistoryPanel({
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
   const [history, setHistory] = useState<PricePoint[]>(fallbackData);
   const [hasRealHistory, setHasRealHistory] = useState(fallbackData.length > 0);
+  const [recordedCloseCount, setRecordedCloseCount] = useState(fallbackData.length);
   const [hasMovement, setHasMovement] = useState(false);
   const [granularity, setGranularity] = useState<"intraday" | "daily">("daily");
 
@@ -52,6 +54,7 @@ export function ArtistPriceHistoryPanel({
 
         setHistory(payload.points);
         setHasRealHistory(Boolean(payload.hasRealHistory));
+        setRecordedCloseCount(payload.recordedCloseCount ?? payload.points.length);
         setHasMovement(Boolean(payload.hasMovement));
         setGranularity(payload.granularity === "intraday" ? "intraday" : "daily");
         setStatus("ready");
@@ -63,6 +66,7 @@ export function ArtistPriceHistoryPanel({
 
         setHistory(fallbackData);
         setHasRealHistory(false);
+        setRecordedCloseCount(fallbackData.length);
         setHasMovement(false);
         setGranularity("daily");
         setStatus(error instanceof Error ? "error" : "error");
@@ -118,7 +122,7 @@ export function ArtistPriceHistoryPanel({
             : "No recorded price change in this range."
           : range === "1D"
             ? "The 1D view uses recorded market refreshes and eligible trade quotes. Hover, tap, or click to inspect one."
-            : `${history.length} recorded daily close${history.length === 1 ? "" : "s"} in this range. Lines connect real observations; RMI does not add hidden prices between them.`}
+            : `${recordedCloseCount} recorded daily close${recordedCloseCount === 1 ? "" : "s"} in this range. Lines connect real observations; RMI does not add hidden prices between them.`}
       </p>
       {status === "error" ? (
         <p className="mt-3 text-xs font-bold text-ember">Price history unavailable.</p>
