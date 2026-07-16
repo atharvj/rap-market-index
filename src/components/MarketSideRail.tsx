@@ -9,30 +9,38 @@ import type { Artist } from "@/lib/types";
 import Link from "next/link";
 import { useMemo } from "react";
 
-export function MarketSideRail({ currentArtistId }: { currentArtistId?: string }) {
+export function MarketSideRail({
+  currentArtistId,
+  includeWatchlist = true,
+  listSize = 5
+}: {
+  currentArtistId?: string;
+  includeWatchlist?: boolean;
+  listSize?: number;
+}) {
   const { state, watchlistArtists } = useGame();
   const marketLists = useMemo(() => {
     const available = state.artists.filter((artist) => artist.id !== currentArtistId);
     const gainers = available
       .filter((artist) => artist.dailyChangePercent > 0)
       .sort((first, second) => second.dailyChangePercent - first.dailyChangePercent)
-      .slice(0, 5);
+      .slice(0, listSize);
     const losers = available
       .filter((artist) => artist.dailyChangePercent < 0)
       .sort((first, second) => first.dailyChangePercent - second.dailyChangePercent)
-      .slice(0, 5);
+      .slice(0, listSize);
     const movers = [...available]
       .sort((first, second) => second.hypeScore - first.hypeScore || Math.abs(second.dailyChangePercent) - Math.abs(first.dailyChangePercent))
-      .slice(0, 5);
+      .slice(0, listSize);
 
     return { gainers, losers, movers };
-  }, [currentArtistId, state.artists]);
+  }, [currentArtistId, listSize, state.artists]);
 
   return (
     <div className="space-y-4">
-      <MarketList title="Trending Artists" artists={marketLists.movers} />
-      {watchlistArtists.length ? (
-        <MarketList title="Your Watchlist" artists={watchlistArtists.slice(0, 5)} href="/watchlist" />
+      <MarketList title="Trending Tickers" artists={marketLists.movers} href="/markets" />
+      {includeWatchlist && watchlistArtists.length ? (
+        <MarketList title="Your Watchlist" artists={watchlistArtists.slice(0, listSize)} href="/watchlist" />
       ) : null}
       <MarketList title="Top Gainers" artists={marketLists.gainers} href="/markets" />
       <MarketList title="Top Losers" artists={marketLists.losers} href="/markets" />

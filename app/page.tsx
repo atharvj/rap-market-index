@@ -2,8 +2,9 @@
 
 import { useAuth } from "@/components/AuthProvider";
 import { useGame } from "@/components/GameProvider";
-import { ArtistIdentity, ArtistMiniCard, ChangeText, RmiButton, RmiSection } from "@/components/RmiPrimitives";
+import { ArtistIdentity, ChangeText, RmiButton, RmiSection } from "@/components/RmiPrimitives";
 import { ArtistAvatar } from "@/components/ArtistAvatar";
+import { MarketSideRail } from "@/components/MarketSideRail";
 import { MarketNewsFeed } from "@/components/MarketNewsFeed";
 import { formatCurrency, formatPercent } from "@/lib/formatters";
 import { getMarketBreadth } from "@/lib/market-analytics";
@@ -19,11 +20,6 @@ export default function HomePage() {
   const [query, setQuery] = useState("");
   const [searchFocused, setSearchFocused] = useState(false);
 
-  const orderedMovers = useMemo(
-    () => [...state.artists].sort((a, b) => Math.abs(b.dailyChangePercent) - Math.abs(a.dailyChangePercent)),
-    [state.artists]
-  );
-  const trending = orderedMovers.slice(0, 8);
   const searchSuggestions = useMemo(() => {
     const normalized = query.trim().toLowerCase();
 
@@ -153,6 +149,8 @@ export default function HomePage() {
         </RmiSection>
 
         <div className="space-y-4">
+          <MarketSideRail includeWatchlist={false} listSize={5} />
+
           <RmiSection title={session ? "Your Portfolio" : "Start Trading"}>
             {session ? (
               <div className="grid gap-3 p-4 sm:grid-cols-3 lg:grid-cols-1">
@@ -187,20 +185,6 @@ export default function HomePage() {
           ) : null}
         </div>
       </div>
-
-      <section>
-        <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-base font-black">Trending Now</h2>
-          <Link href="/markets" className="text-sm font-bold text-paper/55 hover:text-cyan">
-            View Markets
-          </Link>
-        </div>
-        <div className="grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(190px,1fr))]">
-          {trending.map((artist) => (
-            <ArtistMiniCard key={artist.id} artist={artist} />
-          ))}
-        </div>
-      </section>
 
     </div>
   );
