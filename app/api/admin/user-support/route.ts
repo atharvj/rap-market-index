@@ -3,6 +3,7 @@ import { getEmailDomainWarning } from "@/lib/email-address";
 import type { Json } from "@/lib/supabase/database.types";
 import { createServiceRoleClient } from "@/lib/supabase/server";
 import { isAdminEmail, requireAdminRequest } from "@/server/admin-auth";
+import { reportServerError } from "@/server/observability";
 import type { User } from "@supabase/supabase-js";
 
 export const dynamic = "force-dynamic";
@@ -123,7 +124,7 @@ export async function GET(request: Request) {
       { headers: NO_STORE_HEADERS }
     );
   } catch (error) {
-    console.error("Admin user support load failed", error);
+    reportServerError(error, "admin.user_support.load");
     return NextResponse.json(
       { ok: false, error: error instanceof Error ? error.message : "Could not load user support data." },
       { status: 500, headers: NO_STORE_HEADERS }
@@ -353,7 +354,7 @@ export async function PATCH(request: Request) {
 
     return NextResponse.json({ ok: true, action, userId, result: data }, { headers: NO_STORE_HEADERS });
   } catch (error) {
-    console.error("Admin user support action failed", error);
+    reportServerError(error, "admin.user_support.action");
     return NextResponse.json(
       { ok: false, error: error instanceof Error ? error.message : "User support action failed." },
       { status: 500, headers: NO_STORE_HEADERS }

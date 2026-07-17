@@ -6,6 +6,7 @@ import {
 } from "@/lib/supabase/server";
 import type { Database } from "@/lib/supabase/database.types";
 import type { LeaderboardEntry } from "@/lib/types";
+import { reportServerError } from "@/server/observability";
 
 export const dynamic = "force-dynamic";
 
@@ -103,7 +104,7 @@ export async function GET(request: Request) {
       leaderboard: visibleLeaderboard
     }, { headers: responseHeaders });
   } catch (error) {
-    console.error("Leaderboard request failed", error);
+    reportServerError(error, "leaderboard.load");
     return NextResponse.json(
       {
         ok: false,

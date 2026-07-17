@@ -581,6 +581,16 @@ export type Database = {
           retry_after_seconds: number;
         }>;
       };
+      execute_artist_trade_as_user: {
+        Args: {
+          p_user_id: string;
+          p_side: "buy" | "sell" | "short" | "cover";
+          p_artist_id: string;
+          p_shares: number;
+          p_market_eligible: boolean;
+        };
+        Returns: Json;
+      };
       calculate_artist_market_quote: {
         Args: {
           p_artist_id: string;

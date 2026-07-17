@@ -4,6 +4,14 @@ out/
 dist/
 build/
 coverage/
+playwright-report/
+test-results/
+blob-report/
+backups/
+*.dump
+*.dump.enc
+*.dump.enc.sha256
+*.backup
 .env*
 *.tsbuildinfo
 .DS_Store

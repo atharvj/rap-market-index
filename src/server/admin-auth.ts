@@ -1,3 +1,4 @@
+import "server-only";
 import { NextResponse } from "next/server";
 import { createAnonServerClient } from "@/lib/supabase/server";
 import { enforceRateLimit, getRequestIp } from "@/server/rate-limit";

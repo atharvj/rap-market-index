@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createServiceRoleClient, getSupabaseConfigStatus } from "@/lib/supabase/server";
 import type { Database } from "@/lib/supabase/database.types";
 import { loadArtistImageUrls } from "@/server/market/artist-images";
+import { reportServerError } from "@/server/observability";
 
 export const dynamic = "force-dynamic";
 const PRIVATE_RESPONSE_HEADERS = {
@@ -145,7 +146,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
       { headers: PRIVATE_RESPONSE_HEADERS }
     );
   } catch (error) {
-    console.error("Public profile request failed", error);
+    reportServerError(error, "public_profile.load");
     return NextResponse.json(
       {
         ok: false,

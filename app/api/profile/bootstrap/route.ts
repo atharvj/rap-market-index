@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
 import { MAX_FAVORITE_ARTISTS, MAX_FAVORITE_GENRES, MIN_FAVORITE_ARTISTS } from "@/lib/onboarding";
-import { createAnonServerClient, createServiceRoleClient, getSupabaseConfigStatus } from "@/lib/supabase/server";
+import { createServiceRoleClient, getSupabaseConfigStatus } from "@/lib/supabase/server";
 import type { Database } from "@/lib/supabase/database.types";
 import type { Holding, ShortPosition, Transaction } from "@/lib/types";
 import { isAdminEmail } from "@/server/admin-auth";
+import { reportServerError } from "@/server/observability";
 import { enforceRateLimit } from "@/server/rate-limit";
 import { requireConfirmedUser } from "@/server/user-auth";
 
@@ -57,7 +58,7 @@ export async function POST(request: Request) {
       return limited;
     }
 
-    const { supabase, user } = auth;
+    const { user } = auth;
 
     const profileSupabase = createServiceRoleClient();
     const bodyHasUsername = typeof body.username === "string" && Boolean(body.username.trim());
@@ -77,8 +78,8 @@ export async function POST(request: Request) {
         isAdmin: isAdminEmail(user.email),
         usernameWasSelected: bodyHasUsername || user.user_metadata?.username_is_user_selected === true
       }),
-      loadHoldings(supabase, user.id),
-      loadShortPositions(supabase, user.id),
+      loadHoldings(profileSupabase, user.id),
+      loadShortPositions(profileSupabase, user.id),
       loadTransactions(profileSupabase, user.id)
     ]);
 
@@ -112,7 +113,7 @@ export async function POST(request: Request) {
       : null;
 
     if (!safeValidationMessage) {
-      console.error("Profile bootstrap failed", error);
+      reportServerError(error, "profile.bootstrap");
     }
 
     return NextResponse.json(
@@ -286,7 +287,7 @@ async function getOrCreateProfile({
 }
 
 async function loadHoldings(
-  supabase: ReturnType<typeof createAnonServerClient>,
+  supabase: ReturnType<typeof createServiceRoleClient>,
   userId: string
 ): Promise<Holding[]> {
   const { data, error } = await supabase
@@ -306,7 +307,7 @@ async function loadHoldings(
 }
 
 async function loadShortPositions(
-  supabase: ReturnType<typeof createAnonServerClient>,
+  supabase: ReturnType<typeof createServiceRoleClient>,
   userId: string
 ): Promise<ShortPosition[]> {
   const { data, error } = await supabase

@@ -17,6 +17,7 @@ import {
   normalizeMarketNewsSort,
   sortMarketNewsEvents
 } from "@/lib/market-news-sort";
+import { reportServerError } from "@/server/observability";
 
 export const dynamic = "force-dynamic";
 
@@ -219,7 +220,7 @@ export async function GET(request: Request) {
       news
     }, { headers: CACHE_HEADERS });
   } catch (error) {
-    console.error("Market news request failed", error);
+    reportServerError(error, "market.news");
     return NextResponse.json(
       {
         ok: false,

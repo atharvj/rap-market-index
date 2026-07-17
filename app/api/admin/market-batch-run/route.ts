@@ -5,8 +5,6 @@ import { requireAdminRequest } from "@/server/admin-auth";
 import type { MarketUpdateSource } from "@/server/market/daily-update";
 import { getPacificMarketDate } from "@/server/market/market-date";
 import { getMarketModelVersion } from "@/server/market/model-version";
-import { enforceRateLimit, getRequestIp } from "@/server/rate-limit";
-import { secureCompare } from "@/server/secrets";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
@@ -142,31 +140,14 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const secret = process.env.MARKET_UPDATE_SECRET;
+  const auth = await requireAdminRequest(request, { allowMarketSecret: true });
+
+  if (!auth.ok) {
+    return auth.response;
+  }
+
   const providedSecret = request.headers.get("x-market-update-secret");
   const config = getSupabaseConfigStatus();
-
-  if (!providedSecret || !secret || !secureCompare(providedSecret, secret)) {
-    return NextResponse.json(
-      {
-        ok: false,
-        error: "Missing or invalid market update secret."
-      },
-      { status: 401 }
-    );
-  }
-
-  const limited = await enforceRateLimit({
-    request,
-    identifier: getRequestIp(request),
-    scope: "market-batch-run",
-    limit: 120,
-    windowSeconds: 300
-  });
-
-  if (limited) {
-    return limited;
-  }
 
   if (!config.readyForAdminWrites) {
     return NextResponse.json(
@@ -195,7 +176,10 @@ export async function POST(request: Request) {
       method: "POST",
       headers: {
         "content-type": "application/json",
-        "x-market-update-secret": providedSecret
+        ...(providedSecret ? { "x-market-update-secret": providedSecret } : {}),
+        ...(auth.source === "admin-email" && request.headers.get("authorization")
+          ? { authorization: request.headers.get("authorization") as string }
+          : {})
       },
       body: JSON.stringify({
         dryRun,

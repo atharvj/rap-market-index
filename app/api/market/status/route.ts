@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createAnonServerClient, getSupabaseConfigStatus } from "@/lib/supabase/server";
 import { getPacificMarketDate } from "@/server/market/market-date";
+import { reportServerError } from "@/server/observability";
 
 export const dynamic = "force-dynamic";
 
@@ -44,7 +45,7 @@ export async function GET(request: Request) {
       status: buildStatus(row, { artistId })
     }, { headers: CACHE_HEADERS });
   } catch (error) {
-    console.error("Market status request failed", error);
+    reportServerError(error, "market.status");
     return NextResponse.json({
       ok: false,
       source: "fallback",

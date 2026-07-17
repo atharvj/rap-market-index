@@ -1,3 +1,5 @@
+import { withSentryConfig } from "@sentry/nextjs";
+
 const isDevelopment = process.env.NODE_ENV !== "production";
 
 const securityHeaders = [
@@ -13,7 +15,7 @@ const securityHeaders = [
       "style-src 'self' 'unsafe-inline'",
       "img-src 'self' data: blob: https:",
       "font-src 'self' data:",
-      "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://www.googleapis.com https://challenges.cloudflare.com",
+      "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://www.googleapis.com https://challenges.cloudflare.com https://*.ingest.sentry.io https://*.ingest.us.sentry.io",
       "media-src 'self' https:",
       "frame-src 'self' https://www.youtube.com https://www.youtube-nocookie.com https://challenges.cloudflare.com",
       "worker-src 'self' blob:"
@@ -74,4 +76,14 @@ const nextConfig = {
   }
 };
 
-export default nextConfig;
+export default withSentryConfig(nextConfig, {
+  silent: true,
+  sourcemaps: {
+    disable: !process.env.SENTRY_AUTH_TOKEN
+  },
+  telemetry: false,
+  treeshake: {
+    removeDebugLogging: true,
+    removeTracing: true
+  }
+});

@@ -3093,7 +3093,7 @@ function buildLaunchReadinessChecks(data: MarketHealth): LaunchReadinessCheck[] 
       detail:
         redditCoverage > 0 || aiResearchCoverage > 0
           ? `Reddit ${formatPercent(redditCoverage)}, AI source-backed ${formatPercent(aiResearchCoverage)}.`
-          : "Connect Reddit or GROQ_API_KEY before launching underground-heavy coverage."
+          : "Connect Reddit or the AI research provider before launching underground-heavy coverage."
     },
     {
       id: "ai-research",
@@ -3102,7 +3102,7 @@ function buildLaunchReadinessChecks(data: MarketHealth): LaunchReadinessCheck[] 
       severity: "blocker",
       detail: data.config.aiResearchConfigured
         ? `AI event coverage ${formatPercent(aiResearchCoverage)}, high-confidence ${formatPercent(aiHighConfidenceCoverage)}.`
-        : "GROQ_API_KEY is missing, so the AI research layer is disabled."
+        : "The AI research provider is not configured, so that research layer is disabled."
     },
     {
       id: "social",

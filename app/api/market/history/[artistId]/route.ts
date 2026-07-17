@@ -10,6 +10,7 @@ import { createServiceRoleClient, getSupabaseConfigStatus } from "@/lib/supabase
 import type { Database } from "@/lib/supabase/database.types";
 import type { PricePoint } from "@/lib/types";
 import { getPacificMarketDate, shiftMarketDate } from "@/server/market/market-date";
+import { reportServerError } from "@/server/observability";
 
 export const dynamic = "force-dynamic";
 
@@ -103,7 +104,7 @@ export async function GET(request: Request, context: { params: Promise<{ artistI
       historyEnd: points[points.length - 1]?.date ?? null
     }, { headers: CACHE_HEADERS });
   } catch (error) {
-    console.error("Artist history request failed", error);
+    reportServerError(error, "market.history");
     return NextResponse.json(
       {
         ok: false,

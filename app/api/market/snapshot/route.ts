@@ -6,6 +6,7 @@ import type { Database } from "@/lib/supabase/database.types";
 import type { Artist, GameState, HypeStats, PricePoint } from "@/lib/types";
 import { loadArtistImageUrls } from "@/server/market/artist-images";
 import { getPacificMarketDate, shiftMarketDate } from "@/server/market/market-date";
+import { reportServerError } from "@/server/observability";
 
 export const dynamic = "force-dynamic";
 
@@ -84,7 +85,7 @@ export async function GET() {
       state
     }, { headers: CACHE_HEADERS });
   } catch (error) {
-    console.error("Market snapshot request failed", error);
+    reportServerError(error, "market.snapshot");
     return NextResponse.json(
       {
         ok: false,

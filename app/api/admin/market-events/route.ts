@@ -8,8 +8,6 @@ import {
 } from "@/server/market/event-signals";
 import { getPacificMarketDate } from "@/server/market/market-date";
 import { loadActiveArtists, loadRecentMarketEvents, persistMarketEvents } from "@/server/market/supabase-repository";
-import { enforceRateLimit, getRequestIp } from "@/server/rate-limit";
-import { secureCompare } from "@/server/secrets";
 
 export const dynamic = "force-dynamic";
 
@@ -83,31 +81,13 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
+  const auth = await requireAdminRequest(request, { allowMarketSecret: true });
+
+  if (!auth.ok) {
+    return auth.response;
+  }
+
   const config = getSupabaseConfigStatus();
-  const secret = process.env.MARKET_UPDATE_SECRET;
-  const providedSecret = request.headers.get("x-market-update-secret");
-
-  if (!providedSecret || !secret || !secureCompare(providedSecret, secret)) {
-    return NextResponse.json(
-      {
-        ok: false,
-        error: "Missing or invalid market event secret."
-      },
-      { status: 401 }
-    );
-  }
-
-  const limited = await enforceRateLimit({
-    request,
-    identifier: getRequestIp(request),
-    scope: "market-events-write",
-    limit: 120,
-    windowSeconds: 300
-  });
-
-  if (limited) {
-    return limited;
-  }
 
   if (!config.readyForAdminWrites) {
     return NextResponse.json(

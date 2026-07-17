@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createAnonServerClient, createServiceRoleClient, getSupabaseConfigStatus } from "@/lib/supabase/server";
 import { enforceRateLimit } from "@/server/rate-limit";
+import { reportServerError } from "@/server/observability";
 import { requireConfirmedUser } from "@/server/user-auth";
 
 export const dynamic = "force-dynamic";
@@ -49,7 +50,7 @@ export async function POST(request: Request) {
 
   const config = getSupabaseConfigStatus();
 
-  if (!config.readyForPublicReads) {
+  if (!config.readyForPublicReads || !config.serviceRoleConfigured) {
     return NextResponse.json(
       {
         ok: false,
@@ -137,15 +138,16 @@ export async function POST(request: Request) {
     );
   }
 
-  const functionName = getTradeFunctionName(side);
-  const { data, error } = await supabase.rpc(functionName, {
+  const { data, error } = await createServiceRoleClient().rpc("execute_artist_trade_as_user", {
+    p_user_id: authUser.id,
+    p_side: side,
     p_artist_id: artistId,
     p_shares: shares,
     p_market_eligible: marketEligible
   });
 
   if (error) {
-    console.error("Trade RPC failed", { side, artistId, userId: authUser.id, error });
+    reportServerError(error, "trade.execute");
     return NextResponse.json(
       {
         ok: false,
@@ -157,7 +159,7 @@ export async function POST(request: Request) {
 
   return NextResponse.json({
     ok: true,
-    trade: data?.[0] ?? null,
+    trade: data ?? null,
     marketStatus: tradingStatus ? mapTradingStatus(tradingStatus) : null,
     marketEligibility: {
       eligible: marketEligible,
@@ -330,20 +332,4 @@ function validateTradeBody(body: TradeBody): { ok: true } | { ok: false; error: 
   }
 
   return { ok: true };
-}
-
-function getTradeFunctionName(side: NonNullable<TradeBody["side"]>) {
-  if (side === "sell") {
-    return "sell_artist_shares";
-  }
-
-  if (side === "short") {
-    return "short_artist_shares";
-  }
-
-  if (side === "cover") {
-    return "cover_artist_shares";
-  }
-
-  return "buy_artist_shares";
 }
