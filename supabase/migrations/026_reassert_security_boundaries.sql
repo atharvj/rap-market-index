@@ -2,6 +2,8 @@
 -- This migration is intentionally idempotent so it can also repair projects
 -- whose grants drifted while the schema was evolving.
 
+begin;
+
 alter table public.artist_external_ids enable row level security;
 alter table public.artist_stats enable row level security;
 alter table public.market_observations enable row level security;
@@ -63,11 +65,20 @@ grant select on table public.blocked_signup_email_domains to supabase_auth_admin
 revoke all on table public.market_leaderboard from public, anon, authenticated;
 revoke all on table public.market_trade_events from public, anon, authenticated;
 revoke all on table public.short_position_risk from public, anon, authenticated;
-revoke all on table public.season_leaderboard from public, anon, authenticated;
 grant select on table public.market_leaderboard to service_role;
 grant select on table public.market_trade_events to service_role;
 grant select on table public.short_position_risk to service_role;
-grant select on table public.season_leaderboard to service_role;
+
+-- Continuous trading removed the old season leaderboard in migration 004.
+-- Harden it only when repairing a project where that legacy view still exists.
+do $$
+begin
+  if to_regclass('public.season_leaderboard') is not null then
+    execute 'revoke all on table public.season_leaderboard from public, anon, authenticated';
+    execute 'grant select on table public.season_leaderboard to service_role';
+  end if;
+end;
+$$;
 
 -- Account state is available only through confirmed-user server routes. RLS
 -- remains enabled as defense in depth, but old PostgREST grants must not let a
@@ -94,8 +105,17 @@ drop function if exists public.sell_artist_shares(text, numeric, uuid);
 revoke all on function public.calculate_hype_score(
   numeric, numeric, numeric, numeric, numeric, numeric
 ) from public, anon, authenticated;
-revoke all on function public.get_active_season_id()
-  from public, anon, authenticated;
+
+-- The matching season helper was removed with the legacy leaderboard. Keep
+-- this conditional so the hardening migration works on both schema histories.
+do $$
+begin
+  if to_regprocedure('public.get_active_season_id()') is not null then
+    execute 'revoke all on function public.get_active_season_id() from public, anon, authenticated';
+  end if;
+end;
+$$;
+
 revoke all on function public.calculate_trade_commission(numeric, numeric)
   from public, anon, authenticated;
 revoke all on function public.calculate_artist_market_quote(text, numeric)
@@ -249,3 +269,5 @@ revoke all on function public.get_market_trading_status(text) from public, anon,
 grant execute on function public.get_market_trading_status(text) to anon, authenticated, service_role;
 
 notify pgrst, 'reload schema';
+
+commit;

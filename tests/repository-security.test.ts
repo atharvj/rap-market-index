@@ -197,8 +197,12 @@ describe("repository security boundaries", () => {
   it("reasserts raw database privilege boundaries in the latest migration", () => {
     const migration = readTrackedFile("supabase/migrations/026_reassert_security_boundaries.sql");
 
+    expect(migration).toContain("begin;");
+    expect(migration.trimEnd()).toMatch(/commit;$/);
     expect(migration).toContain("revoke all on table public.market_observations from public, anon, authenticated");
     expect(migration).toContain("revoke all on table public.market_leaderboard from public, anon, authenticated");
+    expect(migration).toContain("to_regclass('public.season_leaderboard')");
+    expect(migration).toContain("to_regprocedure('public.get_active_season_id()')");
     for (const table of [
       "profiles",
       "holdings",
