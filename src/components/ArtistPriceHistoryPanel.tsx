@@ -93,8 +93,8 @@ export function ArtistPriceHistoryPanel({
   return (
     <section className="rmi-card overflow-hidden shadow-market">
       <div className="rmi-section-header flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
-        <div>
-          <div className="flex items-center gap-2">
+        <div className="min-w-0 text-left">
+          <div className="flex flex-wrap items-center gap-2">
             <Activity className="h-4 w-4 text-cyan" aria-hidden="true" />
             <h2 className="text-lg font-black">Price History</h2>
             <span className="rmi-status-chip"><Crosshair className="h-3 w-3" /> Recorded quotes</span>
@@ -120,19 +120,19 @@ export function ArtistPriceHistoryPanel({
         </div>
       </div>
       <div className="p-4 sm:p-5">
-      <div className="rmi-chart-shell p-2 sm:p-3"><PriceChart data={history} height={290} timeScale={granularity} /></div>
-      <p className="mt-3 text-xs text-paper/42">
-        {status === "ready" && !hasMovement
-          ? range === "1D"
-            ? "No intraday movement yet. A new quote is recorded when the market runs or an eligible order changes the price."
-            : "No recorded price change in this range."
-          : range === "1D"
-            ? "The 1D view uses recorded market refreshes and eligible trade quotes. Hover, tap, or click to inspect one."
-            : `${recordedCloseCount} recorded daily close${recordedCloseCount === 1 ? "" : "s"} in this range. Lines connect real observations; RMI does not add hidden prices between them.`}
-      </p>
-      {status === "error" ? (
-        <p className="mt-3 text-xs font-bold text-ember">Price history unavailable.</p>
-      ) : null}
+        <div className="rmi-chart-shell p-2 sm:p-3"><PriceChart data={history} height={290} timeScale={granularity} /></div>
+        <p className="mt-3 text-xs text-paper/42">
+          {status === "ready" && !hasMovement
+            ? range === "1D"
+              ? "No intraday movement yet. A new quote is recorded when the market runs or an eligible order changes the price."
+              : "No recorded price change in this range."
+            : range === "1D"
+              ? "The 1D view uses recorded market refreshes and eligible trade quotes. Hover, tap, or click to inspect one."
+              : `${recordedCloseCount} recorded daily close${recordedCloseCount === 1 ? "" : "s"} in this range. Lines connect real observations; RMI does not add hidden prices between them.`}
+        </p>
+        {status === "error" ? (
+          <p className="mt-3 text-xs font-bold text-ember">Price history unavailable.</p>
+        ) : null}
       </div>
     </section>
   );

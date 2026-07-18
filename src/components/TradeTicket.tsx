@@ -76,12 +76,15 @@ export function TradeTicket({
 
   return (
     <section className="rmi-card overflow-hidden shadow-market">
-      <div className="rmi-section-header flex items-center justify-between px-4 py-3">
-        <span className="flex items-center gap-2">
+      <div className="rmi-section-header flex flex-wrap items-center justify-between gap-2 px-4 py-3">
+        <span className="flex min-w-0 items-center gap-2">
           <Radio className="h-3.5 w-3.5 text-cyan" aria-hidden="true" />
           <span className="text-xs font-black uppercase tracking-[0.16em]">Execution Desk</span>
         </span>
-        <span className="rmi-live-dot text-[10px] font-black uppercase tracking-[0.14em] text-mint">Live Quote</span>
+        <span className="flex shrink-0 items-center gap-2 text-[10px] font-black uppercase tracking-[0.14em] text-mint">
+          <span className="rmi-live-dot" aria-hidden="true" />
+          Live Quote
+        </span>
       </div>
       <div className="p-4">
         <div className="flex items-start justify-between gap-3">

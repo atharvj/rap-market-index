@@ -153,32 +153,11 @@ button {
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.02);
 }
 
-.rmi-card::after,
-.rmi-soft-card::after {
-  position: absolute;
-  inset: 0 auto auto 0;
-  width: 42px;
-  height: 1px;
-  content: "";
-  pointer-events: none;
-  background: rgb(var(--color-cyan));
-  box-shadow: 0 0 16px rgba(var(--color-cyan), 0.52);
-}
-
 .rmi-section-header {
   position: relative;
   background:
     linear-gradient(90deg, rgba(var(--color-cyan), 0.075), transparent 42%),
     rgba(var(--color-panel-soft), 0.7);
-}
-
-.rmi-section-header::before {
-  width: 3px;
-  align-self: stretch;
-  border-radius: 999px;
-  background: rgb(var(--color-cyan));
-  box-shadow: 0 0 14px rgba(var(--color-cyan), 0.65);
-  content: "";
 }
 
 .rmi-kicker {
@@ -190,16 +169,6 @@ button {
   font-weight: 800;
   letter-spacing: 0.16em;
   text-transform: uppercase;
-}
-
-.rmi-kicker::before {
-  width: 0.45rem;
-  height: 0.45rem;
-  border: 1px solid rgba(var(--color-cyan), 0.85);
-  background: rgba(var(--color-cyan), 0.2);
-  box-shadow: 0 0 10px rgba(var(--color-cyan), 0.65);
-  content: "";
-  transform: rotate(45deg);
 }
 
 .rmi-hero {
@@ -360,6 +329,7 @@ button {
   position: absolute;
   z-index: 0;
   inset: 0;
+  border-radius: inherit;
   content: "";
   pointer-events: none;
   opacity: 0.14;
@@ -384,20 +354,8 @@ button {
 
 .rmi-page-head {
   position: relative;
-  overflow: hidden;
   border-bottom: 1px solid rgba(var(--color-line), 0.82);
   padding-bottom: 1.25rem;
-}
-
-.rmi-page-head::after {
-  position: absolute;
-  right: 0;
-  bottom: -1px;
-  width: min(24rem, 46%);
-  height: 1px;
-  content: "";
-  background: linear-gradient(90deg, transparent, rgb(var(--color-violet)), rgb(var(--color-cyan)));
-  box-shadow: 0 0 18px rgba(var(--color-cyan), 0.25);
 }
 
 .rmi-terminal-input {

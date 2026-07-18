@@ -190,7 +190,10 @@ export function Shell({ children }: { children: React.ReactNode }) {
             )}
 
             {accountOpen ? (
-              <div className="rmi-card absolute right-0 top-12 z-[90] w-80 overflow-hidden p-3 shadow-2xl" role="menu">
+              <div
+                className="rmi-card absolute right-0 top-12 z-[120] max-h-[calc(100dvh-5.5rem)] w-[min(20rem,calc(100vw-2rem))] overflow-y-auto p-3 shadow-2xl scrollbar-thin"
+                role="menu"
+              >
                 <div className="flex items-center gap-3 border-b border-line pb-3">
                   <UserAvatar avatarUrl={avatarUrl} label={accountLabel} />
                   <div className="min-w-0">

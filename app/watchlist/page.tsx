@@ -9,7 +9,7 @@ import { ArtistIdentity, ChangeText, RmiButton, RmiSection } from "@/components/
 import { WatchlistButton } from "@/components/WatchlistButton";
 import { formatCurrency } from "@/lib/formatters";
 import { getMarketBreadth } from "@/lib/market-analytics";
-import { Radar, Search, Star } from "lucide-react";
+import { Plus, Radar, Search, Star, X } from "lucide-react";
 import Link from "next/link";
 import { useMemo, useState } from "react";
 
@@ -17,7 +17,7 @@ export default function WatchlistPage() {
   const { session } = useAuth();
   const { state, watchlistArtistIds, watchlistArtists } = useGame();
   const [addQuery, setAddQuery] = useState("");
-  const [addFocused, setAddFocused] = useState(false);
+  const [addOpen, setAddOpen] = useState(false);
   const breadth = getMarketBreadth(watchlistArtists);
   const biggestMover = [...watchlistArtists].sort(
     (first, second) => Math.abs(second.dailyChangePercent) - Math.abs(first.dailyChangePercent)
@@ -32,8 +32,7 @@ export default function WatchlistPage() {
           !watchlistArtistIds.includes(artist.id) &&
           (!normalized || artist.name.toLowerCase().includes(normalized) || artist.ticker.toLowerCase().includes(normalized))
       )
-      .sort((first, second) => second.dailyChangePercent - first.dailyChangePercent || first.name.localeCompare(second.name))
-      .slice(0, 7);
+      .sort((first, second) => second.dailyChangePercent - first.dailyChangePercent || first.name.localeCompare(second.name));
   }, [addQuery, state.artists, watchlistArtistIds]);
 
   if (!session) {
@@ -53,35 +52,61 @@ export default function WatchlistPage() {
           <h1 className="mt-2 text-3xl font-black sm:text-4xl">Watchlist</h1>
           <p className="mt-1 text-sm font-bold text-paper/70">{watchlistArtists.length} artists you're tracking</p>
         </div>
-        <div className="relative w-full sm:w-80">
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-paper/35" aria-hidden="true" />
-          <input
-            value={addQuery}
-            onChange={(event) => setAddQuery(event.target.value)}
-            onFocus={() => setAddFocused(true)}
-            onBlur={() => window.setTimeout(() => setAddFocused(false), 140)}
-            className="rmi-terminal-input h-10 w-full pl-9 pr-3 text-sm outline-none placeholder:text-paper/35"
-            placeholder="Add an artist"
-            aria-label="Add an artist to your watchlist"
-          />
-          {addFocused ? (
-            <div className="rmi-card absolute left-0 right-0 top-12 z-50 max-h-80 overflow-y-auto p-1 shadow-2xl scrollbar-thin">
-              {addSuggestions.length ? addSuggestions.map((artist) => (
-                <div key={artist.id} className="flex items-center gap-3 rounded-md px-2 py-2 hover:bg-panelSoft">
-                  <Link href={`/artists/${artist.id}`} className="flex min-w-0 flex-1 items-center gap-3">
-                    <ArtistAvatar artist={artist} size="sm" />
-                    <span className="min-w-0">
-                      <span className="block truncate text-sm font-black">{artist.name}</span>
-                      <span className="text-xs text-paper/45">${artist.ticker}</span>
-                    </span>
-                  </Link>
-                  <WatchlistButton artistId={artist.id} />
-                </div>
-              )) : <p className="px-3 py-5 text-center text-sm text-paper/50">No matching artists.</p>}
-            </div>
-          ) : null}
-        </div>
+        <button
+          type="button"
+          onClick={() => setAddOpen((open) => !open)}
+          className="rmi-button-secondary inline-flex min-h-10 items-center gap-2 rounded-md border border-line px-4 text-sm font-black"
+          aria-expanded={addOpen}
+          aria-controls="watchlist-artist-picker"
+        >
+          <Plus className="h-4 w-4" aria-hidden="true" />
+          Add an artist
+        </button>
       </header>
+
+      {addOpen ? (
+        <section id="watchlist-artist-picker" className="rmi-card p-4 sm:p-5" aria-label="Add artists to watchlist">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h2 className="text-base font-black">Add to watchlist</h2>
+              <p className="mt-1 text-sm text-paper/50">Search every active listing and save the artists you want to track.</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setAddOpen(false)}
+              className="grid h-9 w-9 place-items-center rounded-md border border-line text-paper/55 transition hover:border-cyan/50 hover:text-paper"
+              aria-label="Close artist picker"
+            >
+              <X className="h-4 w-4" aria-hidden="true" />
+            </button>
+          </div>
+          <div className="relative mt-4">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-paper/35" aria-hidden="true" />
+            <input
+              autoFocus
+              value={addQuery}
+              onChange={(event) => setAddQuery(event.target.value)}
+              className="rmi-terminal-input h-11 w-full pl-9 pr-3 text-sm outline-none placeholder:text-paper/35"
+              placeholder="Search artist or ticker"
+              aria-label="Search artists to add to your watchlist"
+            />
+          </div>
+          <div className="mt-3 grid max-h-80 gap-1 overflow-y-auto pr-1 scrollbar-thin sm:grid-cols-2 lg:grid-cols-3">
+            {addSuggestions.length ? addSuggestions.map((artist) => (
+              <div key={artist.id} className="flex min-w-0 items-center gap-3 rounded-md border border-transparent px-2 py-2 transition hover:border-line hover:bg-panelSoft">
+                <Link href={`/artists/${artist.id}`} className="flex min-w-0 flex-1 items-center gap-3">
+                  <ArtistAvatar artist={artist} size="sm" />
+                  <span className="min-w-0">
+                    <span className="block truncate text-sm font-black">{artist.name}</span>
+                    <span className="text-xs text-paper/45">${artist.ticker}</span>
+                  </span>
+                </Link>
+                <WatchlistButton artistId={artist.id} />
+              </div>
+            )) : <p className="col-span-full px-3 py-5 text-center text-sm text-paper/50">No matching artists.</p>}
+          </div>
+        </section>
+      ) : null}
 
       {watchlistArtists.length ? (
         <section>

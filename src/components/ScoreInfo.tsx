@@ -14,7 +14,10 @@ export function ScoreInfo({ className }: { className?: string }) {
       >
         <Info className="h-3 w-3" aria-hidden="true" />
       </button>
-      <span className="pointer-events-none absolute right-0 top-6 z-50 hidden w-72 rounded-lg border border-line bg-panel p-3 text-left text-xs font-bold normal-case leading-5 text-paper shadow-2xl group-focus-within:block group-hover:block">
+      <span
+        role="tooltip"
+        className="pointer-events-none absolute right-0 top-6 z-[120] hidden w-[min(18rem,calc(100vw-2rem))] rounded-lg border border-line bg-panel p-3 text-left text-xs font-bold normal-case leading-5 text-paper shadow-2xl group-focus-within:block group-hover:block"
+      >
         {MARKET_SCORE_EXPLANATION}
       </span>
     </span>

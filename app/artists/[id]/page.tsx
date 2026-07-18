@@ -66,7 +66,7 @@ export default function ArtistDetailPage() {
   return (
     <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_300px] xl:grid-cols-[minmax(0,1fr)_340px]">
       <main className="min-w-0 space-y-5">
-        <section className="rmi-card rmi-noise relative overflow-hidden p-5 sm:p-6">
+        <section className="rmi-card rmi-noise relative p-5 sm:p-6">
           <div className="relative flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
           <div className="flex min-w-0 items-start gap-4">
             <ArtistAvatar artist={artist} size="xl" />
