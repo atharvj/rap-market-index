@@ -181,16 +181,12 @@ export async function GET(request: Request) {
     );
     const storyByPrimaryId = new Map(storyGroups.map((group) => [group.primary.id, group]));
     const groupedEvents = storyGroups.map((group) => group.primary);
-    const selectedEvents = newsSort === "top"
-      ? diversifyMarketNewsEvents(groupedEvents, {
-          feedMode: selectedArtistIds.length ? "artist" : feedMode,
-          limit
-        })
-      : sortMarketNewsEvents(
-          groupedEvents,
-          newsSort,
-          (event) => getNewsImportanceScore(event, runDate)
-        ).slice(0, limit);
+    const selectedEvents = selectMarketNewsEvents(groupedEvents, {
+      feedMode: selectedArtistIds.length ? "artist" : feedMode,
+      limit,
+      runDate,
+      sort: newsSort
+    });
     const eventNews = selectedEvents.map((event) =>
       mapMarketEventToNewsItem(
         event,
@@ -737,6 +733,20 @@ function getSourceWeight(source: string) {
   return 0;
 }
 
+function selectMarketNewsEvents(
+  events: MarketEventRow[],
+  options: { feedMode: NewsFeedMode; limit: number; runDate: string; sort: ReturnType<typeof normalizeMarketNewsSort> }
+) {
+  if (options.sort === "top") {
+    return diversifyMarketNewsEvents(events, options);
+  }
+
+  return dedupeNearDuplicateMarketNewsEvents(
+    sortMarketNewsEvents(events, options.sort, (event) => getNewsImportanceScore(event, options.runDate)),
+    options.feedMode
+  ).slice(0, options.limit);
+}
+
 function diversifyMarketNewsEvents(events: MarketEventRow[], options: { feedMode: NewsFeedMode; limit: number }) {
   const selected: MarketEventRow[] = [];
   const sourceCounts = new Map<string, number>();
@@ -774,6 +784,36 @@ function diversifyMarketNewsEvents(events: MarketEventRow[], options: { feedMode
     selected.push(event);
     seenHeadlineKeys.add(headlineKey);
     sourceCounts.set(source, sourceCount + 1);
+    artistCounts.set(event.artist_id, artistCount + 1);
+  }
+
+  return selected;
+}
+
+function dedupeNearDuplicateMarketNewsEvents(events: MarketEventRow[], feedMode: NewsFeedMode) {
+  const selected: MarketEventRow[] = [];
+  const seenHeadlineKeys = new Set<string>();
+  const perArtistCap = feedMode === "artist" ? events.length : Math.max(1, Math.ceil(events.length * 0.22));
+  const artistCounts = new Map<string, number>();
+
+  for (const event of events) {
+    const headlineKey = getNewsHeadlineKey(event);
+    const artistCount = artistCounts.get(event.artist_id) ?? 0;
+
+    if (artistCount >= perArtistCap) {
+      continue;
+    }
+
+    if (seenHeadlineKeys.has(headlineKey)) {
+      continue;
+    }
+
+    if (isNearDuplicateStory(event, selected)) {
+      continue;
+    }
+
+    selected.push(event);
+    seenHeadlineKeys.add(headlineKey);
     artistCounts.set(event.artist_id, artistCount + 1);
   }
 

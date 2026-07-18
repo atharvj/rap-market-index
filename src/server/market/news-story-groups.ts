@@ -40,13 +40,19 @@ export function groupNewsStoryEvents<T extends NewsStoryEvent>(
 }
 
 export function getNewsStoryKey(event: NewsStoryEvent) {
+  const headline = normalizeNewsStoryHeadline(event.title);
+
+  if (headline) {
+    return `headline:${event.event_date}:${headline}`;
+  }
+
   const sourceUrl = normalizeNewsSourceUrl(event.source_url);
 
   if (sourceUrl) {
     return `url:${sourceUrl}`;
   }
 
-  return `headline:${event.event_date}:${normalizeNewsStoryHeadline(event.title)}`;
+  return `event:${event.event_date}:${event.id}`;
 }
 
 export function resolveNewsStoryArtists<T extends NewsStoryEvent>({
@@ -125,6 +131,8 @@ export function normalizeNewsSourceUrl(value: string | null) {
 function normalizeNewsStoryHeadline(value: string) {
   return value
     .toLowerCase()
+    .replace(/\s*[-|]\s*(?:[a-z0-9]+(?:\.[a-z]{2,})?|[a-z0-9 .&]+)$/i, "")
+    .replace(/\bhotnewhiphop\b/g, "")
     .replace(/\s+-\s+[a-z0-9 .&]+$/i, "")
     .replace(/[’']/g, "")
     .replace(/[^a-z0-9]+/g, " ")
