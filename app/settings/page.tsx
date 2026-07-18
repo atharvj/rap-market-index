@@ -386,7 +386,7 @@ export default function SettingsPage() {
 function SettingsGroup({ title, children, danger = false }: { title: string; children: ReactNode; danger?: boolean }) {
   return (
     <section>
-      <h2 className={danger ? "rmi-data-label mb-2 text-ember" : "rmi-data-label mb-2 text-cyan"}>{title}</h2>
+      <h2 className={danger ? "rmi-data-label mb-2 px-1 text-ember" : "rmi-data-label mb-2 px-1 text-cyan"}>{title}</h2>
       <div className={danger ? "overflow-hidden rounded-lg border border-ember/50 bg-ember/[0.03]" : "rmi-card overflow-hidden border-l-2 border-l-cyan/50"}>{children}</div>
     </section>
   );

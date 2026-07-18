@@ -42,7 +42,7 @@ export default function AboutPage() {
       <header className="rmi-page-head market-grid rmi-noise relative overflow-hidden p-5 sm:p-8">
         <div className="relative z-10 grid gap-7 lg:grid-cols-[minmax(0,1fr)_360px] lg:items-end">
           <div>
-            <div className="rmi-kicker"><Activity className="h-3.5 w-3.5" aria-hidden="true" /> System Brief</div>
+            <div className="rmi-kicker"><Activity className="h-3.5 w-3.5" aria-hidden="true" /> About RMI</div>
             <h1 className="mt-4 max-w-3xl text-3xl font-black leading-tight sm:text-5xl">The signal layer for rap momentum.</h1>
             <p className="mt-4 max-w-2xl text-sm font-semibold leading-6 text-paper/60">
               RMI turns verified audience movement, public attention, music events, and fantasy-market activity into a transparent experience for following artist momentum.
@@ -59,12 +59,12 @@ export default function AboutPage() {
 
       <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_320px]">
         <main className="rmi-card overflow-hidden shadow-market">
-          <section className="rmi-section-header">
+          <section className="rmi-section-header flex flex-col gap-3 p-5 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <p className="rmi-data-label text-cyan">Market Framework</p>
-              <h2 className="mt-1 text-xl font-black">How RMI works</h2>
+              <p className="rmi-data-label text-cyan">Market Guide</p>
+              <h2 className="mt-1 text-xl font-black">How RMI Works</h2>
             </div>
-            <span className="rmi-status-chip border-mint/30 bg-mint/8 text-mint"><span className="rmi-live-dot" /> Operational</span>
+            <span className="rmi-status-chip border-mint/30 bg-mint/8 text-mint"><span className="rmi-live-dot" /> Market Active</span>
           </section>
 
           <div className="grid md:grid-cols-2">
@@ -84,8 +84,8 @@ export default function AboutPage() {
 
         <aside className="space-y-5 lg:sticky lg:top-24 lg:self-start">
           <section className="rmi-card overflow-hidden shadow-market">
-            <div className="rmi-section-header">
-              <h2 className="text-sm font-black">Exchange Directory</h2>
+            <div className="rmi-section-header flex items-center justify-between gap-3 px-4 py-3">
+              <h2 className="text-sm font-black">Explore RMI</h2>
               <Activity className="h-4 w-4 text-cyan" aria-hidden="true" />
             </div>
             <div className="divide-y divide-line">

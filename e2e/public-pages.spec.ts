@@ -194,6 +194,24 @@ test("homepage visual contract", async ({ page }) => {
   await assertStablePublicPage(page, "/", "Spot the next rise.", "homepage.png");
 });
 
+test("homepage artist search opens as an overlay without resizing the hero", async ({ page }) => {
+  await page.goto("/");
+  await expect(page.locator('[aria-busy="true"]')).toHaveCount(0, { timeout: 15_000 });
+
+  const hero = page.getByTestId("home-market-hero");
+  const search = page.getByPlaceholder("Search an artist, e.g. Ken Carson");
+  const before = await hero.boundingBox();
+
+  await search.focus();
+  await expect(page.getByTestId("home-search-results")).toBeVisible();
+  const after = await hero.boundingBox();
+
+  expect(before).not.toBeNull();
+  expect(after).not.toBeNull();
+  expect(Math.abs((after?.height ?? 0) - (before?.height ?? 0))).toBeLessThanOrEqual(2);
+  await expect(page.getByTestId("home-search-results")).toHaveCSS("position", "absolute");
+});
+
 test("markets visual contract", async ({ page }) => {
   await assertStablePublicPage(page, "/markets", "Artist Markets", "markets.png");
 });

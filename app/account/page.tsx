@@ -575,11 +575,17 @@ function AccountPageContent() {
           <h2 className="mb-3 text-lg font-black">Account Controls</h2>
           <div className="rmi-card border-t-2 border-t-cyan/70 p-4">
             <p className="mb-4 text-sm text-paper/55">Security, privacy, and account preferences live in the settings console.</p>
-            <RmiButton href="/settings" variant="secondary">Open Settings</RmiButton>
-            <button type="button" onClick={signOut} className="flex items-center gap-2 text-sm font-black text-ember">
-              <LogOut className="h-4 w-4" />
-              Sign out
-            </button>
+            <div className="flex flex-wrap items-center gap-3">
+              <RmiButton href="/settings" variant="secondary">Open Settings</RmiButton>
+              <button
+                type="button"
+                onClick={signOut}
+                className="rmi-button-secondary inline-flex min-h-10 items-center gap-2 rounded-md border border-ember/40 px-4 text-sm font-black text-ember hover:bg-ember/10"
+              >
+                <LogOut className="h-4 w-4" />
+                Sign out
+              </button>
+            </div>
           </div>
         </div>
       </section>

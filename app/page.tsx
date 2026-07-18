@@ -98,7 +98,7 @@ export default function HomePage() {
 
   return (
     <div className="space-y-6">
-      <section className="rmi-card rmi-hero relative z-40 grid min-w-0 overflow-visible lg:grid-cols-[minmax(0,1.45fr)_minmax(300px,0.55fr)]">
+      <section data-testid="home-market-hero" className="rmi-card rmi-hero relative z-40 grid min-w-0 overflow-visible lg:grid-cols-[minmax(0,1.45fr)_minmax(300px,0.55fr)]">
         <div className="rmi-noise grid min-w-0 content-center px-5 py-9 text-center sm:px-8 lg:min-h-[260px] lg:text-left">
           <div className="relative z-10">
           <p className="rmi-kicker">RMI Market Intelligence</p>
@@ -121,7 +121,7 @@ export default function HomePage() {
             />
             <RmiButton type="submit">Search</RmiButton>
             {searchFocused ? (
-              <div className="rmi-card absolute left-0 right-0 top-[100px] z-[100] max-h-72 overflow-y-auto p-2 text-left shadow-2xl scrollbar-thin sm:right-20 sm:top-12">
+              <div data-testid="home-search-results" className="rmi-card absolute left-0 right-0 top-[calc(100%+0.5rem)] z-[100] max-h-72 overscroll-contain overflow-y-auto p-2 text-left shadow-2xl scrollbar-thin sm:right-[5.75rem]">
                 {searchSuggestions.map((artist) => (
                   <Link
                     key={artist.id}

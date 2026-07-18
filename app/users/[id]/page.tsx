@@ -4,7 +4,7 @@ import { AdminBadge } from "@/components/AdminBadge";
 import { UserAvatar } from "@/components/UserAvatar";
 import { formatCurrency, formatPercent } from "@/lib/formatters";
 import clsx from "clsx";
-import { Activity, BarChart3, CalendarDays, CircleGauge, LockKeyhole, Radio, Star, Trophy, WalletCards } from "lucide-react";
+import { Activity, BarChart3, CalendarDays, LockKeyhole, Radio, Star, Trophy, WalletCards } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -115,13 +115,13 @@ export default function PublicUserProfilePage() {
   return (
     <div className="mx-auto max-w-6xl space-y-5">
       <section className="rmi-hero market-grid rmi-noise relative overflow-hidden p-5 shadow-market sm:p-7">
-        <div className="relative z-10 grid gap-6 md:grid-cols-[130px_minmax(0,1fr)_230px] md:items-center">
+        <div className="relative z-10 grid gap-6 lg:grid-cols-[130px_minmax(0,1fr)_230px] lg:items-center">
           <div className="relative w-fit">
             <span className="absolute -inset-3 rounded-full border border-cyan/20" aria-hidden="true" />
             <UserAvatar avatarUrl={profile.avatarUrl} label={profile.username} size="lg" />
           </div>
           <div className="min-w-0">
-            <p className="rmi-kicker"><Radio className="h-4 w-4" aria-hidden="true" /> Public Trader Node</p>
+            <p className="rmi-kicker"><Radio className="h-4 w-4" aria-hidden="true" /> Public Profile</p>
             <div className="flex min-w-0 flex-wrap items-center gap-2">
               <h1 className="mt-2 truncate text-3xl font-black sm:text-4xl">{profile.username}</h1>
               {profile.isAdmin ? <AdminBadge /> : null}
@@ -145,7 +145,7 @@ export default function PublicUserProfilePage() {
       </section>
 
       <section className="rmi-card market-grid shadow-market">
-        <div className="rmi-section-header">
+        <div className="rmi-section-header flex flex-col gap-3 p-5 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <p className="rmi-kicker text-cyan"><BarChart3 className="h-4 w-4" aria-hidden="true" /> Public Portfolio</p>
             <h2 className="mt-1 text-xl font-black">Open Positions</h2>
@@ -204,17 +204,16 @@ export default function PublicUserProfilePage() {
       </section>
 
       <section className="rmi-card market-grid shadow-market">
-        <div className="rmi-section-header">
+        <div className="rmi-section-header flex items-center justify-between gap-3 p-5">
           <div>
-            <p className="rmi-kicker text-violet"><Star className="h-4 w-4" aria-hidden="true" /> Identity Signals</p>
+            <p className="rmi-kicker text-violet"><Star className="h-4 w-4" aria-hidden="true" /> Artist Favorites</p>
             <h2 className="mt-1 text-xl font-black">Favorite Artists</h2>
           </div>
-          <CircleGauge className="h-5 w-5 text-violet" aria-hidden="true" />
         </div>
-        <div className="grid divide-y divide-line sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-3 p-3 sm:grid-cols-2 lg:grid-cols-3">
           {profile.favoriteArtists.length ? (
             profile.favoriteArtists.map((artist) => (
-              <Link key={artist.id} href={`/artists/${artist.id}`} className="rmi-signal-card rmi-signal-violet m-2 flex items-center gap-3 p-4">
+              <Link key={artist.id} href={`/artists/${artist.id}`} className="rmi-signal-card rmi-signal-violet flex items-center gap-3 p-4">
                 <span className="flex items-center gap-3">
                   <ProfileArtistImage
                     name={artist.name}

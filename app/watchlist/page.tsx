@@ -65,7 +65,11 @@ export default function WatchlistPage() {
       </header>
 
       {addOpen ? (
-        <section id="watchlist-artist-picker" className="rmi-card p-4 sm:p-5" aria-label="Add artists to watchlist">
+        <section
+          id="watchlist-artist-picker"
+          className="rmi-card relative z-10 w-full scroll-mt-28 overflow-visible p-4 sm:p-5"
+          aria-label="Add artists to watchlist"
+        >
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
               <h2 className="text-base font-black">Add to watchlist</h2>

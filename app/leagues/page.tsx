@@ -1,11 +1,11 @@
 "use client";
 
 import { RmiButton } from "@/components/RmiPrimitives";
-import { Activity, ArrowUpRight, MessageCircle, ShieldCheck, Trophy, UsersRound } from "lucide-react";
+import { ArrowUpRight, MessageCircle, ShieldCheck, Trophy, UsersRound } from "lucide-react";
 
 const plannedFeatures = [
   { icon: UsersRound, title: "Private Leagues", detail: "Invite friends and compare portfolios in a private table." },
-  { icon: Trophy, title: "League Rankings", detail: "Compete on return without changing the public artist market." },
+  { icon: Trophy, title: "League Rankings", detail: "See who builds the strongest portfolio over time." },
   { icon: MessageCircle, title: "League Activity", detail: "Follow trades and league updates in one private feed." }
 ];
 
@@ -15,10 +15,10 @@ export default function LeaguesPage() {
       <section className="rmi-hero market-grid rmi-noise overflow-hidden">
         <div className="grid gap-6 p-6 sm:p-9 lg:grid-cols-[minmax(0,1fr)_340px] lg:items-center">
           <div>
-            <span className="rmi-status-chip border-violet/30 bg-violet/10 text-violet"><span className="h-1.5 w-1.5 rounded-full bg-violet" /> Network Preview</span>
-            <h1 className="mt-5 text-3xl font-black sm:text-5xl">Private markets. Shared competition.</h1>
+            <span className="inline-flex items-center gap-2 rounded-md border border-violet/45 bg-violet/15 px-4 py-2 text-xs font-black uppercase tracking-[0.16em] text-violet shadow-[0_0_24px_rgba(var(--color-violet),0.16)]"><span className="h-2 w-2 rounded-full bg-violet" /> Coming Soon</span>
+            <h1 className="mt-5 text-3xl font-black sm:text-5xl">Build a league. Trade against your friends.</h1>
             <p className="mt-4 max-w-xl text-sm font-semibold leading-6 text-paper/60">
-              Create private groups, compare returns, and compete with friends. Leagues are coming after the core market launch.
+              Create private groups, invite friends, and compete on portfolio returns.
             </p>
             <div className="mt-6 flex flex-wrap gap-3">
               <RmiButton href="/leaderboard">View Global Rankings <ArrowUpRight className="ml-2 h-4 w-4" /></RmiButton>
@@ -28,16 +28,16 @@ export default function LeaguesPage() {
           <div className="rmi-signal-card relative overflow-hidden p-5">
             <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-cyan via-violet to-mint" />
             <div className="flex items-center justify-between">
-              <span className="rmi-data-label">League Uplink</span>
-              <span className="rmi-live-dot" />
+              <span className="rmi-data-label">League Preview</span>
+              <span className="rmi-status-chip border-violet/30 bg-violet/10 text-violet">Coming Soon</span>
             </div>
             <div className="mt-8 grid place-items-center py-6">
               <ShieldCheck className="h-16 w-16 text-violet" strokeWidth={1.25} aria-hidden="true" />
             </div>
             <div className="grid grid-cols-3 gap-2 border-t border-line pt-4 text-center">
               <LeagueSignal value="Private" label="Access" />
-              <LeagueSignal value="Live" label="Standings" />
-              <LeagueSignal value="Fair" label="Market" />
+              <LeagueSignal value="Ranked" label="Standings" />
+              <LeagueSignal value="Social" label="Competition" />
             </div>
           </div>
         </div>
@@ -57,11 +57,12 @@ export default function LeaguesPage() {
       </section>
 
       <section className="rmi-card flex flex-wrap items-center justify-between gap-4 p-5">
-        <div className="flex items-center gap-3">
-          <span className="grid h-10 w-10 place-items-center rounded-md bg-mint/10 text-mint"><Activity className="h-5 w-5" aria-hidden="true" /></span>
-          <div><p className="text-sm font-black">The global market stays shared.</p><p className="mt-1 text-xs font-semibold text-paper/45">League competition will compare portfolios without creating separate artist prices.</p></div>
+        <div>
+          <p className="rmi-kicker text-violet">Coming Soon</p>
+          <p className="mt-2 text-sm font-black">Build your portfolio now.</p>
+          <p className="mt-1 text-xs font-semibold text-paper/45">Bring it into private competition with friends when leagues open.</p>
         </div>
-        <span className="rmi-status-chip border-mint/25 bg-mint/8 text-mint">Architecture Ready</span>
+        <RmiButton href="/portfolio" variant="secondary">Open Portfolio</RmiButton>
       </section>
     </div>
   );

@@ -155,7 +155,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
             </Link>
           ) : null}
 
-          <div ref={accountMenuRef} className="relative ml-auto lg:ml-0">
+          <div ref={accountMenuRef} className="relative ml-auto shrink-0 lg:ml-0">
             {authLoading ? (
               <div
                 className="h-10 w-24 rounded-lg bg-panelSoft motion-safe:animate-pulse"
@@ -191,7 +191,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
 
             {accountOpen ? (
               <div
-                className="rmi-card absolute right-0 top-12 z-[120] max-h-[calc(100dvh-5.5rem)] w-[min(20rem,calc(100vw-2rem))] overflow-y-auto p-3 shadow-2xl scrollbar-thin"
+                className="rmi-card absolute right-0 top-[calc(100%+0.75rem)] z-[120] max-h-[calc(100dvh-5.5rem)] w-[min(20rem,calc(100vw-2rem))] overscroll-contain overflow-y-auto p-3 shadow-2xl scrollbar-thin"
                 role="menu"
               >
                 <div className="flex items-center gap-3 border-b border-line pb-3">
@@ -240,14 +240,16 @@ export function Shell({ children }: { children: React.ReactNode }) {
                   </Link>
                 </div>
 
-                <button
-                  type="button"
-                  onClick={handleSignOut}
-                  className="flex w-full items-center gap-3 border-t border-line px-3 pt-4 text-left text-sm font-black hover:text-ember"
-                >
-                  <LogOut className="h-4 w-4" aria-hidden="true" />
-                  Sign out
-                </button>
+                <div className="mt-2 border-t border-line pt-3">
+                  <button
+                    type="button"
+                    onClick={handleSignOut}
+                    className="flex w-full items-center gap-3 rounded-md px-3 py-2.5 text-left text-sm font-black hover:bg-ember/10 hover:text-ember"
+                  >
+                    <LogOut className="h-4 w-4" aria-hidden="true" />
+                    Sign out
+                  </button>
+                </div>
               </div>
             ) : null}
           </div>
@@ -330,12 +332,12 @@ function MarketTape({ artists }: { artists: Artist[] }) {
       <div className="mx-auto flex min-h-10 max-w-[1440px] px-4 sm:px-6 lg:px-8">
         <Link
           href="/markets"
-          className="z-10 flex shrink-0 items-center gap-2 border-r border-line/80 bg-panelSoft/95 pr-5 text-[10px] font-black uppercase tracking-[0.12em]"
+          className="z-10 flex shrink-0 items-center gap-2 bg-panelSoft/95 pr-4 text-[10px] font-black uppercase tracking-[0.12em]"
         >
           <span className="rmi-live-dot" aria-hidden="true" />
           Market Live
         </Link>
-        <div className="market-tape-viewport min-w-0 flex-1 overflow-hidden">
+        <div className="market-tape-viewport min-w-0 flex-1 overflow-hidden pl-3 sm:pl-4">
           <div className="market-tape-track flex h-full w-max items-center">
             <MarketTapeGroup artists={artists} />
             <MarketTapeGroup artists={artists} duplicate />

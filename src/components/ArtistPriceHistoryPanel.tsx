@@ -92,8 +92,8 @@ export function ArtistPriceHistoryPanel({
 
   return (
     <section className="rmi-card overflow-hidden shadow-market">
-      <div className="rmi-section-header flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
-        <div className="min-w-0 text-left">
+      <div className="rmi-section-header !flex flex-col !items-stretch !justify-between gap-3 px-4 py-4 text-left sm:!flex-row sm:!items-center sm:px-5">
+        <div className="min-w-0 text-left sm:mr-auto">
           <div className="flex flex-wrap items-center gap-2">
             <Activity className="h-4 w-4 text-cyan" aria-hidden="true" />
             <h2 className="text-lg font-black">Price History</h2>

@@ -60,7 +60,11 @@ export function PolicyDocument({
 
         <main className="rmi-card market-grid min-w-0 overflow-hidden px-5 sm:px-7">
           {sections.map((section, index) => (
-            <section key={section.id} id={section.id} className="scroll-mt-32 border-b border-line py-7 last:border-b-0">
+            <section
+              key={section.id}
+              id={section.id}
+              className={`scroll-mt-32 py-7 ${index < sections.length - 1 ? "border-b border-line" : ""}`}
+            >
               <div className="flex items-center gap-3">
                 <span className="grid h-8 w-8 shrink-0 place-items-center rounded-md border border-violet/35 bg-violet/10 text-xs font-black text-violet">
                   {String(index + 1).padStart(2, "0")}
@@ -70,7 +74,7 @@ export function PolicyDocument({
               <div className="mt-3 text-sm leading-7 text-paper/65">{section.body}</div>
             </section>
           ))}
-          <Link href={link.href} className="rmi-button-secondary mb-7 inline-flex min-h-10 items-center rounded-md border border-line px-4 text-sm font-black">
+          <Link href={link.href} className="rmi-button-secondary mb-7 mt-1 inline-flex min-h-10 items-center rounded-md border border-line px-4 text-sm font-black">
             {link.label}
           </Link>
         </main>
