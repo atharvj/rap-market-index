@@ -6,9 +6,11 @@ import { ArtistIdentity, ChangeText, RmiButton, RmiSection } from "@/components/
 import { ArtistAvatar } from "@/components/ArtistAvatar";
 import { MarketSideRail } from "@/components/MarketSideRail";
 import { MarketNewsFeed } from "@/components/MarketNewsFeed";
+import { MiniSparkline } from "@/components/MiniSparkline";
 import { formatCurrency, formatPercent } from "@/lib/formatters";
 import { getMarketBreadth } from "@/lib/market-analytics";
 import type { Artist } from "@/lib/types";
+import { Activity, ArrowDownRight, ArrowUpRight, Gauge, Radio } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
@@ -57,6 +59,18 @@ export default function HomePage() {
     .filter((artist) => artist.id !== marketLeader?.id)
     .sort((a, b) => b.hypeScore - a.hypeScore)[0] ?? marketLeader;
   const breadth = getMarketBreadth(state.artists);
+  const signalDeck = useMemo(
+    () =>
+      [...state.artists]
+        .sort(
+          (first, second) =>
+            Math.abs(second.dailyChangePercent) + second.hypeScore / 35 -
+              (Math.abs(first.dailyChangePercent) + first.hypeScore / 35) ||
+            second.hypeScore - first.hypeScore
+        )
+        .slice(0, 6),
+    [state.artists]
+  );
   const portfolioDayPercent = portfolioValue - portfolioDayChange > 0
     ? (portfolioDayChange / (portfolioValue - portfolioDayChange)) * 100
     : 0;
@@ -84,29 +98,36 @@ export default function HomePage() {
 
   return (
     <div className="space-y-6">
-      <section className="relative z-40 grid min-w-0 overflow-visible rounded-lg border border-line bg-panel lg:grid-cols-[minmax(0,1.45fr)_minmax(290px,0.55fr)]">
-        <div className="grid min-w-0 content-center px-5 py-8 text-center sm:px-8 lg:min-h-[230px] lg:text-left">
-          <p className="text-xs font-bold uppercase tracking-[0.18em] text-cyan">Rap Market Index</p>
-          <h1 className="mt-3 min-w-0 break-words text-3xl font-black leading-tight sm:text-4xl">Spot the next rise.</h1>
-          <p className="mt-3 text-base font-bold text-paper/75">Buy shares in rappers. Build a portfolio when they blow up.</p>
+      <section className="rmi-card rmi-hero relative z-40 grid min-w-0 overflow-visible lg:grid-cols-[minmax(0,1.45fr)_minmax(300px,0.55fr)]">
+        <div className="rmi-noise grid min-w-0 content-center px-5 py-9 text-center sm:px-8 lg:min-h-[260px] lg:text-left">
+          <div className="relative z-10">
+          <p className="rmi-kicker">RMI Market Intelligence</p>
+          <h1 className="mt-4 min-w-0 break-words text-3xl font-black leading-[1.05] sm:text-5xl">
+            Spot the next <span className="text-cyan drop-shadow-[0_0_18px_rgba(var(--color-cyan),0.28)]">rise.</span>
+          </h1>
+          <p className="mt-3 max-w-2xl text-sm font-medium text-paper/66 sm:text-base">Buy shares in rappers. Build a portfolio when they blow up.</p>
+          <div className="mt-4 flex flex-wrap justify-center gap-2 lg:justify-start">
+            <span className="inline-flex items-center gap-2 rounded-md border border-mint/25 bg-mint/5 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-mint"><span className="rmi-live-dot" /> Market online</span>
+            <span className="inline-flex items-center gap-2 rounded-md border border-violet/25 bg-violet/5 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-violet"><Radio className="h-3 w-3" /> Verified catalysts</span>
+          </div>
           <form onSubmit={submitSearch} className="relative mx-auto mt-6 flex w-full min-w-0 max-w-xl flex-col gap-2 sm:flex-row lg:mx-0">
             <input
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               onFocus={() => setSearchFocused(true)}
               onBlur={() => window.setTimeout(() => setSearchFocused(false), 140)}
-              className="min-h-11 min-w-0 flex-1 rounded-lg border border-line bg-panelSoft px-3 text-sm outline-none placeholder:text-paper/35 focus:border-cyan"
+              className="min-h-11 min-w-0 flex-1 rounded-md border border-line bg-ink/70 px-3 text-sm shadow-[inset_0_0_18px_rgba(0,0,0,0.16)] outline-none placeholder:text-paper/30 focus:border-cyan focus:shadow-[0_0_22px_rgba(var(--color-cyan),0.09)]"
               placeholder="Search an artist, e.g. Ken Carson"
             />
             <RmiButton type="submit">Search</RmiButton>
             {searchFocused ? (
-              <div className="absolute left-0 right-0 top-[100px] z-[100] max-h-72 overflow-y-auto rounded-lg border border-line bg-panel p-2 text-left shadow-2xl scrollbar-thin sm:right-20 sm:top-12">
+              <div className="rmi-card absolute left-0 right-0 top-[100px] z-[100] max-h-72 overflow-y-auto p-2 text-left shadow-2xl scrollbar-thin sm:right-20 sm:top-12">
                 {searchSuggestions.map((artist) => (
                   <Link
                     key={artist.id}
                     href={`/artists/${artist.id}`}
                     onClick={() => setSearchFocused(false)}
-                    className="flex items-center justify-between gap-3 rounded-lg px-3 py-2 hover:bg-panelSoft"
+                    className="flex items-center justify-between gap-3 rounded-md px-3 py-2 hover:bg-cyan/5"
                   >
                     <span className="flex min-w-0 items-center gap-3">
                       <ArtistAvatar artist={artist} size="sm" />
@@ -121,23 +142,52 @@ export default function HomePage() {
               </div>
             ) : null}
           </form>
+          </div>
         </div>
 
-        <div className="grid divide-y divide-line border-t border-line bg-panelSoft lg:border-l lg:border-t-0">
-          {marketLeader ? <PulseArtist label="Top gainer" artist={marketLeader} /> : null}
-          {underPressure ? <PulseArtist label="Under pressure" artist={underPressure} /> : null}
-          {signalLeader ? <PulseArtist label="Strongest signal" artist={signalLeader} score /> : null}
+        <div className="grid divide-y divide-line/80 border-t border-line bg-ink/45 lg:border-l lg:border-t-0">
+          {marketLeader ? <PulseArtist label="Top gainer" artist={marketLeader} accent="mint" /> : null}
+          {underPressure ? <PulseArtist label="Under pressure" artist={underPressure} accent="ember" /> : null}
+          {signalLeader ? <PulseArtist label="Strongest signal" artist={signalLeader} score accent="violet" /> : null}
         </div>
       </section>
 
       <section className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <HeroStat label="Active Listings" value={String(state.artists.length)} />
-        <HeroStat label="Gaining Today" value={String(breadth.advancers)} />
-        <HeroStat label="Declining Today" value={String(breadth.decliners)} />
-        <HeroStat label="Average Move" value={formatPercent(breadth.averageAbsoluteMove)} />
+        <HeroStat label="Active Listings" value={String(state.artists.length)} accent="cyan" icon={<Activity className="h-4 w-4" />} />
+        <HeroStat label="Gaining Today" value={String(breadth.advancers)} accent="mint" icon={<ArrowUpRight className="h-4 w-4" />} />
+        <HeroStat label="Declining Today" value={String(breadth.decliners)} accent="ember" icon={<ArrowDownRight className="h-4 w-4" />} />
+        <HeroStat label="Average Move" value={formatPercent(breadth.averageAbsoluteMove)} accent="brass" icon={<Gauge className="h-4 w-4" />} />
       </section>
 
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,1.55fr)_minmax(300px,0.65fr)]">
+      <RmiSection
+        title="Live Signal Deck"
+        subtitle="Artists with the strongest combination of market movement and current RMI signal."
+        action={<Link href="/markets" className="text-xs font-black text-cyan hover:text-paper">Open Markets</Link>}
+      >
+        <div className="grid gap-px bg-line/70 sm:grid-cols-2 xl:grid-cols-3">
+          {signalDeck.map((artist, index) => (
+            <Link key={artist.id} href={`/artists/${artist.id}`} className="group bg-panel px-4 py-4 transition-colors hover:bg-cyan/[0.045]">
+              <div className="flex items-start justify-between gap-3">
+                <ArtistIdentity artist={artist} linked={false} />
+                <span className="rmi-data-label text-cyan/65">0{index + 1}</span>
+              </div>
+              <div className="mt-4 flex items-end justify-between gap-4">
+                <div>
+                  <p className="text-lg font-black number-tabular">{formatCurrency(artist.currentPrice)}</p>
+                  <ChangeText value={artist.dailyChangePercent} />
+                </div>
+                <MiniSparkline data={artist.priceHistory} positive={artist.dailyChangePercent >= 0} width={118} height={38} />
+              </div>
+              <div className="mt-3 flex items-center justify-between border-t border-line/60 pt-2">
+                <span className="rmi-data-label">RMI signal</span>
+                <span className="text-xs font-black text-violet number-tabular">{artist.hypeScore}/100</span>
+              </div>
+            </Link>
+          ))}
+        </div>
+      </RmiSection>
+
+      <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1.55fr)_minmax(300px,0.65fr)]">
         <RmiSection
           title="Market Catalysts"
           subtitle="Verified stories with enough evidence and relevance to inform an RMI quote."
@@ -190,31 +240,35 @@ export default function HomePage() {
   );
 }
 
-function PulseArtist({ label, artist, score = false }: { label: string; artist: Artist; score?: boolean }) {
+function PulseArtist({ label, artist, score = false, accent }: { label: string; artist: Artist; score?: boolean; accent: "mint" | "ember" | "violet" }) {
   return (
-    <div className="grid content-center gap-3 p-5">
-      <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-paper/45">{label}</p>
+    <div className="relative grid content-center gap-3 overflow-hidden p-5">
+      <span className={accent === "mint" ? "absolute inset-y-0 left-0 w-0.5 bg-mint shadow-[0_0_12px_rgba(var(--color-mint),0.6)]" : accent === "ember" ? "absolute inset-y-0 left-0 w-0.5 bg-ember shadow-[0_0_12px_rgba(var(--color-ember),0.6)]" : "absolute inset-y-0 left-0 w-0.5 bg-violet shadow-[0_0_12px_rgba(var(--color-violet),0.6)]"} />
+      <p className="rmi-data-label">{label}</p>
       <div className="flex items-center justify-between gap-4">
         <ArtistIdentity artist={artist} />
-        {score ? <span className="text-sm font-black text-cyan">{artist.hypeScore}/100</span> : <ChangeText value={artist.dailyChangePercent} />}
+        {score ? <span className="text-sm font-black text-violet">{artist.hypeScore}/100</span> : <ChangeText value={artist.dailyChangePercent} />}
       </div>
     </div>
   );
 }
 
-function HeroStat({ label, value }: { label: string; value: string }) {
+function HeroStat({ label, value, accent, icon }: { label: string; value: string; accent: "cyan" | "mint" | "ember" | "brass"; icon: React.ReactNode }) {
   return (
-    <div className="rounded-lg bg-panelSoft p-4">
-      <p className="text-xs font-bold text-paper/65">{label}</p>
-      <p className="mt-1 text-xl font-black number-tabular">{value}</p>
+    <div className={`rmi-metric rmi-metric-${accent} p-4`}>
+      <div className="flex items-center justify-between gap-2">
+        <p className="rmi-data-label">{label}</p>
+        <span className={accent === "cyan" ? "text-cyan" : accent === "mint" ? "text-mint" : accent === "ember" ? "text-ember" : "text-brass"}>{icon}</span>
+      </div>
+      <p className="mt-2 text-xl font-black number-tabular">{value}</p>
     </div>
   );
 }
 
 function SnapshotTile({ label, value, positive = true }: { label: string; value: string; positive?: boolean }) {
   return (
-    <div className="rounded-lg bg-panelSoft p-4">
-      <p className="text-xs font-bold text-paper/55">{label}</p>
+    <div className="rmi-metric p-4">
+      <p className="rmi-data-label">{label}</p>
       <p className={positive ? "mt-1 text-xl font-black text-paper number-tabular" : "mt-1 text-xl font-black text-ember number-tabular"}>{value}</p>
     </div>
   );

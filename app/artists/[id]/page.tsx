@@ -13,7 +13,7 @@ import { WatchlistButton } from "@/components/WatchlistButton";
 import { sanitizeMoveExplanation } from "@/lib/artist-explanations";
 import { formatCurrency, formatShares } from "@/lib/formatters";
 import { estimateMarketMakerQuote } from "@/lib/trading";
-import { BadgeCheck, KeyRound } from "lucide-react";
+import { Activity, BadgeCheck, KeyRound, Radio, Zap } from "lucide-react";
 import { useParams } from "next/navigation";
 import type { ReactNode } from "react";
 
@@ -66,12 +66,14 @@ export default function ArtistDetailPage() {
   return (
     <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_300px] xl:grid-cols-[minmax(0,1fr)_340px]">
       <main className="min-w-0 space-y-5">
-        <section className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <section className="rmi-card rmi-noise relative overflow-hidden p-5 sm:p-6">
+          <div className="relative flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
           <div className="flex min-w-0 items-start gap-4">
             <ArtistAvatar artist={artist} size="xl" />
             <div className="min-w-0">
+              <div className="rmi-kicker mb-2"><Radio className="h-3.5 w-3.5" aria-hidden="true" /> Live Artist Quote</div>
               <div className="flex flex-wrap items-center gap-2">
-                <h1 className="truncate text-2xl font-black">{artist.name}</h1>
+                <h1 className="truncate text-3xl font-black sm:text-4xl">{artist.name}</h1>
                 <BadgeCheck className="h-4 w-4 text-cyan" aria-hidden="true" />
                 <WatchlistButton artistId={artist.id} />
               </div>
@@ -79,32 +81,37 @@ export default function ArtistDetailPage() {
                 <span>${artist.ticker} · {artist.hypeScore}/100 RMI Score</span>
                 <ScoreInfo />
               </p>
-              <p className="mt-1 text-xs text-paper/40">Latest recorded quote · {state.artists.length} active listings</p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <span className="rmi-status-chip"><span className="rmi-live-dot" /> Market active</span>
+                <span className="rmi-status-chip text-violet"><Zap className="h-3 w-3" /> Signal rank #{signalRank}</span>
+              </div>
             </div>
           </div>
 
           <div className="shrink-0 sm:text-right">
-            <p className="text-4xl font-black number-tabular">{formatCurrency(artist.currentPrice)}</p>
+            <p className="rmi-data-label">Last recorded price</p>
+            <p className="mt-1 text-4xl font-black number-tabular sm:text-5xl">{formatCurrency(artist.currentPrice)}</p>
             <p className="mt-1 text-sm"><ChangeText value={artist.dailyChangePercent} suffix=" today" /></p>
+          </div>
           </div>
         </section>
 
         <ArtistPriceHistoryPanel artistId={artist.id} fallbackData={artist.priceHistory} />
 
-        <section className="rmi-card grid grid-cols-2 overflow-hidden sm:grid-cols-4">
-          <QuoteStat label="Previous Close" value={formatCurrency(activeArtist.previousClose)} />
-          <QuoteStat label="Today's Change" value={`${priceChange >= 0 ? "+" : ""}${formatCurrency(priceChange)}`} />
-          <QuoteStat label="Bid" value={formatCurrency(sellQuote.executionPrice)} />
-          <QuoteStat label="Ask" value={formatCurrency(buyQuote.executionPrice)} />
-          <QuoteStat label="Recorded Low" value={formatCurrency(recordedLow)} />
-          <QuoteStat label="Recorded High" value={formatCurrency(recordedHigh)} />
-          <QuoteStat label="24h Rank" value={`#${moveRank}`} />
-          <QuoteStat label="Signal Rank" value={`#${signalRank}`} />
+        <section className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+          <QuoteStat label="Previous Close" value={formatCurrency(activeArtist.previousClose)} tone="cyan" />
+          <QuoteStat label="Today's Change" value={`${priceChange >= 0 ? "+" : ""}${formatCurrency(priceChange)}`} tone={priceChange >= 0 ? "mint" : "ember"} />
+          <QuoteStat label="Bid" value={formatCurrency(sellQuote.executionPrice)} tone="ember" />
+          <QuoteStat label="Ask" value={formatCurrency(buyQuote.executionPrice)} tone="mint" />
+          <QuoteStat label="Recorded Low" value={formatCurrency(recordedLow)} tone="violet" />
+          <QuoteStat label="Recorded High" value={formatCurrency(recordedHigh)} tone="brass" />
+          <QuoteStat label="24h Rank" value={`#${moveRank}`} tone="cyan" />
+          <QuoteStat label="Signal Rank" value={`#${signalRank}`} tone="violet" />
         </section>
 
         <ArtistAudienceSnapshot artistId={artist.id} />
 
-        <RmiSection title="Why the Quote Moved">
+        <RmiSection title={<span className="flex items-center gap-2"><Activity className="h-4 w-4 text-mint" /> Why the Quote Moved</span>}>
           <div className="px-4">
             <CatalystRow icon={<KeyRound className="h-4 w-4" />} text={explanation} />
           </div>
@@ -134,10 +141,10 @@ export default function ArtistDetailPage() {
   );
 }
 
-function QuoteStat({ label, value }: { label: string; value: string }) {
+function QuoteStat({ label, value, tone }: { label: string; value: string; tone: "cyan" | "mint" | "ember" | "violet" | "brass" }) {
   return (
-    <div className="min-w-0 border-b border-r border-line px-3 py-3 sm:[&:nth-last-child(-n+4)]:border-b-0">
-      <p className="text-[10px] font-bold uppercase text-paper/45">{label}</p>
+    <div className={`rmi-metric rmi-metric-${tone} min-w-0 px-3 py-3`}>
+      <p className="rmi-data-label">{label}</p>
       <p className="mt-1 truncate text-sm font-black number-tabular">{value}</p>
     </div>
   );

@@ -216,10 +216,10 @@ function HomeLeadStory({ item }: { item: MarketNewsItem }) {
   const source = item.sourceName || item.sourceDomain || "RMI Market Wire";
 
   return (
-    <article className="overflow-hidden rounded-lg border border-line bg-panel shadow-market">
+    <article className="rmi-card rmi-news-card rmi-noise overflow-hidden">
       <div className="grid gap-0 lg:grid-cols-[minmax(260px,0.88fr)_minmax(0,1fr)]">
         <NewsThumbnail item={item} size="hero" />
-        <div className="grid content-between gap-5 p-5 sm:p-6">
+        <div className="relative z-[1] grid content-between gap-5 p-5 sm:p-6">
           <div>
             <div className="flex flex-wrap items-center gap-2 text-xs font-black text-paper/55">
               <NewsTickerLinks item={item} />
@@ -262,7 +262,7 @@ function HomeStoryCard({ item }: { item: MarketNewsItem }) {
   const positive = item.sentimentScore >= 0;
 
   return (
-    <article className="overflow-hidden rounded-lg border border-line bg-panel shadow-sm hover:border-cyan/50">
+    <article className="rmi-card rmi-news-card overflow-hidden">
       <NewsThumbnail item={item} size="card" />
       <div className="grid gap-3 p-3.5">
         <div className="flex flex-wrap items-center gap-2 text-[11px] font-black text-paper/50">
@@ -289,7 +289,7 @@ function HomeBrief({ item }: { item: MarketNewsItem }) {
   const positive = item.sentimentScore >= 0;
 
   return (
-    <article className="rounded-lg border border-line bg-panel px-3 py-3 hover:bg-panelSoft/60">
+    <article className="rmi-soft-card rmi-news-card px-3 py-3">
       <div className="grid grid-cols-[46px_minmax(0,1fr)_18px] items-start gap-3">
         <NewsThumbnail item={item} size="small" />
         <div className="min-w-0">
@@ -338,7 +338,7 @@ function MarketNewsArticle({
 
   if (featured) {
     return (
-      <article className="py-4">
+      <article className="rmi-news-card py-4">
         <div className="grid gap-4 md:grid-cols-[160px_minmax(0,1fr)]">
           <NewsThumbnail item={item} size="featured" />
           <div className="min-w-0">
@@ -360,7 +360,7 @@ function MarketNewsArticle({
   }
 
   return (
-    <article className={clsx("py-3", compact ? "px-0" : "px-1")}>
+    <article className={clsx("rmi-news-card py-3", compact ? "px-0" : "px-1")}>
       <div className={clsx("grid items-start gap-3", compact ? "grid-cols-[minmax(0,1fr)_18px]" : "grid-cols-[86px_minmax(0,1fr)_18px]")}>
         {compact ? null : <NewsThumbnail item={item} size="row" />}
         <div className="min-w-0">

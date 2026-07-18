@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { FileCheck2, ShieldCheck } from "lucide-react";
 import type { ReactNode } from "react";
 
 type PolicySection = {
@@ -21,35 +22,55 @@ export function PolicyDocument({
   link: { href: string; label: string };
 }) {
   return (
-    <article className="mx-auto max-w-5xl">
-      <header className="border-b border-line pb-6">
-        <p className="text-xs font-bold uppercase tracking-[0.16em] text-cyan">RMI Policy</p>
-        <h1 className="mt-2 text-3xl font-black">{title}</h1>
-        <p className="mt-3 max-w-3xl text-sm leading-6 text-paper/65">{summary}</p>
-        <p className="mt-3 text-xs font-bold text-paper/40">Effective {effectiveDate}</p>
+    <article className="mx-auto max-w-6xl space-y-5">
+      <header className="rmi-hero market-grid rmi-noise relative overflow-hidden p-5 sm:p-7">
+        <div className="relative z-10 grid gap-6 lg:grid-cols-[minmax(0,1fr)_270px] lg:items-end">
+          <div>
+            <p className="rmi-kicker"><ShieldCheck className="h-4 w-4" aria-hidden="true" /> RMI Trust Center</p>
+            <h1 className="mt-3 text-3xl font-black sm:text-5xl">{title}</h1>
+            <p className="mt-3 max-w-3xl text-sm leading-6 text-paper/65">{summary}</p>
+          </div>
+          <div className="rmi-signal-card rmi-signal-violet p-4">
+            <p className="rmi-data-label">Document Status</p>
+            <div className="mt-3 flex items-center gap-3">
+              <span className="grid h-10 w-10 place-items-center rounded-md border border-violet/35 bg-violet/10 text-violet">
+                <FileCheck2 className="h-5 w-5" aria-hidden="true" />
+              </span>
+              <div>
+                <p className="text-sm font-black">Current Policy</p>
+                <p className="mt-0.5 text-xs font-bold text-paper/45">Effective {effectiveDate}</p>
+              </div>
+            </div>
+          </div>
+        </div>
       </header>
 
-      <div className="grid gap-8 py-7 lg:grid-cols-[220px_minmax(0,1fr)]">
-        <aside className="lg:sticky lg:top-6 lg:self-start">
-          <p className="text-xs font-black uppercase tracking-[0.14em] text-paper/40">On This Page</p>
-          <nav className="mt-3 grid gap-2 text-sm font-bold text-paper/60" aria-label={`${title} sections`}>
+      <div className="grid gap-5 lg:grid-cols-[250px_minmax(0,1fr)]">
+        <aside className="rmi-card h-fit p-4 lg:sticky lg:top-32 lg:self-start">
+          <p className="rmi-data-label text-violet">Document Index</p>
+          <nav className="mt-3 grid gap-1 text-sm font-bold text-paper/60" aria-label={`${title} sections`}>
             {sections.map((section, index) => (
-              <a key={section.id} href={`#${section.id}`} className="hover:text-cyan">
-                {index + 1}. {section.title}
+              <a key={section.id} href={`#${section.id}`} className="rounded-md border border-transparent px-3 py-2 hover:border-violet/30 hover:bg-violet/5 hover:text-violet">
+                <span className="mr-2 font-black text-violet">{String(index + 1).padStart(2, "0")}</span>
+                {section.title}
               </a>
             ))}
           </nav>
         </aside>
 
-        <main className="min-w-0">
+        <main className="rmi-card market-grid min-w-0 overflow-hidden px-5 sm:px-7">
           {sections.map((section, index) => (
-            <section key={section.id} id={section.id} className="scroll-mt-8 border-b border-line py-6 first:pt-0 last:border-b-0">
-              <p className="text-xs font-black text-cyan">{String(index + 1).padStart(2, "0")}</p>
-              <h2 className="mt-1 text-xl font-black">{section.title}</h2>
+            <section key={section.id} id={section.id} className="scroll-mt-32 border-b border-line py-7 last:border-b-0">
+              <div className="flex items-center gap-3">
+                <span className="grid h-8 w-8 shrink-0 place-items-center rounded-md border border-violet/35 bg-violet/10 text-xs font-black text-violet">
+                  {String(index + 1).padStart(2, "0")}
+                </span>
+                <h2 className="text-xl font-black">{section.title}</h2>
+              </div>
               <div className="mt-3 text-sm leading-7 text-paper/65">{section.body}</div>
             </section>
           ))}
-          <Link href={link.href} className="mt-6 inline-flex text-sm font-black text-cyan hover:text-cyan/75">
+          <Link href={link.href} className="rmi-button-secondary mb-7 inline-flex min-h-10 items-center rounded-md border border-line px-4 text-sm font-black">
             {link.label}
           </Link>
         </main>

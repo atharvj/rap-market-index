@@ -90,7 +90,8 @@ export default function OnboardingPage() {
 
   if (!configured || !session) {
     return (
-      <div className="mx-auto max-w-md space-y-4 text-center">
+      <div className="rmi-auth-surface market-grid mx-auto max-w-xl space-y-4 p-8 text-center">
+        <div className="rmi-kicker justify-center">Market Access</div>
         <h1 className="text-3xl font-black">Create your market profile</h1>
         <p className="text-sm leading-6 text-paper/60">Log in with a confirmed email address to finish setting up RMI.</p>
         <RmiButton href="/account?mode=signin">Log In</RmiButton>
@@ -99,7 +100,7 @@ export default function OnboardingPage() {
   }
 
   if (loading) {
-    return <div className="mx-auto h-96 max-w-2xl rounded-lg bg-panelSoft motion-safe:animate-pulse" />;
+    return <div className="rmi-auth-surface mx-auto h-96 max-w-4xl motion-safe:animate-pulse" />;
   }
 
   function toggleGenre(genre: string) {
@@ -175,11 +176,13 @@ export default function OnboardingPage() {
       : true;
 
   return (
-    <div className="mx-auto max-w-2xl space-y-6">
-      <div className="text-center font-black text-cyan">RMI</div>
+    <div className="rmi-auth-surface market-grid rmi-noise mx-auto max-w-4xl space-y-6 p-5 sm:p-8">
+      <div className="flex items-center justify-center gap-2 text-center font-black text-cyan">
+        <span className="rmi-live-dot" /> RMI Profile Sequence
+      </div>
       <div className="grid grid-cols-4 gap-2" aria-label={`Step ${step + 1} of 4`}>
         {Array.from({ length: 4 }).map((_, index) => (
-          <span key={index} className={index <= step ? "h-1 rounded bg-cyan" : "h-1 rounded bg-panelSoft"} />
+          <span key={index} className={index <= step ? "h-1 rounded bg-gradient-to-r from-cyan via-violet to-mint shadow-[0_0_12px_rgba(37,213,255,0.45)]" : "h-1 rounded bg-panelSoft"} />
         ))}
       </div>
 
@@ -202,7 +205,7 @@ export default function OnboardingPage() {
                   disabled={unavailable}
                   aria-pressed={active}
                   className={active
-                    ? "rmi-card min-h-14 border-cyan bg-cyan/10 p-4 text-left ring-2 ring-cyan/45 transition"
+                    ? "rmi-card min-h-14 border-violet bg-violet/10 p-4 text-left ring-2 ring-violet/45 transition shadow-[0_0_22px_rgba(151,103,255,0.12)]"
                     : unavailable
                       ? "rmi-card min-h-14 cursor-not-allowed p-4 text-left opacity-40"
                       : "rmi-card min-h-14 p-4 text-left transition hover:-translate-y-0.5 hover:border-cyan/70 hover:bg-panelSoft"
@@ -223,7 +226,7 @@ export default function OnboardingPage() {
             <input
               value={query}
               onChange={(event) => setQuery(event.target.value)}
-              className="h-10 w-full rounded-lg border border-line bg-panelSoft pl-9 pr-3 text-sm outline-none focus:border-cyan"
+              className="rmi-terminal-input h-10 w-full pl-9 pr-3 text-sm"
               placeholder="Search artists"
             />
           </div>
@@ -244,7 +247,7 @@ export default function OnboardingPage() {
                   disabled={unavailable}
                   aria-pressed={active}
                   className={active
-                    ? "rmi-card flex items-center gap-3 border-cyan bg-cyan/10 p-4 text-left ring-2 ring-cyan/45 transition"
+                    ? "rmi-card flex items-center gap-3 border-violet bg-violet/10 p-4 text-left ring-2 ring-violet/45 transition shadow-[0_0_22px_rgba(151,103,255,0.12)]"
                     : unavailable
                       ? "rmi-card flex cursor-not-allowed items-center gap-3 p-4 text-left opacity-40"
                       : "rmi-card flex items-center gap-3 p-4 text-left transition hover:-translate-y-0.5 hover:border-cyan/70 hover:bg-panelSoft"
@@ -266,7 +269,7 @@ export default function OnboardingPage() {
 
       {step === 2 ? (
         <OnboardingStep eyebrow="Step 3 of 4" title="Your opening balance" description="Every trader starts on equal footing. Starter cash cannot be purchased or withdrawn.">
-          <div className="rmi-card grid place-items-center gap-3 p-10 text-center">
+          <div className="rmi-card market-grid grid place-items-center gap-3 border-t-2 border-t-mint p-10 text-center">
             <WalletCards className="h-8 w-8 text-mint" />
             <p className="text-4xl font-black number-tabular">{formatCurrency(100_000)}</p>
             <p className="max-w-md text-sm leading-6 text-paper/60">Use fantasy cash to build positions. The global ranking compares portfolio performance from the same starting balance.</p>
@@ -276,7 +279,7 @@ export default function OnboardingPage() {
 
       {step === 3 ? (
         <OnboardingStep eyebrow="Step 4 of 4" title="Start in global rankings" description="Private leagues are coming later. Your portfolio can compete globally from day one.">
-          <div className="rmi-card grid place-items-center gap-3 p-10 text-center">
+          <div className="rmi-card market-grid grid place-items-center gap-3 border-t-2 border-t-brass p-10 text-center">
             <Trophy className="h-8 w-8 text-brass" />
             <p className="text-xl font-black">Global market access</p>
             <p className="max-w-md text-sm leading-6 text-paper/60">Follow quotes, trade artists, and compare your fantasy return with the full RMI community.</p>
@@ -291,7 +294,7 @@ export default function OnboardingPage() {
           type="button"
           onClick={() => setStep((current) => Math.max(0, current - 1))}
           disabled={step === 0 || saving}
-          className="min-h-10 rounded-lg border border-line text-sm font-bold disabled:opacity-35"
+          className="rmi-button-secondary min-h-10 text-sm disabled:opacity-35"
         >
           Back
         </button>
@@ -299,7 +302,7 @@ export default function OnboardingPage() {
           type="button"
           onClick={() => step === 3 ? void finishOnboarding() : setStep((current) => Math.min(3, current + 1))}
           disabled={!canContinue || saving}
-          className="min-h-10 rounded-lg bg-paper text-sm font-bold text-ink disabled:opacity-40"
+          className="rmi-button-primary min-h-10 text-sm disabled:opacity-40"
         >
           {step === 3 ? saving ? "Finishing..." : "Enter RMI" : "Continue"}
         </button>
@@ -321,9 +324,9 @@ function OnboardingStep({
 }) {
   return (
     <div className="space-y-5">
-      <header>
-        <p className="text-xs font-bold uppercase tracking-wide text-paper/45">{eyebrow}</p>
-        <h1 className="mt-1 text-3xl font-black">{title}</h1>
+      <header className="border-b border-line/70 pb-4">
+        <p className="rmi-data-label text-cyan">{eyebrow}</p>
+        <h1 className="mt-1 text-3xl font-black sm:text-4xl">{title}</h1>
         <p className="mt-2 text-sm leading-6 text-paper/65">{description}</p>
       </header>
       {children}

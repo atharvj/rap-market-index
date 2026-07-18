@@ -32,13 +32,13 @@ export default function ScoutPage() {
 
   return (
     <div className="space-y-6">
-      <header className="grid gap-5 rounded-lg border border-line bg-panel p-6 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
+      <header className="rmi-page-head rmi-noise grid gap-5 p-6 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
         <div>
-          <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.16em] text-cyan">
+          <div className="rmi-kicker">
             <Radar className="h-4 w-4" aria-hidden="true" />
             Discovery
           </div>
-          <h1 className="mt-3 text-3xl font-black">Scout Emerging Artists</h1>
+          <h1 className="mt-3 text-3xl font-black sm:text-4xl">Scout Emerging Artists</h1>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-paper/65">
             Explore smaller artists already trading on RMI, ranked by current market signal and momentum.
           </p>
@@ -60,7 +60,7 @@ export default function ScoutPage() {
           action={<TrendingUp className="h-4 w-4 text-cyan" aria-hidden="true" />}
         >
           <div className="p-4">
-            <PriceChart data={discoveryIndex} height={190} />
+            <div className="rmi-chart-shell p-3"><PriceChart data={discoveryIndex} height={190} /></div>
           </div>
         </RmiSection>
 
@@ -116,7 +116,7 @@ export default function ScoutPage() {
 
 function ScoutStat({ label, value, detail, tone = "neutral" }: { label: string; value: string; detail: string; tone?: "neutral" | "good" | "bad" }) {
   return (
-    <div className="rounded-lg bg-panelSoft p-4">
+    <div className={`rmi-metric ${tone === "good" ? "rmi-metric-mint" : tone === "bad" ? "rmi-metric-ember" : "rmi-metric-cyan"} p-4`}>
       <p className="text-xs font-bold text-paper/50">{label}</p>
       <p className={tone === "good" ? "mt-1 text-xl font-black text-mint number-tabular" : tone === "bad" ? "mt-1 text-xl font-black text-ember number-tabular" : "mt-1 text-xl font-black number-tabular"}>{value}</p>
       <p className="mt-1 text-xs text-paper/40">{detail}</p>
@@ -135,7 +135,7 @@ function SignalTile({ label, value }: { label: string; value: string }) {
 
 function ScoutMethod({ icon, title, copy }: { icon: React.ReactNode; title: string; copy: string }) {
   return (
-    <div className="flex items-start gap-3 rounded-lg bg-panelSoft p-4">
+    <div className="rmi-signal-card flex items-start gap-3 p-4">
       <span className="mt-0.5 text-cyan">{icon}</span>
       <div>
         <h3 className="text-sm font-black">{title}</h3>

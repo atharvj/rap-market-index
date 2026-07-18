@@ -4,6 +4,7 @@ import { PriceChart } from "@/components/PriceChart";
 import { formatDate } from "@/lib/formatters";
 import type { PricePoint } from "@/lib/types";
 import clsx from "clsx";
+import { Activity, Crosshair } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
 type HistoryRange = "1D" | "7D" | "1M" | "3M" | "6M" | "1Y" | "ALL";
@@ -90,10 +91,14 @@ export function ArtistPriceHistoryPanel({
   }, [hasRealHistory, history, status]);
 
   return (
-    <section className="rmi-card p-4 shadow-market sm:p-5">
-      <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+    <section className="rmi-card overflow-hidden shadow-market">
+      <div className="rmi-section-header flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
         <div>
-          <h2 className="text-xl font-black">Price History</h2>
+          <div className="flex items-center gap-2">
+            <Activity className="h-4 w-4 text-cyan" aria-hidden="true" />
+            <h2 className="text-lg font-black">Price History</h2>
+            <span className="rmi-status-chip"><Crosshair className="h-3 w-3" /> Recorded quotes</span>
+          </div>
           <p className="mt-1 text-sm font-bold text-paper/50">{subtitle}</p>
         </div>
         <div className="inline-flex max-w-full overflow-x-auto rounded-lg border border-line bg-panelSoft p-1 scrollbar-thin">
@@ -105,8 +110,8 @@ export function ArtistPriceHistoryPanel({
               className={clsx(
                 "h-8 min-w-11 rounded px-2 text-xs font-black transition",
                 range === candidate
-                  ? "bg-cyan text-white"
-                  : "text-paper/50 hover:bg-panel hover:text-paper"
+                  ? "bg-cyan text-ink shadow-[0_0_18px_rgba(37,213,255,0.25)]"
+                  : "text-paper/50 hover:bg-cyan/10 hover:text-cyan"
               )}
             >
               {candidate}
@@ -114,8 +119,9 @@ export function ArtistPriceHistoryPanel({
           ))}
         </div>
       </div>
-      <PriceChart data={history} height={290} timeScale={granularity} />
-      <p className="mt-2 text-xs text-paper/42">
+      <div className="p-4 sm:p-5">
+      <div className="rmi-chart-shell p-2 sm:p-3"><PriceChart data={history} height={290} timeScale={granularity} /></div>
+      <p className="mt-3 text-xs text-paper/42">
         {status === "ready" && !hasMovement
           ? range === "1D"
             ? "No intraday movement yet. A new quote is recorded when the market runs or an eligible order changes the price."
@@ -127,6 +133,7 @@ export function ArtistPriceHistoryPanel({
       {status === "error" ? (
         <p className="mt-3 text-xs font-bold text-ember">Price history unavailable.</p>
       ) : null}
+      </div>
     </section>
   );
 }

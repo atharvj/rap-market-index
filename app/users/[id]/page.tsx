@@ -4,7 +4,7 @@ import { AdminBadge } from "@/components/AdminBadge";
 import { UserAvatar } from "@/components/UserAvatar";
 import { formatCurrency, formatPercent } from "@/lib/formatters";
 import clsx from "clsx";
-import { BarChart3, CalendarDays, Star, Trophy, WalletCards } from "lucide-react";
+import { Activity, BarChart3, CalendarDays, CircleGauge, LockKeyhole, Radio, Star, Trophy, WalletCards } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -113,22 +113,20 @@ export default function PublicUserProfilePage() {
   const portfolioVisible = profile.portfolioIsPublic && profile.portfolioValue !== null;
 
   return (
-    <div className="mx-auto max-w-5xl space-y-5">
-      <section className="rmi-card p-5 shadow-market">
-        <div className="grid gap-5 md:grid-cols-[130px_minmax(0,1fr)]">
-          <UserAvatar avatarUrl={profile.avatarUrl} label={profile.username} size="lg" />
+    <div className="mx-auto max-w-6xl space-y-5">
+      <section className="rmi-hero market-grid rmi-noise relative overflow-hidden p-5 shadow-market sm:p-7">
+        <div className="relative z-10 grid gap-6 md:grid-cols-[130px_minmax(0,1fr)_230px] md:items-center">
+          <div className="relative w-fit">
+            <span className="absolute -inset-3 rounded-full border border-cyan/20" aria-hidden="true" />
+            <UserAvatar avatarUrl={profile.avatarUrl} label={profile.username} size="lg" />
+          </div>
           <div className="min-w-0">
+            <p className="rmi-kicker"><Radio className="h-4 w-4" aria-hidden="true" /> Public Trader Node</p>
             <div className="flex min-w-0 flex-wrap items-center gap-2">
-              <h1 className="truncate text-3xl font-black">{profile.username}</h1>
+              <h1 className="mt-2 truncate text-3xl font-black sm:text-4xl">{profile.username}</h1>
               {profile.isAdmin ? <AdminBadge /> : null}
             </div>
-            <div className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
-              <ProfileMetric icon={<CalendarDays className="h-4 w-4" />} label="Member Since" value={memberSince} />
-              <ProfileMetric icon={<Trophy className="h-4 w-4" />} label="Rank" value="Global standings" />
-              <ProfileMetric icon={<WalletCards className="h-4 w-4" />} label="Net Worth" value={portfolioVisible ? formatCurrency(profile.portfolioValue ?? 0) : "Private"} />
-              <ProfileMetric icon={<WalletCards className="h-4 w-4" />} label="Cash" value={portfolioVisible ? formatCurrency(profile.cashBalance ?? 0) : "Private"} />
-            </div>
-            <p className="mt-5 max-w-3xl text-sm font-bold leading-6 text-paper/58">
+            <p className="mt-3 max-w-3xl text-sm font-bold leading-6 text-paper/58">
               {profile.isPrivate ? "This trader keeps their profile private." : profile.bio || "This trader has not added a bio yet."}
             </p>
             {profile.gainPercent !== null ? (
@@ -137,24 +135,39 @@ export default function PublicUserProfilePage() {
               </p>
             ) : null}
           </div>
+          <div className="grid gap-2">
+            <ProfileMetric icon={<CalendarDays className="h-4 w-4" />} label="Member Since" value={memberSince} />
+            <ProfileMetric icon={<Trophy className="h-4 w-4" />} label="Rank" value="Global standings" />
+            <ProfileMetric icon={<WalletCards className="h-4 w-4" />} label="Net Worth" value={portfolioVisible ? formatCurrency(profile.portfolioValue ?? 0) : "Private"} />
+            <ProfileMetric icon={<WalletCards className="h-4 w-4" />} label="Cash" value={portfolioVisible ? formatCurrency(profile.cashBalance ?? 0) : "Private"} />
+          </div>
         </div>
       </section>
 
-      <section className="rmi-card shadow-market">
-        <div className="flex min-h-11 items-center gap-2 border-b border-line bg-panelSoft px-4">
-          <span className="h-5 w-1 rounded bg-brass" />
-          <BarChart3 className="h-4 w-4 text-brass" aria-hidden="true" />
-          <h2 className="text-xs font-black uppercase tracking-wide">Public Portfolio</h2>
+      <section className="rmi-card market-grid shadow-market">
+        <div className="rmi-section-header">
+          <div>
+            <p className="rmi-kicker text-cyan"><BarChart3 className="h-4 w-4" aria-hidden="true" /> Public Portfolio</p>
+            <h2 className="mt-1 text-xl font-black">Open Positions</h2>
+          </div>
+          <span className="rmi-status-chip border-cyan/30 bg-cyan/10 text-cyan">
+            {profile.portfolioIsPublic ? `${profile.holdings.length} Listed` : "Private"}
+          </span>
         </div>
         <div className="divide-y divide-line">
           {!profile.portfolioIsPublic ? (
-            <p className="p-4 text-sm font-bold text-paper/50">This trader keeps their portfolio private.</p>
+            <div className="grid min-h-36 place-items-center p-5 text-center">
+              <div>
+                <LockKeyhole className="mx-auto h-6 w-6 text-violet" aria-hidden="true" />
+                <p className="mt-3 text-sm font-bold text-paper/50">This trader keeps their portfolio private.</p>
+              </div>
+            </div>
           ) : profile.holdings.length ? (
             profile.holdings.map((holding) => (
               <Link
                 key={holding.artistId}
                 href={`/artists/${holding.artistId}`}
-                className="grid gap-3 px-4 py-3 hover:bg-panelSoft/70 sm:grid-cols-[minmax(0,1fr)_120px_120px]"
+                className="rmi-table-row grid gap-3 px-4 py-3 sm:grid-cols-[minmax(0,1fr)_120px_120px]"
               >
                 <span className="flex items-center gap-3">
                   <ProfileArtistImage
@@ -190,16 +203,18 @@ export default function PublicUserProfilePage() {
         </div>
       </section>
 
-      <section className="rmi-card shadow-market">
-        <div className="flex min-h-11 items-center gap-2 border-b border-line bg-panelSoft px-4">
-          <span className="h-5 w-1 rounded bg-brass" />
-          <Star className="h-4 w-4 text-brass" aria-hidden="true" />
-          <h2 className="text-xs font-black uppercase tracking-wide">Favorite Artists</h2>
+      <section className="rmi-card market-grid shadow-market">
+        <div className="rmi-section-header">
+          <div>
+            <p className="rmi-kicker text-violet"><Star className="h-4 w-4" aria-hidden="true" /> Identity Signals</p>
+            <h2 className="mt-1 text-xl font-black">Favorite Artists</h2>
+          </div>
+          <CircleGauge className="h-5 w-5 text-violet" aria-hidden="true" />
         </div>
-        <div className="grid divide-y divide-line sm:grid-cols-2 sm:divide-x sm:divide-y-0 lg:grid-cols-3">
+        <div className="grid divide-y divide-line sm:grid-cols-2 lg:grid-cols-3">
           {profile.favoriteArtists.length ? (
             profile.favoriteArtists.map((artist) => (
-              <Link key={artist.id} href={`/artists/${artist.id}`} className="flex items-center gap-3 p-4 hover:bg-panelSoft/70">
+              <Link key={artist.id} href={`/artists/${artist.id}`} className="rmi-signal-card rmi-signal-violet m-2 flex items-center gap-3 p-4">
                 <span className="flex items-center gap-3">
                   <ProfileArtistImage
                     name={artist.name}
@@ -225,18 +240,23 @@ export default function PublicUserProfilePage() {
 
 function ProfileMetric({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
   return (
-    <div className="grid grid-cols-[18px_104px_minmax(0,1fr)] items-center gap-2">
-      <span className="text-paper/35">{icon}</span>
-      <span className="text-paper/45">{label}:</span>
-      <span className="min-w-0 truncate font-black number-tabular">{value}</span>
+    <div className="rmi-soft-card grid grid-cols-[18px_minmax(0,1fr)] items-center gap-2 px-3 py-2">
+      <span className="text-cyan">{icon}</span>
+      <span className="min-w-0">
+        <span className="block text-[9px] font-black uppercase tracking-[0.12em] text-paper/35">{label}</span>
+        <span className="block truncate text-xs font-black number-tabular">{value}</span>
+      </span>
     </div>
   );
 }
 
 function StatusCard({ text }: { text: string }) {
   return (
-    <section className="rmi-card mx-auto max-w-xl p-5 text-sm font-bold text-paper/55 shadow-market">
-      {text}
+    <section className="rmi-auth-surface market-grid mx-auto grid min-h-[360px] max-w-xl place-items-center p-6 text-center shadow-market">
+      <div>
+        <Activity className="mx-auto h-7 w-7 text-cyan motion-safe:animate-pulse" aria-hidden="true" />
+        <p className="mt-3 text-sm font-bold text-paper/55">{text}</p>
+      </div>
     </section>
   );
 }

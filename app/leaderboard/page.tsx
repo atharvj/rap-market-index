@@ -6,7 +6,7 @@ import { useGame } from "@/components/GameProvider";
 import { UserAvatar } from "@/components/UserAvatar";
 import { formatCurrency, formatPercent } from "@/lib/formatters";
 import clsx from "clsx";
-import { Crown, Medal, ShieldCheck, Users } from "lucide-react";
+import { Crown, Medal, Radio, ShieldCheck, Trophy, Users } from "lucide-react";
 import Link from "next/link";
 
 export default function LeaderboardPage() {
@@ -34,8 +34,9 @@ export default function LeaderboardPage() {
   return (
     <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
       <main className="min-w-0 space-y-5">
-        <header>
-          <h1 className="text-3xl font-black">Leaderboard</h1>
+        <header className="rmi-page-head">
+          <div className="rmi-kicker"><Trophy className="h-3.5 w-3.5" /> Competitive Board</div>
+          <h1 className="mt-2 text-3xl font-black sm:text-4xl">Leaderboard</h1>
           <p className="mt-1 text-sm text-paper/65">Global rankings by fantasy portfolio value, updated from current market quotes.</p>
         </header>
 
@@ -50,7 +51,7 @@ export default function LeaderboardPage() {
         {podium.slice(0, 3).map((entry, index) => (
           <div
             key={`${entry.id}-${index}`}
-            className={clsx("rmi-card grid place-items-center p-6 text-center", index === 0 && "border-cyan/70")}
+            className={clsx("rmi-signal-card grid place-items-center p-6 text-center", index === 0 ? "border-brass/70 shadow-[0_0_28px_rgba(255,199,71,0.12)]" : index === 1 ? "border-cyan/45" : "border-violet/45")}
           >
             {index === 0 ? <Crown className="h-5 w-5 text-brass" /> : <Medal className="h-5 w-5 text-paper/50" />}
             <div className="mt-3"><UserAvatar avatarUrl={entry.avatarUrl} label={entry.username} size="sm" /></div>
@@ -65,7 +66,7 @@ export default function LeaderboardPage() {
 
         <section className="rmi-card overflow-x-auto">
         <div className="min-w-[650px]">
-        <div className="grid grid-cols-[54px_minmax(0,1fr)_120px_110px_88px] border-b border-line px-4 py-3 text-xs font-bold text-paper/45">
+        <div className="rmi-table-head grid grid-cols-[54px_minmax(0,1fr)_120px_110px_88px] px-4 py-3 text-xs font-bold text-paper/45">
           <span>Rank</span>
           <span>Trader</span>
           <span className="text-right">Value</span>
@@ -76,7 +77,7 @@ export default function LeaderboardPage() {
           <div
             key={entry.id}
             className={clsx(
-              "grid grid-cols-[54px_minmax(0,1fr)_120px_110px_88px] items-center border-b border-line px-4 py-3 text-sm last:border-b-0",
+              "rmi-table-row grid grid-cols-[54px_minmax(0,1fr)_120px_110px_88px] items-center px-4 py-3 text-sm",
               entry.isCurrentUser && "border-l-2 border-l-cyan bg-cyan/10"
             )}
             aria-current={entry.isCurrentUser ? "true" : undefined}
@@ -134,7 +135,7 @@ export default function LeaderboardPage() {
 
       <aside className="space-y-4 xl:sticky xl:top-6 xl:self-start">
         <section className="rmi-card p-5">
-          <p className="text-xs font-bold uppercase tracking-[0.14em] text-paper/45">Your Standing</p>
+          <p className="rmi-data-label flex items-center gap-2"><Radio className="h-3.5 w-3.5 text-mint" /> Your Standing</p>
           <p className="mt-3 text-3xl font-black number-tabular">{formatCurrency(portfolioValue)}</p>
           <p className="mt-2 text-sm font-black text-cyan">{currentRank ? `Rank #${currentRank}` : "Not currently ranked"}</p>
           <p className={gainPercent >= 0 ? "mt-1 text-sm font-black text-mint" : "mt-1 text-sm font-black text-ember"}>
@@ -176,7 +177,7 @@ export default function LeaderboardPage() {
 
 function RankingStat({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-lg bg-panelSoft p-4">
+    <div className="rmi-metric rmi-metric-violet p-4">
       <p className="text-xs font-bold text-paper/50">{label}</p>
       <p className="mt-1 text-xl font-black number-tabular">{value}</p>
     </div>

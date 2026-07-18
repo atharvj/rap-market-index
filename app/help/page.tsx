@@ -119,7 +119,7 @@ export default function HelpPage() {
 
   return (
     <div className="space-y-6">
-      <header className="grid gap-5 border-b border-line pb-7 lg:grid-cols-[minmax(0,1fr)_minmax(320px,0.7fr)] lg:items-end">
+      <header className="rmi-page-head market-grid rmi-noise grid gap-5 p-5 sm:p-7 lg:grid-cols-[minmax(0,1fr)_minmax(320px,0.7fr)] lg:items-end">
         <div>
           <div className="flex items-center gap-2 text-cyan">
             <HelpCircle className="h-5 w-5" aria-hidden="true" />
@@ -136,14 +136,14 @@ export default function HelpPage() {
           <input
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            className="h-11 w-full rounded-lg border border-line bg-panel pl-10 pr-3 text-sm outline-none transition focus:border-cyan"
+            className="rmi-terminal-input h-11 w-full pl-10 pr-3 text-sm"
             placeholder="Search Help"
           />
         </label>
       </header>
 
       <div className="grid gap-6 lg:grid-cols-[220px_minmax(0,1fr)]">
-        <aside>
+        <aside className="rmi-card h-fit border-t-2 border-t-violet/70 p-4 lg:sticky lg:top-24">
           <h2 className="text-xs font-black uppercase tracking-wide text-paper/45">Browse by Topic</h2>
           <div className="mt-3 grid gap-1 sm:grid-cols-4 lg:grid-cols-1">
             {categories.map((item) => (
@@ -174,7 +174,7 @@ export default function HelpPage() {
                 const Icon = topic.icon;
 
                 return (
-                  <article key={topic.id} id={topic.id} className="rmi-card p-5">
+                  <article key={topic.id} id={topic.id} className="rmi-signal-card market-grid p-5">
                     <div className="flex items-start gap-3">
                       <span className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-cyan/10 text-cyan">
                         <Icon className="h-5 w-5" aria-hidden="true" />
@@ -201,7 +201,7 @@ export default function HelpPage() {
             <div className="rmi-card p-8 text-center">
               <h2 className="text-lg font-black">No matching help topics</h2>
               <p className="mt-2 text-sm text-paper/55">Try a shorter search or browse all topics.</p>
-              <button type="button" onClick={() => { setQuery(""); setCategory("All"); }} className="mt-4 rounded-lg border border-line px-4 py-2 text-sm font-black hover:border-cyan">
+              <button type="button" onClick={() => { setQuery(""); setCategory("All"); }} className="rmi-button-secondary mt-4 px-4 py-2 text-sm">
                 Show All Topics
               </button>
             </div>

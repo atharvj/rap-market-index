@@ -9,7 +9,7 @@ import { ArtistIdentity, ChangeText, RmiButton, RmiSection } from "@/components/
 import { WatchlistButton } from "@/components/WatchlistButton";
 import { formatCurrency } from "@/lib/formatters";
 import { getMarketBreadth } from "@/lib/market-analytics";
-import { Search } from "lucide-react";
+import { Radar, Search, Star } from "lucide-react";
 import Link from "next/link";
 import { useMemo, useState } from "react";
 
@@ -47,9 +47,10 @@ export default function WatchlistPage() {
 
   return (
     <div className="space-y-5">
-      <header className="flex flex-wrap items-end justify-between gap-4">
+      <header className="rmi-page-head flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-black">Watchlist</h1>
+          <div className="rmi-kicker"><Radar className="h-3.5 w-3.5" /> Personal Radar</div>
+          <h1 className="mt-2 text-3xl font-black sm:text-4xl">Watchlist</h1>
           <p className="mt-1 text-sm font-bold text-paper/70">{watchlistArtists.length} artists you're tracking</p>
         </div>
         <div className="relative w-full sm:w-80">
@@ -59,12 +60,12 @@ export default function WatchlistPage() {
             onChange={(event) => setAddQuery(event.target.value)}
             onFocus={() => setAddFocused(true)}
             onBlur={() => window.setTimeout(() => setAddFocused(false), 140)}
-            className="h-10 w-full rounded-lg border border-line bg-panel pl-9 pr-3 text-sm outline-none placeholder:text-paper/35 focus:border-cyan"
+            className="rmi-terminal-input h-10 w-full pl-9 pr-3 text-sm outline-none placeholder:text-paper/35"
             placeholder="Add an artist"
             aria-label="Add an artist to your watchlist"
           />
           {addFocused ? (
-            <div className="absolute left-0 right-0 top-12 z-50 max-h-80 overflow-y-auto rounded-lg border border-line bg-panel p-1 shadow-2xl scrollbar-thin">
+            <div className="rmi-card absolute left-0 right-0 top-12 z-50 max-h-80 overflow-y-auto p-1 shadow-2xl scrollbar-thin">
               {addSuggestions.length ? addSuggestions.map((artist) => (
                 <div key={artist.id} className="flex items-center gap-3 rounded-md px-2 py-2 hover:bg-panelSoft">
                   <Link href={`/artists/${artist.id}`} className="flex min-w-0 flex-1 items-center gap-3">
@@ -101,7 +102,7 @@ export default function WatchlistPage() {
       ) : null}
 
       <section className="rmi-card overflow-hidden">
-        <div className="grid grid-cols-[minmax(0,1fr)_78px_64px_40px] gap-x-3 border-b border-line px-4 py-3 text-xs font-bold text-paper/45 sm:grid-cols-[minmax(0,1fr)_96px_76px_60px_40px]">
+        <div className="rmi-table-head grid grid-cols-[minmax(0,1fr)_78px_64px_40px] gap-x-3 px-4 py-3 text-xs font-bold text-paper/45 sm:grid-cols-[minmax(0,1fr)_96px_76px_60px_40px]">
           <span>Artist</span>
           <span className="text-right">Price</span>
           <span className="text-right">24h</span>
@@ -112,7 +113,7 @@ export default function WatchlistPage() {
           watchlistArtists.map((artist) => (
             <div
               key={artist.id}
-              className="grid grid-cols-[minmax(0,1fr)_78px_64px_40px] items-center gap-x-3 border-b border-line px-4 py-3 last:border-b-0 hover:bg-panelSoft sm:grid-cols-[minmax(0,1fr)_96px_76px_60px_40px]"
+              className="rmi-table-row grid grid-cols-[minmax(0,1fr)_78px_64px_40px] items-center gap-x-3 px-4 py-3 sm:grid-cols-[minmax(0,1fr)_96px_76px_60px_40px]"
             >
               <Link href={`/artists/${artist.id}`} className="flex min-w-0 items-center gap-3">
                 <ArtistAvatar artist={artist} />
@@ -159,8 +160,8 @@ export default function WatchlistPage() {
 
 function WatchlistInsight({ label, artist, value }: { label: string; artist: Parameters<typeof ArtistIdentity>[0]["artist"]; value: React.ReactNode }) {
   return (
-    <div className="rmi-card p-4">
-      <p className="mb-3 text-[11px] font-bold uppercase tracking-[0.14em] text-paper/40">{label}</p>
+    <div className="rmi-signal-card p-4">
+      <p className="mb-3 flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.14em] text-paper/40"><Star className="h-3 w-3 text-violet" />{label}</p>
       <div className="flex items-center justify-between gap-3">
         <ArtistIdentity artist={artist} />
         <span className="text-sm font-black number-tabular">{value}</span>

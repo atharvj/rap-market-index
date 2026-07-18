@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Activity, ArrowUpRight, BookOpenCheck, CircleGauge, DatabaseZap, ShieldCheck } from "lucide-react";
 
 const sections = [
   {
@@ -37,48 +38,98 @@ const sections = [
 
 export default function AboutPage() {
   return (
-    <div className="mx-auto grid max-w-6xl gap-5 lg:grid-cols-[minmax(0,1fr)_320px]">
-      <main className="rmi-card shadow-market">
-        <section className="border-b border-line p-5">
-          <p className="text-[11px] font-black uppercase tracking-wide text-brass">About RMI</p>
-          <h1 className="mt-2 text-3xl font-black leading-tight">Rap Market Index</h1>
-          <p className="mt-3 max-w-3xl text-sm font-bold leading-6 text-paper/60">
-            A virtual rap exchange for tracking artist momentum, market prices, news catalysts, and fantasy portfolios.
-          </p>
-        </section>
-
-        <div className="divide-y divide-line">
-          {sections.map((section) => (
-            <section key={section.title} className="p-5">
-              <h2 className="text-lg font-black">{section.title}</h2>
-              <p className="mt-2 max-w-3xl text-sm font-bold leading-6 text-paper/60">{section.body}</p>
-            </section>
-          ))}
-        </div>
-      </main>
-
-      <aside className="space-y-5">
-        <section className="rmi-card p-5 shadow-market">
-          <h2 className="text-sm font-black uppercase tracking-wide">Quick links</h2>
-          <div className="mt-4 grid gap-3 text-sm font-bold text-cyan">
-            <Link href="/markets">Now Trading</Link>
-            <Link href="/news">News and Events</Link>
-            <Link href="/leaderboard">Leaderboard</Link>
-            <Link href="/portfolio">My Portfolio</Link>
-            <Link href="/help">Help Center</Link>
+    <div className="mx-auto max-w-6xl space-y-5">
+      <header className="rmi-page-head market-grid rmi-noise relative overflow-hidden p-5 sm:p-8">
+        <div className="relative z-10 grid gap-7 lg:grid-cols-[minmax(0,1fr)_360px] lg:items-end">
+          <div>
+            <div className="rmi-kicker"><Activity className="h-3.5 w-3.5" aria-hidden="true" /> System Brief</div>
+            <h1 className="mt-4 max-w-3xl text-3xl font-black leading-tight sm:text-5xl">The signal layer for rap momentum.</h1>
+            <p className="mt-4 max-w-2xl text-sm font-semibold leading-6 text-paper/60">
+              RMI turns verified audience movement, public attention, music events, and fantasy-market activity into a transparent experience for following artist momentum.
+            </p>
           </div>
-        </section>
+          <div className="grid grid-cols-2 gap-2">
+            <TrustMetric icon={DatabaseZap} label="Inputs" value="Multi-source" tone="cyan" />
+            <TrustMetric icon={CircleGauge} label="Output" value="Daily quotes" tone="violet" />
+            <TrustMetric icon={BookOpenCheck} label="Evidence" value="Verified" tone="mint" />
+            <TrustMetric icon={ShieldCheck} label="Economy" value="Fantasy only" tone="brass" />
+          </div>
+        </div>
+      </header>
 
-        <section className="rmi-card p-5 shadow-market">
-          <h2 className="text-sm font-black uppercase tracking-wide">Need help?</h2>
-          <p className="mt-3 text-sm font-bold leading-6 text-paper/58">
-            Find answers about accounts, trading, artist quotes, portfolios, privacy, and common problems.
-          </p>
-          <Link href="/help" className="mt-4 inline-flex text-sm font-black text-cyan hover:text-cyan/75">
-            Open Help Center
-          </Link>
-        </section>
-      </aside>
+      <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_320px]">
+        <main className="rmi-card overflow-hidden shadow-market">
+          <section className="rmi-section-header">
+            <div>
+              <p className="rmi-data-label text-cyan">Market Framework</p>
+              <h2 className="mt-1 text-xl font-black">How RMI works</h2>
+            </div>
+            <span className="rmi-status-chip border-mint/30 bg-mint/8 text-mint"><span className="rmi-live-dot" /> Operational</span>
+          </section>
+
+          <div className="grid md:grid-cols-2">
+            {sections.map((section, index) => (
+              <section key={section.title} className="group border-b border-line p-5 transition hover:bg-panelSoft/55 md:odd:border-r">
+                <div className="flex items-start gap-4">
+                  <span className="number-tabular text-xs font-black text-cyan/70">{String(index + 1).padStart(2, "0")}</span>
+                  <div>
+                    <h3 className="text-base font-black group-hover:text-cyan">{section.title}</h3>
+                    <p className="mt-2 text-sm font-semibold leading-6 text-paper/56">{section.body}</p>
+                  </div>
+                </div>
+              </section>
+            ))}
+          </div>
+        </main>
+
+        <aside className="space-y-5 lg:sticky lg:top-24 lg:self-start">
+          <section className="rmi-card overflow-hidden shadow-market">
+            <div className="rmi-section-header">
+              <h2 className="text-sm font-black">Exchange Directory</h2>
+              <Activity className="h-4 w-4 text-cyan" aria-hidden="true" />
+            </div>
+            <div className="divide-y divide-line">
+              {[
+                ["Now Trading", "/markets"],
+                ["Market News", "/news"],
+                ["Global Rankings", "/leaderboard"],
+                ["My Portfolio", "/portfolio"],
+                ["Help Center", "/help"]
+              ].map(([label, href]) => (
+                <Link key={href} href={href} className="flex items-center justify-between px-4 py-3 text-sm font-bold text-paper/65 transition hover:bg-cyan/5 hover:text-cyan">
+                  {label}<ArrowUpRight className="h-3.5 w-3.5" aria-hidden="true" />
+                </Link>
+              ))}
+            </div>
+          </section>
+
+          <section className="rmi-signal-card market-grid border-t-2 border-t-violet/70 p-5 shadow-market">
+            <p className="rmi-data-label text-violet">Support Channel</p>
+            <h2 className="mt-2 text-lg font-black">Need a clearer signal?</h2>
+            <p className="mt-2 text-sm font-semibold leading-6 text-paper/55">
+              Find answers about accounts, trading, artist quotes, portfolios, privacy, and common problems.
+            </p>
+            <Link href="/help" className="rmi-button-secondary mt-5 flex h-10 items-center justify-center text-sm">Open Help Center</Link>
+          </section>
+        </aside>
+      </div>
+    </div>
+  );
+}
+
+function TrustMetric({ icon: Icon, label, value, tone }: { icon: typeof Activity; label: string; value: string; tone: "cyan" | "violet" | "mint" | "brass" }) {
+  const tones = {
+    cyan: "border-cyan/25 bg-cyan/7 text-cyan",
+    violet: "border-violet/25 bg-violet/7 text-violet",
+    mint: "border-mint/25 bg-mint/7 text-mint",
+    brass: "border-brass/25 bg-brass/7 text-brass"
+  };
+
+  return (
+    <div className={`rounded-md border p-3 ${tones[tone]}`}>
+      <Icon className="h-4 w-4" aria-hidden="true" />
+      <p className="mt-3 text-[10px] font-black uppercase text-paper/40">{label}</p>
+      <p className="mt-0.5 text-sm font-black text-paper">{value}</p>
     </div>
   );
 }

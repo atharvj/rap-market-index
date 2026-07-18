@@ -20,10 +20,11 @@ const config: Config = {
         brass: "rgb(var(--color-brass) / <alpha-value>)",
         mint: "rgb(var(--color-mint) / <alpha-value>)",
         ember: "rgb(var(--color-ember) / <alpha-value>)",
-        cyan: "rgb(var(--color-cyan) / <alpha-value>)"
+        cyan: "rgb(var(--color-cyan) / <alpha-value>)",
+        violet: "rgb(var(--color-violet) / <alpha-value>)"
       },
       boxShadow: {
-        market: "0 10px 28px rgba(31, 41, 51, 0.08)"
+        market: "0 18px 50px rgba(0, 0, 0, 0.24), 0 0 0 1px rgb(var(--color-cyan) / 0.025)"
       }
     }
   },

@@ -6,6 +6,7 @@ import { MiniSparkline } from "@/components/MiniSparkline";
 import { RmiSection } from "@/components/RmiPrimitives";
 import { formatCurrency, formatPercent } from "@/lib/formatters";
 import type { Artist } from "@/lib/types";
+import { Activity, Flame, Star, TrendingDown, TrendingUp } from "lucide-react";
 import Link from "next/link";
 import { useMemo } from "react";
 
@@ -38,12 +39,12 @@ export function MarketSideRail({
 
   return (
     <div className="space-y-4">
-      <MarketList title="Trending Tickers" artists={marketLists.movers} href="/markets" />
+      <MarketList title="Trending Tickers" artists={marketLists.movers} href="/markets" tone="cyan" icon="activity" />
       {includeWatchlist && watchlistArtists.length ? (
-        <MarketList title="Your Watchlist" artists={watchlistArtists.slice(0, listSize)} href="/watchlist" />
+        <MarketList title="Your Watchlist" artists={watchlistArtists.slice(0, listSize)} href="/watchlist" tone="violet" icon="star" />
       ) : null}
-      <MarketList title="Top Gainers" artists={marketLists.gainers} href="/markets" />
-      <MarketList title="Top Losers" artists={marketLists.losers} href="/markets" />
+      <MarketList title="Top Gainers" artists={marketLists.gainers} href="/markets" tone="mint" icon="up" />
+      <MarketList title="Top Losers" artists={marketLists.losers} href="/markets" tone="ember" icon="down" />
     </div>
   );
 }
@@ -51,32 +52,49 @@ export function MarketSideRail({
 function MarketList({
   title,
   artists,
-  href
+  href,
+  tone,
+  icon
 }: {
   title: string;
   artists: Artist[];
   href?: string;
+  tone: "cyan" | "mint" | "ember" | "violet";
+  icon: "activity" | "up" | "down" | "star";
 }) {
   if (!artists.length) {
     return null;
   }
 
+  const toneClasses = {
+    cyan: { icon: "text-cyan", border: "border-cyan/20" },
+    mint: { icon: "text-mint", border: "border-mint/20" },
+    ember: { icon: "text-ember", border: "border-ember/20" },
+    violet: { icon: "text-violet", border: "border-violet/20" }
+  }[tone];
+
   return (
     <RmiSection
-      title={title}
+      title={
+        <span className="flex items-center gap-2">
+          <RailIcon icon={icon} className={`h-3.5 w-3.5 ${toneClasses.icon}`} />
+          {title}
+        </span>
+      }
       action={href ? <Link href={href} className="text-xs font-bold text-cyan hover:underline">View All</Link> : null}
+      className={`overflow-hidden ${toneClasses.border}`}
     >
-      <div className="divide-y divide-line">
+      <div className="divide-y divide-line/75">
         {artists.map((artist) => (
           <Link
             key={artist.id}
             href={`/artists/${artist.id}`}
-            className="grid grid-cols-[minmax(0,1fr)_64px_68px] items-center gap-2 px-3 py-2.5 transition hover:bg-panelSoft"
+            className="group grid grid-cols-[minmax(0,1fr)_64px_68px] items-center gap-2 px-3 py-2.5 transition hover:bg-cyan/[0.045]"
           >
             <span className="flex min-w-0 items-center gap-2.5">
               <ArtistAvatar artist={artist} size="sm" />
               <span className="min-w-0">
-                <span className="block truncate text-xs font-black">{artist.name}</span>
+                <span className="block truncate text-xs font-black transition group-hover:text-cyan">{artist.name}</span>
                 <span className="block truncate text-[10px] font-bold text-paper/42">${artist.ticker}</span>
               </span>
             </span>
@@ -97,4 +115,12 @@ function MarketList({
       </div>
     </RmiSection>
   );
+}
+
+function RailIcon({ icon, className }: { icon: "activity" | "up" | "down" | "star"; className: string }) {
+  if (icon === "up") return <TrendingUp className={className} aria-hidden="true" />;
+  if (icon === "down") return <TrendingDown className={className} aria-hidden="true" />;
+  if (icon === "star") return <Star className={className} aria-hidden="true" />;
+  if (icon === "activity") return <Flame className={className} aria-hidden="true" />;
+  return <Activity className={className} aria-hidden="true" />;
 }

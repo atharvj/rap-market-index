@@ -9,7 +9,7 @@ import { formatCurrency, formatPercent } from "@/lib/formatters";
 import { applyThemePreference, getStoredThemePreference, type ThemePreference } from "@/lib/theme";
 import type { Artist } from "@/lib/types";
 import clsx from "clsx";
-import { AudioLines, CircleHelp, LogOut, Monitor, Moon, Palette, Settings, Sun, X } from "lucide-react";
+import { Activity, CircleHelp, LogOut, Monitor, Moon, Palette, Settings, Sun, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -107,16 +107,20 @@ export function Shell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex min-h-screen flex-col bg-ink text-paper">
-      <header className="sticky top-0 z-[80] border-b border-line/70 bg-ink/95 shadow-[0_12px_30px_rgba(0,0,0,0.08)] backdrop-blur-xl">
-        <div className="mx-auto flex max-w-[1280px] items-center gap-4 px-4 py-4 sm:px-6 lg:px-8">
-          <Link href="/" className="flex shrink-0 items-center gap-2 font-black" aria-label="RMI home">
-            <span className="grid h-8 w-8 place-items-center rounded-lg border border-cyan/30 bg-cyan/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]">
-              <AudioLines className="h-4 w-4 text-cyan" aria-hidden="true" />
+      <header className="sticky top-0 z-[80] border-b border-line/75 bg-ink/90 shadow-[0_14px_38px_rgba(0,0,0,0.24)] backdrop-blur-xl">
+        <div className="market-grid border-b border-line/45">
+          <div className="mx-auto flex max-w-[1440px] items-center gap-3 px-4 py-3 sm:px-6 lg:px-8">
+          <Link href="/" className="group flex shrink-0 items-center gap-2.5" aria-label="RMI home">
+            <span className="rmi-brand-mark grid h-9 w-9 place-items-center rounded-md">
+              <Activity className="h-[18px] w-[18px] text-cyan transition-transform group-hover:scale-110" aria-hidden="true" />
             </span>
-            <span className="tracking-[0.04em]">RMI</span>
+            <span>
+              <span className="block text-sm font-black tracking-[0.08em]">RMI</span>
+              <span className="hidden text-[8px] font-bold uppercase tracking-[0.2em] text-cyan/70 xl:block">Live Index</span>
+            </span>
           </Link>
 
-          <nav className="ml-3 hidden items-center gap-5 text-sm font-bold text-paper/70 md:flex" aria-label="Primary">
+          <nav className="ml-2 hidden items-center gap-1 text-xs font-bold text-paper/60 md:flex" aria-label="Primary">
             {navItems.map((item) => {
               const active = pathname === item.href || (item.href === "/leaderboard" && pathname === "/rankings");
 
@@ -124,10 +128,8 @@ export function Shell({ children }: { children: React.ReactNode }) {
                 <Link
                   key={item.href}
                   href={item.href}
-                  className={clsx(
-                    "relative py-1 transition-colors after:absolute after:inset-x-0 after:-bottom-1.5 after:h-0.5 after:origin-center after:rounded-full after:bg-cyan after:transition-transform hover:text-paper",
-                    active ? "text-paper after:scale-x-100" : "text-paper/65 after:scale-x-0"
-                  )}
+                  data-active={active}
+                  className="rmi-nav-link rounded-md px-2.5 py-2 transition-colors"
                 >
                   {item.label}
                 </Link>
@@ -135,12 +137,12 @@ export function Shell({ children }: { children: React.ReactNode }) {
             })}
           </nav>
 
-          <GlobalArtistSearch className="ml-auto hidden w-52 lg:block xl:w-64" />
+          <GlobalArtistSearch className="ml-auto hidden w-52 lg:block xl:w-72" />
 
           {!authLoading && session ? (
             <Link
               href="/portfolio"
-              className="hidden items-center gap-4 rounded-lg border border-line bg-panel px-3 py-2 text-xs hover:border-cyan xl:flex"
+              className="rmi-metric rmi-metric-mint hidden min-h-10 items-center gap-4 px-3 py-1.5 text-xs hover:border-cyan xl:flex"
               aria-label={`Portfolio ${formatCurrency(portfolioValue)}, today ${formatPercent(portfolioDayChangePercent)}`}
             >
               <span>
@@ -163,7 +165,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
               <button
                 type="button"
                 onClick={() => setAccountOpen((open) => !open)}
-                className="grid h-10 w-10 place-items-center rounded-full border border-line bg-panel text-sm font-black hover:border-cyan"
+                className="grid h-10 w-10 place-items-center rounded-full border border-line bg-panel text-sm font-black shadow-[0_0_20px_rgba(var(--color-cyan),0.08)] hover:border-cyan"
                 aria-label="Open account menu"
                 aria-haspopup="menu"
                 aria-expanded={accountOpen}
@@ -174,13 +176,13 @@ export function Shell({ children }: { children: React.ReactNode }) {
               <div className="flex items-center gap-1.5 sm:gap-2">
                 <Link
                   href="/account"
-                  className="inline-flex min-h-9 items-center rounded-lg border border-line px-3 text-xs font-bold hover:border-cyan sm:px-4 sm:text-sm"
+                  className="rmi-button-secondary inline-flex min-h-9 items-center rounded-md border border-line px-3 text-xs font-bold sm:px-4 sm:text-sm"
                 >
                   Log in
                 </Link>
                 <Link
                   href="/account?mode=signup"
-                  className="inline-flex min-h-9 items-center rounded-lg bg-paper px-3 text-xs font-bold text-ink hover:bg-paper/90 sm:px-4 sm:text-sm"
+                  className="rmi-button-primary inline-flex min-h-9 items-center rounded-md px-3 text-xs font-bold sm:px-4 sm:text-sm"
                 >
                   Sign up
                 </Link>
@@ -188,7 +190,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
             )}
 
             {accountOpen ? (
-              <div className="absolute right-0 top-12 z-[90] w-80 rounded-lg border border-line bg-panel p-3 shadow-2xl" role="menu">
+              <div className="rmi-card absolute right-0 top-12 z-[90] w-80 overflow-hidden p-3 shadow-2xl" role="menu">
                 <div className="flex items-center gap-3 border-b border-line pb-3">
                   <UserAvatar avatarUrl={avatarUrl} label={accountLabel} />
                   <div className="min-w-0">
@@ -201,7 +203,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
                 </div>
 
                 <div className="py-3">
-                  <Link href="/account" onClick={() => setAccountOpen(false)} className="flex min-h-11 items-center justify-center rounded-lg border border-line px-3 text-sm font-black hover:border-cyan">
+                  <Link href="/account" onClick={() => setAccountOpen(false)} className="rmi-button-secondary flex min-h-11 items-center justify-center rounded-md border border-line px-3 text-sm font-black">
                     Manage Your Account
                   </Link>
                 </div>
@@ -230,7 +232,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
                     Help Center
                   </Link>
                   <Link href="/about" onClick={() => setAccountOpen(false)} className="flex items-center gap-3 rounded-lg px-3 py-2 hover:bg-panelSoft">
-                    <AudioLines className="h-4 w-4 text-paper/45" aria-hidden="true" />
+                    <Activity className="h-4 w-4 text-paper/45" aria-hidden="true" />
                     About RMI
                   </Link>
                 </div>
@@ -246,16 +248,17 @@ export function Shell({ children }: { children: React.ReactNode }) {
               </div>
             ) : null}
           </div>
+          </div>
         </div>
 
-        <div className="mx-auto flex max-w-[1280px] items-center gap-2 overflow-x-auto px-4 pb-4 sm:px-6 md:hidden">
+        <div className="mx-auto flex max-w-[1440px] items-center gap-2 overflow-x-auto border-b border-line/45 px-4 py-2 sm:px-6 md:hidden">
           {navItems.map((item) => (
             <Link
               key={item.href}
               href={item.href}
               className={clsx(
-                "shrink-0 rounded-full border px-3 py-1.5 text-xs font-bold",
-                pathname === item.href ? "border-cyan bg-cyan/10 text-paper" : "border-line text-paper/65"
+                "rmi-nav-link shrink-0 rounded-md px-3 py-1.5 text-xs font-bold",
+                pathname === item.href ? "border-cyan/45 bg-cyan/10 text-cyan" : "text-paper/60"
               )}
             >
               {item.label}
@@ -271,7 +274,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
         <AppearanceModal current={themePreference} onChange={chooseTheme} onClose={() => setAppearanceOpen(false)} />
       ) : null}
 
-      <main className="mx-auto w-full max-w-[1280px] flex-1 px-4 py-7 sm:px-6 lg:px-8">
+      <main className="mx-auto w-full max-w-[1440px] flex-1 px-4 py-6 sm:px-6 lg:px-8">
         {marketError ? (
           <div className="mb-5 rounded-lg border border-ember/45 bg-ember/10 px-4 py-3 text-sm font-bold text-ember" role="alert">
             {marketError}
@@ -287,12 +290,12 @@ export function Shell({ children }: { children: React.ReactNode }) {
 function MarketBootPlaceholder() {
   return (
     <div className="space-y-6" aria-busy="true" aria-label="Loading current market data">
-      <div className="grid min-h-[230px] overflow-hidden rounded-lg border border-line bg-panel lg:grid-cols-[minmax(0,1.45fr)_minmax(290px,0.55fr)]">
+      <div className="rmi-hero market-grid rmi-noise grid min-h-[230px] overflow-hidden lg:grid-cols-[minmax(0,1.45fr)_minmax(290px,0.55fr)]">
         <div className="grid content-center gap-4 px-5 py-8 sm:px-8">
-          <div className="h-3 w-32 rounded bg-panelSoft motion-safe:animate-pulse" />
+          <div className="h-3 w-32 rounded bg-cyan/10 motion-safe:animate-pulse" />
           <div className="h-10 w-full max-w-lg rounded bg-panelSoft motion-safe:animate-pulse" />
           <div className="h-4 w-full max-w-md rounded bg-panelSoft motion-safe:animate-pulse" />
-          <div className="h-11 w-full max-w-xl rounded-lg bg-panelSoft motion-safe:animate-pulse" />
+          <div className="h-11 w-full max-w-xl rounded-md bg-panelSoft motion-safe:animate-pulse" />
         </div>
         <div className="grid divide-y divide-line border-t border-line bg-panelSoft/45 lg:border-l lg:border-t-0">
           {[0, 1, 2].map((item) => (
@@ -306,13 +309,13 @@ function MarketBootPlaceholder() {
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         {[0, 1, 2, 3].map((item) => (
-          <div key={item} className="h-20 rounded-lg bg-panelSoft motion-safe:animate-pulse" />
+          <div key={item} className="rmi-metric h-20 motion-safe:animate-pulse" />
         ))}
       </div>
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1.55fr)_minmax(300px,0.65fr)]">
-        <div className="h-72 rounded-lg border border-line bg-panel motion-safe:animate-pulse" />
-        <div className="h-72 rounded-lg border border-line bg-panel motion-safe:animate-pulse" />
+        <div className="rmi-card h-72 motion-safe:animate-pulse" />
+        <div className="rmi-card h-72 motion-safe:animate-pulse" />
       </div>
     </div>
   );
@@ -320,14 +323,14 @@ function MarketBootPlaceholder() {
 
 function MarketTape({ artists }: { artists: Artist[] }) {
   return (
-    <div className="bg-panelSoft/45" aria-label="Current RMI market prices">
-      <div className="mx-auto flex min-h-10 max-w-[1280px] px-4 sm:px-6 lg:px-8">
+    <div className="rmi-tape" aria-label="Current RMI market prices">
+      <div className="mx-auto flex min-h-10 max-w-[1440px] px-4 sm:px-6 lg:px-8">
         <Link
           href="/markets"
-          className="z-10 flex shrink-0 items-center gap-2 pr-5 text-xs font-black"
+          className="z-10 flex shrink-0 items-center gap-2 border-r border-line/80 bg-panelSoft/95 pr-5 text-[10px] font-black uppercase tracking-[0.12em]"
         >
-          <span className="h-2 w-2 rounded-full bg-mint" aria-hidden="true" />
-          RMI Market
+          <span className="rmi-live-dot" aria-hidden="true" />
+          Market Live
         </Link>
         <div className="market-tape-viewport min-w-0 flex-1 overflow-hidden">
           <div className="market-tape-track flex h-full w-max items-center">
@@ -342,11 +345,12 @@ function MarketTape({ artists }: { artists: Artist[] }) {
 
 function SiteFooter() {
   return (
-    <footer className="mt-10 border-t border-line bg-panelSoft/55">
-      <div className="mx-auto grid max-w-[1280px] gap-8 px-4 py-9 sm:grid-cols-2 sm:px-6 lg:grid-cols-[1.4fr_0.7fr_0.7fr_1fr] lg:px-8">
+    <footer className="market-grid relative mt-10 overflow-hidden border-t border-cyan/20 bg-panelSoft/75">
+      <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-cyan to-transparent opacity-70" />
+      <div className="mx-auto grid max-w-[1440px] gap-8 px-4 py-9 sm:grid-cols-2 sm:px-6 lg:grid-cols-[1.4fr_0.7fr_0.7fr_1fr] lg:px-8">
         <div>
           <div className="flex items-center gap-2 font-black">
-            <AudioLines className="h-4 w-4 text-cyan" aria-hidden="true" />
+            <span className="rmi-brand-mark grid h-8 w-8 place-items-center rounded-md"><Activity className="h-4 w-4 text-cyan" aria-hidden="true" /></span>
             RMI
           </div>
           <p className="mt-3 max-w-sm text-sm leading-6 text-paper/55">
@@ -371,7 +375,7 @@ function SiteFooter() {
           ]}
         />
         <div>
-          <h2 className="text-xs font-black uppercase tracking-[0.14em] text-paper/45">About RMI</h2>
+          <h2 className="rmi-data-label">About RMI</h2>
           <p className="mt-3 text-sm leading-6 text-paper/55">
             Quotes update from audience momentum, media coverage, verified events, and market activity.
           </p>
@@ -392,7 +396,7 @@ function SiteFooter() {
 function FooterColumn({ title, links }: { title: string; links: Array<[string, string]> }) {
   return (
     <div>
-      <h2 className="text-xs font-black uppercase tracking-[0.14em] text-paper/45">{title}</h2>
+      <h2 className="rmi-data-label">{title}</h2>
       <div className="mt-3 grid gap-2 text-sm font-bold text-paper/60">
         {links.map(([label, href]) => (
           <Link key={href} href={href} className="hover:text-cyan">
@@ -412,7 +416,7 @@ function MarketTapeGroup({ artists, duplicate = false }: { artists: Artist[]; du
           key={`${duplicate ? "copy" : "primary"}-${artist.id}`}
           href={`/artists/${artist.id}`}
           tabIndex={duplicate ? -1 : undefined}
-          className="flex h-full shrink-0 items-center gap-2 px-4 text-xs hover:bg-panelSoft"
+          className="flex h-full shrink-0 items-center gap-2 border-r border-line/35 px-4 text-xs hover:bg-cyan/5"
         >
           <span className="font-black text-cyan">{artist.ticker}</span>
           <span className="number-tabular text-paper/65">{formatCurrency(artist.currentPrice)}</span>
@@ -442,7 +446,7 @@ function AppearanceModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4" role="dialog" aria-modal="true">
-      <div className="w-full max-w-lg rounded-lg border border-line bg-panel p-5 shadow-2xl">
+      <div className="rmi-card market-grid w-full max-w-lg p-5 shadow-2xl">
         <div className="flex items-center justify-between">
           <h2 className="text-2xl font-black">Appearance</h2>
           <button type="button" onClick={onClose} className="grid h-9 w-9 place-items-center rounded-full hover:bg-panelSoft" aria-label="Close">
@@ -456,7 +460,7 @@ function AppearanceModal({
               type="button"
               onClick={() => onChange(option.value)}
               className={clsx(
-                "flex items-center justify-between rounded-lg border px-4 py-3 text-left text-sm font-black",
+                "flex items-center justify-between rounded-md border px-4 py-3 text-left text-sm font-black",
                 current === option.value ? "border-cyan bg-cyan/10" : "border-line bg-panelSoft hover:border-cyan"
               )}
             >
@@ -468,7 +472,7 @@ function AppearanceModal({
             </button>
           ))}
         </div>
-        <button type="button" onClick={onClose} className="mt-5 h-11 w-full rounded-lg bg-paper text-sm font-black text-ink">
+        <button type="button" onClick={onClose} className="rmi-button-primary mt-5 h-11 w-full rounded-md text-sm font-black">
           Done
         </button>
       </div>

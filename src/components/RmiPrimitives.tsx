@@ -9,20 +9,22 @@ export function RmiSection({
   title,
   subtitle,
   action,
-  children
+  children,
+  className
 }: {
-  title?: string;
+  title?: ReactNode;
   subtitle?: string;
   action?: ReactNode;
   children: ReactNode;
+  className?: string;
 }) {
   return (
-    <section className="rmi-card overflow-hidden">
+    <section className={clsx("rmi-card overflow-hidden", className)}>
       {title ? (
-        <div className="flex items-start justify-between gap-4 border-b border-line px-4 py-3">
+        <div className="rmi-section-header flex items-start justify-between gap-4 border-b border-line/80 px-4 py-3">
           <div>
-            <h2 className="text-base font-black">{title}</h2>
-            {subtitle ? <p className="mt-1 text-sm font-bold text-paper/60">{subtitle}</p> : null}
+            <h2 className="text-sm font-black tracking-[0.01em]">{title}</h2>
+            {subtitle ? <p className="mt-1 text-xs font-medium text-paper/55">{subtitle}</p> : null}
           </div>
           {action ? <div className="shrink-0">{action}</div> : null}
         </div>
@@ -48,9 +50,9 @@ export function RmiButton({
   disabled?: boolean;
 }) {
   const className = clsx(
-    "inline-flex min-h-9 items-center justify-center rounded-lg px-4 text-sm font-black transition disabled:cursor-not-allowed disabled:opacity-50",
-    variant === "primary" && "bg-paper text-ink hover:bg-paper/90",
-    variant === "secondary" && "border border-line bg-transparent text-paper hover:border-cyan",
+    "inline-flex min-h-9 items-center justify-center rounded-md px-4 text-sm font-black transition disabled:cursor-not-allowed disabled:opacity-50",
+    variant === "primary" && "rmi-button-primary",
+    variant === "secondary" && "rmi-button-secondary border border-line bg-transparent text-paper",
     variant === "danger" && "border border-ember/60 text-ember hover:bg-ember/10"
   );
 
@@ -93,7 +95,7 @@ export function ArtistIdentity({
   }
 
   return (
-    <Link href={`/artists/${artist.id}`} className="flex min-w-0 items-center gap-3">
+    <Link href={`/artists/${artist.id}`} className="flex min-w-0 items-center gap-3 hover:text-cyan">
       {content}
     </Link>
   );
@@ -110,7 +112,7 @@ export function ChangeText({ value, suffix = "" }: { value: number; suffix?: str
 
 export function ArtistMiniCard({ artist }: { artist: Artist }) {
   return (
-    <Link href={`/artists/${artist.id}`} className="rmi-card grid min-w-0 gap-4 p-4 transition hover:-translate-y-0.5 hover:border-cyan/70">
+    <Link href={`/artists/${artist.id}`} className="rmi-signal-card grid min-w-0 gap-4 p-4">
       <ArtistIdentity artist={artist} linked={false} />
       <div>
         <p className="text-lg font-black number-tabular">{formatCurrency(artist.currentPrice)}</p>
@@ -130,7 +132,7 @@ export function ArtistTableRow({
   muted?: boolean;
 }) {
   return (
-    <div className={clsx("grid grid-cols-[minmax(0,1fr)_92px_82px] items-center gap-4 border-b border-line px-4 py-3 last:border-b-0", muted && "opacity-65")}>
+    <div className={clsx("grid grid-cols-[minmax(0,1fr)_92px_82px] items-center gap-4 border-b border-line/70 px-4 py-3 transition-colors last:border-b-0 hover:bg-cyan/[0.035]", muted && "opacity-65")}>
       <ArtistIdentity artist={artist} />
       <p className="text-right text-sm font-black number-tabular">{formatCurrency(artist.currentPrice)}</p>
       <div className="text-right text-sm">{right ?? <ChangeText value={artist.dailyChangePercent} />}</div>

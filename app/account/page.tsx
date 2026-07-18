@@ -31,7 +31,7 @@ const turnstileSiteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY?.trim() ?? "
 
 export default function AccountPage() {
   return (
-    <Suspense fallback={<div className="mx-auto h-80 max-w-md rounded-lg bg-panelSoft motion-safe:animate-pulse" />}>
+    <Suspense fallback={<div className="rmi-auth-surface mx-auto h-80 max-w-xl motion-safe:animate-pulse" />}>
       <AccountPageContent />
     </Suspense>
   );
@@ -314,23 +314,37 @@ function AccountPageContent() {
   }
 
   if (configured && authLoading) {
-    return <div className="mx-auto h-80 max-w-md rounded-lg bg-panelSoft motion-safe:animate-pulse" />;
+    return <div className="rmi-auth-surface mx-auto h-80 max-w-xl motion-safe:animate-pulse" />;
   }
 
   if (!configured || !session) {
     return (
-      <div className="mx-auto max-w-md space-y-5">
+      <div className="mx-auto max-w-xl space-y-5">
         <header className="text-center">
-          <h1 className="text-3xl font-black">{mode === "signup" ? "Create your RMI account" : "Log in to RMI"}</h1>
-          <p className="mt-2 text-sm font-bold text-paper/70">Trade with fantasy cash. No real money.</p>
+          <div className="rmi-kicker justify-center">Secure Trader Access</div>
+          <h1 className="mt-3 text-3xl font-black sm:text-4xl">
+            {mode === "signup" ? "Enter the RMI market." : "Welcome back."}
+          </h1>
+          <p className="mx-auto mt-2 max-w-md text-sm text-paper/60">
+            {mode === "signup"
+              ? "Create a verified profile, build a watchlist, and start with fantasy cash."
+              : "Access your portfolio, watchlist, and personalized market desk."}
+          </p>
         </header>
 
-        <form onSubmit={submitAuth} className="rmi-card grid gap-3 p-5">
+        <form onSubmit={submitAuth} className="rmi-auth-surface market-grid rmi-noise grid gap-3 p-5 sm:p-7">
+          <div className="mb-2 flex items-center justify-between border-b border-line/70 pb-4">
+            <div>
+              <p className="rmi-data-label">Identity Terminal</p>
+              <p className="mt-1 text-sm font-semibold">{mode === "signup" ? "New account" : "Existing trader"}</p>
+            </div>
+            <span className="rmi-status-chip"><span className="rmi-live-dot" /> Protected</span>
+          </div>
           {mode === "signup" ? (
             <input
               value={username}
               onChange={(event) => setUsername(event.target.value)}
-              className="h-11 rounded-lg border border-line bg-panelSoft px-3 text-sm font-bold outline-none focus:border-cyan"
+              className="rmi-terminal-input h-11 px-3 text-sm font-bold"
               placeholder="Username"
               autoComplete="username"
               pattern="[A-Za-z0-9_.-]{2,32}"
@@ -344,7 +358,7 @@ function AccountPageContent() {
             value={email}
             onChange={(event) => setEmail(event.target.value)}
             type="email"
-            className="h-11 rounded-lg border border-line bg-panelSoft px-3 text-sm font-bold outline-none focus:border-cyan"
+            className="rmi-terminal-input h-11 px-3 text-sm font-bold"
             placeholder="Email"
             autoComplete="email"
             required
@@ -357,7 +371,7 @@ function AccountPageContent() {
               value={password}
               onChange={(event) => setPassword(event.target.value)}
               type={showPassword ? "text" : "password"}
-              className="h-11 w-full rounded-lg border border-line bg-panelSoft px-3 pr-11 text-sm font-bold outline-none focus:border-cyan"
+              className="rmi-terminal-input h-11 w-full px-3 pr-11 text-sm font-bold"
               placeholder="Password"
               autoComplete={mode === "signup" ? "new-password" : "current-password"}
               minLength={mode === "signup" ? 8 : undefined}
@@ -379,7 +393,7 @@ function AccountPageContent() {
             resetKey={captchaResetKey}
             action={mode === "signup" ? "rmi_signup" : "rmi_login"}
           />
-          <button type="submit" disabled={submitting} className="h-11 rounded-lg bg-paper text-sm font-black text-ink disabled:opacity-60">
+          <button type="submit" disabled={submitting} className="rmi-button-primary h-11 text-sm disabled:opacity-60">
             {mode === "signup" ? "Sign up" : "Log in"}
           </button>
           <div className="flex items-center gap-3 text-xs font-bold uppercase tracking-wide text-paper/35" aria-hidden="true">
@@ -391,7 +405,7 @@ function AccountPageContent() {
             type="button"
             onClick={continueWithGoogle}
             disabled={submitting}
-            className="h-11 rounded-lg border border-line bg-panelSoft text-sm font-black transition hover:border-cyan disabled:opacity-60"
+            className="rmi-button-secondary h-11 text-sm disabled:opacity-60"
           >
             Continue with Google
           </button>
@@ -412,18 +426,19 @@ function AccountPageContent() {
           >
             {mode === "signup" ? "Already have an account?" : "Create account"}
           </button>
-          {message ? <p className="text-sm font-bold text-paper/65">{message}</p> : null}
+          {message ? <p className="rounded-md border border-cyan/25 bg-cyan/5 px-3 py-2 text-sm font-semibold text-paper/75">{message}</p> : null}
         </form>
       </div>
     );
   }
 
   return (
-    <div className="mx-auto max-w-5xl space-y-5">
-      <header className="flex flex-wrap items-start justify-between gap-4">
+    <div className="mx-auto max-w-6xl space-y-5">
+      <header className="rmi-page-head flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-black">Player Profile</h1>
-          <p className="mt-1 text-sm font-bold text-paper/70">Manage your public RMI identity.</p>
+          <div className="rmi-kicker">Identity Console</div>
+          <h1 className="mt-2 text-3xl font-black">Trader Profile</h1>
+          <p className="mt-1 text-sm text-paper/60">Manage the identity and artist signals shown on your public profile.</p>
         </div>
         <div className="flex flex-wrap gap-2">
           {state.userId ? <RmiButton href={`/users/${state.userId}`} variant="secondary">View Public Profile</RmiButton> : null}
@@ -431,7 +446,7 @@ function AccountPageContent() {
         </div>
       </header>
 
-      <section className="rmi-card p-5">
+      <section className="rmi-card market-grid rmi-noise overflow-hidden p-5 sm:p-7">
         <div className="grid gap-5 sm:grid-cols-[142px_minmax(0,1fr)]">
           <div>
             <button type="button" onClick={() => fileRef.current?.click()} className="group relative">
@@ -464,10 +479,10 @@ function AccountPageContent() {
             <textarea
               value={bio}
               onChange={(event) => setBio(event.target.value)}
-              className="mt-6 min-h-24 w-full rounded-lg border border-line bg-panelSoft p-3 text-sm font-bold outline-none placeholder:text-paper/35 focus:border-cyan"
+              className="rmi-terminal-input mt-6 min-h-24 w-full p-3 text-sm font-semibold placeholder:text-paper/35"
               placeholder="A little about me..."
             />
-            <button type="button" onClick={() => saveProfile()} className="mt-3 h-10 rounded-lg bg-paper px-4 text-sm font-black text-ink">
+            <button type="button" onClick={() => saveProfile()} className="rmi-button-primary mt-3 h-10 px-4 text-sm">
               Save profile
             </button>
             {message ? <p className="mt-3 text-sm font-bold text-paper/65">{message}</p> : null}
@@ -479,12 +494,12 @@ function AccountPageContent() {
         <div>
           <div className="mb-3 flex items-end justify-between gap-3">
             <div>
-              <h2 className="text-lg font-black">Favorite Artists</h2>
+              <h2 className="text-lg font-black">Favorite Artist Signals</h2>
               <p className="text-xs text-paper/50">Choose up to 12 artists for your public profile.</p>
             </div>
             <span className="text-xs font-bold text-paper/45">{favoriteArtistIds.length}/12</span>
           </div>
-          <div className="rmi-card overflow-visible">
+          <div className="rmi-card overflow-visible border-t-2 border-t-violet/70">
             {favoriteArtists.length ? (
               favoriteArtists.map((artist) => (
                 <div key={artist.id} className="flex items-center gap-3 border-b border-line px-4 py-3 hover:bg-panelSoft">
@@ -515,7 +530,7 @@ function AccountPageContent() {
               <input
                 value={favoriteQuery}
                 onChange={(event) => setFavoriteQuery(event.target.value)}
-                className="h-10 w-full rounded-lg border border-line bg-panelSoft pl-9 pr-3 text-sm outline-none placeholder:text-paper/35 focus:border-cyan"
+                className="rmi-terminal-input h-10 w-full pl-9 pr-3 text-sm placeholder:text-paper/35"
                 placeholder="Find an artist to add"
                 disabled={favoriteArtistIds.length >= 12}
               />
@@ -548,7 +563,7 @@ function AccountPageContent() {
               <button
                 type="button"
                 onClick={() => saveProfile(favoriteArtistIds)}
-                className="mt-3 h-10 w-full rounded-lg bg-paper px-4 text-sm font-black text-ink hover:bg-paper/90"
+                className="rmi-button-primary mt-3 h-10 w-full px-4 text-sm"
               >
                 Save Favorite Artists
               </button>
@@ -557,8 +572,10 @@ function AccountPageContent() {
         </div>
 
         <div>
-          <h2 className="mb-3 text-lg font-black">Account</h2>
-          <div className="rmi-card p-4">
+          <h2 className="mb-3 text-lg font-black">Account Controls</h2>
+          <div className="rmi-card border-t-2 border-t-cyan/70 p-4">
+            <p className="mb-4 text-sm text-paper/55">Security, privacy, and account preferences live in the settings console.</p>
+            <RmiButton href="/settings" variant="secondary">Open Settings</RmiButton>
             <button type="button" onClick={signOut} className="flex items-center gap-2 text-sm font-black text-ember">
               <LogOut className="h-4 w-4" />
               Sign out
@@ -572,8 +589,8 @@ function AccountPageContent() {
 
 function ProfileStat({ icon, label, value }: { icon: ReactNode; label: string; value: string }) {
   return (
-    <div className="flex items-center gap-3 text-sm">
-      <span className="text-paper/45">{icon}</span>
+    <div className="rmi-soft-card flex min-h-14 items-center gap-3 px-3 text-sm">
+      <span className="text-cyan">{icon}</span>
       <span className="text-paper/55">{label}:</span>
       <span className="ml-auto font-black">{value}</span>
     </div>

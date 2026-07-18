@@ -195,15 +195,15 @@ test("homepage visual contract", async ({ page }) => {
 });
 
 test("markets visual contract", async ({ page }) => {
-  await assertStablePublicPage(page, "/markets", "Markets", "markets.png");
+  await assertStablePublicPage(page, "/markets", "Artist Markets", "markets.png");
 });
 
 test("news visual contract", async ({ page }) => {
-  await assertStablePublicPage(page, "/news", "Market News", "news.png");
+  await assertStablePublicPage(page, "/news", "Market Intelligence", "news.png");
 });
 
 test("about visual contract", async ({ page }) => {
-  await assertStablePublicPage(page, "/about", "Rap Market Index", "about.png");
+  await assertStablePublicPage(page, "/about", "The signal layer for rap momentum.", "about.png");
 });
 
 test("help visual contract", async ({ page }) => {

@@ -10,6 +10,7 @@ import { formatCurrency, formatDate, formatPercent, formatShares } from "@/lib/f
 import { buildPortfolioQuoteSeries, getSeriesChangePercent } from "@/lib/market-analytics";
 import { STARTING_CASH } from "@/lib/market";
 import Link from "next/link";
+import { Activity, BriefcaseBusiness, Radar, WalletCards } from "lucide-react";
 import { useMemo } from "react";
 
 export default function PortfolioPage() {
@@ -42,12 +43,13 @@ export default function PortfolioPage() {
 
   return (
     <div className="space-y-5">
-      <header className="flex flex-wrap items-end justify-between gap-4">
+      <header className="rmi-page-head flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-black">Your Portfolio</h1>
+          <div className="rmi-kicker"><BriefcaseBusiness className="h-3.5 w-3.5" /> Portfolio Terminal</div>
+          <h1 className="mt-2 text-3xl font-black sm:text-4xl">Your Portfolio</h1>
           <p className="mt-1 text-sm text-paper/65">Positions, performance, allocation, and recent trading activity.</p>
         </div>
-        <RmiButton href="/markets" variant="secondary">Find an Artist</RmiButton>
+        <div className="flex items-center gap-2"><span className="rmi-status-chip"><span className="rmi-live-dot" /> Live valuation</span><RmiButton href="/markets" variant="secondary">Find an Artist</RmiButton></div>
       </header>
 
       <section className="grid grid-cols-2 gap-3 lg:grid-cols-4">
@@ -73,7 +75,7 @@ export default function PortfolioPage() {
       >
         {chartData.length ? (
           <div className="p-4">
-            <PriceChart data={chartData} height={220} />
+            <div className="rmi-chart-shell p-3"><PriceChart data={chartData} height={220} /></div>
           </div>
         ) : (
           <div className="grid min-h-40 place-items-center p-6 text-center">
@@ -89,7 +91,7 @@ export default function PortfolioPage() {
         <RmiSection title="Holdings" subtitle={`${holdings.length} long position${holdings.length === 1 ? "" : "s"}`}>
           <div className="overflow-x-auto">
             <div className="min-w-[610px]">
-              <div className="grid grid-cols-[minmax(180px,1fr)_76px_100px_112px_96px] border-b border-line px-4 py-3 text-xs font-bold text-paper/45">
+              <div className="rmi-table-head grid grid-cols-[minmax(180px,1fr)_76px_100px_112px_96px] px-4 py-3 text-xs font-bold text-paper/45">
                 <span>Artist</span>
                 <span>Shares</span>
                 <span>Average Cost</span>
@@ -101,7 +103,7 @@ export default function PortfolioPage() {
                   <Link
                     key={holding.artistId}
                     href={`/artists/${holding.artistId}`}
-                    className="grid grid-cols-[minmax(180px,1fr)_76px_100px_112px_96px] items-center border-b border-line px-4 py-3 last:border-b-0 hover:bg-panelSoft"
+                    className="rmi-table-row grid grid-cols-[minmax(180px,1fr)_76px_100px_112px_96px] items-center px-4 py-3"
                   >
                     <span className="flex min-w-0 items-center gap-3">
                       <ArtistAvatar artist={holding.artist} size="sm" />
@@ -196,7 +198,7 @@ export default function PortfolioPage() {
 
 function PortfolioStat({ label, value, detail, good = true }: { label: string; value: string; detail?: string; good?: boolean }) {
   return (
-    <div className="rounded-lg bg-panelSoft p-4">
+    <div className={`rmi-metric ${good ? "rmi-metric-mint" : "rmi-metric-ember"} p-4`}>
       <p className="text-xs font-bold text-paper/55">{label}</p>
       <p className="mt-1 text-2xl font-black number-tabular">{value}</p>
       {detail ? <p className={good ? "mt-1 text-xs font-black text-mint" : "mt-1 text-xs font-black text-ember"}>{detail}</p> : null}

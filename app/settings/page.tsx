@@ -69,9 +69,12 @@ export default function SettingsPage() {
 
   if (!configured || !session) {
     return (
-      <div className="space-y-4">
-        <h1 className="text-3xl font-black">Settings</h1>
-        <section className="rmi-card p-5">
+      <div className="mx-auto max-w-3xl space-y-4">
+        <header className="rmi-page-head">
+          <div className="rmi-kicker">Control Center</div>
+          <h1 className="mt-2 text-3xl font-black">Settings</h1>
+        </header>
+        <section className="rmi-auth-surface market-grid p-5">
           <p className="text-sm font-bold text-paper/70">Sign in to manage your account.</p>
           <div className="mt-4">
             <RmiButton href="/account">Log in</RmiButton>
@@ -181,10 +184,14 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="mx-auto max-w-5xl space-y-5">
-      <h1 className="text-3xl font-black">Settings</h1>
+    <div className="mx-auto max-w-6xl space-y-5">
+      <header className="rmi-page-head">
+        <div className="rmi-kicker">Trader Control Center</div>
+        <h1 className="mt-2 text-3xl font-black sm:text-4xl">Settings</h1>
+        <p className="mt-1 text-sm text-paper/55">Identity, access, appearance, and public-profile controls.</p>
+      </header>
 
-      <section className="flex items-center justify-between gap-4">
+      <section className="rmi-card market-grid rmi-noise flex items-center justify-between gap-4 p-4 sm:p-5">
         <div className="flex min-w-0 items-center gap-3">
           <UserAvatar avatarUrl={avatarUrl} label={displayName} />
           <div className="min-w-0">
@@ -207,9 +214,9 @@ export default function SettingsPage() {
               maxLength={32}
               pattern="[A-Za-z0-9_.-]{2,32}"
               title="Use 2-32 letters, numbers, periods, hyphens, or underscores."
-              className="h-9 min-w-0 flex-1 rounded-lg border border-line bg-panelSoft px-3 text-sm font-black outline-none focus:border-cyan"
+              className="rmi-terminal-input h-9 min-w-0 flex-1 px-3 text-sm font-black"
             />
-            <button type="button" onClick={saveUsername} className="rounded-lg border border-line px-3 text-sm font-black hover:border-cyan">
+            <button type="button" onClick={saveUsername} className="rmi-button-secondary px-3 text-sm">
               Save
             </button>
           </div>
@@ -229,7 +236,7 @@ export default function SettingsPage() {
 
                 void sendPasswordReset();
               }}
-              className="rounded-lg border border-line px-3 py-1.5 text-sm font-black hover:border-cyan"
+              className="rmi-button-secondary px-3 py-1.5 text-sm"
             >
               Change
             </button>
@@ -245,7 +252,7 @@ export default function SettingsPage() {
                   type="button"
                   onClick={sendPasswordReset}
                   disabled={!passwordCaptchaToken}
-                  className="rounded-lg bg-paper px-3 py-2 text-sm font-black text-ink disabled:opacity-40"
+                  className="rmi-button-primary px-3 py-2 text-sm disabled:opacity-40"
                 >
                   Send Reset Email
                 </button>
@@ -260,7 +267,7 @@ export default function SettingsPage() {
           <select
             value={theme}
             onChange={(event) => chooseTheme(event.target.value as ThemePreference)}
-            className="h-9 flex-1 rounded-lg border border-line bg-panelSoft px-3 text-sm font-black outline-none"
+            className="rmi-terminal-input h-9 flex-1 px-3 text-sm font-black"
           >
             <option value="system">System</option>
             <option value="dark">Dark</option>
@@ -317,11 +324,11 @@ export default function SettingsPage() {
         </SettingsRow>
       </SettingsGroup>
 
-      {message ? <p className="text-sm font-bold text-paper/65">{message}</p> : null}
+      {message ? <p className="rounded-md border border-cyan/25 bg-cyan/5 px-4 py-3 text-sm font-semibold text-paper/70">{message}</p> : null}
 
       {deleteOpen ? (
         <div className="fixed inset-0 z-50 grid place-items-center bg-black/75 px-4" role="dialog" aria-modal="true" aria-labelledby="delete-account-title">
-          <div className="rmi-card w-full max-w-md p-5 shadow-2xl">
+          <div className="rmi-card market-grid rmi-noise w-full max-w-md p-5 shadow-2xl">
             <div className="flex items-center justify-between gap-4">
               <h2 id="delete-account-title" className="text-xl font-black">Delete Account</h2>
               <button type="button" onClick={() => setDeleteOpen(false)} className="grid h-9 w-9 place-items-center rounded-full text-paper/55 hover:bg-panelSoft" aria-label="Close">
@@ -338,7 +345,7 @@ export default function SettingsPage() {
                 type={showDeletePassword ? "text" : "password"}
                 autoComplete="current-password"
                 placeholder="Password"
-                className="h-11 w-full rounded-lg border border-ember/40 bg-panelSoft px-3 pr-11 text-sm outline-none focus:border-ember"
+                className="rmi-terminal-input h-11 w-full border-ember/40 px-3 pr-11 text-sm focus:border-ember"
                 disabled={deleting}
               />
               <button
@@ -379,15 +386,15 @@ export default function SettingsPage() {
 function SettingsGroup({ title, children, danger = false }: { title: string; children: ReactNode; danger?: boolean }) {
   return (
     <section>
-      <h2 className={danger ? "mb-2 text-sm font-black text-ember" : "mb-2 text-sm font-black text-paper/65"}>{title}</h2>
-      <div className={danger ? "overflow-hidden rounded-lg border border-ember/50" : "rmi-card overflow-hidden"}>{children}</div>
+      <h2 className={danger ? "rmi-data-label mb-2 text-ember" : "rmi-data-label mb-2 text-cyan"}>{title}</h2>
+      <div className={danger ? "overflow-hidden rounded-lg border border-ember/50 bg-ember/[0.03]" : "rmi-card overflow-hidden border-l-2 border-l-cyan/50"}>{children}</div>
     </section>
   );
 }
 
 function SettingsRow({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <div className="flex min-h-14 items-center justify-between gap-4 border-b border-line px-4 py-3 last:border-b-0">
+    <div className="flex min-h-14 items-center justify-between gap-4 border-b border-line px-4 py-3 transition-colors last:border-b-0 hover:bg-cyan/[0.025]">
       <span className="text-sm font-black">{label}</span>
       <div className="flex min-w-0 flex-1 justify-end">{children}</div>
     </div>

@@ -14,7 +14,15 @@ export function MiniSparkline({
   const points = data.slice(-18);
 
   if (points.length < 2) {
-    return <div className="rounded bg-panelSoft" style={{ width, height }} />;
+    return (
+      <div
+        className="relative overflow-hidden rounded-sm border border-line/60 bg-panelSoft/70"
+        style={{ width, height }}
+        aria-label="Price history is still building"
+      >
+        <span className="absolute inset-x-2 top-1/2 h-px bg-paper/12" />
+      </div>
+    );
   }
 
   const prices = points.map((point) => point.price);
@@ -34,9 +42,17 @@ export function MiniSparkline({
   const last = coordinates[coordinates.length - 1];
 
   return (
-    <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Recent price trend">
-      <path d={path} fill="none" stroke={positive ? "#00856f" : "#d93025"} strokeWidth="2.25" />
-      <circle cx={last.x} cy={last.y} r="2.4" fill={positive ? "#00856f" : "#d93025"} />
+    <svg
+      width={width}
+      height={height}
+      viewBox={`0 0 ${width} ${height}`}
+      className={positive ? "overflow-visible text-mint" : "overflow-visible text-ember"}
+      role="img"
+      aria-label="Recent price trend"
+    >
+      <path d={path} fill="none" stroke="currentColor" strokeOpacity="0.16" strokeWidth="6" />
+      <path d={path} fill="none" stroke="currentColor" strokeWidth="2.1" />
+      <circle cx={last.x} cy={last.y} r="2.6" fill="currentColor" />
     </svg>
   );
 }
