@@ -106,7 +106,7 @@ export function GlobalArtistSearch({ className }: { className?: string }) {
       </form>
 
       {open ? (
-        <div id="global-artist-results" className="absolute left-0 right-0 top-12 z-[80] max-h-80 overflow-y-auto rounded-lg border border-line bg-panel p-1 shadow-2xl scrollbar-thin">
+        <div id="global-artist-results" className="rmi-popover absolute left-0 right-0 top-12 z-[80] max-h-80 overflow-y-auto p-1 scrollbar-thin">
           {suggestions.length ? (
             suggestions.map((artist) => (
               <button

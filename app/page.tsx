@@ -74,6 +74,10 @@ export default function HomePage() {
   const portfolioDayPercent = portfolioValue - portfolioDayChange > 0
     ? (portfolioDayChange / (portfolioValue - portfolioDayChange)) * 100
     : 0;
+  const investedValue = Math.max(0, portfolioValue - state.cashBalance);
+  const investedPercent = portfolioValue > 0
+    ? Math.min(100, Math.max(0, (investedValue / portfolioValue) * 100))
+    : 0;
 
   function submitSearch(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -121,7 +125,7 @@ export default function HomePage() {
             />
             <RmiButton type="submit">Search</RmiButton>
             {searchFocused ? (
-              <div data-testid="home-search-results" className="rmi-card absolute left-0 right-0 top-[calc(100%+0.5rem)] z-[100] max-h-72 overscroll-contain overflow-y-auto p-2 text-left shadow-2xl scrollbar-thin sm:right-[5.75rem]">
+              <div data-testid="home-search-results" className="rmi-popover absolute left-0 right-0 top-[calc(100%+0.5rem)] z-[100] max-h-72 overscroll-contain overflow-y-auto p-2 text-left scrollbar-thin sm:right-[5.75rem]">
                 {searchSuggestions.map((artist) => (
                   <Link
                     key={artist.id}
@@ -203,11 +207,39 @@ export default function HomePage() {
 
           <RmiSection title={session ? "Your Portfolio" : "Start Trading"}>
             {session ? (
-              <div className="grid gap-3 p-4 sm:grid-cols-3 lg:grid-cols-1">
-                <SnapshotTile label="Portfolio" value={formatCurrency(portfolioValue)} />
-                <SnapshotTile label="Cash" value={formatCurrency(state.cashBalance)} />
-                <SnapshotTile label="Today" value={formatPercent(portfolioDayPercent)} positive={portfolioDayPercent >= 0} />
-                <RmiButton href="/portfolio" variant="secondary">View Portfolio</RmiButton>
+              <div className="space-y-4 p-4">
+                <div className="flex items-end justify-between gap-3">
+                  <div>
+                    <p className="rmi-data-label">Total Value</p>
+                    <p className="mt-1 text-2xl font-black number-tabular">{formatCurrency(portfolioValue)}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="rmi-data-label">Today</p>
+                    <p className={`mt-1 text-base font-black number-tabular ${portfolioDayPercent >= 0 ? "text-mint" : "text-ember"}`}>
+                      {formatPercent(portfolioDayPercent)}
+                    </p>
+                  </div>
+                </div>
+                <div>
+                  <div className="mb-2 flex items-center justify-between gap-3 text-[10px] font-bold text-paper/45">
+                    <span>Portfolio Allocation</span>
+                    <span className="number-tabular">{investedPercent.toFixed(0)}% invested</span>
+                  </div>
+                  <div className="h-1.5 overflow-hidden rounded-full bg-panelSoft">
+                    <div className="h-full rounded-full bg-cyan" style={{ width: `${investedPercent}%` }} />
+                  </div>
+                </div>
+                <dl className="grid grid-cols-2 gap-3 border-t border-line/70 pt-3">
+                  <div>
+                    <dt className="rmi-data-label">Invested</dt>
+                    <dd className="mt-1 text-sm font-black number-tabular">{formatCurrency(investedValue)}</dd>
+                  </div>
+                  <div>
+                    <dt className="rmi-data-label">Cash</dt>
+                    <dd className="mt-1 text-sm font-black number-tabular">{formatCurrency(state.cashBalance)}</dd>
+                  </div>
+                </dl>
+                <RmiButton href="/portfolio" variant="secondary" className="w-full">View Portfolio</RmiButton>
               </div>
             ) : (
               <div className="space-y-4 p-4 text-sm">
@@ -261,15 +293,6 @@ function HeroStat({ label, value, accent, icon }: { label: string; value: string
         <span className={accent === "cyan" ? "text-cyan" : accent === "mint" ? "text-mint" : accent === "ember" ? "text-ember" : "text-brass"}>{icon}</span>
       </div>
       <p className="mt-2 text-xl font-black number-tabular">{value}</p>
-    </div>
-  );
-}
-
-function SnapshotTile({ label, value, positive = true }: { label: string; value: string; positive?: boolean }) {
-  return (
-    <div className="rmi-metric p-4">
-      <p className="rmi-data-label">{label}</p>
-      <p className={positive ? "mt-1 text-xl font-black text-paper number-tabular" : "mt-1 text-xl font-black text-ember number-tabular"}>{value}</p>
     </div>
   );
 }

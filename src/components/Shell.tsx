@@ -191,7 +191,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
 
             {accountOpen ? (
               <div
-                className="rmi-card absolute right-0 top-[calc(100%+0.75rem)] z-[120] max-h-[calc(100dvh-5.5rem)] w-[min(20rem,calc(100vw-2rem))] overscroll-contain overflow-y-auto p-3 shadow-2xl scrollbar-thin"
+                className="rmi-popover absolute right-0 top-[calc(100%+0.75rem)] z-[120] max-h-[calc(100dvh-5.5rem)] w-[min(20rem,calc(100vw-2rem))] overscroll-contain overflow-y-auto p-3 scrollbar-thin"
                 role="menu"
               >
                 <div className="flex items-center gap-3 border-b border-line pb-3">
@@ -332,7 +332,7 @@ function MarketTape({ artists }: { artists: Artist[] }) {
       <div className="mx-auto flex min-h-10 max-w-[1440px] px-4 sm:px-6 lg:px-8">
         <Link
           href="/markets"
-          className="z-10 flex shrink-0 items-center gap-2 bg-panelSoft/95 pr-4 text-[10px] font-black uppercase tracking-[0.12em]"
+          className="z-10 flex shrink-0 items-center gap-2.5 pr-5 text-[10px] font-black uppercase tracking-[0.12em]"
         >
           <span className="rmi-live-dot" aria-hidden="true" />
           Market Live

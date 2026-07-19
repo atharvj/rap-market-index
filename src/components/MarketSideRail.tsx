@@ -3,7 +3,6 @@
 import { ArtistAvatar } from "@/components/ArtistAvatar";
 import { useGame } from "@/components/GameProvider";
 import { MiniSparkline } from "@/components/MiniSparkline";
-import { RmiSection } from "@/components/RmiPrimitives";
 import { formatCurrency, formatPercent } from "@/lib/formatters";
 import type { Artist } from "@/lib/types";
 import { Activity, Flame, Star, TrendingDown, TrendingUp } from "lucide-react";
@@ -38,14 +37,14 @@ export function MarketSideRail({
   }, [currentArtistId, listSize, state.artists]);
 
   return (
-    <div className="space-y-4">
+    <aside className="rmi-card overflow-hidden">
       <MarketList title="Trending Tickers" artists={marketLists.movers} href="/markets" tone="cyan" icon="activity" />
       {includeWatchlist && watchlistArtists.length ? (
         <MarketList title="Your Watchlist" artists={watchlistArtists.slice(0, listSize)} href="/watchlist" tone="violet" icon="star" />
       ) : null}
       <MarketList title="Top Gainers" artists={marketLists.gainers} href="/markets" tone="mint" icon="up" />
       <MarketList title="Top Losers" artists={marketLists.losers} href="/markets" tone="ember" icon="down" />
-    </div>
+    </aside>
   );
 }
 
@@ -67,23 +66,21 @@ function MarketList({
   }
 
   const toneClasses = {
-    cyan: { icon: "text-cyan", border: "border-cyan/20" },
-    mint: { icon: "text-mint", border: "border-mint/20" },
-    ember: { icon: "text-ember", border: "border-ember/20" },
-    violet: { icon: "text-violet", border: "border-violet/20" }
+    cyan: "text-cyan",
+    mint: "text-mint",
+    ember: "text-ember",
+    violet: "text-violet"
   }[tone];
 
   return (
-    <RmiSection
-      title={
+    <section className="border-t border-line/75 first:border-t-0">
+      <div className="rmi-section-header flex items-center justify-between gap-3 px-3 py-2.5">
         <span className="flex items-center gap-2">
-          <RailIcon icon={icon} className={`h-3.5 w-3.5 ${toneClasses.icon}`} />
-          {title}
+          <RailIcon icon={icon} className={`h-3.5 w-3.5 ${toneClasses}`} />
+          <span className="text-xs font-black">{title}</span>
         </span>
-      }
-      action={href ? <Link href={href} className="text-xs font-bold text-cyan hover:underline">View All</Link> : null}
-      className={`overflow-hidden ${toneClasses.border}`}
-    >
+        {href ? <Link href={href} className="text-[11px] font-bold text-cyan hover:text-paper">View All</Link> : null}
+      </div>
       <div className="divide-y divide-line/75">
         {artists.map((artist) => (
           <Link
@@ -113,7 +110,7 @@ function MarketList({
           </Link>
         ))}
       </div>
-    </RmiSection>
+    </section>
   );
 }
 

@@ -203,13 +203,18 @@ test("homepage artist search opens as an overlay without resizing the hero", asy
   const before = await hero.boundingBox();
 
   await search.focus();
-  await expect(page.getByTestId("home-search-results")).toBeVisible();
+  const results = page.getByTestId("home-search-results");
+  await expect(results).toBeVisible();
   const after = await hero.boundingBox();
 
   expect(before).not.toBeNull();
   expect(after).not.toBeNull();
   expect(Math.abs((after?.height ?? 0) - (before?.height ?? 0))).toBeLessThanOrEqual(2);
-  await expect(page.getByTestId("home-search-results")).toHaveCSS("position", "absolute");
+  await expect(results).toHaveCSS("position", "absolute");
+  await expect(results).toHaveCSS("opacity", "1");
+  expect(await results.evaluate((element) => getComputedStyle(element).backgroundColor)).not.toBe(
+    "rgba(0, 0, 0, 0)"
+  );
 });
 
 test("markets visual contract", async ({ page }) => {

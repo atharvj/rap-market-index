@@ -40,7 +40,8 @@ export function RmiButton({
   variant = "primary",
   onClick,
   type = "button",
-  disabled = false
+  disabled = false,
+  className
 }: {
   children: ReactNode;
   href?: string;
@@ -48,24 +49,26 @@ export function RmiButton({
   onClick?: () => void;
   type?: "button" | "submit";
   disabled?: boolean;
+  className?: string;
 }) {
-  const className = clsx(
+  const buttonClassName = clsx(
     "inline-flex min-h-9 items-center justify-center rounded-md px-4 text-sm font-black transition disabled:cursor-not-allowed disabled:opacity-50",
     variant === "primary" && "rmi-button-primary",
     variant === "secondary" && "rmi-button-secondary border border-line bg-transparent text-paper",
-    variant === "danger" && "border border-ember/60 text-ember hover:bg-ember/10"
+    variant === "danger" && "border border-ember/60 text-ember hover:bg-ember/10",
+    className
   );
 
   if (href) {
     return (
-      <Link href={href} className={className}>
+      <Link href={href} className={buttonClassName}>
         {children}
       </Link>
     );
   }
 
   return (
-    <button type={type} onClick={onClick} disabled={disabled} className={className}>
+    <button type={type} onClick={onClick} disabled={disabled} className={buttonClassName}>
       {children}
     </button>
   );

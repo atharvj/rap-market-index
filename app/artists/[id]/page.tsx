@@ -38,7 +38,8 @@ export default function ArtistDetailPage() {
   const explanation = sanitizeMoveExplanation(
     activeArtist.ticker,
     activeArtist.lastMoveExplanation,
-    activeArtist.dailyChangePercent
+    activeArtist.dailyChangePercent,
+    activeArtist.stats
   );
   const recordedPrices = [...activeArtist.priceHistory.map((point) => point.price), activeArtist.currentPrice];
   const recordedHigh = Math.max(...recordedPrices);

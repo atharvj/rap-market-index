@@ -154,6 +154,8 @@ function mapArtist(row: ArtistRow, stats: ArtistStatsRow | null, history: PriceP
     }
   ];
 
+  const mappedStats = mapStats(stats);
+
   return {
     id: row.id,
     name: row.name,
@@ -166,12 +168,13 @@ function mapArtist(row: ArtistRow, stats: ArtistStatsRow | null, history: PriceP
     volatility: Number(row.volatility),
     category: row.category,
     accent: row.accent,
-    stats: mapStats(stats),
+    stats: mappedStats,
     priceHistory: history.length ? history.slice(-PRICE_HISTORY_LOOKBACK_DAYS) : fallbackHistory,
     lastMoveExplanation: sanitizeMoveExplanation(
       row.ticker,
       row.last_move_explanation,
-      Number(row.daily_change_percent)
+      Number(row.daily_change_percent),
+      mappedStats
     )
   };
 }
