@@ -41,7 +41,7 @@ const ACCENTS = [
   "from-sky-300 via-pink-200 to-yellow-200",
   "from-lime-300 via-cyan-200 to-zinc-100",
   "from-rose-300 via-emerald-200 to-stone-100",
-  "from-violet-300 via-zinc-100 to-emerald-300",
+  "from-sky-300 via-zinc-100 to-emerald-300",
   "from-red-300 via-zinc-100 to-cyan-300",
   "from-blue-300 via-stone-100 to-emerald-300",
   "from-amber-200 via-fuchsia-200 to-cyan-300"

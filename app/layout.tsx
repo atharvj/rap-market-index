@@ -10,9 +10,22 @@ const publicIndexingEnabled = process.env.NEXT_PUBLIC_RMI_PUBLIC_INDEXING === "t
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
   applicationName: "Rap Market Index",
+  manifest: "/manifest.webmanifest",
+  category: "entertainment",
+  creator: "Rap Market Index",
+  publisher: "Rap Market Index",
+  authors: [{ name: "Rap Market Index", url: siteUrl }],
   title: {
     default: "Rap Market Index",
     template: "%s | Rap Market Index"
+  },
+  alternates: {
+    canonical: "/"
+  },
+  formatDetection: {
+    address: false,
+    email: false,
+    telephone: false
   },
   description: "Virtual rap exchange with artist prices, market news, portfolios, and fantasy cash.",
   icons: {
@@ -25,12 +38,21 @@ export const metadata: Metadata = {
     description: "Virtual rap exchange with artist prices, market news, portfolios, and fantasy cash.",
     url: siteUrl,
     siteName: "Rap Market Index",
+    images: [
+      {
+        url: "/opengraph-image",
+        width: 1200,
+        height: 630,
+        alt: "Rap Market Index market dashboard"
+      }
+    ],
     type: "website"
   },
   twitter: {
-    card: "summary",
+    card: "summary_large_image",
     title: "Rap Market Index",
-    description: "Virtual rap exchange with artist prices, market news, portfolios, and fantasy cash."
+    description: "Virtual rap exchange with artist prices, market news, portfolios, and fantasy cash.",
+    images: ["/opengraph-image"]
   },
   robots: {
     index: publicIndexingEnabled,

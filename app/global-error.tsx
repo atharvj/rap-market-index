@@ -23,9 +23,9 @@ export default function GlobalErrorPage({
             minHeight: "100vh",
             display: "grid",
             placeItems: "center",
-            background: "#f5f7f9",
-            color: "#1f2933",
-            fontFamily: "Arial, Helvetica, sans-serif",
+            background: "#070b12",
+            color: "#edf4ff",
+            fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif',
             padding: 24
           }}
         >
@@ -33,10 +33,10 @@ export default function GlobalErrorPage({
             style={{
               width: "100%",
               maxWidth: 680,
-              border: "1px solid #d9e0e7",
-              background: "#fff",
-              padding: 24,
-              boxShadow: "0 10px 28px rgba(31, 41, 51, 0.08)"
+              border: "1px solid #223044",
+              borderRadius: 8,
+              background: "#0b111b",
+              padding: 24
             }}
           >
             <div style={{ display: "flex", gap: 16, alignItems: "flex-start" }}>
@@ -46,19 +46,20 @@ export default function GlobalErrorPage({
                   height: 44,
                   display: "grid",
                   placeItems: "center",
-                  background: "#fdeceb",
-                  color: "#d93025"
+                  borderRadius: 6,
+                  background: "rgba(255, 82, 111, 0.12)",
+                  color: "#ff526f"
                 }}
               >
                 <AlertTriangle size={20} aria-hidden="true" />
               </div>
               <div>
-                <p style={{ margin: 0, color: "#6fa131", fontSize: 12, fontWeight: 800, textTransform: "uppercase" }}>
+                <p style={{ margin: 0, color: "#27d7ff", fontSize: 12, fontWeight: 600, textTransform: "uppercase" }}>
                   Rap Market Index
                 </p>
                 <h1 style={{ margin: "8px 0 0", fontSize: 28, lineHeight: 1.1 }}>The app hit a system error.</h1>
-                <p style={{ margin: "12px 0 0", color: "#5f6b76", fontSize: 14, lineHeight: 1.6, fontWeight: 700 }}>
-                  Reload the app. If this keeps happening, check the deployment logs before opening the site to users.
+                <p style={{ margin: "12px 0 0", color: "#9ba9bb", fontSize: 14, lineHeight: 1.6 }}>
+                  Reload the page. If the problem continues, try again in a few minutes.
                 </p>
               </div>
             </div>
@@ -72,10 +73,11 @@ export default function GlobalErrorPage({
                 alignItems: "center",
                 gap: 8,
                 border: 0,
-                background: "#1f2933",
-                color: "#fff",
+                borderRadius: 6,
+                background: "#edf4ff",
+                color: "#070b12",
                 padding: "0 16px",
-                fontWeight: 800,
+                fontWeight: 600,
                 cursor: "pointer"
               }}
             >

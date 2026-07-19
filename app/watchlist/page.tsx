@@ -49,13 +49,13 @@ export default function WatchlistPage() {
       <header className="rmi-page-head flex flex-wrap items-end justify-between gap-4">
         <div>
           <div className="rmi-kicker"><Radar className="h-3.5 w-3.5" /> Personal Radar</div>
-          <h1 className="mt-2 text-3xl font-black sm:text-4xl">Watchlist</h1>
-          <p className="mt-1 text-sm font-bold text-paper/70">{watchlistArtists.length} artists you're tracking</p>
+          <h1 className="mt-2 text-3xl font-bold sm:text-4xl">Watchlist</h1>
+          <p className="mt-1 text-sm font-medium text-paper/70">{watchlistArtists.length} artists you're tracking</p>
         </div>
         <button
           type="button"
           onClick={() => setAddOpen((open) => !open)}
-          className="rmi-button-secondary inline-flex min-h-10 items-center gap-2 rounded-md border border-line px-4 text-sm font-black"
+          className="rmi-button-secondary inline-flex min-h-10 items-center gap-2 rounded-md border border-line px-4 text-sm font-semibold"
           aria-expanded={addOpen}
           aria-controls="watchlist-artist-picker"
         >
@@ -72,7 +72,7 @@ export default function WatchlistPage() {
         >
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
-              <h2 className="text-base font-black">Add to watchlist</h2>
+              <h2 className="text-base font-semibold">Add to watchlist</h2>
               <p className="mt-1 text-sm text-paper/50">Search every active listing and save the artists you want to track.</p>
             </div>
             <button
@@ -101,7 +101,7 @@ export default function WatchlistPage() {
                 <Link href={`/artists/${artist.id}`} className="flex min-w-0 flex-1 items-center gap-3">
                   <ArtistAvatar artist={artist} size="sm" />
                   <span className="min-w-0">
-                    <span className="block truncate text-sm font-black">{artist.name}</span>
+                    <span className="block truncate text-sm font-semibold">{artist.name}</span>
                     <span className="text-xs text-paper/45">${artist.ticker}</span>
                   </span>
                 </Link>
@@ -115,7 +115,7 @@ export default function WatchlistPage() {
       {watchlistArtists.length ? (
         <section>
           <div className="mb-3">
-            <h2 className="text-base font-black">Watchlist Briefing</h2>
+            <h2 className="text-base font-semibold">Watchlist Briefing</h2>
             <p className="mt-1 text-sm text-paper/50">The strongest quote and signal activity among the artists you follow.</p>
           </div>
           <div className="grid gap-3 md:grid-cols-3">
@@ -147,22 +147,22 @@ export default function WatchlistPage() {
               <Link href={`/artists/${artist.id}`} className="flex min-w-0 items-center gap-3">
                 <ArtistAvatar artist={artist} />
                 <span className="min-w-0">
-                  <span className="block truncate text-sm font-black">{artist.name}</span>
-                  <span className="text-xs font-bold text-paper/45">${artist.ticker}</span>
+                  <span className="block truncate text-sm font-semibold">{artist.name}</span>
+                  <span className="text-xs font-medium text-paper/45">${artist.ticker}</span>
                 </span>
               </Link>
-              <span className="text-right text-sm font-black number-tabular">{formatCurrency(artist.currentPrice)}</span>
+              <span className="text-right text-sm font-semibold number-tabular">{formatCurrency(artist.currentPrice)}</span>
               <span className="text-right text-xs">
                 <ChangeText value={artist.dailyChangePercent} />
               </span>
-              <span className="hidden text-right text-xs font-black text-paper/55 sm:block">{artist.hypeScore}</span>
+              <span className="hidden text-right text-xs font-semibold text-paper/55 sm:block">{artist.hypeScore}</span>
               <WatchlistButton artistId={artist.id} />
             </div>
           ))
         ) : (
           <div className="grid min-h-48 place-items-center p-6 text-center">
             <div>
-              <h2 className="text-lg font-black">Build your market radar</h2>
+              <h2 className="text-lg font-semibold">Build your market radar</h2>
               <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-paper/55">
                 Save artists to compare their quote movement, signal strength, and verified catalysts in one place.
               </p>
@@ -176,7 +176,7 @@ export default function WatchlistPage() {
         <RmiSection
           title="Watchlist News"
           subtitle="Verified, price-relevant catalysts for the artists you follow."
-          action={<Link href="/news" className="text-xs font-bold text-cyan">All Market News</Link>}
+          action={<Link href="/news" className="text-xs font-semibold text-cyan">All Market News</Link>}
         >
           <div className="px-4">
             <MarketNewsFeed artistIds={watchlistArtists.map((artist) => artist.id)} limit={8} compact />
@@ -190,10 +190,10 @@ export default function WatchlistPage() {
 function WatchlistInsight({ label, artist, value }: { label: string; artist: Parameters<typeof ArtistIdentity>[0]["artist"]; value: React.ReactNode }) {
   return (
     <div className="rmi-signal-card p-4">
-      <p className="mb-3 flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.14em] text-paper/40"><Star className="h-3 w-3 text-violet" />{label}</p>
+      <p className="mb-3 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-paper/40"><Star className="h-3 w-3 text-brass" />{label}</p>
       <div className="flex items-center justify-between gap-3">
         <ArtistIdentity artist={artist} />
-        <span className="text-sm font-black number-tabular">{value}</span>
+        <span className="text-sm font-semibold number-tabular">{value}</span>
       </div>
     </div>
   );
@@ -201,9 +201,9 @@ function WatchlistInsight({ label, artist, value }: { label: string; artist: Par
 
 function BriefingCount({ label, value, tone = "neutral" }: { label: string; value: number; tone?: "neutral" | "good" | "bad" }) {
   return (
-    <div className="rounded-lg bg-panelSoft px-2 py-3">
+    <div className="rounded-md bg-panelSoft px-2 py-3">
       <p className="text-paper/45">{label}</p>
-      <p className={tone === "good" ? "mt-1 font-black text-mint" : tone === "bad" ? "mt-1 font-black text-ember" : "mt-1 font-black"}>{value}</p>
+      <p className={tone === "good" ? "mt-1 font-semibold text-mint" : tone === "bad" ? "mt-1 font-semibold text-ember" : "mt-1 font-semibold"}>{value}</p>
     </div>
   );
 }

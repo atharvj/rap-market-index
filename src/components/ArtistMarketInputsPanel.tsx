@@ -94,14 +94,14 @@ export function ArtistMarketInputsPanel({ artistId }: { artistId: string }) {
   }, [selectedSeries, status]);
 
   return (
-    <section className="rounded-md border border-line bg-panel/86 p-4 shadow-market sm:p-5">
+    <section className="rmi-card p-4 sm:p-5">
       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <div className="flex items-center gap-2">
             <Database className="h-4 w-4 text-cyan" aria-hidden="true" />
-            <h2 className="text-xl font-black">Market inputs</h2>
+            <h2 className="text-xl font-semibold">Market Inputs</h2>
           </div>
-          <p className="mt-1 text-sm font-bold text-paper/45">{subtitle}</p>
+          <p className="mt-1 text-sm text-paper/45">{subtitle}</p>
         </div>
         <div className="inline-flex rounded-md border border-line bg-black/20 p-1">
           {ranges.map((candidate) => (
@@ -110,7 +110,7 @@ export function ArtistMarketInputsPanel({ artistId }: { artistId: string }) {
               type="button"
               onClick={() => setRange(candidate)}
               className={clsx(
-                "h-8 min-w-11 rounded px-2 text-xs font-black transition",
+                "h-8 min-w-11 rounded px-2 text-xs font-semibold transition-colors",
                 range === candidate
                   ? "bg-brass text-ink"
                   : "text-paper/55 hover:bg-white/[0.04] hover:text-paper"
@@ -131,16 +131,16 @@ export function ArtistMarketInputsPanel({ artistId }: { artistId: string }) {
                 type="button"
                 onClick={() => setSelectedKey(item.key)}
                 className={clsx(
-                  "min-h-16 rounded-md border px-3 py-2 text-left transition",
+                  "min-h-16 rounded-md border px-3 py-2 text-left transition-colors",
                   selectedSeries?.key === item.key
                     ? "border-brass bg-brass/12"
                     : "border-line bg-black/18 hover:border-paper/25"
                 )}
               >
-                <span className="block text-[11px] font-black uppercase tracking-wide text-paper/42">
+                <span className="block text-[11px] font-semibold uppercase tracking-wide text-paper/42">
                   {item.label}
                 </span>
-                <span className="mt-1 block text-lg font-black number-tabular">
+                <span className="mt-1 block text-lg font-semibold number-tabular">
                   {item.latestValue === null ? "--" : formatObservationValue(item.latestValue, item.unit)}
                 </span>
               </button>
@@ -212,7 +212,7 @@ function EmptyState({ status }: { status: "loading" | "ready" | "error" }) {
     <div className="grid min-h-40 place-items-center rounded-md border border-dashed border-line bg-black/12 px-4 text-center">
       <div>
         <Radio className="mx-auto h-5 w-5 text-paper/35" aria-hidden="true" />
-        <p className="mt-2 text-sm font-black text-paper/55">
+        <p className="mt-2 text-sm font-semibold text-paper/55">
           {status === "loading"
             ? "Loading market inputs"
             : status === "error"

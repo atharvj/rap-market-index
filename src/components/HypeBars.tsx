@@ -22,14 +22,14 @@ export function HypeBars({ stats }: { stats: HypeStats }) {
         return (
           <div key={metric.key}>
             <div className="mb-1 flex items-center justify-between gap-3 text-xs">
-              <span className="font-bold text-paper/65">{metric.label}</span>
+              <span className="font-medium text-paper/65">{metric.label}</span>
               <span className="number-tabular text-paper/55">
                 {metric.key === "newsScore" ? raw.toFixed(0) : `${raw > 0 ? "+" : ""}${raw.toFixed(1)}%`}
               </span>
             </div>
-            <div className="h-2 overflow-hidden rounded-sm bg-black/35">
+            <div className="h-2 overflow-hidden rounded-sm bg-paper/10">
               <div
-                className="h-full rounded-sm bg-gradient-to-r from-mint via-cyan to-brass opacity-90"
+                className="h-full rounded-sm bg-cyan"
                 style={{ width: `${Math.min(100, Math.max(4, normalized))}%` }}
               />
             </div>

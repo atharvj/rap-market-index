@@ -36,7 +36,7 @@ export default function LeaderboardPage() {
       <main className="min-w-0 space-y-5">
         <header className="rmi-page-head">
           <div className="rmi-kicker"><Trophy className="h-3.5 w-3.5" /> Competitive Board</div>
-          <h1 className="mt-2 text-3xl font-black sm:text-4xl">Leaderboard</h1>
+          <h1 className="mt-2 text-3xl font-bold sm:text-4xl">Leaderboard</h1>
           <p className="mt-1 text-sm text-paper/65">Global rankings by fantasy portfolio value, updated from current market quotes.</p>
         </header>
 
@@ -51,22 +51,22 @@ export default function LeaderboardPage() {
         {podium.slice(0, 3).map((entry, index) => (
           <div
             key={`${entry.id}-${index}`}
-            className={clsx("rmi-signal-card grid place-items-center p-6 text-center", index === 0 ? "border-brass/70 shadow-[0_0_28px_rgba(255,199,71,0.12)]" : index === 1 ? "border-cyan/45" : "border-violet/45")}
+            className={clsx("rmi-signal-card grid place-items-center p-6 text-center", index === 0 ? "border-brass/70" : index === 1 ? "border-cyan/45" : "border-line")}
           >
             {index === 0 ? <Crown className="h-5 w-5 text-brass" /> : <Medal className="h-5 w-5 text-paper/50" />}
             <div className="mt-3"><UserAvatar avatarUrl={entry.avatarUrl} label={entry.username} size="sm" /></div>
-            <Link href={`/users/${entry.id}`} className="mt-3 text-sm font-black hover:text-cyan">
+            <Link href={`/users/${entry.id}`} className="mt-3 text-sm font-semibold hover:text-cyan">
               {entry.isCurrentUser ? "You" : entry.username}
             </Link>
-            <p className="text-xs font-bold text-paper/60">Portfolio Value</p>
-            <p className="mt-1 text-xl font-black text-mint number-tabular">{formatCurrency(entry.portfolioValue)}</p>
+            <p className="text-xs font-medium text-paper/60">Portfolio Value</p>
+            <p className="mt-1 text-xl font-semibold text-mint number-tabular">{formatCurrency(entry.portfolioValue)}</p>
           </div>
         ))}
         </section>
 
         <section className="rmi-card overflow-x-auto">
         <div className="min-w-[650px]">
-        <div className="rmi-table-head grid grid-cols-[54px_minmax(0,1fr)_120px_110px_88px] px-4 py-3 text-xs font-bold text-paper/45">
+        <div className="rmi-table-head grid grid-cols-[54px_minmax(0,1fr)_120px_110px_88px] px-4 py-3 text-xs font-medium text-paper/45">
           <span>Rank</span>
           <span>Trader</span>
           <span className="text-right">Value</span>
@@ -82,21 +82,21 @@ export default function LeaderboardPage() {
             )}
             aria-current={entry.isCurrentUser ? "true" : undefined}
           >
-            <span className="font-black">{entry.rank ?? index + 1}</span>
+            <span className="font-semibold">{entry.rank ?? index + 1}</span>
             <span className="flex min-w-0 items-center gap-2">
               <UserAvatar avatarUrl={entry.avatarUrl} label={entry.username} size="sm" />
-              <Link href={`/users/${entry.id}`} className="truncate font-black hover:text-cyan">
+              <Link href={`/users/${entry.id}`} className="truncate font-semibold hover:text-cyan">
                 {entry.isCurrentUser ? `${entry.username} (You)` : entry.username}
               </Link>
               {entry.isAdmin ? <AdminBadge compact /> : null}
             </span>
-            <span className="text-right font-black number-tabular">{formatCurrency(entry.portfolioValue)}</span>
-            <span className="text-right font-black number-tabular">
+            <span className="text-right font-semibold number-tabular">{formatCurrency(entry.portfolioValue)}</span>
+            <span className="text-right font-semibold number-tabular">
               {entry.portfolioIsPublic === false
                 ? "Private"
                 : formatCurrency(Math.max(0, entry.portfolioValue - entry.cashBalance))}
             </span>
-            <span className={entry.gainPercent >= 0 ? "text-right font-black text-mint" : "text-right font-black text-ember"}>
+            <span className={entry.gainPercent >= 0 ? "text-right font-semibold text-mint" : "text-right font-semibold text-ember"}>
               {formatPercent(entry.gainPercent)}
             </span>
           </div>
@@ -107,10 +107,10 @@ export default function LeaderboardPage() {
         <section className="rmi-card p-5">
           <div className="flex flex-wrap items-end justify-between gap-4">
             <div>
-              <h2 className="text-base font-black">Return Distribution</h2>
+              <h2 className="text-base font-semibold">Return Distribution</h2>
               <p className="mt-1 text-sm text-paper/55">All-time fantasy returns across every ranked account.</p>
             </div>
-            <span className="text-xs font-bold text-paper/45">Marked to current artist quotes</span>
+            <span className="text-xs font-medium text-paper/45">Marked to current artist quotes</span>
           </div>
           <div className="mt-5 grid grid-cols-3 gap-3">
             <ReturnStat label="Lowest" value={lowestReturn} />
@@ -136,16 +136,16 @@ export default function LeaderboardPage() {
       <aside className="space-y-4 xl:sticky xl:top-6 xl:self-start">
         <section className="rmi-card p-5">
           <p className="rmi-data-label flex items-center gap-2"><Radio className="h-3.5 w-3.5 text-mint" /> Your Standing</p>
-          <p className="mt-3 text-3xl font-black number-tabular">{formatCurrency(portfolioValue)}</p>
-          <p className="mt-2 text-sm font-black text-cyan">{currentRank ? `Rank #${currentRank}` : "Not currently ranked"}</p>
-          <p className={gainPercent >= 0 ? "mt-1 text-sm font-black text-mint" : "mt-1 text-sm font-black text-ember"}>
+          <p className="mt-3 text-3xl font-bold number-tabular">{formatCurrency(portfolioValue)}</p>
+          <p className="mt-2 text-sm font-semibold text-cyan">{currentRank ? `Rank #${currentRank}` : "Not currently ranked"}</p>
+          <p className={gainPercent >= 0 ? "mt-1 text-sm font-semibold text-mint" : "mt-1 text-sm font-semibold text-ember"}>
             {formatPercent(gainPercent)} all time
           </p>
           <div className="mt-5"><RmiButton href="/portfolio" variant="secondary">Open Portfolio</RmiButton></div>
         </section>
 
         <section className="rmi-card overflow-hidden">
-          <div className="border-b border-line px-4 py-3"><h2 className="text-sm font-black">Market Movers</h2></div>
+          <div className="border-b border-line px-4 py-3"><h2 className="text-sm font-semibold">Market Movers</h2></div>
           {movers.map((artist) => (
             <div key={artist.id} className="flex items-center justify-between gap-3 border-b border-line px-4 py-3 last:border-b-0">
               <ArtistIdentity artist={artist} />
@@ -157,7 +157,7 @@ export default function LeaderboardPage() {
         <section className="rmi-card p-5">
           <div className="flex items-center gap-2">
             <Users className="h-4 w-4 text-cyan" aria-hidden="true" />
-            <h2 className="text-sm font-black">How Rankings Work</h2>
+            <h2 className="text-sm font-semibold">How Rankings Work</h2>
           </div>
           <div className="mt-4 space-y-3 text-sm leading-5 text-paper/55">
             <p>Rank is determined by cash plus the live value of long positions and short equity.</p>
@@ -177,18 +177,18 @@ export default function LeaderboardPage() {
 
 function RankingStat({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rmi-metric rmi-metric-violet p-4">
-      <p className="text-xs font-bold text-paper/50">{label}</p>
-      <p className="mt-1 text-xl font-black number-tabular">{value}</p>
+    <div className="rmi-metric rmi-metric-cyan p-4">
+      <p className="text-xs font-medium text-paper/50">{label}</p>
+      <p className="mt-1 text-xl font-semibold number-tabular">{value}</p>
     </div>
   );
 }
 
 function ReturnStat({ label, value }: { label: string; value: number }) {
   return (
-    <div className="rounded-lg bg-panelSoft p-3 text-center">
+    <div className="rounded-md bg-panelSoft p-3 text-center">
       <p className="text-xs text-paper/45">{label}</p>
-      <p className={value >= 0 ? "mt-1 font-black text-mint number-tabular" : "mt-1 font-black text-ember number-tabular"}>
+      <p className={value >= 0 ? "mt-1 font-semibold text-mint number-tabular" : "mt-1 font-semibold text-ember number-tabular"}>
         {formatPercent(value)}
       </p>
     </div>

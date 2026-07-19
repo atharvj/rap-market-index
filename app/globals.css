@@ -13,6 +13,11 @@
   --color-ember: 255 79 123;
   --color-cyan: 37 213 255;
   --color-violet: 151 103 255;
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  --radius-panel: 8px;
+  --radius-control: 6px;
+  --shadow-panel: 0 10px 30px rgba(0, 0, 0, 0.14);
+  --shadow-popover: 0 18px 48px rgba(0, 0, 0, 0.32);
   color-scheme: dark;
 }
 
@@ -54,7 +59,10 @@ body {
   overflow-x: hidden;
   background: rgb(var(--color-ink));
   color: rgb(var(--color-paper));
-  font-family: Inter, "SF Pro Text", "Segoe UI", Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans);
+  font-size: 16px;
+  font-weight: 400;
+  line-height: 1.5;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
 }
@@ -80,7 +88,7 @@ a {
 }
 
 button {
-  transition: background-color 160ms ease, border-color 160ms ease, color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
+  transition: background-color 160ms ease, border-color 160ms ease, color 160ms ease, box-shadow 160ms ease;
 }
 
 :focus-visible {
@@ -90,10 +98,6 @@ button {
 
 ::selection {
   background: rgba(88, 166, 255, 0.22);
-}
-
-.market-grid {
-  background-image: none;
 }
 
 .number-tabular {
@@ -123,8 +127,8 @@ button {
 .rmi-card {
   border: 1px solid rgb(var(--color-line));
   background: rgb(var(--color-panel));
-  border-radius: 8px;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.14);
+  border-radius: var(--radius-panel);
+  box-shadow: var(--shadow-panel);
 }
 
 .rmi-card:not(.absolute) {
@@ -134,19 +138,19 @@ button {
 .rmi-soft-card {
   border: 1px solid rgba(var(--color-line), 0.78);
   background: rgb(var(--color-panel-soft));
-  border-radius: 8px;
+  border-radius: var(--radius-panel);
   box-shadow: none;
 }
 
 .rmi-popover {
   isolation: isolate;
   border: 1px solid rgb(var(--color-line));
-  border-radius: 8px;
+  border-radius: var(--radius-panel);
   background-color: rgb(var(--color-panel));
   background-image: none;
   color: rgb(var(--color-paper));
   opacity: 1;
-  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.32);
+  box-shadow: var(--shadow-popover);
   backdrop-filter: none;
 }
 
@@ -211,7 +215,7 @@ button {
   overflow: hidden;
   border: 1px solid rgba(var(--color-line), 0.88);
   background: rgba(var(--color-panel-soft), 0.92);
-  border-radius: 8px;
+  border-radius: var(--radius-panel);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.025);
 }
 
@@ -236,8 +240,8 @@ button {
   overflow: hidden;
   border: 1px solid rgba(var(--color-line), 0.88);
   background: rgba(var(--color-panel), 0.88);
-  border-radius: 8px;
-  transition: border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
+  border-radius: var(--radius-panel);
+  transition: border-color 160ms ease, box-shadow 160ms ease;
 }
 
 .rmi-signal-card:hover {
@@ -279,16 +283,28 @@ button {
   box-shadow: none;
 }
 
-.rmi-noise {
-  position: relative;
-}
-
-.rmi-noise::before {
-  display: none;
-}
-
 .rmi-news-card {
-  transition: border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
+  transition: border-color 160ms ease, box-shadow 160ms ease;
+}
+
+.rmi-skeleton {
+  position: relative;
+  overflow: hidden;
+  background: rgb(var(--color-panel-soft));
+}
+
+.rmi-skeleton::after {
+  position: absolute;
+  inset: 0;
+  content: "";
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(var(--color-paper), 0.055),
+    transparent
+  );
+  transform: translateX(-100%);
+  animation: rmi-skeleton-shimmer 1.6s ease-in-out infinite;
 }
 
 .rmi-news-card:hover {
@@ -426,12 +442,22 @@ button {
   }
 }
 
+@keyframes rmi-skeleton-shimmer {
+  to {
+    transform: translateX(100%);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .market-tape-track {
     animation: none;
   }
 
   .rmi-live-dot {
+    animation: none;
+  }
+
+  .rmi-skeleton::after {
     animation: none;
   }
 }

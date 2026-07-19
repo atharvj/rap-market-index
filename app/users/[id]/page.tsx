@@ -4,7 +4,7 @@ import { AdminBadge } from "@/components/AdminBadge";
 import { UserAvatar } from "@/components/UserAvatar";
 import { formatCurrency, formatPercent } from "@/lib/formatters";
 import clsx from "clsx";
-import { Activity, BarChart3, CalendarDays, LockKeyhole, Radio, Star, Trophy, WalletCards } from "lucide-react";
+import { Activity, BarChart3, CalendarDays, LoaderCircle, LockKeyhole, Radio, Star, Trophy, WalletCards } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -98,7 +98,7 @@ export default function PublicUserProfilePage() {
   }, [params.id]);
 
   if (loading) {
-    return <StatusCard text="Loading profile..." />;
+    return <StatusCard text="Loading profile..." loading />;
   }
 
   if (error || !profile) {
@@ -114,7 +114,7 @@ export default function PublicUserProfilePage() {
 
   return (
     <div className="mx-auto max-w-6xl space-y-5">
-      <section className="rmi-hero market-grid rmi-noise relative overflow-hidden p-5 shadow-market sm:p-7">
+      <section className="rmi-hero relative overflow-hidden p-5 sm:p-7">
         <div className="relative z-10 grid gap-6 lg:grid-cols-[130px_minmax(0,1fr)_230px] lg:items-center">
           <div className="relative w-fit">
             <span className="absolute -inset-3 rounded-full border border-cyan/20" aria-hidden="true" />
@@ -123,14 +123,14 @@ export default function PublicUserProfilePage() {
           <div className="min-w-0">
             <p className="rmi-kicker"><Radio className="h-4 w-4" aria-hidden="true" /> Public Profile</p>
             <div className="flex min-w-0 flex-wrap items-center gap-2">
-              <h1 className="mt-2 truncate text-3xl font-black sm:text-4xl">{profile.username}</h1>
+              <h1 className="mt-2 truncate text-3xl font-bold sm:text-4xl">{profile.username}</h1>
               {profile.isAdmin ? <AdminBadge /> : null}
             </div>
-            <p className="mt-3 max-w-3xl text-sm font-bold leading-6 text-paper/58">
+            <p className="mt-3 max-w-3xl text-sm font-medium leading-6 text-paper/58">
               {profile.isPrivate ? "This trader keeps their profile private." : profile.bio || "This trader has not added a bio yet."}
             </p>
             {profile.gainPercent !== null ? (
-              <p className={clsx("mt-3 text-sm font-black number-tabular", profile.gainPercent >= 0 ? "text-mint" : "text-ember")}>
+              <p className={clsx("mt-3 text-sm font-semibold number-tabular", profile.gainPercent >= 0 ? "text-mint" : "text-ember")}>
                 {formatPercent(profile.gainPercent)} All-Time
               </p>
             ) : null}
@@ -144,11 +144,11 @@ export default function PublicUserProfilePage() {
         </div>
       </section>
 
-      <section className="rmi-card market-grid shadow-market">
+      <section className="rmi-card">
         <div className="rmi-section-header flex flex-col gap-3 p-5 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <p className="rmi-kicker text-cyan"><BarChart3 className="h-4 w-4" aria-hidden="true" /> Public Portfolio</p>
-            <h2 className="mt-1 text-xl font-black">Open Positions</h2>
+            <h2 className="mt-1 text-xl font-semibold">Open Positions</h2>
           </div>
           <span className="rmi-status-chip border-cyan/30 bg-cyan/10 text-cyan">
             {profile.portfolioIsPublic ? `${profile.holdings.length} Listed` : "Private"}
@@ -158,8 +158,8 @@ export default function PublicUserProfilePage() {
           {!profile.portfolioIsPublic ? (
             <div className="grid min-h-36 place-items-center p-5 text-center">
               <div>
-                <LockKeyhole className="mx-auto h-6 w-6 text-violet" aria-hidden="true" />
-                <p className="mt-3 text-sm font-bold text-paper/50">This trader keeps their portfolio private.</p>
+                <LockKeyhole className="mx-auto h-6 w-6 text-cyan" aria-hidden="true" />
+                <p className="mt-3 text-sm font-medium text-paper/50">This trader keeps their portfolio private.</p>
               </div>
             </div>
           ) : profile.holdings.length ? (
@@ -173,21 +173,20 @@ export default function PublicUserProfilePage() {
                   <ProfileArtistImage
                     name={holding.name}
                     ticker={holding.ticker}
-                    accent={holding.accent}
                     imageUrl={holding.imageUrl}
                   />
                   <span className="min-w-0">
-                    <span className="block truncate text-sm font-black">{holding.name}</span>
-                    <span className="text-xs font-bold text-paper/50">
+                    <span className="block truncate text-sm font-semibold">{holding.name}</span>
+                    <span className="text-xs font-medium text-paper/50">
                       {holding.ticker} · {holding.shares.toLocaleString("en-US", { maximumFractionDigits: 2 })} shares
                     </span>
                   </span>
                 </span>
-                <span className="text-sm font-black number-tabular sm:text-right">
+                <span className="text-sm font-semibold number-tabular sm:text-right">
                   <span className="block">{formatCurrency(holding.marketValue)}</span>
                   <span className="text-xs text-paper/45">{formatCurrency(holding.currentPrice)}</span>
                 </span>
-                <span className="text-sm font-black number-tabular sm:text-right">
+                <span className="text-sm font-semibold number-tabular sm:text-right">
                   <span className={holding.profitLoss >= 0 ? "block text-mint" : "block text-ember"}>
                     {formatCurrency(holding.profitLoss)}
                   </span>
@@ -198,16 +197,16 @@ export default function PublicUserProfilePage() {
               </Link>
             ))
           ) : (
-            <p className="p-4 text-sm font-bold text-paper/50">No public holdings yet.</p>
+            <p className="p-4 text-sm font-medium text-paper/50">No public holdings yet.</p>
           )}
         </div>
       </section>
 
-      <section className="rmi-card market-grid shadow-market">
+      <section className="rmi-card">
         <div className="rmi-section-header flex items-center justify-between gap-3 p-5">
           <div>
-            <p className="rmi-kicker text-violet"><Star className="h-4 w-4" aria-hidden="true" /> Artist Favorites</p>
-            <h2 className="mt-1 text-xl font-black">Favorite Artists</h2>
+            <p className="rmi-kicker text-cyan"><Star className="h-4 w-4" aria-hidden="true" /> Artist Favorites</p>
+            <h2 className="mt-1 text-xl font-semibold">Favorite Artists</h2>
           </div>
         </div>
         <div className="grid gap-3 p-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -218,18 +217,17 @@ export default function PublicUserProfilePage() {
                   <ProfileArtistImage
                     name={artist.name}
                     ticker={artist.ticker}
-                    accent={artist.accent}
                     imageUrl={artist.imageUrl}
                   />
                   <span className="min-w-0">
-                    <span className="block truncate text-sm font-black">{artist.name}</span>
-                    <span className="text-xs font-bold text-paper/50">${artist.ticker}</span>
+                    <span className="block truncate text-sm font-semibold">{artist.name}</span>
+                    <span className="text-xs font-medium text-paper/50">${artist.ticker}</span>
                   </span>
                 </span>
               </Link>
             ))
           ) : (
-            <p className="p-4 text-sm font-bold text-paper/50">No favorite artists listed yet.</p>
+            <p className="p-4 text-sm font-medium text-paper/50">No favorite artists listed yet.</p>
           )}
         </div>
       </section>
@@ -242,19 +240,23 @@ function ProfileMetric({ icon, label, value }: { icon: React.ReactNode; label: s
     <div className="rmi-soft-card grid grid-cols-[18px_minmax(0,1fr)] items-center gap-2 px-3 py-2">
       <span className="text-cyan">{icon}</span>
       <span className="min-w-0">
-        <span className="block text-[9px] font-black uppercase tracking-[0.12em] text-paper/35">{label}</span>
-        <span className="block truncate text-xs font-black number-tabular">{value}</span>
+        <span className="block text-[9px] font-semibold uppercase tracking-[0.12em] text-paper/35">{label}</span>
+        <span className="block truncate text-xs font-semibold number-tabular">{value}</span>
       </span>
     </div>
   );
 }
 
-function StatusCard({ text }: { text: string }) {
+function StatusCard({ text, loading = false }: { text: string; loading?: boolean }) {
   return (
-    <section className="rmi-auth-surface market-grid mx-auto grid min-h-[360px] max-w-xl place-items-center p-6 text-center shadow-market">
+    <section className="rmi-auth-surface mx-auto grid min-h-[360px] max-w-xl place-items-center p-6 text-center">
       <div>
-        <Activity className="mx-auto h-7 w-7 text-cyan motion-safe:animate-pulse" aria-hidden="true" />
-        <p className="mt-3 text-sm font-bold text-paper/55">{text}</p>
+        {loading ? (
+          <LoaderCircle className="mx-auto h-7 w-7 text-cyan motion-safe:animate-spin" aria-hidden="true" />
+        ) : (
+          <Activity className="mx-auto h-7 w-7 text-cyan" aria-hidden="true" />
+        )}
+        <p className="mt-3 text-sm font-medium text-paper/55">{text}</p>
       </div>
     </section>
   );
@@ -263,17 +265,15 @@ function StatusCard({ text }: { text: string }) {
 function ProfileArtistImage({
   name,
   ticker,
-  accent,
   imageUrl
 }: {
   name: string;
   ticker: string;
-  accent: string;
   imageUrl?: string | null;
 }) {
   return (
     <span
-      className={`relative grid h-10 w-10 shrink-0 place-items-center overflow-hidden rounded-full border border-line bg-gradient-to-br ${accent} text-sm font-black text-paper`}
+      className="relative grid h-10 w-10 shrink-0 place-items-center overflow-hidden rounded-full border border-line bg-panelSoft text-sm font-semibold text-paper"
       aria-label={name}
       role="img"
     >

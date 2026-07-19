@@ -35,12 +35,12 @@ export default function ResetPasswordPage() {
 
   if (loading) {
     return (
-      <div className="rmi-auth-surface market-grid mx-auto grid min-h-[420px] max-w-2xl place-items-center p-6">
+      <div className="rmi-auth-surface mx-auto grid min-h-[420px] max-w-2xl place-items-center p-6">
         <div className="text-center">
           <span className="mx-auto grid h-12 w-12 place-items-center rounded-md border border-cyan/35 bg-cyan/10 text-cyan motion-safe:animate-pulse">
             <ShieldCheck className="h-6 w-6" aria-hidden="true" />
           </span>
-          <p className="mt-4 text-sm font-bold text-paper/60">Verifying secure recovery link...</p>
+          <p className="mt-4 text-sm font-medium text-paper/60">Verifying secure recovery link...</p>
         </div>
       </div>
     );
@@ -48,11 +48,11 @@ export default function ResetPasswordPage() {
 
   if (!configured || !session) {
     return (
-      <div className="rmi-auth-surface market-grid rmi-noise mx-auto max-w-xl overflow-hidden p-6 sm:p-8">
+      <div className="rmi-auth-surface mx-auto max-w-xl overflow-hidden p-6 sm:p-8">
         <span className="grid h-12 w-12 place-items-center rounded-md border border-ember/35 bg-ember/10 text-ember">
           <KeyRound className="h-6 w-6" aria-hidden="true" />
         </span>
-        <h1 className="mt-5 text-3xl font-black">Recovery Link Unavailable</h1>
+        <h1 className="mt-5 text-3xl font-bold">Recovery Link Unavailable</h1>
         <p className="mt-3 text-sm leading-6 text-paper/65">
           This recovery link is missing, invalid, or expired. Request a new reset email from Account Settings.
         </p>
@@ -65,20 +65,20 @@ export default function ResetPasswordPage() {
 
   return (
     <div className="mx-auto grid max-w-5xl gap-5 lg:grid-cols-[minmax(0,0.85fr)_minmax(380px,0.65fr)]">
-      <header className="rmi-hero market-grid rmi-noise grid content-center p-6 sm:p-8">
+      <header className="rmi-hero grid content-center p-6 sm:p-8">
         <p className="rmi-kicker"><ShieldCheck className="h-4 w-4" aria-hidden="true" /> RMI Secure Account</p>
-        <h1 className="mt-4 text-3xl font-black sm:text-5xl">Choose a New Password</h1>
+        <h1 className="mt-4 text-3xl font-bold sm:text-5xl">Choose a New Password</h1>
         <p className="mt-3 max-w-xl text-sm leading-6 text-paper/65">
           Create a new password for your RMI identity. The update is applied through your encrypted account session.
         </p>
       </header>
 
-      <form onSubmit={submit} className="rmi-auth-surface market-grid grid content-center gap-4 p-5 sm:p-7">
+      <form onSubmit={submit} className="rmi-auth-surface grid content-center gap-4 p-5 sm:p-7">
         <div>
-          <p className="rmi-data-label text-violet">Credential Reset</p>
-          <h2 className="mt-2 text-xl font-black">New Access Key</h2>
+          <p className="rmi-data-label text-cyan">Credential Reset</p>
+          <h2 className="mt-2 text-xl font-semibold">New Access Key</h2>
         </div>
-        <label className="grid gap-2 text-sm font-black">
+        <label className="grid gap-2 text-sm font-semibold">
           New Password
           <span className="relative">
             <input
@@ -99,7 +99,7 @@ export default function ResetPasswordPage() {
             </button>
           </span>
         </label>
-        <label className="grid gap-2 text-sm font-black">
+        <label className="grid gap-2 text-sm font-semibold">
           Confirm Password
           <input
             type={showPassword ? "text" : "password"}
@@ -110,10 +110,10 @@ export default function ResetPasswordPage() {
             required
           />
         </label>
-        <button type="submit" disabled={submitting} className="rmi-button-primary mt-1 h-11 rounded-md text-sm font-black disabled:opacity-60">
+        <button type="submit" disabled={submitting} className="rmi-button-primary mt-1 h-11 rounded-md text-sm font-semibold disabled:opacity-60">
           {submitting ? "Updating..." : "Update Password"}
         </button>
-        {message ? <p className="rounded-md border border-line bg-panelSoft px-3 py-2 text-sm font-bold text-paper/65">{message}</p> : null}
+        {message ? <p className="rounded-md border border-line bg-panelSoft px-3 py-2 text-sm font-medium text-paper/65">{message}</p> : null}
       </form>
     </div>
   );

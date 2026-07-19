@@ -226,7 +226,7 @@ test("news visual contract", async ({ page }) => {
 });
 
 test("about visual contract", async ({ page }) => {
-  await assertStablePublicPage(page, "/about", "The signal layer for rap momentum.", "about.png");
+  await assertStablePublicPage(page, "/about", "A fantasy market for following rapper momentum.", "about.png");
 });
 
 test("help visual contract", async ({ page }) => {

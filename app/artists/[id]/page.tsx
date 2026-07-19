@@ -26,7 +26,7 @@ export default function ArtistDetailPage() {
     return (
       <RmiSection>
         <div className="p-6">
-          <h1 className="text-2xl font-black">Artist not found</h1>
+          <h1 className="text-2xl font-bold">Artist not found</h1>
           <RmiButton href="/markets" variant="secondary">Back to markets</RmiButton>
         </div>
       </RmiSection>
@@ -67,31 +67,31 @@ export default function ArtistDetailPage() {
   return (
     <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_300px] xl:grid-cols-[minmax(0,1fr)_340px]">
       <main className="min-w-0 space-y-5">
-        <section className="rmi-card rmi-noise relative p-5 sm:p-6">
+        <section className="rmi-card relative p-5 sm:p-6">
           <div className="relative flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
           <div className="flex min-w-0 items-start gap-4">
             <ArtistAvatar artist={artist} size="xl" />
             <div className="min-w-0">
               <div className="rmi-kicker mb-2"><Radio className="h-3.5 w-3.5" aria-hidden="true" /> Live Artist Quote</div>
               <div className="flex flex-wrap items-center gap-2">
-                <h1 className="truncate text-3xl font-black sm:text-4xl">{artist.name}</h1>
+                <h1 className="truncate text-3xl font-bold sm:text-4xl">{artist.name}</h1>
                 <BadgeCheck className="h-4 w-4 text-cyan" aria-hidden="true" />
                 <WatchlistButton artistId={artist.id} />
               </div>
-              <p className="mt-1 flex flex-wrap items-center gap-1.5 text-sm font-bold text-paper/60">
+              <p className="mt-1 flex flex-wrap items-center gap-1.5 text-sm font-medium text-paper/60">
                 <span>${artist.ticker} · {artist.hypeScore}/100 RMI Score</span>
                 <ScoreInfo />
               </p>
               <div className="mt-3 flex flex-wrap gap-2">
                 <span className="rmi-status-chip"><span className="rmi-live-dot" /> Market active</span>
-                <span className="rmi-status-chip text-violet"><Zap className="h-3 w-3" /> Signal rank #{signalRank}</span>
+                <span className="rmi-status-chip text-cyan"><Zap className="h-3 w-3" /> Signal rank #{signalRank}</span>
               </div>
             </div>
           </div>
 
           <div className="shrink-0 sm:text-right">
             <p className="rmi-data-label">Last recorded price</p>
-            <p className="mt-1 text-4xl font-black number-tabular sm:text-5xl">{formatCurrency(artist.currentPrice)}</p>
+            <p className="mt-1 text-4xl font-bold number-tabular sm:text-5xl">{formatCurrency(artist.currentPrice)}</p>
             <p className="mt-1 text-sm"><ChangeText value={artist.dailyChangePercent} suffix=" today" /></p>
           </div>
           </div>
@@ -146,7 +146,7 @@ function QuoteStat({ label, value, tone }: { label: string; value: string; tone:
   return (
     <div className={`rmi-metric rmi-metric-${tone} min-w-0 px-3 py-3`}>
       <p className="rmi-data-label">{label}</p>
-      <p className="mt-1 truncate text-sm font-black number-tabular">{value}</p>
+      <p className="mt-1 truncate text-sm font-semibold number-tabular">{value}</p>
     </div>
   );
 }
@@ -155,7 +155,7 @@ function CatalystRow({ icon, text }: { icon: ReactNode; text: string }) {
   return (
     <div className="flex gap-3 py-3 text-sm">
       <span className="mt-0.5 text-paper/45">{icon}</span>
-      <p className="font-bold leading-5 text-paper/85">{text}</p>
+      <p className="font-medium leading-5 text-paper/85">{text}</p>
     </div>
   );
 }
@@ -163,8 +163,8 @@ function CatalystRow({ icon, text }: { icon: ReactNode; text: string }) {
 function PositionRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-center justify-between gap-4">
-      <span className="font-bold text-paper/55">{label}</span>
-      <span className="font-black number-tabular">{value}</span>
+      <span className="font-medium text-paper/55">{label}</span>
+      <span className="font-semibold number-tabular">{value}</span>
     </div>
   );
 }

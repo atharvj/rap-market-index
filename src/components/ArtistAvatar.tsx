@@ -10,7 +10,7 @@ export function ArtistAvatar({ artist, size = "md" }: { artist: Artist; size?: "
 
   return (
     <div
-      className={`${sizeClass} relative grid shrink-0 place-items-center overflow-hidden rounded-full border border-paper/10 bg-gradient-to-br ${artist.accent} font-black text-white shadow-market saturate-[0.9]`}
+      className={`${sizeClass} relative grid shrink-0 place-items-center overflow-hidden rounded-full border border-line bg-panelSoft font-semibold text-paper`}
       aria-label={artist.name}
       role="img"
     >

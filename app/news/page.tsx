@@ -4,7 +4,7 @@ import { useGame } from "@/components/GameProvider";
 import { MarketNewsFeed, type MarketNewsItem } from "@/components/MarketNewsFeed";
 import { ArtistIdentity, ChangeText, RmiButton } from "@/components/RmiPrimitives";
 import type { MarketNewsSort } from "@/lib/market-news-sort";
-import { ArrowUpDown, Music, Radio, ShieldCheck, Sparkles } from "lucide-react";
+import { Activity, ArrowUpDown, Music, Radio, ShieldCheck } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
 
 export default function NewsPage() {
@@ -31,16 +31,16 @@ export default function NewsPage() {
         <div className="rmi-page-head flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <div className="rmi-kicker"><Radio className="h-4 w-4" /> RMI Market Wire</div>
-            <h1 className="mt-3 text-4xl font-black">Market Intelligence</h1>
-            <p className="mt-2 max-w-2xl text-sm text-paper/60">Verified artist catalysts ranked by impact, confidence, and recency before they reach the public feed.</p>
+            <h1 className="mt-3 text-4xl font-bold">Market Intelligence</h1>
+            <p className="mt-2 max-w-2xl text-sm text-paper/60">Price-relevant artist events ranked by impact, source confidence, and recency.</p>
           </div>
-          <label className="rmi-terminal-input flex w-full items-center gap-2 px-3 text-xs font-bold text-paper/55 sm:w-auto">
+          <label className="rmi-terminal-input flex w-full items-center gap-2 px-3 text-xs font-medium text-paper/55 sm:w-auto">
             <ArrowUpDown className="h-4 w-4" aria-hidden="true" />
             <span>Sort</span>
             <select
               value={newsSort}
               onChange={(event) => setNewsSort(event.target.value as MarketNewsSort)}
-              className="min-w-32 bg-transparent font-black text-paper outline-none"
+              className="min-w-32 bg-transparent font-semibold text-paper outline-none"
               aria-label="Sort market news"
             >
               <option value="top">Top Stories</option>
@@ -50,7 +50,7 @@ export default function NewsPage() {
             </select>
           </label>
         </div>
-        <div className="rmi-card rmi-noise mt-5 px-5">
+        <div className="rmi-card mt-5 px-5">
           <MarketNewsFeed limit={40} variant="full" sort={newsSort} onItemsChange={handleNewsItems} />
         </div>
       </main>
@@ -58,7 +58,7 @@ export default function NewsPage() {
       <aside className="space-y-4 lg:sticky lg:top-6 lg:self-start">
         <section className="rmi-card overflow-hidden">
           <div className="rmi-section-header px-4 py-3">
-            <h2 className="flex items-center gap-2 text-sm font-black"><Sparkles className="h-4 w-4 text-violet" /> News-Linked Movers</h2>
+            <h2 className="flex items-center gap-2 text-sm font-semibold"><Activity className="h-4 w-4 text-cyan" /> News-Linked Movers</h2>
           </div>
           {movers.length ? movers.map((artist) => (
               <div key={artist.id} className="rmi-table-row flex items-center justify-between gap-3 px-4 py-3 last:border-b-0">
@@ -75,7 +75,7 @@ export default function NewsPage() {
 
         <section className="rmi-card rmi-news-card p-4">
           <Music className="h-5 w-5 text-cyan" aria-hidden="true" />
-          <h2 className="mt-3 text-sm font-black">RMI Market Wire</h2>
+          <h2 className="mt-3 text-sm font-semibold">RMI Market Wire</h2>
           <p className="mt-2 text-sm leading-6 text-paper/60">
             Routine uploads, reposts, and low-signal chatter are excluded. A story must clear evidence and relevance checks before it appears here.
           </p>

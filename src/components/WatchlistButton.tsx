@@ -53,7 +53,7 @@ export function WatchlistButton({
         title={title}
         aria-label={action}
         className={clsx(
-          "inline-flex min-h-9 shrink-0 items-center justify-center gap-2 rounded-lg border px-2.5 text-sm font-black transition disabled:cursor-wait disabled:opacity-60",
+          "inline-flex min-h-9 shrink-0 items-center justify-center gap-2 rounded-md border px-2.5 text-sm font-semibold transition-colors disabled:cursor-wait disabled:opacity-60",
           active
             ? "border-brass/45 bg-brass/[0.15] text-brass"
             : "border-line bg-panel text-paper/50 hover:border-brass/40 hover:text-brass"
@@ -65,7 +65,7 @@ export function WatchlistButton({
       {message ? (
         <span
           role="status"
-          className="absolute right-0 top-11 z-40 w-max max-w-56 rounded-lg border border-line bg-panel px-3 py-2 text-xs font-bold text-paper shadow-xl"
+          className="absolute right-0 top-11 z-40 w-max max-w-56 rounded-md border border-line bg-panel px-3 py-2 text-xs font-medium text-paper shadow-[var(--shadow-popover)]"
         >
           {message}
         </span>

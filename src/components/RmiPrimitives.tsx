@@ -23,7 +23,7 @@ export function RmiSection({
       {title ? (
         <div className="rmi-section-header flex items-start justify-between gap-4 border-b border-line/80 px-4 py-3">
           <div>
-            <h2 className="text-sm font-black tracking-[0.01em]">{title}</h2>
+            <h2 className="text-sm font-semibold">{title}</h2>
             {subtitle ? <p className="mt-1 text-xs font-medium text-paper/55">{subtitle}</p> : null}
           </div>
           {action ? <div className="shrink-0">{action}</div> : null}
@@ -52,7 +52,7 @@ export function RmiButton({
   className?: string;
 }) {
   const buttonClassName = clsx(
-    "inline-flex min-h-9 items-center justify-center rounded-md px-4 text-sm font-black transition disabled:cursor-not-allowed disabled:opacity-50",
+    "inline-flex min-h-9 items-center justify-center rounded-md px-4 text-sm font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50",
     variant === "primary" && "rmi-button-primary",
     variant === "secondary" && "rmi-button-secondary border border-line bg-transparent text-paper",
     variant === "danger" && "border border-ember/60 text-ember hover:bg-ember/10",
@@ -87,8 +87,8 @@ export function ArtistIdentity({
     <>
       <ArtistAvatar artist={artist} />
       <span className="min-w-0">
-        <span className="block truncate text-sm font-black">{artist.name}</span>
-        <span className="block truncate text-xs font-bold text-paper/45">${artist.ticker}{detail ? ` · ${detail}` : ""}</span>
+        <span className="block truncate text-sm font-semibold">{artist.name}</span>
+        <span className="block truncate text-xs font-medium text-paper/45">${artist.ticker}{detail ? ` · ${detail}` : ""}</span>
       </span>
     </>
   );
@@ -106,7 +106,7 @@ export function ArtistIdentity({
 
 export function ChangeText({ value, suffix = "" }: { value: number; suffix?: string }) {
   return (
-    <span className={clsx("font-black number-tabular", value >= 0 ? "text-mint" : "text-ember")}>
+    <span className={clsx("font-semibold number-tabular", value >= 0 ? "text-mint" : "text-ember")}>
       {formatPercent(value)}
       {suffix}
     </span>
@@ -118,7 +118,7 @@ export function ArtistMiniCard({ artist }: { artist: Artist }) {
     <Link href={`/artists/${artist.id}`} className="rmi-signal-card grid min-w-0 gap-4 p-4">
       <ArtistIdentity artist={artist} linked={false} />
       <div>
-        <p className="text-lg font-black number-tabular">{formatCurrency(artist.currentPrice)}</p>
+        <p className="text-lg font-semibold number-tabular">{formatCurrency(artist.currentPrice)}</p>
         <ChangeText value={artist.dailyChangePercent} />
       </div>
     </Link>
@@ -137,7 +137,7 @@ export function ArtistTableRow({
   return (
     <div className={clsx("grid grid-cols-[minmax(0,1fr)_92px_82px] items-center gap-4 border-b border-line/70 px-4 py-3 transition-colors last:border-b-0 hover:bg-cyan/[0.035]", muted && "opacity-65")}>
       <ArtistIdentity artist={artist} />
-      <p className="text-right text-sm font-black number-tabular">{formatCurrency(artist.currentPrice)}</p>
+      <p className="text-right text-sm font-semibold number-tabular">{formatCurrency(artist.currentPrice)}</p>
       <div className="text-right text-sm">{right ?? <ChangeText value={artist.dailyChangePercent} />}</div>
     </div>
   );

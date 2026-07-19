@@ -32,13 +32,13 @@ export default function ScoutPage() {
 
   return (
     <div className="space-y-6">
-      <header className="rmi-page-head rmi-noise grid gap-5 p-6 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
+      <header className="rmi-page-head grid gap-5 p-6 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
         <div>
           <div className="rmi-kicker">
             <Radar className="h-4 w-4" aria-hidden="true" />
             Discovery
           </div>
-          <h1 className="mt-3 text-3xl font-black sm:text-4xl">Scout Emerging Artists</h1>
+          <h1 className="mt-3 text-3xl font-bold sm:text-4xl">Scout Emerging Artists</h1>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-paper/65">
             Explore smaller artists already trading on RMI, ranked by current market signal and momentum.
           </p>
@@ -83,7 +83,7 @@ export default function ScoutPage() {
       <section>
         <div className="mb-3 flex items-end justify-between gap-4">
           <div>
-          <h2 className="text-lg font-black">On the Radar</h2>
+          <h2 className="text-lg font-semibold">On the Radar</h2>
             <p className="mt-1 text-sm text-paper/55">Smaller active listings showing the strongest current RMI signals.</p>
           </div>
           <span className="text-xs text-paper/45">{emergingArtists.length} shown</span>
@@ -117,8 +117,8 @@ export default function ScoutPage() {
 function ScoutStat({ label, value, detail, tone = "neutral" }: { label: string; value: string; detail: string; tone?: "neutral" | "good" | "bad" }) {
   return (
     <div className={`rmi-metric ${tone === "good" ? "rmi-metric-mint" : tone === "bad" ? "rmi-metric-ember" : "rmi-metric-cyan"} p-4`}>
-      <p className="text-xs font-bold text-paper/50">{label}</p>
-      <p className={tone === "good" ? "mt-1 text-xl font-black text-mint number-tabular" : tone === "bad" ? "mt-1 text-xl font-black text-ember number-tabular" : "mt-1 text-xl font-black number-tabular"}>{value}</p>
+      <p className="text-xs font-medium text-paper/50">{label}</p>
+      <p className={tone === "good" ? "mt-1 text-xl font-semibold text-mint number-tabular" : tone === "bad" ? "mt-1 text-xl font-semibold text-ember number-tabular" : "mt-1 text-xl font-semibold number-tabular"}>{value}</p>
       <p className="mt-1 text-xs text-paper/40">{detail}</p>
     </div>
   );
@@ -126,9 +126,9 @@ function ScoutStat({ label, value, detail, tone = "neutral" }: { label: string; 
 
 function SignalTile({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-lg bg-panelSoft p-3">
+    <div className="rounded-md bg-panelSoft p-3">
       <p className="text-paper/45">{label}</p>
-      <p className="mt-1 font-black number-tabular">{value}</p>
+      <p className="mt-1 font-semibold number-tabular">{value}</p>
     </div>
   );
 }
@@ -138,7 +138,7 @@ function ScoutMethod({ icon, title, copy }: { icon: React.ReactNode; title: stri
     <div className="rmi-signal-card flex items-start gap-3 p-4">
       <span className="mt-0.5 text-cyan">{icon}</span>
       <div>
-        <h3 className="text-sm font-black">{title}</h3>
+        <h3 className="text-sm font-semibold">{title}</h3>
         <p className="mt-1 text-sm leading-6 text-paper/55">{copy}</p>
       </div>
     </div>

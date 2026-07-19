@@ -72,10 +72,10 @@ export default function SettingsPage() {
       <div className="mx-auto max-w-3xl space-y-4">
         <header className="rmi-page-head">
           <div className="rmi-kicker">Control Center</div>
-          <h1 className="mt-2 text-3xl font-black">Settings</h1>
+          <h1 className="mt-2 text-3xl font-bold">Settings</h1>
         </header>
-        <section className="rmi-auth-surface market-grid p-5">
-          <p className="text-sm font-bold text-paper/70">Sign in to manage your account.</p>
+        <section className="rmi-auth-surface p-5">
+          <p className="text-sm font-medium text-paper/70">Sign in to manage your account.</p>
           <div className="mt-4">
             <RmiButton href="/account">Log in</RmiButton>
           </div>
@@ -187,19 +187,19 @@ export default function SettingsPage() {
     <div className="mx-auto max-w-6xl space-y-5">
       <header className="rmi-page-head">
         <div className="rmi-kicker">Trader Control Center</div>
-        <h1 className="mt-2 text-3xl font-black sm:text-4xl">Settings</h1>
+        <h1 className="mt-2 text-3xl font-bold sm:text-4xl">Settings</h1>
         <p className="mt-1 text-sm text-paper/55">Identity, access, appearance, and public-profile controls.</p>
       </header>
 
-      <section className="rmi-card market-grid rmi-noise flex items-center justify-between gap-4 p-4 sm:p-5">
+      <section className="rmi-card flex items-center justify-between gap-4 p-4 sm:p-5">
         <div className="flex min-w-0 items-center gap-3">
           <UserAvatar avatarUrl={avatarUrl} label={displayName} />
           <div className="min-w-0">
             <div className="flex items-center gap-2">
-              <p className="truncate text-sm font-black">{displayName}</p>
+              <p className="truncate text-sm font-semibold">{displayName}</p>
               {isAdminUser ? <AdminBadge compact /> : null}
             </div>
-            <p className="truncate text-xs font-bold text-paper/55">{user?.email}</p>
+            <p className="truncate text-xs font-medium text-paper/55">{user?.email}</p>
           </div>
         </div>
         <RmiButton href="/account" variant="secondary">Edit Profile</RmiButton>
@@ -214,7 +214,7 @@ export default function SettingsPage() {
               maxLength={32}
               pattern="[A-Za-z0-9_.-]{2,32}"
               title="Use 2-32 letters, numbers, periods, hyphens, or underscores."
-              className="rmi-terminal-input h-9 min-w-0 flex-1 px-3 text-sm font-black"
+              className="rmi-terminal-input h-9 min-w-0 flex-1 px-3 text-sm font-medium"
             />
             <button type="button" onClick={saveUsername} className="rmi-button-secondary px-3 text-sm">
               Save
@@ -222,7 +222,7 @@ export default function SettingsPage() {
           </div>
         </SettingsRow>
         <SettingsRow label="Email">
-          <span className="font-black text-paper/70">{user?.email}</span>
+          <span className="font-medium text-paper/70">{user?.email}</span>
         </SettingsRow>
         <SettingsRow label="Password">
           <div className="flex w-full flex-col items-end gap-3">
@@ -267,7 +267,7 @@ export default function SettingsPage() {
           <select
             value={theme}
             onChange={(event) => chooseTheme(event.target.value as ThemePreference)}
-            className="rmi-terminal-input h-9 flex-1 px-3 text-sm font-black"
+            className="rmi-terminal-input h-9 flex-1 px-3 text-sm font-medium"
           >
             <option value="system">System</option>
             <option value="dark">Dark</option>
@@ -314,7 +314,7 @@ export default function SettingsPage() {
                 setDeleteOpen(true);
               }}
               disabled={isAdminUser}
-              className="inline-flex items-center gap-2 rounded-lg border border-ember/60 px-3 py-1.5 text-sm font-black text-ember disabled:cursor-not-allowed disabled:opacity-40"
+              className="inline-flex items-center gap-2 rounded-md border border-ember/60 px-3 py-1.5 text-sm font-semibold text-ember disabled:cursor-not-allowed disabled:opacity-40"
               title={isAdminUser ? "Administrator accounts must be removed by another administrator." : "Delete account"}
             >
               <Trash2 className="h-4 w-4" aria-hidden="true" />
@@ -328,9 +328,9 @@ export default function SettingsPage() {
 
       {deleteOpen ? (
         <div className="fixed inset-0 z-50 grid place-items-center bg-black/75 px-4" role="dialog" aria-modal="true" aria-labelledby="delete-account-title">
-          <div className="rmi-card market-grid rmi-noise w-full max-w-md p-5 shadow-2xl">
+          <div className="rmi-popover w-full max-w-md rounded-md p-5">
             <div className="flex items-center justify-between gap-4">
-              <h2 id="delete-account-title" className="text-xl font-black">Delete Account</h2>
+              <h2 id="delete-account-title" className="text-xl font-semibold">Delete Account</h2>
               <button type="button" onClick={() => setDeleteOpen(false)} className="grid h-9 w-9 place-items-center rounded-full text-paper/55 hover:bg-panelSoft" aria-label="Close">
                 <X className="h-5 w-5" />
               </button>
@@ -366,12 +366,12 @@ export default function SettingsPage() {
               />
             </div>
             <div className="mt-5 flex justify-end gap-2">
-              <button type="button" onClick={() => setDeleteOpen(false)} className="min-h-10 rounded-lg border border-line px-4 text-sm font-black">Cancel</button>
+              <button type="button" onClick={() => setDeleteOpen(false)} className="min-h-10 rounded-md border border-line px-4 text-sm font-semibold">Cancel</button>
               <button
                 type="button"
                 onClick={deleteAccount}
                 disabled={deleting || deletePassword.length < 8 || Boolean(turnstileSiteKey && !deleteCaptchaToken)}
-                className="min-h-10 rounded-lg bg-ember px-4 text-sm font-black text-white disabled:opacity-40"
+                className="min-h-10 rounded-md bg-ember px-4 text-sm font-semibold text-white disabled:opacity-40"
               >
                 {deleting ? "Deleting..." : "Delete Permanently"}
               </button>
@@ -387,7 +387,7 @@ function SettingsGroup({ title, children, danger = false }: { title: string; chi
   return (
     <section>
       <h2 className={danger ? "rmi-data-label mb-2 px-1 text-ember" : "rmi-data-label mb-2 px-1 text-cyan"}>{title}</h2>
-      <div className={danger ? "overflow-hidden rounded-lg border border-ember/50 bg-ember/[0.03]" : "rmi-card overflow-hidden border-l-2 border-l-cyan/50"}>{children}</div>
+      <div className={danger ? "overflow-hidden rounded-md border border-ember/50 bg-ember/[0.03]" : "rmi-card overflow-hidden border-l-2 border-l-cyan/50"}>{children}</div>
     </section>
   );
 }
@@ -395,7 +395,7 @@ function SettingsGroup({ title, children, danger = false }: { title: string; chi
 function SettingsRow({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="flex min-h-14 items-center justify-between gap-4 border-b border-line px-4 py-3 transition-colors last:border-b-0 hover:bg-cyan/[0.025]">
-      <span className="text-sm font-black">{label}</span>
+      <span className="text-sm font-semibold">{label}</span>
       <div className="flex min-w-0 flex-1 justify-end">{children}</div>
     </div>
   );

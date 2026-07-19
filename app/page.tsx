@@ -103,16 +103,16 @@ export default function HomePage() {
   return (
     <div className="space-y-6">
       <section data-testid="home-market-hero" className="rmi-card rmi-hero relative z-40 grid min-w-0 overflow-visible lg:grid-cols-[minmax(0,1.45fr)_minmax(300px,0.55fr)]">
-        <div className="rmi-noise grid min-w-0 content-center px-5 py-9 text-center sm:px-8 lg:min-h-[260px] lg:text-left">
+        <div className="grid min-w-0 content-center px-5 py-9 text-center sm:px-8 lg:min-h-[260px] lg:text-left">
           <div className="relative z-10">
           <p className="rmi-kicker">RMI Market Intelligence</p>
-          <h1 className="mt-4 min-w-0 break-words text-3xl font-black leading-[1.05] sm:text-5xl">
-            Spot the next <span className="text-cyan drop-shadow-[0_0_18px_rgba(var(--color-cyan),0.28)]">rise.</span>
+          <h1 className="mt-4 min-w-0 break-words text-3xl font-bold leading-[1.05] sm:text-5xl">
+            Spot the next <span className="text-cyan">rise.</span>
           </h1>
           <p className="mt-3 max-w-2xl text-sm font-medium text-paper/66 sm:text-base">Buy shares in rappers. Build a portfolio when they blow up.</p>
           <div className="mt-4 flex flex-wrap justify-center gap-2 lg:justify-start">
-            <span className="inline-flex items-center gap-2 rounded-md border border-mint/25 bg-mint/5 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-mint"><span className="rmi-live-dot" /> Market online</span>
-            <span className="inline-flex items-center gap-2 rounded-md border border-violet/25 bg-violet/5 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-violet"><Radio className="h-3 w-3" /> Verified catalysts</span>
+            <span className="inline-flex items-center gap-2 rounded-[var(--radius-control)] border border-mint/25 bg-mint/5 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-mint"><span className="rmi-live-dot" /> Market online</span>
+            <span className="inline-flex items-center gap-2 rounded-[var(--radius-control)] border border-cyan/25 bg-cyan/5 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-cyan"><Radio className="h-3 w-3" /> Verified catalysts</span>
           </div>
           <form onSubmit={submitSearch} className="relative mx-auto mt-6 flex w-full min-w-0 max-w-xl flex-col gap-2 sm:flex-row lg:mx-0">
             <input
@@ -120,7 +120,7 @@ export default function HomePage() {
               onChange={(event) => setQuery(event.target.value)}
               onFocus={() => setSearchFocused(true)}
               onBlur={() => window.setTimeout(() => setSearchFocused(false), 140)}
-              className="min-h-11 min-w-0 flex-1 rounded-md border border-line bg-ink/70 px-3 text-sm shadow-[inset_0_0_18px_rgba(0,0,0,0.16)] outline-none placeholder:text-paper/30 focus:border-cyan focus:shadow-[0_0_22px_rgba(var(--color-cyan),0.09)]"
+              className="min-h-11 min-w-0 flex-1 rounded-[var(--radius-control)] border border-line bg-ink/70 px-3 text-sm outline-none placeholder:text-paper/30 focus:border-cyan"
               placeholder="Search an artist, e.g. Ken Carson"
             />
             <RmiButton type="submit">Search</RmiButton>
@@ -131,12 +131,12 @@ export default function HomePage() {
                     key={artist.id}
                     href={`/artists/${artist.id}`}
                     onClick={() => setSearchFocused(false)}
-                    className="flex items-center justify-between gap-3 rounded-md px-3 py-2 hover:bg-cyan/5"
+                    className="flex items-center justify-between gap-3 rounded-[var(--radius-control)] px-3 py-2 hover:bg-cyan/5"
                   >
                     <span className="flex min-w-0 items-center gap-3">
                       <ArtistAvatar artist={artist} size="sm" />
                       <span className="min-w-0">
-                        <span className="block truncate text-sm font-black">{artist.name}</span>
+                        <span className="block truncate text-sm font-semibold">{artist.name}</span>
                         <span className="block text-xs text-paper/45">${artist.ticker} · {formatCurrency(artist.currentPrice)}</span>
                       </span>
                     </span>
@@ -152,7 +152,7 @@ export default function HomePage() {
         <div className="grid divide-y divide-line/80 border-t border-line bg-ink/45 lg:border-l lg:border-t-0">
           {marketLeader ? <PulseArtist label="Top gainer" artist={marketLeader} accent="mint" /> : null}
           {underPressure ? <PulseArtist label="Under pressure" artist={underPressure} accent="ember" /> : null}
-          {signalLeader ? <PulseArtist label="Strongest signal" artist={signalLeader} score accent="violet" /> : null}
+          {signalLeader ? <PulseArtist label="Strongest signal" artist={signalLeader} score accent="cyan" /> : null}
         </div>
       </section>
 
@@ -166,7 +166,7 @@ export default function HomePage() {
       <RmiSection
         title="Live Signal Deck"
         subtitle="Artists with the strongest combination of market movement and current RMI signal."
-        action={<Link href="/markets" className="text-xs font-black text-cyan hover:text-paper">Open Markets</Link>}
+        action={<Link href="/markets" className="text-xs font-semibold text-cyan hover:text-paper">Open Markets</Link>}
       >
         <div className="grid gap-px bg-line/70 sm:grid-cols-2 xl:grid-cols-3">
           {signalDeck.map((artist, index) => (
@@ -177,14 +177,14 @@ export default function HomePage() {
               </div>
               <div className="mt-4 flex items-end justify-between gap-4">
                 <div>
-                  <p className="text-lg font-black number-tabular">{formatCurrency(artist.currentPrice)}</p>
+                  <p className="text-lg font-bold number-tabular">{formatCurrency(artist.currentPrice)}</p>
                   <ChangeText value={artist.dailyChangePercent} />
                 </div>
                 <MiniSparkline data={artist.priceHistory} positive={artist.dailyChangePercent >= 0} width={118} height={38} />
               </div>
               <div className="mt-3 flex items-center justify-between border-t border-line/60 pt-2">
                 <span className="rmi-data-label">RMI signal</span>
-                <span className="text-xs font-black text-violet number-tabular">{artist.hypeScore}/100</span>
+                <span className="text-xs font-semibold text-cyan number-tabular">{artist.hypeScore}/100</span>
               </div>
             </Link>
           ))}
@@ -211,11 +211,11 @@ export default function HomePage() {
                 <div className="flex items-end justify-between gap-3">
                   <div>
                     <p className="rmi-data-label">Total Value</p>
-                    <p className="mt-1 text-2xl font-black number-tabular">{formatCurrency(portfolioValue)}</p>
+                    <p className="mt-1 text-2xl font-bold number-tabular">{formatCurrency(portfolioValue)}</p>
                   </div>
                   <div className="text-right">
                     <p className="rmi-data-label">Today</p>
-                    <p className={`mt-1 text-base font-black number-tabular ${portfolioDayPercent >= 0 ? "text-mint" : "text-ember"}`}>
+                    <p className={`mt-1 text-base font-semibold number-tabular ${portfolioDayPercent >= 0 ? "text-mint" : "text-ember"}`}>
                       {formatPercent(portfolioDayPercent)}
                     </p>
                   </div>
@@ -232,11 +232,11 @@ export default function HomePage() {
                 <dl className="grid grid-cols-2 gap-3 border-t border-line/70 pt-3">
                   <div>
                     <dt className="rmi-data-label">Invested</dt>
-                    <dd className="mt-1 text-sm font-black number-tabular">{formatCurrency(investedValue)}</dd>
+                    <dd className="mt-1 text-sm font-semibold number-tabular">{formatCurrency(investedValue)}</dd>
                   </div>
                   <div>
                     <dt className="rmi-data-label">Cash</dt>
-                    <dd className="mt-1 text-sm font-black number-tabular">{formatCurrency(state.cashBalance)}</dd>
+                    <dd className="mt-1 text-sm font-semibold number-tabular">{formatCurrency(state.cashBalance)}</dd>
                   </div>
                 </dl>
                 <RmiButton href="/portfolio" variant="secondary" className="w-full">View Portfolio</RmiButton>
@@ -272,14 +272,14 @@ export default function HomePage() {
   );
 }
 
-function PulseArtist({ label, artist, score = false, accent }: { label: string; artist: Artist; score?: boolean; accent: "mint" | "ember" | "violet" }) {
+function PulseArtist({ label, artist, score = false, accent }: { label: string; artist: Artist; score?: boolean; accent: "mint" | "ember" | "cyan" }) {
   return (
     <div className="relative grid content-center gap-3 overflow-hidden p-5">
-      <span className={accent === "mint" ? "absolute inset-y-0 left-0 w-0.5 bg-mint shadow-[0_0_12px_rgba(var(--color-mint),0.6)]" : accent === "ember" ? "absolute inset-y-0 left-0 w-0.5 bg-ember shadow-[0_0_12px_rgba(var(--color-ember),0.6)]" : "absolute inset-y-0 left-0 w-0.5 bg-violet shadow-[0_0_12px_rgba(var(--color-violet),0.6)]"} />
+      <span className={accent === "mint" ? "absolute inset-y-0 left-0 w-0.5 bg-mint" : accent === "ember" ? "absolute inset-y-0 left-0 w-0.5 bg-ember" : "absolute inset-y-0 left-0 w-0.5 bg-cyan"} />
       <p className="rmi-data-label">{label}</p>
       <div className="flex items-center justify-between gap-4">
         <ArtistIdentity artist={artist} />
-        {score ? <span className="text-sm font-black text-violet">{artist.hypeScore}/100</span> : <ChangeText value={artist.dailyChangePercent} />}
+        {score ? <span className="text-sm font-semibold text-cyan">{artist.hypeScore}/100</span> : <ChangeText value={artist.dailyChangePercent} />}
       </div>
     </div>
   );
@@ -292,7 +292,7 @@ function HeroStat({ label, value, accent, icon }: { label: string; value: string
         <p className="rmi-data-label">{label}</p>
         <span className={accent === "cyan" ? "text-cyan" : accent === "mint" ? "text-mint" : accent === "ember" ? "text-ember" : "text-brass"}>{icon}</span>
       </div>
-      <p className="mt-2 text-xl font-black number-tabular">{value}</p>
+      <p className="mt-2 text-xl font-bold number-tabular">{value}</p>
     </div>
   );
 }

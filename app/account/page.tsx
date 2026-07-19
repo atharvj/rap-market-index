@@ -314,7 +314,15 @@ function AccountPageContent() {
   }
 
   if (configured && authLoading) {
-    return <div className="rmi-auth-surface mx-auto h-80 max-w-xl motion-safe:animate-pulse" />;
+    return (
+      <div className="rmi-auth-surface mx-auto max-w-xl space-y-4 p-6" role="status" aria-label="Loading account">
+        <div className="rmi-skeleton h-4 w-28 rounded-sm" />
+        <div className="rmi-skeleton h-9 w-56 rounded-sm" />
+        <div className="rmi-skeleton h-11 w-full rounded-md" />
+        <div className="rmi-skeleton h-11 w-full rounded-md" />
+        <div className="rmi-skeleton h-11 w-full rounded-md" />
+      </div>
+    );
   }
 
   if (!configured || !session) {
@@ -322,7 +330,7 @@ function AccountPageContent() {
       <div className="mx-auto max-w-xl space-y-5">
         <header className="text-center">
           <div className="rmi-kicker justify-center">Secure Trader Access</div>
-          <h1 className="mt-3 text-3xl font-black sm:text-4xl">
+          <h1 className="mt-3 text-3xl font-bold sm:text-4xl">
             {mode === "signup" ? "Enter the RMI market." : "Welcome back."}
           </h1>
           <p className="mx-auto mt-2 max-w-md text-sm text-paper/60">
@@ -332,7 +340,7 @@ function AccountPageContent() {
           </p>
         </header>
 
-        <form onSubmit={submitAuth} className="rmi-auth-surface market-grid rmi-noise grid gap-3 p-5 sm:p-7">
+        <form onSubmit={submitAuth} className="rmi-auth-surface grid gap-3 p-5 sm:p-7">
           <div className="mb-2 flex items-center justify-between border-b border-line/70 pb-4">
             <div>
               <p className="rmi-data-label">Identity Terminal</p>
@@ -422,7 +430,7 @@ function AccountPageContent() {
           <button
             type="button"
             onClick={() => router.push(mode === "signup" ? "/account?mode=signin" : "/account?mode=signup")}
-            className="text-sm font-black text-cyan"
+            className="text-sm font-semibold text-cyan"
           >
             {mode === "signup" ? "Already have an account?" : "Create account"}
           </button>
@@ -437,7 +445,7 @@ function AccountPageContent() {
       <header className="rmi-page-head flex flex-wrap items-start justify-between gap-4">
         <div>
           <div className="rmi-kicker">Identity Console</div>
-          <h1 className="mt-2 text-3xl font-black">Trader Profile</h1>
+          <h1 className="mt-2 text-3xl font-bold">Trader Profile</h1>
           <p className="mt-1 text-sm text-paper/60">Manage the identity and artist signals shown on your public profile.</p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -446,7 +454,7 @@ function AccountPageContent() {
         </div>
       </header>
 
-      <section className="rmi-card market-grid rmi-noise overflow-hidden p-5 sm:p-7">
+      <section className="rmi-card overflow-hidden p-5 sm:p-7">
         <div className="grid gap-5 sm:grid-cols-[142px_minmax(0,1fr)]">
           <div>
             <button type="button" onClick={() => fileRef.current?.click()} className="group relative">
@@ -456,7 +464,7 @@ function AccountPageContent() {
               </span>
             </button>
             <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp,image/gif" className="hidden" onChange={uploadAvatar} />
-            <button type="button" onClick={() => fileRef.current?.click()} className="mt-3 flex items-center gap-2 text-sm font-black text-cyan">
+            <button type="button" onClick={() => fileRef.current?.click()} className="mt-3 flex items-center gap-2 text-sm font-semibold text-cyan">
               <ImagePlus className="h-4 w-4" />
               Add Image
             </button>
@@ -464,7 +472,7 @@ function AccountPageContent() {
 
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
-              <h2 className="truncate text-3xl font-black">{displayName}</h2>
+              <h2 className="truncate text-3xl font-bold">{displayName}</h2>
               {isAdminUser ? <AdminBadge /> : null}
             </div>
             <p className="mt-1 truncate text-sm font-bold text-paper/55">{user?.email}</p>
@@ -494,19 +502,19 @@ function AccountPageContent() {
         <div>
           <div className="mb-3 flex items-end justify-between gap-3">
             <div>
-              <h2 className="text-lg font-black">Favorite Artist Signals</h2>
+              <h2 className="text-lg font-semibold">Favorite Artists</h2>
               <p className="text-xs text-paper/50">Choose up to 12 artists for your public profile.</p>
             </div>
             <span className="text-xs font-bold text-paper/45">{favoriteArtistIds.length}/12</span>
           </div>
-          <div className="rmi-card overflow-visible border-t-2 border-t-violet/70">
+          <div className="rmi-card overflow-visible border-t-2 border-t-cyan/70">
             {favoriteArtists.length ? (
               favoriteArtists.map((artist) => (
                 <div key={artist.id} className="flex items-center gap-3 border-b border-line px-4 py-3 hover:bg-panelSoft">
                   <Link href={`/artists/${artist.id}`} className="flex min-w-0 flex-1 items-center gap-3">
                     <ArtistAvatar artist={artist} size="sm" />
                     <span className="min-w-0">
-                      <span className="block truncate text-sm font-black">{artist.name}</span>
+                      <span className="block truncate text-sm font-semibold">{artist.name}</span>
                       <span className="text-xs font-bold text-paper/45">${artist.ticker}</span>
                     </span>
                   </Link>
@@ -535,7 +543,7 @@ function AccountPageContent() {
                 disabled={favoriteArtistIds.length >= 12}
               />
               {favoriteQuery.trim() && favoriteArtistIds.length < 12 ? (
-                <div className="absolute left-3 right-3 top-14 z-20 max-h-64 overflow-y-auto rounded-lg border border-line bg-panel p-1 shadow-2xl">
+                <div className="rmi-popover absolute left-3 right-3 top-14 z-20 max-h-64 overflow-y-auto rounded-md p-1">
                   {favoriteSuggestions.length ? (
                     favoriteSuggestions.map((artist) => (
                       <button
@@ -549,7 +557,7 @@ function AccountPageContent() {
                       >
                         <ArtistAvatar artist={artist} size="sm" />
                         <span className="min-w-0 flex-1">
-                          <span className="block truncate text-sm font-black">{artist.name}</span>
+                          <span className="block truncate text-sm font-semibold">{artist.name}</span>
                           <span className="text-xs text-paper/45">${artist.ticker}</span>
                         </span>
                         <Plus className="h-4 w-4 text-cyan" aria-hidden="true" />
@@ -572,7 +580,7 @@ function AccountPageContent() {
         </div>
 
         <div>
-          <h2 className="mb-3 text-lg font-black">Account Controls</h2>
+          <h2 className="mb-3 text-lg font-semibold">Account Controls</h2>
           <div className="rmi-card border-t-2 border-t-cyan/70 p-4">
             <p className="mb-4 text-sm text-paper/55">Security, privacy, and account preferences live in the settings console.</p>
             <div className="flex flex-wrap items-center gap-3">
@@ -580,7 +588,7 @@ function AccountPageContent() {
               <button
                 type="button"
                 onClick={signOut}
-                className="rmi-button-secondary inline-flex min-h-10 items-center gap-2 rounded-md border border-ember/40 px-4 text-sm font-black text-ember hover:bg-ember/10"
+                className="rmi-button-secondary inline-flex min-h-10 items-center gap-2 rounded-md border border-ember/40 px-4 text-sm font-semibold text-ember hover:bg-ember/10"
               >
                 <LogOut className="h-4 w-4" />
                 Sign out
@@ -598,7 +606,7 @@ function ProfileStat({ icon, label, value }: { icon: ReactNode; label: string; v
     <div className="rmi-soft-card flex min-h-14 items-center gap-3 px-3 text-sm">
       <span className="text-cyan">{icon}</span>
       <span className="text-paper/55">{label}:</span>
-      <span className="ml-auto font-black">{value}</span>
+      <span className="ml-auto font-semibold">{value}</span>
     </div>
   );
 }

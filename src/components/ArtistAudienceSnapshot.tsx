@@ -68,8 +68,8 @@ export function ArtistAudienceSnapshot({ artistId }: { artistId: string }) {
   return (
     <section className="rmi-card overflow-hidden">
       <div className="border-b border-line px-4 py-3">
-        <h2 className="text-base font-black">Public Market Indicators</h2>
-        <p className="mt-1 text-xs font-bold text-paper/48">High-level audience, attention, media, and trading context. No single indicator sets the quote.</p>
+        <h2 className="text-base font-semibold">Public Market Indicators</h2>
+        <p className="mt-1 text-xs text-paper/48">High-level audience, attention, media, and trading context. No single indicator sets the quote.</p>
       </div>
       <div
         className="grid divide-x divide-y divide-line"
@@ -77,8 +77,8 @@ export function ArtistAudienceSnapshot({ artistId }: { artistId: string }) {
       >
         {metrics.map((metric) => (
           <div key={metric.key} className="min-w-0 px-3 py-3">
-            <p className="truncate text-[10px] font-bold uppercase text-paper/42">{metric.label}</p>
-            <p className="mt-1 text-sm font-black number-tabular">{formatCompact(metric.value)}</p>
+            <p className="truncate text-[10px] font-semibold uppercase text-paper/42">{metric.label}</p>
+            <p className="mt-1 text-sm font-semibold number-tabular">{formatCompact(metric.value)}</p>
             <p className="mt-1 text-[10px] text-paper/35">{formatDate(metric.date)}</p>
           </div>
         ))}

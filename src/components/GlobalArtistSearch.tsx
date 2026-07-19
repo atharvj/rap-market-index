@@ -97,7 +97,7 @@ export function GlobalArtistSearch({ className }: { className?: string }) {
             setOpen(true);
           }}
           onFocus={() => setOpen(true)}
-          className="h-10 w-full rounded-lg border border-line bg-panelSoft pl-9 pr-3 text-sm outline-none placeholder:text-paper/35 focus:border-cyan"
+          className="h-10 w-full rounded-[var(--radius-control)] border border-line bg-panelSoft pl-9 pr-3 text-sm outline-none placeholder:text-paper/35 focus:border-cyan"
           placeholder="Search artists"
           aria-label="Search artists"
           aria-expanded={open}
@@ -113,12 +113,12 @@ export function GlobalArtistSearch({ className }: { className?: string }) {
                 key={artist.id}
                 type="button"
                 onClick={() => openArtist(artist.id)}
-                className="flex w-full items-center justify-between gap-3 rounded-md px-3 py-2 text-left hover:bg-panelSoft"
+                className="flex w-full items-center justify-between gap-3 rounded-[var(--radius-control)] px-3 py-2 text-left hover:bg-panelSoft focus-visible:bg-panelSoft"
               >
                 <span className="flex min-w-0 items-center gap-3">
                   <ArtistAvatar artist={artist} size="sm" />
                   <span className="min-w-0">
-                    <span className="block truncate text-sm font-black">{artist.name}</span>
+                    <span className="block truncate text-sm font-semibold">{artist.name}</span>
                     <span className="block truncate text-xs text-paper/45">${artist.ticker} · {formatCurrency(artist.currentPrice)}</span>
                   </span>
                 </span>

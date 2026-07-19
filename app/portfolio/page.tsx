@@ -46,7 +46,7 @@ export default function PortfolioPage() {
       <header className="rmi-page-head flex flex-wrap items-end justify-between gap-4">
         <div>
           <div className="rmi-kicker"><BriefcaseBusiness className="h-3.5 w-3.5" /> Portfolio Terminal</div>
-          <h1 className="mt-2 text-3xl font-black sm:text-4xl">Your Portfolio</h1>
+          <h1 className="mt-2 text-3xl font-bold sm:text-4xl">Your Portfolio</h1>
           <p className="mt-1 text-sm text-paper/65">Positions, performance, allocation, and recent trading activity.</p>
         </div>
         <div className="flex items-center gap-2"><span className="rmi-status-chip"><span className="rmi-live-dot" /> Live valuation</span><RmiButton href="/markets" variant="secondary">Find an Artist</RmiButton></div>
@@ -68,7 +68,7 @@ export default function PortfolioPage() {
         title="Portfolio Value History"
         subtitle="Estimated value of your current holdings and cash at each recorded market close."
         action={chartData.length ? (
-          <span className={quoteHistoryChange >= 0 ? "text-sm font-black text-mint number-tabular" : "text-sm font-black text-ember number-tabular"}>
+          <span className={quoteHistoryChange >= 0 ? "text-sm font-semibold text-mint number-tabular" : "text-sm font-semibold text-ember number-tabular"}>
             {formatPercent(quoteHistoryChange)}
           </span>
         ) : null}
@@ -80,7 +80,7 @@ export default function PortfolioPage() {
         ) : (
           <div className="grid min-h-40 place-items-center p-6 text-center">
             <div>
-              <p className="text-sm font-black">Your portfolio is entirely cash</p>
+              <p className="text-sm font-semibold">Your portfolio is entirely cash</p>
               <p className="mt-1 text-sm text-paper/50">A quote-history chart appears after you open a position.</p>
             </div>
           </div>
@@ -91,7 +91,7 @@ export default function PortfolioPage() {
         <RmiSection title="Holdings" subtitle={`${holdings.length} long position${holdings.length === 1 ? "" : "s"}`}>
           <div className="overflow-x-auto">
             <div className="min-w-[610px]">
-              <div className="rmi-table-head grid grid-cols-[minmax(180px,1fr)_76px_100px_112px_96px] px-4 py-3 text-xs font-bold text-paper/45">
+              <div className="rmi-table-head grid grid-cols-[minmax(180px,1fr)_76px_100px_112px_96px] px-4 py-3 text-xs font-medium text-paper/45">
                 <span>Artist</span>
                 <span>Shares</span>
                 <span>Average Cost</span>
@@ -108,13 +108,13 @@ export default function PortfolioPage() {
                     <span className="flex min-w-0 items-center gap-3">
                       <ArtistAvatar artist={holding.artist} size="sm" />
                       <span className="min-w-0">
-                        <span className="block truncate text-sm font-black">{holding.artist.name}</span>
+                        <span className="block truncate text-sm font-semibold">{holding.artist.name}</span>
                         <span className="block text-xs text-paper/40">${holding.artist.ticker}</span>
                       </span>
                     </span>
-                    <span className="text-sm font-black number-tabular">{formatShares(holding.shares)}</span>
-                    <span className="text-sm font-black number-tabular">{formatCurrency(holding.averageBuyPrice)}</span>
-                    <span className="text-right text-sm font-black number-tabular">{formatCurrency(holding.currentValue)}</span>
+                    <span className="text-sm font-semibold number-tabular">{formatShares(holding.shares)}</span>
+                    <span className="text-sm font-semibold number-tabular">{formatCurrency(holding.averageBuyPrice)}</span>
+                    <span className="text-right text-sm font-semibold number-tabular">{formatCurrency(holding.currentValue)}</span>
                     <span className="text-right text-xs"><ChangeText value={holding.profitLossPercent} /></span>
                   </Link>
                 ))
@@ -146,9 +146,9 @@ export default function PortfolioPage() {
                     <div className="flex items-center justify-between gap-3 text-sm">
                       <span className="flex min-w-0 items-center gap-2">
                         <span className="h-2.5 w-2.5 rounded-sm" style={{ background: allocationColor(index) }} />
-                        <span className="truncate font-bold">{holding.artist.name}</span>
+                        <span className="truncate font-medium">{holding.artist.name}</span>
                       </span>
-                      <span className="font-black number-tabular">{Math.round((holding.currentValue / Math.max(1, invested)) * 100)}%</span>
+                      <span className="font-semibold number-tabular">{Math.round((holding.currentValue / Math.max(1, invested)) * 100)}%</span>
                     </div>
                     <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-panelSoft">
                       <div
@@ -178,12 +178,12 @@ export default function PortfolioPage() {
               return (
                 <div key={transaction.id} className="grid gap-2 px-4 py-3 text-sm sm:grid-cols-[minmax(0,1fr)_90px_100px_80px] sm:items-center">
                   <div className="min-w-0">
-                    <p className="truncate font-black">{artist?.name ?? transaction.artistId}</p>
+                    <p className="truncate font-semibold">{artist?.name ?? transaction.artistId}</p>
                     <p className="text-xs text-paper/45">{formatDate(transaction.createdAt)}</p>
                   </div>
-                  <span className="font-black capitalize">{transaction.type}</span>
-                  <span className="font-black number-tabular">{formatShares(transaction.shares)} shares</span>
-                  <span className="text-right font-black number-tabular">{formatCurrency(transaction.price)}</span>
+                  <span className="font-medium capitalize">{transaction.type}</span>
+                  <span className="font-semibold number-tabular">{formatShares(transaction.shares)} shares</span>
+                  <span className="text-right font-semibold number-tabular">{formatCurrency(transaction.price)}</span>
                 </div>
               );
             })}
@@ -199,9 +199,9 @@ export default function PortfolioPage() {
 function PortfolioStat({ label, value, detail, good = true }: { label: string; value: string; detail?: string; good?: boolean }) {
   return (
     <div className={`rmi-metric ${good ? "rmi-metric-mint" : "rmi-metric-ember"} p-4`}>
-      <p className="text-xs font-bold text-paper/55">{label}</p>
-      <p className="mt-1 text-2xl font-black number-tabular">{value}</p>
-      {detail ? <p className={good ? "mt-1 text-xs font-black text-mint" : "mt-1 text-xs font-black text-ember"}>{detail}</p> : null}
+      <p className="text-xs font-medium text-paper/55">{label}</p>
+      <p className="mt-1 text-2xl font-bold number-tabular">{value}</p>
+      {detail ? <p className={good ? "mt-1 text-xs font-semibold text-mint" : "mt-1 text-xs font-semibold text-ember"}>{detail}</p> : null}
     </div>
   );
 }
@@ -209,8 +209,8 @@ function PortfolioStat({ label, value, detail, good = true }: { label: string; v
 function AnalyticsRow({ label, value, tone = "neutral" }: { label: string; value: string; tone?: "neutral" | "good" | "bad" }) {
   return (
     <div className="flex items-center justify-between gap-3 px-4 py-3">
-      <span className="font-bold text-paper/55">{label}</span>
-      <span className={tone === "good" ? "font-black text-mint number-tabular" : tone === "bad" ? "font-black text-ember number-tabular" : "font-black number-tabular"}>
+      <span className="font-medium text-paper/55">{label}</span>
+      <span className={tone === "good" ? "font-semibold text-mint number-tabular" : tone === "bad" ? "font-semibold text-ember number-tabular" : "font-semibold number-tabular"}>
         {value}
       </span>
     </div>

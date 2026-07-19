@@ -135,12 +135,12 @@ export function MarketNewsFeed({
           <Radio className="h-5 w-5" aria-hidden="true" />
         </span>
         <div>
-          <p className="text-sm font-black text-paper">Market Wire Is Clear</p>
+          <p className="text-sm font-semibold text-paper">Market Wire Is Clear</p>
           <p className="mt-1 max-w-xl text-sm leading-6 text-paper/55">
             No verified, price-relevant stories are available for this view right now. Routine posts and unconfirmed chatter stay out of the feed.
           </p>
           {!artistId && !artistIdsKey && resolvedVariant !== "compact" ? (
-            <Link href="/markets" className="mt-3 inline-flex text-xs font-black text-cyan hover:text-cyan/75">
+            <Link href="/markets" className="mt-3 inline-flex text-xs font-semibold text-cyan hover:text-cyan/75">
               Browse the Market
             </Link>
           ) : null}
@@ -172,10 +172,10 @@ function MarketNewsSkeleton({ compact }: { compact: boolean }) {
     <div className="grid gap-3 p-4" aria-label="Loading market news" aria-busy="true">
       {Array.from({ length: compact ? 2 : 3 }).map((_, index) => (
         <div key={index} className="grid grid-cols-[52px_minmax(0,1fr)] gap-3 py-2">
-          <div className="h-12 rounded bg-panelSoft motion-safe:animate-pulse" />
+          <div className="rmi-skeleton h-12 rounded-[var(--radius-control)]" />
           <div className="space-y-2">
-            <div className="h-3 w-1/3 rounded bg-panelSoft motion-safe:animate-pulse" />
-            <div className="h-4 w-full max-w-xl rounded bg-panelSoft motion-safe:animate-pulse" />
+            <div className="rmi-skeleton h-3 w-1/3 rounded-[var(--radius-control)]" />
+            <div className="rmi-skeleton h-4 w-full max-w-xl rounded-[var(--radius-control)]" />
           </div>
         </div>
       ))}
@@ -216,27 +216,27 @@ function HomeLeadStory({ item }: { item: MarketNewsItem }) {
   const source = item.sourceName || item.sourceDomain || "RMI Market Wire";
 
   return (
-    <article className="rmi-card rmi-news-card rmi-noise overflow-hidden">
+    <article className="rmi-card rmi-news-card overflow-hidden">
       <div className="grid gap-0 lg:grid-cols-[minmax(260px,0.88fr)_minmax(0,1fr)]">
         <NewsThumbnail item={item} size="hero" />
         <div className="relative z-[1] grid content-between gap-5 p-5 sm:p-6">
           <div>
-            <div className="flex flex-wrap items-center gap-2 text-xs font-black text-paper/55">
+            <div className="flex flex-wrap items-center gap-2 text-xs font-semibold text-paper/55">
               <NewsTickerLinks item={item} />
               <EventBadge item={item} positive={positive} />
               <span>{formatDate(item.eventDate)}</span>
               <SourceMeta item={item} />
             </div>
-            <h2 className="mt-3 text-xl font-black leading-tight text-paper sm:text-2xl">
+            <h2 className="mt-3 text-xl font-bold leading-tight text-paper sm:text-2xl">
               {trimTitle(item.title, 132)}
             </h2>
-            <p className="mt-3 text-sm font-bold leading-6 text-paper/58">
+            <p className="mt-3 text-sm leading-6 text-paper/58">
               {source} catalyst ranked by impact, confidence, and recency for {formatNewsArtistNames(item)}.
             </p>
           </div>
 
           <div className="grid gap-3 sm:grid-cols-[1fr_auto] sm:items-end">
-            <div className="grid grid-cols-2 gap-3 text-xs font-black uppercase tracking-wide text-paper/45">
+            <div className="grid grid-cols-2 gap-3 text-xs font-semibold uppercase tracking-wide text-paper/45">
               <ImpactGauge label="Impact" value={item.impactScore} positive={positive} />
               <ImpactGauge label="Confidence" value={item.confidence * 100} positive />
             </div>
@@ -244,7 +244,7 @@ function HomeLeadStory({ item }: { item: MarketNewsItem }) {
               <MediaLink item={item} />
               <Link
                 href={`/artists/${item.artistId}`}
-                className="inline-flex min-h-9 items-center gap-2 rounded bg-paper px-3 text-xs font-black text-ink hover:bg-paper/90"
+                className="inline-flex min-h-9 items-center gap-2 rounded-[var(--radius-control)] bg-paper px-3 text-xs font-semibold text-ink hover:bg-paper/90"
               >
                 View quote
                 <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
@@ -265,13 +265,13 @@ function HomeStoryCard({ item }: { item: MarketNewsItem }) {
     <article className="rmi-card rmi-news-card overflow-hidden">
       <NewsThumbnail item={item} size="card" />
       <div className="grid gap-3 p-3.5">
-        <div className="flex flex-wrap items-center gap-2 text-[11px] font-black text-paper/50">
+        <div className="flex flex-wrap items-center gap-2 text-[11px] font-semibold text-paper/50">
           <NewsTickerLinks item={item} />
           <EventBadge item={item} positive={positive} />
           <span>{formatDate(item.eventDate)}</span>
           <SourceMeta item={item} />
         </div>
-        <h3 className="min-h-[3.2rem] text-sm font-black leading-snug text-paper">
+        <h3 className="min-h-[3.2rem] text-sm font-semibold leading-snug text-paper">
           {trimTitle(item.title, 88)}
         </h3>
         <div className="flex items-center justify-end gap-3 border-t border-line pt-3">
@@ -293,13 +293,13 @@ function HomeBrief({ item }: { item: MarketNewsItem }) {
       <div className="grid grid-cols-[46px_minmax(0,1fr)_18px] items-start gap-3">
         <NewsThumbnail item={item} size="small" />
         <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-2 text-[11px] font-black text-paper/50">
+          <div className="flex flex-wrap items-center gap-2 text-[11px] font-semibold text-paper/50">
             <NewsTickerLinks item={item} />
             <span>{formatDate(item.eventDate)}</span>
             <EventBadge item={item} positive={positive} />
             <SourceMeta item={item} />
           </div>
-          <h3 className="mt-1 truncate text-sm font-black text-paper">{item.title}</h3>
+          <h3 className="mt-1 truncate text-sm font-semibold text-paper">{item.title}</h3>
         </div>
         <SourceLink item={item} />
       </div>
@@ -326,7 +326,7 @@ function MarketNewsArticle({
       <span>{formatDate(item.eventDate)}</span>
       <span
         className={clsx(
-          "rounded px-1.5 py-0.5",
+          "rounded-[var(--radius-control)] px-1.5 py-0.5",
           positive ? "bg-mint/[0.08] text-mint" : "bg-ember/[0.08] text-ember"
         )}
       >
@@ -349,8 +349,8 @@ function MarketNewsArticle({
               </div>
             </div>
             {meta}
-            <h3 className="mt-2 text-xl font-black leading-tight text-paper">{title}</h3>
-            <p className="mt-3 text-xs font-bold uppercase tracking-wide text-paper/40">
+            <h3 className="mt-2 text-xl font-bold leading-tight text-paper">{title}</h3>
+            <p className="mt-3 text-xs font-semibold uppercase tracking-wide text-paper/40">
               Impact {Math.round(item.impactScore)} · Confidence {Math.round(item.confidence * 100)}%
             </p>
           </div>
@@ -365,9 +365,9 @@ function MarketNewsArticle({
         {compact ? null : <NewsThumbnail item={item} size="row" />}
         <div className="min-w-0">
           {meta}
-          <h3 className="mt-1 text-sm font-black leading-snug text-paper">{title}</h3>
+          <h3 className="mt-1 text-sm font-semibold leading-snug text-paper">{title}</h3>
           {!compact ? (
-            <p className="mt-2 text-xs font-bold text-paper/45">{formatNewsArtistNames(item)}</p>
+            <p className="mt-2 text-xs font-medium text-paper/45">{formatNewsArtistNames(item)}</p>
           ) : null}
         </div>
         <div className="flex flex-col items-end gap-2">
@@ -388,7 +388,7 @@ function NewsTickerLinks({ item }: { item: MarketNewsItem }) {
         <Link
           key={artist.artistId}
           href={`/artists/${artist.artistId}`}
-          className="rounded bg-cyan/10 px-2 py-1 text-cyan hover:bg-cyan/15"
+          className="rounded-[var(--radius-control)] bg-cyan/10 px-2 py-1 text-cyan hover:bg-cyan/15"
           title={artist.artistName}
         >
           {artist.ticker}
@@ -429,13 +429,12 @@ function NewsThumbnail({ item, size = "row" }: { item: MarketNewsItem; size?: "h
     <Link
       href={`/artists/${item.artistId}`}
       className={clsx(
-        "relative block shrink-0 overflow-hidden rounded-lg border border-line bg-panelSoft",
+        "relative block shrink-0 overflow-hidden rounded-[var(--radius-control)] border border-line bg-panelSoft",
         dimensions
       )}
       aria-label={`${item.artistName} quote`}
     >
       <span className={clsx("absolute inset-0 grid place-items-center", getNewsFallbackClass(item))}>
-        <span className="absolute inset-0 opacity-55 [background-image:linear-gradient(135deg,rgba(255,255,255,.35)_0,rgba(255,255,255,0)_32%),radial-gradient(circle_at_84%_18%,rgba(255,255,255,.45),transparent_26%)]" />
         <span className="relative grid place-items-center gap-2 text-paper/75">
           {item.sourceIconUrl ? (
             <img
@@ -448,7 +447,7 @@ function NewsThumbnail({ item, size = "row" }: { item: MarketNewsItem; size?: "h
               }}
             />
           ) : null}
-          <span className={clsx("font-black", size === "hero" ? "text-5xl" : size === "card" ? "text-3xl" : "text-sm")}>
+          <span className={clsx("font-semibold", size === "hero" ? "text-5xl" : size === "card" ? "text-3xl" : "text-sm")}>
             {item.ticker}
           </span>
         </span>
@@ -472,14 +471,14 @@ function NewsThumbnail({ item, size = "row" }: { item: MarketNewsItem; size?: "h
         </span>
       ) : null}
       {size === "hero" ? (
-        <span className="absolute inset-x-0 bottom-0 flex items-center justify-between gap-3 bg-black/58 px-4 py-3 text-sm font-black text-white">
+        <span className="absolute inset-x-0 bottom-0 flex items-center justify-between gap-3 bg-black/70 px-4 py-3 text-sm font-semibold text-white">
           <span className="truncate">{item.artistName} · {item.ticker}</span>
-          <span className="shrink-0 rounded bg-white/15 px-2 py-1 text-[10px] uppercase tracking-wide">
+          <span className="shrink-0 rounded-[var(--radius-control)] bg-white/15 px-2 py-1 text-[10px] uppercase tracking-wide">
             {getEventLabel(item)}
           </span>
         </span>
       ) : (
-        <span className="absolute bottom-1 left-1 rounded bg-white/90 px-1.5 py-0.5 text-[10px] font-black text-paper shadow-sm">
+        <span className="absolute bottom-1 left-1 rounded-[var(--radius-control)] bg-white/90 px-1.5 py-0.5 text-[10px] font-semibold text-paper shadow-sm">
           {item.ticker}
         </span>
       )}
@@ -489,29 +488,29 @@ function NewsThumbnail({ item, size = "row" }: { item: MarketNewsItem; size?: "h
 
 function getNewsFallbackClass(item: MarketNewsItem) {
   if (item.eventType === "controversy") {
-    return "bg-gradient-to-br from-ember/14 via-panelSoft to-cyan/10";
+    return "bg-ember/10";
   }
 
   if (item.eventType === "review") {
-    return "bg-gradient-to-br from-cyan/14 via-panelSoft to-brass/12";
+    return "bg-cyan/10";
   }
 
   if (item.eventType === "viral") {
-    return "bg-gradient-to-br from-cyan/18 via-brass/10 to-panelSoft";
+    return "bg-cyan/10";
   }
 
   if (item.eventType === "tour" || item.eventType === "award") {
-    return "bg-gradient-to-br from-brass/18 via-panelSoft to-cyan/10";
+    return "bg-brass/10";
   }
 
-  return "bg-gradient-to-br from-panelSoft via-brass/12 to-cyan/10";
+  return "bg-panelSoft";
 }
 
 function EventBadge({ item, positive }: { item: MarketNewsItem; positive: boolean }) {
   return (
     <span
       className={clsx(
-        "rounded px-1.5 py-0.5",
+        "rounded-[var(--radius-control)] px-1.5 py-0.5",
         item.eventType === "controversy"
           ? "bg-ember/[0.09] text-ember"
           : item.eventType === "review"
@@ -611,7 +610,7 @@ function MediaLink({ item, compact = false }: { item: MarketNewsItem; compact?: 
       target="_blank"
       rel="noreferrer"
       className={clsx(
-        "inline-flex items-center gap-1.5 rounded-lg border border-line bg-panelSoft text-xs font-black text-paper/65 hover:border-cyan/45 hover:text-cyan",
+        "inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-line bg-panelSoft text-xs font-semibold text-paper/65 hover:border-cyan/45 hover:text-cyan",
         compact ? "px-1.5 py-1" : "min-h-9 px-3"
       )}
     >

@@ -91,28 +91,29 @@ export function ArtistPriceHistoryPanel({
   }, [hasRealHistory, history, status]);
 
   return (
-    <section className="rmi-card overflow-hidden shadow-market">
-      <div className="rmi-section-header !flex flex-col !items-stretch !justify-between gap-3 px-4 py-4 text-left sm:!flex-row sm:!items-center sm:px-5">
+    <section className="rmi-card overflow-hidden" aria-busy={status === "loading"}>
+      <div className="rmi-section-header flex flex-col items-stretch justify-between gap-3 px-4 py-4 text-left sm:flex-row sm:items-center sm:px-5">
         <div className="min-w-0 text-left sm:mr-auto">
           <div className="flex flex-wrap items-center gap-2">
             <Activity className="h-4 w-4 text-cyan" aria-hidden="true" />
-            <h2 className="text-lg font-black">Price History</h2>
+            <h2 className="text-lg font-semibold">Price History</h2>
             <span className="rmi-status-chip"><Crosshair className="h-3 w-3" /> Recorded quotes</span>
           </div>
-          <p className="mt-1 text-sm font-bold text-paper/50">{subtitle}</p>
+          <p className="mt-1 text-sm text-paper/50">{subtitle}</p>
         </div>
-        <div className="inline-flex max-w-full overflow-x-auto rounded-lg border border-line bg-panelSoft p-1 scrollbar-thin">
+        <div className="inline-flex max-w-full overflow-x-auto rounded-[var(--radius-control)] border border-line bg-panelSoft p-1 scrollbar-thin">
           {ranges.map((candidate) => (
             <button
               key={candidate}
               type="button"
               onClick={() => setRange(candidate)}
               className={clsx(
-                "h-8 min-w-11 rounded px-2 text-xs font-black transition",
+                "h-8 min-w-11 rounded-[calc(var(--radius-control)-2px)] px-2 text-xs font-semibold transition",
                 range === candidate
-                  ? "bg-cyan text-ink shadow-[0_0_18px_rgba(37,213,255,0.25)]"
+                  ? "bg-cyan text-ink"
                   : "text-paper/50 hover:bg-cyan/10 hover:text-cyan"
               )}
+              aria-pressed={range === candidate}
             >
               {candidate}
             </button>

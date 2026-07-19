@@ -5,7 +5,7 @@ import { useGame } from "@/components/GameProvider";
 import { MiniSparkline } from "@/components/MiniSparkline";
 import { formatCurrency, formatPercent } from "@/lib/formatters";
 import type { Artist } from "@/lib/types";
-import { Activity, Flame, Star, TrendingDown, TrendingUp } from "lucide-react";
+import { Activity, Star, TrendingDown, TrendingUp } from "lucide-react";
 import Link from "next/link";
 import { useMemo } from "react";
 
@@ -40,7 +40,7 @@ export function MarketSideRail({
     <aside className="rmi-card overflow-hidden">
       <MarketList title="Trending Tickers" artists={marketLists.movers} href="/markets" tone="cyan" icon="activity" />
       {includeWatchlist && watchlistArtists.length ? (
-        <MarketList title="Your Watchlist" artists={watchlistArtists.slice(0, listSize)} href="/watchlist" tone="violet" icon="star" />
+        <MarketList title="Your Watchlist" artists={watchlistArtists.slice(0, listSize)} href="/watchlist" tone="brass" icon="star" />
       ) : null}
       <MarketList title="Top Gainers" artists={marketLists.gainers} href="/markets" tone="mint" icon="up" />
       <MarketList title="Top Losers" artists={marketLists.losers} href="/markets" tone="ember" icon="down" />
@@ -58,7 +58,7 @@ function MarketList({
   title: string;
   artists: Artist[];
   href?: string;
-  tone: "cyan" | "mint" | "ember" | "violet";
+  tone: "cyan" | "mint" | "ember" | "brass";
   icon: "activity" | "up" | "down" | "star";
 }) {
   if (!artists.length) {
@@ -69,7 +69,7 @@ function MarketList({
     cyan: "text-cyan",
     mint: "text-mint",
     ember: "text-ember",
-    violet: "text-violet"
+    brass: "text-brass"
   }[tone];
 
   return (
@@ -77,7 +77,7 @@ function MarketList({
       <div className="rmi-section-header flex items-center justify-between gap-3 px-3 py-2.5">
         <span className="flex items-center gap-2">
           <RailIcon icon={icon} className={`h-3.5 w-3.5 ${toneClasses}`} />
-          <span className="text-xs font-black">{title}</span>
+          <span className="text-xs font-semibold">{title}</span>
         </span>
         {href ? <Link href={href} className="text-[11px] font-bold text-cyan hover:text-paper">View All</Link> : null}
       </div>
@@ -91,8 +91,8 @@ function MarketList({
             <span className="flex min-w-0 items-center gap-2.5">
               <ArtistAvatar artist={artist} size="sm" />
               <span className="min-w-0">
-                <span className="block truncate text-xs font-black transition group-hover:text-cyan">{artist.name}</span>
-                <span className="block truncate text-[10px] font-bold text-paper/42">${artist.ticker}</span>
+                <span className="block truncate text-xs font-semibold transition group-hover:text-cyan">{artist.name}</span>
+                <span className="block truncate text-[10px] font-medium text-paper/42">${artist.ticker}</span>
               </span>
             </span>
             <MiniSparkline
@@ -102,8 +102,8 @@ function MarketList({
               height={24}
             />
             <span className="text-right number-tabular">
-              <span className="block text-xs font-black">{formatCurrency(artist.currentPrice)}</span>
-              <span className={artist.dailyChangePercent >= 0 ? "block text-[10px] font-black text-mint" : "block text-[10px] font-black text-ember"}>
+              <span className="block text-xs font-semibold">{formatCurrency(artist.currentPrice)}</span>
+              <span className={artist.dailyChangePercent >= 0 ? "block text-[10px] font-semibold text-mint" : "block text-[10px] font-semibold text-ember"}>
                 {formatPercent(artist.dailyChangePercent)}
               </span>
             </span>
@@ -118,6 +118,6 @@ function RailIcon({ icon, className }: { icon: "activity" | "up" | "down" | "sta
   if (icon === "up") return <TrendingUp className={className} aria-hidden="true" />;
   if (icon === "down") return <TrendingDown className={className} aria-hidden="true" />;
   if (icon === "star") return <Star className={className} aria-hidden="true" />;
-  if (icon === "activity") return <Flame className={className} aria-hidden="true" />;
+  if (icon === "activity") return <Activity className={className} aria-hidden="true" />;
   return <Activity className={className} aria-hidden="true" />;
 }

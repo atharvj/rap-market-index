@@ -59,7 +59,7 @@ export default function MarketsPage() {
       <header className="rmi-page-head flex flex-wrap items-end justify-between gap-5">
         <div>
           <div className="rmi-kicker"><Activity className="h-4 w-4" /> Live Exchange</div>
-          <h1 className="mt-3 text-4xl font-black">Artist Markets</h1>
+          <h1 className="mt-3 text-4xl font-bold">Artist Markets</h1>
           <p className="mt-2 max-w-2xl text-sm text-paper/60">Scan every active quote, compare momentum, and move from market signal to artist research in one view.</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -73,7 +73,7 @@ export default function MarketsPage() {
           title={<span className="flex items-center gap-2"><Signal className="h-4 w-4 text-cyan" /> RMI Market Pulse</span>}
           subtitle="Equal-weight quote movement across every active artist over recorded market sessions."
           action={
-            <span className={marketIndexChange >= 0 ? "text-sm font-black text-mint number-tabular" : "text-sm font-black text-ember number-tabular"}>
+            <span className={marketIndexChange >= 0 ? "text-sm font-semibold text-mint number-tabular" : "text-sm font-semibold text-ember number-tabular"}>
               {formatPercent(marketIndexChange)}
             </span>
           }
@@ -101,9 +101,9 @@ export default function MarketsPage() {
             className="h-full min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-paper/35"
             placeholder="Search artist or ticker"
           />
-          <span className="hidden text-[10px] font-black uppercase tracking-[0.18em] text-paper/35 sm:block">{artists.length} Results</span>
+          <span className="hidden text-[10px] font-semibold uppercase tracking-[0.18em] text-paper/35 sm:block">{artists.length} Results</span>
         </label>
-        <div className="flex items-center gap-1 rounded-lg border border-line bg-panel/85 p-1 shadow-market" aria-label="Sort markets">
+        <div className="flex items-center gap-1 rounded-md border border-line bg-panel p-1" aria-label="Sort markets">
           <SortButton active={sortKey === "name"} onClick={() => chooseSort("name")}>Name</SortButton>
           <SortButton active={sortKey === "price"} onClick={() => chooseSort("price")}>Price</SortButton>
           <SortButton active={sortKey === "change"} onClick={() => chooseSort("change")}>24h</SortButton>
@@ -138,11 +138,11 @@ export default function MarketsPage() {
             <Link href={`/artists/${artist.id}`} className="flex min-w-0 items-center gap-3">
               <ArtistAvatar artist={artist} />
               <span className="min-w-0">
-                <span className="block truncate text-sm font-black">{artist.name}</span>
-                <span className="block truncate text-xs font-bold text-paper/45">${artist.ticker}</span>
+                <span className="block truncate text-sm font-semibold">{artist.name}</span>
+                <span className="block truncate text-xs font-medium text-paper/45">${artist.ticker}</span>
               </span>
             </Link>
-            <span className="text-right text-sm font-black number-tabular">{formatCurrency(artist.currentPrice)}</span>
+            <span className="text-right text-sm font-semibold number-tabular">{formatCurrency(artist.currentPrice)}</span>
             <span className="text-right text-xs">
               <ChangeText value={artist.dailyChangePercent} />
             </span>
@@ -157,8 +157,8 @@ export default function MarketsPage() {
 function BreadthRow({ label, value, tone = "neutral" }: { label: string; value: number; tone?: "neutral" | "good" | "bad" }) {
   return (
     <div className="rmi-metric flex items-center justify-between gap-3 px-3 py-3 text-sm">
-      <span className="font-bold text-paper/60">{label}</span>
-      <span className={tone === "good" ? "font-black text-mint number-tabular" : tone === "bad" ? "font-black text-ember number-tabular" : "font-black number-tabular"}>
+      <span className="font-medium text-paper/60">{label}</span>
+      <span className={tone === "good" ? "font-semibold text-mint number-tabular" : tone === "bad" ? "font-semibold text-ember number-tabular" : "font-semibold number-tabular"}>
         {value}
       </span>
     </div>
@@ -178,7 +178,7 @@ function SortButton({
     <button
       type="button"
       onClick={onClick}
-      className={active ? "h-8 rounded-md bg-paper px-3 text-xs font-bold text-ink" : "h-8 rounded-md px-3 text-xs font-bold text-paper/55 hover:text-paper"}
+      className={active ? "h-8 rounded-md bg-paper px-3 text-xs font-semibold text-ink" : "h-8 rounded-md px-3 text-xs font-semibold text-paper/55 hover:text-paper"}
     >
       {children}
     </button>
