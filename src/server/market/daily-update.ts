@@ -1907,7 +1907,6 @@ function explainMove(
     ["video momentum", stats.youtubeGrowth],
     ["discovery trend", stats.searchGrowth],
     ["fan sentiment", stats.socialGrowth],
-    ["media and reviews", stats.newsScore - 50],
     ["trading demand", stats.traderDemand]
   ] as const;
   const [signalName] = signals.reduce((best, current) =>
@@ -1922,10 +1921,11 @@ function explainMove(
       return `${ticker} held flat as ${formatCatalystReason(primaryCatalyst.reason)} was balanced by broader market signals${sourceClause}.`;
     }
 
-    return `${ticker} held flat as available market signals balanced out without a source-backed headline catalyst strong enough to lead the move${sourceClause}.`;
+    return `${ticker} held unchanged at the latest market close. No verified headline or event was strong enough to attribute as the primary cause${sourceClause}.`;
   }
 
   const direction = dailyChangePercent > 0 ? "moved higher" : "pulled back";
+  const magnitude = Math.abs(dailyChangePercent).toFixed(2);
 
   if (primaryCatalyst) {
     const counterClause = getCounterCatalystClause({
@@ -1935,15 +1935,15 @@ function explainMove(
     const catalyst = formatCatalystReason(primaryCatalyst.reason);
 
     if (primaryCatalyst.reasonPriority >= 8 && Math.abs(primaryCatalyst.priceShock) >= 0.006) {
-      return `${ticker} ${direction} after ${catalyst} became the main market catalyst${counterClause}${sourceClause}.`;
+      return `${ticker} ${direction} by ${magnitude}% after ${catalyst} became the main market catalyst${counterClause}${sourceClause}.`;
     }
   }
 
   if (counterCatalyst?.reasonPriority && counterCatalyst.reasonPriority >= 8) {
-    return `${ticker} ${direction} as ${signalName} shifted, though ${formatCatalystReason(counterCatalyst.reason)} offset part of the move${sourceClause}.`;
+    return `${ticker} ${direction} by ${magnitude}% as ${signalName} shifted, though ${formatCatalystReason(counterCatalyst.reason)} offset part of the move${sourceClause}.`;
   }
 
-  return `${ticker} ${direction} on baseline market data without a source-backed headline catalyst strong enough to lead the move${sourceClause}.`;
+  return `${ticker} ${direction} by ${magnitude}% at the latest market close. No verified headline or event was strong enough to attribute as the primary cause${sourceClause}.`;
 }
 
 function getSourceConsensusClause(sourceAttribution: SourceAttribution) {
