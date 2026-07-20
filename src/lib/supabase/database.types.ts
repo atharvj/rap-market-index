@@ -69,6 +69,7 @@ export type Database = {
           spotify_id: string | null;
           youtube_channel_id: string | null;
           musicbrainz_id: string | null;
+          wikipedia_article_title: string | null;
           lastfm_name: string | null;
           gdelt_query: string | null;
           created_at: string;
@@ -79,6 +80,7 @@ export type Database = {
           spotify_id?: string | null;
           youtube_channel_id?: string | null;
           musicbrainz_id?: string | null;
+          wikipedia_article_title?: string | null;
           lastfm_name?: string | null;
           gdelt_query?: string | null;
           created_at?: string;

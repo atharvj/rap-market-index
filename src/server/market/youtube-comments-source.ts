@@ -260,9 +260,23 @@ export async function collectYoutubeCommentMarketSignals({
         ? warnings
         : [
             ...warnings,
-            `YouTube comments skipped ${artists.length - channelLookups.length} artist(s) without youtube_channel_id.`
+            `YouTube comments skipped missing channel IDs for: ${formatMissingArtistNames({ artists, channelLookups })}.`
           ]
   };
+}
+
+function formatMissingArtistNames({
+  artists,
+  channelLookups
+}: {
+  artists: MarketUpdateArtist[];
+  channelLookups: Array<{ artist: MarketUpdateArtist }>;
+}) {
+  const mappedIds = new Set(channelLookups.map((lookup) => lookup.artist.id));
+  return artists
+    .filter((artist) => !mappedIds.has(artist.id))
+    .map((artist) => `${artist.name} (${artist.ticker})`)
+    .join(", ");
 }
 
 function buildYoutubeCommentSignal({

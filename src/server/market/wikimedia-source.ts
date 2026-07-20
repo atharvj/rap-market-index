@@ -8,6 +8,7 @@ import {
 import type {
   AdapterSignal,
   AdapterSignals,
+  ArtistExternalIds,
   MarketObservation,
   ObservationBaselines
 } from "@/server/market/market-data";
@@ -15,6 +16,7 @@ import type { HypeStats } from "@/lib/types";
 
 type WikimediaCollectOptions = {
   artists: MarketUpdateArtist[];
+  externalIds?: Record<string, ArtistExternalIds>;
   runDate: string;
   baselines?: ObservationBaselines;
   delayMs?: number;
@@ -83,6 +85,7 @@ const REQUEST_ERROR = "request_error";
 
 export async function collectWikimediaMarketSignals({
   artists,
+  externalIds = {},
   runDate,
   baselines = {},
   delayMs = 250,
@@ -99,9 +102,11 @@ export async function collectWikimediaMarketSignals({
     }
 
     const query = buildWikipediaSearchQuery(artist.name);
+    const exactTitle = externalIds[artist.id]?.wikipediaArticleTitle?.trim();
     const article = await resolveWikipediaArticle({
       artist,
       query,
+      exactTitle,
       timeoutMs,
       fetchImpl
     });
@@ -245,21 +250,30 @@ function buildWikimediaSignal({
 async function resolveWikipediaArticle({
   artist,
   query,
+  exactTitle,
   timeoutMs,
   fetchImpl
 }: {
   artist: MarketUpdateArtist;
   query: string;
+  exactTitle?: string;
   timeoutMs: number;
   fetchImpl: typeof fetch;
 }): Promise<{ ok: true; candidate: WikipediaCandidate } | { ok: false; error: string }> {
   const titleCandidate = await resolveWikipediaTitleCandidate({
     artist,
+    titleCandidates: exactTitle ? [exactTitle] : undefined,
+    minimumScore: exactTitle ? 0 : undefined,
+    manualOverride: Boolean(exactTitle),
     timeoutMs,
     fetchImpl
   });
 
   if (titleCandidate.ok) {
+    return titleCandidate;
+  }
+
+  if (exactTitle) {
     return titleCandidate;
   }
 
@@ -329,14 +343,19 @@ async function resolveWikipediaArticle({
 
 async function resolveWikipediaTitleCandidate({
   artist,
+  titleCandidates = buildWikipediaTitleCandidates(artist.name),
+  minimumScore = 0.55,
+  manualOverride = false,
   timeoutMs,
   fetchImpl
 }: {
   artist: MarketUpdateArtist;
+  titleCandidates?: string[];
+  minimumScore?: number;
+  manualOverride?: boolean;
   timeoutMs: number;
   fetchImpl: typeof fetch;
 }): Promise<{ ok: true; candidate: WikipediaCandidate } | { ok: false; error: string }> {
-  const titleCandidates = buildWikipediaTitleCandidates(artist.name);
   const errors: string[] = [];
 
   for (const title of titleCandidates) {
@@ -385,7 +404,7 @@ async function resolveWikipediaTitleCandidate({
       snippet: page.extract ?? ""
     });
 
-    if (score.confidence < 0.55) {
+    if (score.confidence < minimumScore) {
       errors.push(`${page.title} did not have enough artist context.`);
       continue;
     }
@@ -395,7 +414,7 @@ async function resolveWikipediaTitleCandidate({
       candidate: {
         title: page.title,
         confidence: score.confidence,
-        reason: `Exact title lookup: ${score.reason}`,
+        reason: manualOverride ? "Operator-verified exact Wikipedia title." : `Exact title lookup: ${score.reason}`,
         snippet: page.extract,
         pageId: page.pageid
       }

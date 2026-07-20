@@ -111,7 +111,8 @@ const SOURCE_ID_FIELDS = [
   { key: "gdeltQuery", label: "News search queries", warningThreshold: 80 },
   { key: "spotifyId", label: "Spotify exact IDs", warningThreshold: null },
   { key: "youtubeChannelId", label: "YouTube exact IDs", warningThreshold: null },
-  { key: "musicbrainzId", label: "Release database IDs", warningThreshold: null }
+  { key: "musicbrainzId", label: "Release database IDs", warningThreshold: null },
+  { key: "wikipediaArticleTitle", label: "Wikipedia exact titles", warningThreshold: null }
 ] as const;
 
 const OBSERVATION_SERIES = [

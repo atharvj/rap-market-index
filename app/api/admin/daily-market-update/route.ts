@@ -740,6 +740,7 @@ async function collectRealSignals({
           artists,
           runDate,
           externalIds,
+          authToken: process.env.LISTENBRAINZ_USER_TOKEN,
           baselines: listenbrainzBaselines
         })
       );
@@ -844,6 +845,7 @@ async function collectRealSignals({
         collectWikimediaMarketSignals({
           artists,
           runDate,
+          externalIds,
           baselines: wikimediaBaselines
         })
       );

@@ -26,12 +26,15 @@ const mbid = "f82bcf78-5b69-4622-a5ef-73800768d9ac";
 describe("ListenBrainz market source", () => {
   it("collects exact-MBID popularity in one request and waits for a baseline before moving", async () => {
     let requestBody: unknown;
+    let authorization: string | null | undefined;
     const result = await collectListenBrainzMarketSignals({
       artists: [artist],
       runDate: "2026-07-11",
+      authToken: "listenbrainz-token",
       externalIds: { [artist.id]: { artistId: artist.id, musicbrainzId: mbid } },
       fetchImpl: async (_input, init) => {
         requestBody = JSON.parse(String(init?.body));
+        authorization = new Headers(init?.headers).get("authorization");
         return new Response(JSON.stringify([{
           artist_mbid: mbid,
           total_listen_count: 100000,
@@ -41,6 +44,7 @@ describe("ListenBrainz market source", () => {
     });
 
     expect(requestBody).toEqual({ artist_mbids: [mbid] });
+    expect(authorization).toBe("Token listenbrainz-token");
     expect(result.observations).toHaveLength(2);
     expect(result.signals[artist.id].stats.streamingGrowth).toBeUndefined();
     expect(result.signals[artist.id].rawPayload.status).toBe("baseline_only");
@@ -50,6 +54,7 @@ describe("ListenBrainz market source", () => {
     const result = await collectListenBrainzMarketSignals({
       artists: [artist],
       runDate: "2026-07-11",
+      authToken: "listenbrainz-token",
       externalIds: { [artist.id]: { artistId: artist.id, musicbrainzId: mbid } },
       baselines: {
         [artist.id]: {
@@ -68,5 +73,24 @@ describe("ListenBrainz market source", () => {
 
     expect(result.signals[artist.id].stats.streamingGrowth).toBeGreaterThan(0);
     expect(result.signals[artist.id].confidence).toBeLessThanOrEqual(0.62);
+  });
+
+  it("skips cleanly when no user token is configured", async () => {
+    let requested = false;
+    const result = await collectListenBrainzMarketSignals({
+      artists: [artist],
+      runDate: "2026-07-11",
+      externalIds: { [artist.id]: { artistId: artist.id, musicbrainzId: mbid } },
+      fetchImpl: async () => {
+        requested = true;
+        return new Response("[]", { status: 200 });
+      }
+    });
+
+    expect(requested).toBe(false);
+    expect(result.observations).toEqual([]);
+    expect(result.warnings).toEqual([
+      "ListenBrainz skipped because LISTENBRAINZ_USER_TOKEN is not configured."
+    ]);
   });
 });

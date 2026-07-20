@@ -23,6 +23,8 @@ type SourceIdInput = {
   lastfm_name?: string | null;
   gdeltQuery?: string | null;
   gdelt_query?: string | null;
+  wikipediaArticleTitle?: string | null;
+  wikipedia_article_title?: string | null;
 };
 
 type SourceIdsBody = {
@@ -221,6 +223,10 @@ async function normalizeSourceIdRecords(
     const musicbrainzId = normalizeMusicbrainzId(getProvidedValue(input, "musicbrainzId", "musicbrainz_id"));
     const lastfmName = normalizeNullableText(getProvidedValue(input, "lastfmName", "lastfm_name"), 120);
     const gdeltQuery = normalizeNullableText(getProvidedValue(input, "gdeltQuery", "gdelt_query"), 320);
+    const wikipediaArticleTitle = normalizeNullableText(
+      getProvidedValue(input, "wikipediaArticleTitle", "wikipedia_article_title"),
+      255
+    );
 
     if (spotifyId.error) {
       errors.push(`Record ${index + 1}: ${spotifyId.error}`);
@@ -250,6 +256,12 @@ async function normalizeSourceIdRecords(
       errors.push(`Record ${index + 1}: ${gdeltQuery.error}`);
     } else if (gdeltQuery.provided) {
       record.gdeltQuery = gdeltQuery.value;
+    }
+
+    if (wikipediaArticleTitle.error) {
+      errors.push(`Record ${index + 1}: ${wikipediaArticleTitle.error}`);
+    } else if (wikipediaArticleTitle.provided) {
+      record.wikipediaArticleTitle = wikipediaArticleTitle.value;
     }
 
     if (Object.keys(record).length === 1) {

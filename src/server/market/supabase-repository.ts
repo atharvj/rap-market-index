@@ -27,6 +27,7 @@ export type ArtistExternalIdUpsert = {
   spotifyId?: string | null;
   youtubeChannelId?: string | null;
   musicbrainzId?: string | null;
+  wikipediaArticleTitle?: string | null;
   lastfmName?: string | null;
   gdeltQuery?: string | null;
 };
@@ -357,6 +358,7 @@ export async function loadArtistExternalIds(
       spotifyId: row.spotify_id ?? undefined,
       youtubeChannelId: row.youtube_channel_id ?? undefined,
       musicbrainzId: row.musicbrainz_id ?? undefined,
+      wikipediaArticleTitle: row.wikipedia_article_title ?? undefined,
       lastfmName: row.lastfm_name ?? undefined,
       gdeltQuery: row.gdelt_query ?? undefined
     };
@@ -383,6 +385,10 @@ export async function upsertArtistExternalIds(
       youtube_channel_id:
         record.youtubeChannelId !== undefined ? record.youtubeChannelId : current?.youtubeChannelId ?? null,
       musicbrainz_id: record.musicbrainzId !== undefined ? record.musicbrainzId : current?.musicbrainzId ?? null,
+      wikipedia_article_title:
+        record.wikipediaArticleTitle !== undefined
+          ? record.wikipediaArticleTitle
+          : current?.wikipediaArticleTitle ?? null,
       lastfm_name: record.lastfmName !== undefined ? record.lastfmName : current?.lastfmName ?? null,
       gdelt_query: record.gdeltQuery !== undefined ? record.gdeltQuery : current?.gdeltQuery ?? null
     };
@@ -402,6 +408,7 @@ export async function upsertArtistExternalIds(
       spotifyId: row.spotify_id ?? undefined,
       youtubeChannelId: row.youtube_channel_id ?? undefined,
       musicbrainzId: row.musicbrainz_id ?? undefined,
+      wikipediaArticleTitle: row.wikipedia_article_title ?? undefined,
       lastfmName: row.lastfm_name ?? undefined,
       gdeltQuery: row.gdelt_query ?? undefined
     };

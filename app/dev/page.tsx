@@ -221,6 +221,7 @@ type ArtistSourceIdRecord = {
     musicbrainzId?: string;
     lastfmName?: string;
     gdeltQuery?: string;
+    wikipediaArticleTitle?: string;
   };
 };
 
@@ -236,6 +237,7 @@ type ManualSourceIdForm = {
   musicbrainzId: string;
   lastfmName: string;
   gdeltQuery: string;
+  wikipediaArticleTitle: string;
 };
 
 type ManualSourceIdSaveState =
@@ -354,7 +356,8 @@ const sourceIdLabelByField: Record<string, string> = {
   youtubeChannelId: "YouTube channel",
   musicbrainzId: "MusicBrainz ID",
   lastfmName: "audience search name",
-  gdeltQuery: "news search query"
+  gdeltQuery: "news search query",
+  wikipediaArticleTitle: "Wikipedia article title"
 };
 
 const manualSourceIdFields: Array<{
@@ -392,6 +395,12 @@ const manualSourceIdFields: Array<{
     label: "News search query",
     placeholder: "\"Artist Name\"",
     helper: "Optional override for news/review/event matching."
+  },
+  {
+    key: "wikipediaArticleTitle",
+    label: "Wikipedia article title",
+    placeholder: "Exact English Wikipedia article title",
+    helper: "Optional. Use the exact title shown after /wiki/ on the artist's English Wikipedia page."
   }
 ];
 
@@ -740,7 +749,8 @@ const emptyManualSourceIdForm: ManualSourceIdForm = {
   youtubeChannelId: "",
   musicbrainzId: "",
   lastfmName: "",
-  gdeltQuery: ""
+  gdeltQuery: "",
+  wikipediaArticleTitle: ""
 };
 
 const emptyArtistRosterForm: ArtistRosterForm = {
@@ -1638,7 +1648,8 @@ export default function DevPage() {
           youtubeChannelId: sourceIds?.youtubeChannelId ?? "",
           musicbrainzId: sourceIds?.musicbrainzId ?? "",
           lastfmName: sourceIds?.lastfmName ?? "",
-          gdeltQuery: sourceIds?.gdeltQuery ?? ""
+          gdeltQuery: sourceIds?.gdeltQuery ?? "",
+          wikipediaArticleTitle: sourceIds?.wikipediaArticleTitle ?? ""
         });
       }
 
@@ -1713,7 +1724,8 @@ export default function DevPage() {
           youtubeChannelId: sourceIds?.youtubeChannelId ?? "",
           musicbrainzId: sourceIds?.musicbrainzId ?? "",
           lastfmName: sourceIds?.lastfmName ?? "",
-          gdeltQuery: sourceIds?.gdeltQuery ?? ""
+          gdeltQuery: sourceIds?.gdeltQuery ?? "",
+          wikipediaArticleTitle: sourceIds?.wikipediaArticleTitle ?? ""
         });
       }
 
@@ -2752,15 +2764,17 @@ function MarketHealthPanel({ data }: { data: MarketHealth }) {
       <CoverageGrid title="Source ID coverage" items={data.sourceCoverage.map((item) => ({
         key: item.key,
         label: item.label,
-        value: formatPercent(item.coveragePercent),
-        detail: `${item.configuredCount} mapped, ${item.missingCount} missing`
+        value: formatCoveragePercent(item.coveragePercent),
+        detail: `${item.configuredCount} of ${data.activeArtistCount} artists mapped`
       }))} />
 
       <CoverageGrid title="Observation freshness" items={data.observationHealth.map((item) => ({
         key: item.key,
         label: item.label,
-        value: formatPercent(item.freshCoveragePercent),
-        detail: item.latestDate ? `Latest ${formatDate(item.latestDate)}` : "No observations"
+        value: formatCoveragePercent(item.freshCoveragePercent),
+        detail: item.latestDate
+          ? `${item.freshArtistCount} of ${data.activeArtistCount} artists fresh · Latest ${formatDate(item.latestDate)}`
+          : "No observations"
       }))} />
 
       <CoverageGrid title="Quote tick health" items={[
@@ -3550,6 +3564,10 @@ function formatSignedCurrency(value: number) {
 
 function formatUnsignedPercent(value: number) {
   return `${value.toFixed(1)}%`;
+}
+
+function formatCoveragePercent(value: number) {
+  return `${Math.max(0, Math.min(100, value)).toFixed(2)}%`;
 }
 
 function shortId(value: string) {
@@ -4696,6 +4714,7 @@ type ManualSourceIdUpsert = {
   spotifyId?: string | null;
   youtubeChannelId?: string | null;
   musicbrainzId?: string | null;
+  wikipediaArticleTitle?: string | null;
   lastfmName?: string | null;
   gdeltQuery?: string | null;
 };
@@ -4750,7 +4769,8 @@ function buildManualSourceForm(record: ArtistSourceIdRecord): ManualSourceIdForm
     youtubeChannelId: record.externalIds.youtubeChannelId ?? "",
     musicbrainzId: record.externalIds.musicbrainzId ?? "",
     lastfmName: record.externalIds.lastfmName ?? "",
-    gdeltQuery: record.externalIds.gdeltQuery ?? ""
+    gdeltQuery: record.externalIds.gdeltQuery ?? "",
+    wikipediaArticleTitle: record.externalIds.wikipediaArticleTitle ?? ""
   };
 }
 

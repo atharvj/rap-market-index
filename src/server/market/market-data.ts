@@ -5,6 +5,7 @@ export type ArtistExternalIds = {
   spotifyId?: string;
   youtubeChannelId?: string;
   musicbrainzId?: string;
+  wikipediaArticleTitle?: string;
   lastfmName?: string;
   gdeltQuery?: string;
 };

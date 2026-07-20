@@ -19,6 +19,7 @@ type ListenBrainzCollectOptions = {
   runDate: string;
   externalIds?: Record<string, ArtistExternalIds>;
   baselines?: ObservationBaselines;
+  authToken?: string;
   timeoutMs?: number;
   fetchImpl?: typeof fetch;
 };
@@ -45,6 +46,7 @@ export async function collectListenBrainzMarketSignals({
   runDate,
   externalIds = {},
   baselines = {},
+  authToken,
   timeoutMs = 10000,
   fetchImpl = fetch
 }: ListenBrainzCollectOptions): Promise<ListenBrainzMarketSignals> {
@@ -66,8 +68,19 @@ export async function collectListenBrainzMarketSignals({
     };
   }
 
+  const normalizedAuthToken = authToken?.trim();
+
+  if (!normalizedAuthToken) {
+    return {
+      signals: {},
+      observations: [],
+      warnings: ["ListenBrainz skipped because LISTENBRAINZ_USER_TOKEN is not configured."]
+    };
+  }
+
   const result = await fetchArtistPopularity({
     artistMbids: Array.from(artistsByMbid.keys()),
+    authToken: normalizedAuthToken,
     timeoutMs,
     fetchImpl
   });
@@ -172,10 +185,12 @@ export async function collectListenBrainzMarketSignals({
 
 async function fetchArtistPopularity({
   artistMbids,
+  authToken,
   timeoutMs,
   fetchImpl
 }: {
   artistMbids: string[];
+  authToken: string;
   timeoutMs: number;
   fetchImpl: typeof fetch;
 }): Promise<{ ok: true; rows: ListenBrainzPopularityRow[] } | { ok: false; error: string }> {
@@ -188,6 +203,7 @@ async function fetchArtistPopularity({
       signal: controller.signal,
       headers: {
         accept: "application/json",
+        authorization: `Token ${authToken}`,
         "content-type": "application/json",
         "user-agent": "rap-market-index/0.1 market research"
       },
