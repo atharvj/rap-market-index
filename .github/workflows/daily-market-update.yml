@@ -2,10 +2,10 @@ name: Run daily market update
 
 on:
   schedule:
-    # GitHub schedules can start late. Both slots call the same idempotent
-    # Pacific market date, so the second is a recovery attempt if the first
-    # is delayed or interrupted.
-    - cron: "15 10,11 * * *"
+    # GitHub schedules can start late. Every slot calls the same idempotent
+    # Pacific market date, so later slots recover from delayed or interrupted
+    # runs without writing a second close for that date.
+    - cron: "15 10,11,12,13 * * *"
   workflow_dispatch:
 
 concurrency:
@@ -27,8 +27,8 @@ jobs:
           fi
 
           curl --fail-with-body --silent --show-error --max-time 295 \
-            --retry 1 \
-            --retry-delay 20 \
+            --retry 3 \
+            --retry-delay 15 \
             --retry-all-errors \
             --header "x-market-update-secret: $MARKET_UPDATE_SECRET" \
             https://rap-market-index.vercel.app/api/cron/daily-market-update

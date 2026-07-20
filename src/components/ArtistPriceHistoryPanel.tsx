@@ -22,7 +22,7 @@ type HistoryResponse = {
   historyEnd?: string | null;
 };
 
-const ranges: HistoryRange[] = ["1D", "7D", "1M", "3M", "6M", "1Y", "ALL"];
+const ranges: HistoryRange[] = ["7D", "1M", "3M", "6M", "1Y", "ALL"];
 
 export function ArtistPriceHistoryPanel({
   artistId,
@@ -126,10 +126,10 @@ export function ArtistPriceHistoryPanel({
           {status === "ready" && !hasMovement
             ? range === "1D"
               ? "No intraday movement yet. A new quote is recorded when the market runs or an eligible order changes the price."
-              : "No recorded price change in this range."
+              : "No additional recorded close or eligible trade quote in this range."
             : range === "1D"
               ? "The 1D view uses recorded market refreshes and eligible trade quotes. Hover, tap, or click to inspect one."
-              : `${recordedCloseCount} recorded daily close${recordedCloseCount === 1 ? "" : "s"} in this range. Lines connect real observations; RMI does not add hidden prices between them.`}
+              : `${recordedCloseCount} recorded daily close${recordedCloseCount === 1 ? "" : "s"} in this range. Lines connect recorded closes and eligible public trades; RMI does not invent intraday movement.`}
         </p>
         {status === "error" ? (
           <p className="mt-3 text-xs font-bold text-ember">Price history unavailable.</p>
