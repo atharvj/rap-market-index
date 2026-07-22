@@ -55,9 +55,14 @@ export default function HomePage() {
   }, [query, state.artists]);
   const marketLeader = [...state.artists].sort((a, b) => b.dailyChangePercent - a.dailyChangePercent)[0];
   const underPressure = [...state.artists].sort((a, b) => a.dailyChangePercent - b.dailyChangePercent)[0];
-  const signalLeader = [...state.artists]
-    .filter((artist) => artist.id !== marketLeader?.id)
-    .sort((a, b) => b.hypeScore - a.hypeScore)[0] ?? marketLeader;
+  const signalRanking = [...state.artists].sort(
+    (a, b) => b.hypeScore - a.hypeScore || b.dailyChangePercent - a.dailyChangePercent
+  );
+  const strongestSignal = signalRanking[0];
+  const signalLeader = signalRanking.find((artist) => artist.id !== marketLeader?.id) ?? marketLeader;
+  const signalLeaderLabel = signalLeader?.id === strongestSignal?.id
+    ? "Strongest signal"
+    : "Next strongest signal";
   const breadth = getMarketBreadth(state.artists);
   const signalDeck = useMemo(
     () =>
@@ -152,7 +157,7 @@ export default function HomePage() {
         <div className="grid divide-y divide-line/80 border-t border-line bg-ink/45 lg:border-l lg:border-t-0">
           {marketLeader ? <PulseArtist label="Top gainer" artist={marketLeader} accent="mint" /> : null}
           {underPressure ? <PulseArtist label="Under pressure" artist={underPressure} accent="ember" /> : null}
-          {signalLeader ? <PulseArtist label="Strongest signal" artist={signalLeader} score accent="cyan" /> : null}
+          {signalLeader ? <PulseArtist label={signalLeaderLabel} artist={signalLeader} score accent="cyan" /> : null}
         </div>
       </section>
 

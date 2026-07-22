@@ -192,6 +192,29 @@ test.beforeEach(async ({ page }) => {
 
 test("homepage visual contract", async ({ page }) => {
   await assertStablePublicPage(page, "/", "Spot the next rise.", "homepage.png");
+  await expect(page.getByText("Strongest signal", { exact: true })).toBeVisible();
+});
+
+test("homepage does not call the second-ranked RMI score the strongest signal", async ({ page }) => {
+  await page.unroute("**/api/market/snapshot");
+  const topGainerIsSignalLeader: GameState = {
+    ...marketState,
+    artists: marketState.artists.map((artist, index) => ({
+      ...artist,
+      hypeScore: index === 0 ? 99 : index === 1 ? 90 : Math.min(89, artist.hypeScore)
+    }))
+  };
+  await page.route("**/api/market/snapshot", (route) =>
+    route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({ ok: true, source: "supabase", state: topGainerIsSignalLeader })
+    })
+  );
+
+  await page.goto("/");
+  await expect(page.locator('[aria-busy="true"]')).toHaveCount(0, { timeout: 15_000 });
+  await expect(page.getByText("Next strongest signal", { exact: true })).toBeVisible();
+  await expect(page.getByText("Strongest signal", { exact: true })).toHaveCount(0);
 });
 
 test("homepage artist search opens as an overlay without resizing the hero", async ({ page }) => {
