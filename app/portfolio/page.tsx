@@ -35,8 +35,8 @@ export default function PortfolioPage() {
   if (!session) {
     return (
       <SignedInGate
-        title="Your portfolio is private"
-        description="Log in to see cash, holdings, returns, and account activity. Signed-out visitors cannot access portfolio data."
+        title="Sign in to view your portfolio"
+        description="Log in to see your cash, holdings, returns, and account activity."
       />
     );
   }

@@ -303,6 +303,28 @@ export type Database = {
         Update: Partial<Database["public"]["Tables"]["market_update_runs"]["Insert"]>;
         Relationships: [];
       };
+      user_feedback: {
+        Row: {
+          id: string;
+          user_id: string | null;
+          category: "bug" | "data" | "account" | "idea" | "other";
+          message: string;
+          contact_email: string | null;
+          status: "new" | "reviewed" | "resolved";
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id?: string | null;
+          category: "bug" | "data" | "account" | "idea" | "other";
+          message: string;
+          contact_email?: string | null;
+          status?: "new" | "reviewed" | "resolved";
+          created_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["user_feedback"]["Insert"]>;
+        Relationships: [];
+      };
       profiles: {
         Row: {
           id: string;

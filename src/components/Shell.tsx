@@ -105,6 +105,25 @@ export function Shell({ children }: { children: React.ReactNode }) {
   const themeLabel =
     themePreference === "system" ? `System (${resolvedTheme})` : themePreference === "dark" ? "Dark" : "Light";
 
+  const standaloneAuth = pathname === "/account" && (authLoading || !session);
+  const standalonePasswordReset = pathname.startsWith("/account/reset-password");
+
+  if (standaloneAuth || standalonePasswordReset) {
+    return (
+      <div className="min-h-screen bg-ink text-paper">
+        <header className="mx-auto flex max-w-6xl items-center px-4 py-6 sm:px-6">
+          <Link href="/" className="flex items-center gap-2.5" aria-label="RMI home">
+            <span className="rmi-brand-mark grid h-9 w-9 place-items-center rounded-md">
+              <Activity className="h-4 w-4 text-cyan" aria-hidden="true" />
+            </span>
+            <span className="text-lg font-bold">RMI</span>
+          </Link>
+        </header>
+        <main className="px-4 pb-16 sm:px-6">{children}</main>
+      </div>
+    );
+  }
+
   return (
     <div className="flex min-h-screen flex-col bg-ink text-paper">
       <header className="sticky top-0 z-[80] border-b border-line bg-ink">

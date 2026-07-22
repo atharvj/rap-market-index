@@ -98,8 +98,9 @@ export default function MarketsPage() {
           <input
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            className="h-full min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-paper/35"
+            className="h-full min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-paper/35 focus-visible:outline-none"
             placeholder="Search artist or ticker"
+            aria-label="Search artist or ticker"
           />
           <span className="hidden text-[10px] font-semibold uppercase tracking-[0.18em] text-paper/35 sm:block">{artists.length} Results</span>
         </label>

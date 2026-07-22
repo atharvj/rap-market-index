@@ -9,8 +9,8 @@ describe("artist move explanations", () => {
   });
 
   it("replaces an explanation that contradicts the saved quote direction", () => {
-    expect(sanitizeMoveExplanation("TEST", "TEST moved higher after a release.", -1.2)).toContain("moved lower");
-    expect(sanitizeMoveExplanation("TEST", "TEST fell after a review.", 1.2)).toContain("moved higher");
+    expect(sanitizeMoveExplanation("TEST", "TEST moved higher after a release.", -1.2)).toContain("fell");
+    expect(sanitizeMoveExplanation("TEST", "TEST fell after a review.", 1.2)).toContain("rose");
   });
 
   it("keeps a source-backed explanation when its direction agrees", () => {
@@ -19,7 +19,7 @@ describe("artist move explanations", () => {
     );
   });
 
-  it("adds the strongest supportive recorded inputs when stats are available", () => {
+  it("summarizes the strongest supportive recorded input", () => {
     const result = sanitizeMoveExplanation("TEST", null, 1.2, {
       streamingGrowth: 4.25,
       youtubeGrowth: 2.5,
@@ -29,14 +29,7 @@ describe("artist move explanations", () => {
       traderDemand: 0.2
     });
 
-    expect(result).toContain("moved higher by 1.20%");
-    expect(result).toContain("No verified headline or event was strong enough");
-    expect(result).toContain("Movement evidence aligned with the quote");
-    expect(result).toContain("audience momentum (+4.25%)");
-    expect(result).toContain("video momentum (+2.50%)");
-    expect(result).toContain("Counter-signal: fan reception (-0.80%) opposed the move");
-    expect(result).toContain("Background context: verified media and review tone was mixed at 55/100");
-    expect(result).toContain("Evidence confidence is limited");
+    expect(result).toBe("TEST rose as audience activity strengthened. No major verified story led the move.");
   });
 
   it("uses weakening inputs to explain a decline", () => {
@@ -49,9 +42,7 @@ describe("artist move explanations", () => {
       traderDemand: 0
     });
 
-    expect(result).toContain("moved lower by 0.80%");
-    expect(result).toContain("audience momentum (-3.20%)");
-    expect(result).toContain("video momentum (-1.40%)");
+    expect(result).toBe("TEST fell as audience activity weakened. No major verified story led the move.");
   });
 
   it("upgrades legacy recorded-input wording instead of repeating it", () => {
@@ -66,8 +57,7 @@ describe("artist move explanations", () => {
     });
 
     expect(result).not.toContain("Supporting recorded inputs");
-    expect(result).toContain("Movement evidence aligned with the quote");
-    expect(result).toContain("Evidence confidence is limited");
+    expect(result).toBe("TEST moved higher. No major verified story led the move.");
   });
 
   it("does not append the new evidence summary more than once", () => {
@@ -82,7 +72,7 @@ describe("artist move explanations", () => {
     })).toBe(explanation);
   });
 
-  it("keeps media tone as context instead of claiming it moved the quote", () => {
+  it("does not claim media tone moved the quote", () => {
     const result = sanitizeMoveExplanation("TEST", null, 1, {
       streamingGrowth: 0,
       youtubeGrowth: 0,
@@ -92,9 +82,8 @@ describe("artist move explanations", () => {
       traderDemand: 0
     });
 
-    expect(result).toContain("No measured movement input clearly aligned");
-    expect(result).toContain("Background context: verified media and review tone was positive at 82/100");
-    expect(result).not.toContain("Movement evidence aligned with the quote: verified media");
+    expect(result).toBe("TEST rose at the latest recorded close. No single verified event or measured signal clearly led the move.");
+    expect(result).not.toContain("media");
   });
 
   it("replaces the legacy generic baseline explanation", () => {
@@ -113,8 +102,7 @@ describe("artist move explanations", () => {
     );
 
     expect(result).not.toContain("baseline market data");
-    expect(result).toContain("moved higher by 0.75%");
-    expect(result).toContain("audience momentum (+1.50%)");
+    expect(result).toBe("TEST rose as audience activity strengthened. No major verified story led the move.");
   });
 
   it("preserves a current no-catalyst explanation without overstating confidence", () => {
@@ -134,10 +122,8 @@ describe("artist move explanations", () => {
       }
     );
 
-    expect(result).toContain(noCatalystExplanation);
-    expect(result.match(/No verified headline or event was strong enough/g)).toHaveLength(1);
-    expect(result).toContain("Evidence confidence is limited");
-    expect(result).not.toContain("a verified catalyst and measured movement evidence aligned");
+    expect(result).toBe("TEST rose as audience activity strengthened. No major verified story led the move.");
+    expect(result).not.toContain("verified catalyst");
   });
 
   it("keeps a verified catalyst when the quote closes unchanged", () => {
@@ -156,8 +142,7 @@ describe("artist move explanations", () => {
     );
 
     expect(result).toContain("verified album release");
-    expect(result).toContain("quote closed unchanged");
-    expect(result).toContain("Evidence confidence is moderate");
+    expect(result).toContain("held flat");
   });
 
   it("does not present audience-scale calibration as a verified catalyst", () => {
@@ -176,9 +161,7 @@ describe("artist move explanations", () => {
     );
 
     expect(result).toContain("quote converged toward longer-term audience scale");
-    expect(result).toContain("No verified headline or event was strong enough");
-    expect(result).toContain("Evidence confidence is limited");
-    expect(result).not.toContain("a verified catalyst and measured movement evidence aligned");
+    expect(result).toContain("No major verified story led the move");
   });
 
   it("does not present relative repricing as a verified catalyst", () => {
@@ -197,8 +180,7 @@ describe("artist move explanations", () => {
     );
 
     expect(result).toContain("signals lagged the day's market momentum");
-    expect(result).toContain("No verified headline or event was strong enough");
-    expect(result).toContain("Evidence confidence is limited");
+    expect(result).toContain("No major verified story led the move");
   });
 
   it("rejects a directional claim when the quote closes unchanged", () => {

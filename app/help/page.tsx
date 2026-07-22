@@ -1,17 +1,26 @@
 "use client";
 
+import { useAuth } from "@/components/AuthProvider";
+import { RmiButton } from "@/components/RmiPrimitives";
+import {
+  FEEDBACK_CATEGORIES,
+  FEEDBACK_MESSAGE_MAX_LENGTH,
+  FEEDBACK_MESSAGE_MIN_LENGTH,
+  type FeedbackCategory
+} from "@/lib/feedback";
 import {
   CandlestickChart,
   CircleUserRound,
   HelpCircle,
   Newspaper,
   Search,
+  Send,
   ShieldCheck,
   WalletCards,
   Wrench
 } from "lucide-react";
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { type FormEvent, useMemo, useState } from "react";
 
 const topics = [
   {
@@ -102,10 +111,25 @@ const topics = [
 ];
 
 const categories = ["All", ...Array.from(new Set(topics.map((topic) => topic.category)))];
+const feedbackCategoryLabels: Record<FeedbackCategory, string> = {
+  bug: "Bug",
+  data: "Market data",
+  account: "Account",
+  idea: "Idea",
+  other: "Other"
+};
 
 export default function HelpPage() {
+  const { session } = useAuth();
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState("All");
+  const [feedbackCategory, setFeedbackCategory] = useState<FeedbackCategory>("bug");
+  const [feedbackMessage, setFeedbackMessage] = useState("");
+  const [contactEmail, setContactEmail] = useState("");
+  const [website, setWebsite] = useState("");
+  const [feedbackState, setFeedbackState] = useState<
+    { status: "idle" | "sending" | "success" | "error"; message: string }
+  >({ status: "idle", message: "" });
   const filteredTopics = useMemo(() => {
     const normalized = query.trim().toLowerCase();
 
@@ -116,6 +140,42 @@ export default function HelpPage() {
       return matchesCategory && (!normalized || searchable.includes(normalized));
     });
   }, [category, query]);
+
+  async function submitFeedback(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setFeedbackState({ status: "sending", message: "" });
+
+    try {
+      const response = await fetch("/api/feedback", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          ...(session?.access_token ? { authorization: `Bearer ${session.access_token}` } : {})
+        },
+        body: JSON.stringify({
+          category: feedbackCategory,
+          message: feedbackMessage,
+          contactEmail,
+          website
+        })
+      });
+      const payload = await response.json() as { ok?: boolean; error?: string };
+
+      if (!response.ok || !payload.ok) {
+        throw new Error(payload.error || "Could not send feedback.");
+      }
+
+      setFeedbackMessage("");
+      setContactEmail("");
+      setWebsite("");
+      setFeedbackState({ status: "success", message: "Thanks—your feedback was sent." });
+    } catch (error) {
+      setFeedbackState({
+        status: "error",
+        message: error instanceof Error ? error.message : "Could not send feedback."
+      });
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -208,6 +268,97 @@ export default function HelpPage() {
           )}
         </main>
       </div>
+
+      <section className="rmi-card grid gap-6 p-5 sm:p-7 lg:grid-cols-[minmax(0,0.7fr)_minmax(360px,1fr)]" aria-labelledby="feedback-title">
+        <div>
+          <div className="flex items-center gap-2 text-cyan">
+            <Send className="h-4 w-4" aria-hidden="true" />
+            <span className="text-xs font-semibold uppercase tracking-wide">Send Feedback</span>
+          </div>
+          <h2 id="feedback-title" className="mt-3 text-2xl font-bold">Help improve RMI</h2>
+          <p className="mt-2 max-w-md text-sm leading-6 text-paper/60">
+            Report a bug or questionable market data, ask for account help, or share an idea. You can submit without signing in.
+          </p>
+        </div>
+
+        <form onSubmit={submitFeedback} className="relative grid gap-4">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <label className="grid gap-2 text-xs font-semibold text-paper/60">
+              Category
+              <select
+                value={feedbackCategory}
+                onChange={(event) => setFeedbackCategory(event.target.value as FeedbackCategory)}
+                className="rmi-terminal-input h-11 px-3 text-sm font-medium text-paper"
+                disabled={feedbackState.status === "sending"}
+              >
+                {FEEDBACK_CATEGORIES.map((item) => (
+                  <option key={item} value={item}>{feedbackCategoryLabels[item]}</option>
+                ))}
+              </select>
+            </label>
+            <label className="grid gap-2 text-xs font-semibold text-paper/60">
+              Contact email <span className="font-normal text-paper/35">(optional)</span>
+              <input
+                value={contactEmail}
+                onChange={(event) => setContactEmail(event.target.value)}
+                type="email"
+                inputMode="email"
+                autoComplete="email"
+                maxLength={254}
+                className="rmi-terminal-input h-11 px-3 text-sm font-medium"
+                placeholder="you@example.com"
+                disabled={feedbackState.status === "sending"}
+              />
+            </label>
+          </div>
+
+          <label className="grid gap-2 text-xs font-semibold text-paper/60">
+            Message
+            <textarea
+              value={feedbackMessage}
+              onChange={(event) => setFeedbackMessage(event.target.value)}
+              minLength={FEEDBACK_MESSAGE_MIN_LENGTH}
+              maxLength={FEEDBACK_MESSAGE_MAX_LENGTH}
+              rows={6}
+              required
+              className="rmi-terminal-input min-h-36 resize-y px-3 py-3 text-sm font-medium leading-6"
+              placeholder="Describe what happened, what looks wrong, or what you would improve."
+              disabled={feedbackState.status === "sending"}
+            />
+            <span className="text-right text-[11px] font-normal text-paper/35 number-tabular">
+              {feedbackMessage.length}/{FEEDBACK_MESSAGE_MAX_LENGTH}
+            </span>
+          </label>
+
+          <div className="absolute -left-[10000px] top-auto h-px w-px overflow-hidden" aria-hidden="true">
+            <label>
+              Website
+              <input
+                value={website}
+                onChange={(event) => setWebsite(event.target.value)}
+                name="website"
+                type="text"
+                tabIndex={-1}
+                autoComplete="off"
+              />
+            </label>
+          </div>
+
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div aria-live="polite">
+              {feedbackState.message ? (
+                <p className={feedbackState.status === "error" ? "text-sm font-semibold text-ember" : "text-sm font-semibold text-mint"}>
+                  {feedbackState.message}
+                </p>
+              ) : null}
+            </div>
+            <RmiButton type="submit" disabled={feedbackState.status === "sending"} className="sm:min-w-36">
+              <Send className="h-4 w-4" aria-hidden="true" />
+              {feedbackState.status === "sending" ? "Sending..." : "Send Feedback"}
+            </RmiButton>
+          </div>
+        </form>
+      </section>
     </div>
   );
 }

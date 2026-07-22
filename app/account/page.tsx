@@ -329,9 +329,9 @@ function AccountPageContent() {
     return (
       <div className="mx-auto max-w-xl space-y-5">
         <header className="text-center">
-          <div className="rmi-kicker justify-center">Secure Trader Access</div>
+          <div className="rmi-kicker justify-center">RMI Account</div>
           <h1 className="mt-3 text-3xl font-bold sm:text-4xl">
-            {mode === "signup" ? "Enter the RMI market." : "Welcome back."}
+            {mode === "signup" ? "Create your RMI account." : "Welcome back."}
           </h1>
           <p className="mx-auto mt-2 max-w-md text-sm text-paper/60">
             {mode === "signup"
@@ -341,12 +341,9 @@ function AccountPageContent() {
         </header>
 
         <form onSubmit={submitAuth} className="rmi-auth-surface grid gap-3 p-5 sm:p-7">
-          <div className="mb-2 flex items-center justify-between border-b border-line/70 pb-4">
-            <div>
-              <p className="rmi-data-label">Identity Terminal</p>
-              <p className="mt-1 text-sm font-semibold">{mode === "signup" ? "New account" : "Existing trader"}</p>
-            </div>
-            <span className="rmi-status-chip"><span className="rmi-live-dot" /> Protected</span>
+          <div className="mb-2 border-b border-line/70 pb-4">
+            <p className="rmi-data-label">Account</p>
+            <p className="mt-1 text-sm font-semibold">{mode === "signup" ? "Create account" : "Sign in"}</p>
           </div>
           {mode === "signup" ? (
             <input

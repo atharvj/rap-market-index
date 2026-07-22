@@ -23,9 +23,9 @@ describe("market news sorting", () => {
     ]);
   });
 
-  it("uses absolute impact and confidence for their respective modes", () => {
-    expect(sortMarketNewsEvents(events, "impact")[0].id).toBe("older-impact");
-    expect(sortMarketNewsEvents(events, "confidence")[0].id).toBe("newer-verified");
+  it("normalizes retired sort modes to top stories", () => {
+    expect(normalizeMarketNewsSort("impact")).toBe("top");
+    expect(normalizeMarketNewsSort("confidence")).toBe("top");
   });
 
   it("accepts the route's composite score for top stories", () => {

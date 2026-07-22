@@ -105,7 +105,7 @@ export default function HomePage() {
       <section data-testid="home-market-hero" className="rmi-card rmi-hero relative z-40 grid min-w-0 overflow-visible lg:grid-cols-[minmax(0,1.45fr)_minmax(300px,0.55fr)]">
         <div className="grid min-w-0 content-center px-5 py-9 text-center sm:px-8 lg:min-h-[260px] lg:text-left">
           <div className="relative z-10">
-          <p className="rmi-kicker">RMI Market Intelligence</p>
+          <p className="rmi-kicker">Rap Market Index</p>
           <h1 className="mt-4 min-w-0 break-words text-3xl font-bold leading-[1.05] sm:text-5xl">
             Spot the next <span className="text-cyan">rise.</span>
           </h1>

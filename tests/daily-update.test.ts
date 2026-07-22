@@ -52,4 +52,114 @@ describe("daily market valuation pressure", () => {
     expect(update.explanation).not.toContain("rebased");
     expect(update.rawPayload).not.toHaveProperty("audienceScaleRebaseApplied");
   });
+
+  it("restores a one-cent move when corroborated measured signals were lost to rounding", () => {
+    const result = calculateDailyMarketUpdates({
+      artists: [artist()],
+      runDate: "2026-07-13",
+      source: "blended",
+      adapterSignals: {
+        artist: {
+          stats: {
+            streamingGrowth: 0.2,
+            youtubeGrowth: 0.2
+          },
+          rawPayload: {
+            sourceWeights: {
+              lastfm: { streamingGrowth: 0.8 },
+              youtube: { youtubeGrowth: 0.8 }
+            },
+            sourceValues: {
+              lastfm: { streamingGrowth: 0.2 },
+              youtube: { youtubeGrowth: 0.2 }
+            },
+            sourceDirectionalScores: {
+              lastfm: 0.2,
+              youtube: 0.2
+            }
+          }
+        }
+      }
+    });
+    const update = result.updates[0];
+
+    expect(update.currentPrice).toBe(5.01);
+    expect(update.dailyChangePercent).toBeGreaterThan(0);
+    expect(update.rawPayload.measuredMinimumTick).toMatchObject({
+      applied: true,
+      sourceCount: 2,
+      statCount: 2
+    });
+    expect(update.explanation).toContain("corroborated measured signals");
+  });
+
+  it("can restore a downward tick when corroborated measured signals weaken", () => {
+    const result = calculateDailyMarketUpdates({
+      artists: [artist()],
+      runDate: "2026-07-13",
+      source: "blended",
+      adapterSignals: {
+        artist: {
+          stats: {
+            streamingGrowth: -0.2,
+            youtubeGrowth: -0.2
+          },
+          rawPayload: {
+            sourceWeights: {
+              lastfm: { streamingGrowth: 0.8 },
+              youtube: { youtubeGrowth: 0.8 }
+            },
+            sourceValues: {
+              lastfm: { streamingGrowth: -0.2 },
+              youtube: { youtubeGrowth: -0.2 }
+            },
+            sourceDirectionalScores: {
+              lastfm: -0.2,
+              youtube: -0.2
+            }
+          }
+        }
+      }
+    });
+    const update = result.updates[0];
+
+    expect(update.currentPrice).toBe(4.99);
+    expect(update.dailyChangePercent).toBeLessThan(0);
+    expect(update.rawPayload.measuredMinimumTick).toMatchObject({ applied: true });
+  });
+
+  it("does not manufacture a minimum move from one source", () => {
+    const result = calculateDailyMarketUpdates({
+      artists: [artist()],
+      runDate: "2026-07-13",
+      source: "blended",
+      adapterSignals: {
+        artist: {
+          stats: {
+            streamingGrowth: 0.2,
+            socialGrowth: 0.2
+          },
+          rawPayload: {
+            sourceWeights: {
+              lastfm: { streamingGrowth: 0.8, socialGrowth: 0.4 }
+            },
+            sourceValues: {
+              lastfm: { streamingGrowth: 0.2, socialGrowth: 0.2 }
+            },
+            sourceDirectionalScores: {
+              lastfm: 0.2
+            }
+          }
+        }
+      }
+    });
+    const update = result.updates[0];
+
+    expect(update.currentPrice).toBe(5);
+    expect(update.dailyChangePercent).toBe(0);
+    expect(update.rawPayload.measuredMinimumTick).toMatchObject({
+      applied: false,
+      sourceCount: 1
+    });
+  });
 });

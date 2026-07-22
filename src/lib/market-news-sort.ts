@@ -1,4 +1,4 @@
-export type MarketNewsSort = "top" | "latest" | "impact" | "confidence";
+export type MarketNewsSort = "top" | "latest";
 
 type SortableMarketNewsEvent = {
   id: string;
@@ -9,7 +9,7 @@ type SortableMarketNewsEvent = {
 };
 
 export function normalizeMarketNewsSort(value: string | null | undefined): MarketNewsSort {
-  return value === "latest" || value === "impact" || value === "confidence" ? value : "top";
+  return value === "latest" ? value : "top";
 }
 
 export function sortMarketNewsEvents<T extends SortableMarketNewsEvent>(
@@ -44,14 +44,6 @@ function getPrimaryDifference<T extends SortableMarketNewsEvent>(
     return getEventTimestamp(second) - getEventTimestamp(first);
   }
 
-  if (sort === "impact") {
-    return Math.abs(toFiniteNumber(second.impact_score)) - Math.abs(toFiniteNumber(first.impact_score));
-  }
-
-  if (sort === "confidence") {
-    return toFiniteNumber(second.confidence) - toFiniteNumber(first.confidence);
-  }
-
   return getTopScore(second) - getTopScore(first);
 }
 
@@ -62,9 +54,4 @@ function getEventTimestamp(event: SortableMarketNewsEvent) {
   const timeWithinDay = Number.isFinite(createdAt) ? createdAt % 86_400_000 : 0;
 
   return dayStart + timeWithinDay;
-}
-
-function toFiniteNumber(value: number | string) {
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : 0;
 }

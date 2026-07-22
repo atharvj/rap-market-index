@@ -183,7 +183,7 @@ async function assertStablePublicPage(page: Page, path: string, heading: string,
   await page.addStyleTag({
     content: "*,*::before,*::after{animation:none!important;transition:none!important}nextjs-portal{display:none!important}"
   });
-  await expect(page).toHaveScreenshot(snapshot, { fullPage: true });
+  await expect(page).toHaveScreenshot(snapshot, { fullPage: false });
 }
 
 test.beforeEach(async ({ page }) => {
@@ -221,8 +221,20 @@ test("markets visual contract", async ({ page }) => {
   await assertStablePublicPage(page, "/markets", "Artist Markets", "markets.png");
 });
 
+test("markets search keeps focus on the complete search control", async ({ page }) => {
+  await page.goto("/markets");
+  await expect(page.locator('[aria-busy="true"]')).toHaveCount(0, { timeout: 15_000 });
+
+  const search = page.getByRole("textbox", { name: "Search artist or ticker" });
+  const searchControl = search.locator("..");
+  await search.focus();
+
+  await expect(search).toHaveCSS("outline-style", "none");
+  await expect(searchControl).toHaveCSS("border-style", "solid");
+});
+
 test("news visual contract", async ({ page }) => {
-  await assertStablePublicPage(page, "/news", "Market Intelligence", "news.png");
+  await assertStablePublicPage(page, "/news", "Market News", "news.png");
 });
 
 test("about visual contract", async ({ page }) => {
@@ -231,6 +243,31 @@ test("about visual contract", async ({ page }) => {
 
 test("help visual contract", async ({ page }) => {
   await assertStablePublicPage(page, "/help", "How can we help?", "help.png");
+});
+
+test("help feedback can be submitted without signing in", async ({ page }) => {
+  let submittedBody: Record<string, unknown> | null = null;
+  await page.route("**/api/feedback", async (route) => {
+    submittedBody = route.request().postDataJSON() as Record<string, unknown>;
+    await route.fulfill({
+      status: 201,
+      contentType: "application/json",
+      body: JSON.stringify({ ok: true })
+    });
+  });
+  await page.goto("/help");
+
+  await page.getByLabel("Category").selectOption("data");
+  await page.getByLabel("Contact email").fill("trader@example.com");
+  await page.getByLabel("Message").fill("The latest quote appears to use the wrong source data.");
+  await page.getByRole("button", { name: "Send Feedback" }).click();
+
+  await expect(page.getByText("Thanks—your feedback was sent.")).toBeVisible();
+  expect(submittedBody).toMatchObject({
+    category: "data",
+    contactEmail: "trader@example.com",
+    message: "The latest quote appears to use the wrong source data."
+  });
 });
 
 test("primary public pages do not overflow a mobile viewport", async ({ page }) => {

@@ -895,7 +895,11 @@ function hasPublicReactionSignal(title: string) {
 }
 
 function hasAwardRecognitionSignal(title: string) {
-  return hasAny(title, AWARD_RECOGNITION_TERMS) && !hasAny(title, LEGAL_JUDGMENT_TERMS);
+  return (
+    hasAny(title, AWARD_RECOGNITION_TERMS) &&
+    hasAny(title, AWARD_CONTEXT_TERMS) &&
+    !hasAny(title, LEGAL_JUDGMENT_TERMS)
+  );
 }
 
 function hasMusicFeatureContext(title: string) {
@@ -1350,6 +1354,17 @@ const AWARD_RECOGNITION_TERMS = [
   "takes home",
   "wins",
   "won"
+];
+const AWARD_CONTEXT_TERMS = [
+  "award",
+  "bet hip hop awards",
+  "billboard music awards",
+  "grammy",
+  "hall of fame",
+  "honors",
+  "mercury prize",
+  "mtv video music awards",
+  "vmas"
 ];
 const LEGAL_JUDGMENT_TERMS = [
   "court",

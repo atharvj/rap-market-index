@@ -194,6 +194,23 @@ describe("repository security boundaries", () => {
     expect(client).not.toContain("createServiceRoleClient");
   });
 
+  it("keeps user feedback behind the server route and service role", () => {
+    const route = readTrackedFile("app/api/feedback/route.ts");
+    const migration = readTrackedFile("supabase/migrations/028_user_feedback.sql");
+
+    expect(route).toContain('scope: "feedback-submit"');
+    expect(route).toContain("getRequestIp(request)");
+    expect(route).toContain("requireConfirmedUser(request)");
+    expect(route).toContain('createServiceRoleClient().from("user_feedback").insert');
+    expect(route).not.toMatch(/request(?:Body|Data|Payload)?\.userId/);
+    expect(migration).toContain("alter table public.user_feedback enable row level security");
+    expect(migration).toContain(
+      "revoke all on table public.user_feedback from public, anon, authenticated"
+    );
+    expect(migration).toContain("grant all on table public.user_feedback to service_role");
+    expect(migration).not.toMatch(/create policy/i);
+  });
+
   it("reasserts raw database privilege boundaries in the latest migration", () => {
     const migration = readTrackedFile("supabase/migrations/026_reassert_security_boundaries.sql");
 

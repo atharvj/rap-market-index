@@ -180,7 +180,8 @@ export function calculateDailyMarketUpdates(input: MarketUpdateInput) {
       adapterSignals: input.adapterSignals
     })
   );
-  const updates = applyMarketRelativePricing(standaloneUpdates, input.marketCoverageRatio);
+  const updates = applyMarketRelativePricing(standaloneUpdates, input.marketCoverageRatio)
+    .map(applyMeasuredMinimumTick);
 
   const averageMovePercent =
     updates.reduce((total, update) => total + update.dailyChangePercent, 0) / Math.max(1, updates.length);
@@ -813,6 +814,9 @@ function calculateArtistUpdate({
   const rawSignalDelta = signals.hasMomentumSignal
     ? calculateSignalDelta(stats) * artist.volatility
     : staleMomentumDecayDelta * artist.volatility;
+  const measuredSignalDelta = signals.hasMomentumSignal
+    ? calculateSignalDelta(signals.stats) * artist.volatility
+    : 0;
   const evidenceAdjustedRawSignalDelta = getEvidenceAdjustedRawSignalDelta({
     rawSignalDelta,
     credibleEventSupport,
@@ -897,6 +901,7 @@ function calculateArtistUpdate({
       decayedExistingStats,
       eventMemoryAdjustedStats,
       staleMomentumDecayDelta,
+      measuredSignalDelta,
       rawSignalDelta,
       evidenceAdjustedRawSignalDelta,
       reliabilityAdjustedDelta,
@@ -915,6 +920,94 @@ function calculateArtistUpdate({
       categoryDailyCap,
       dailyCap,
       modifiers: signals.modifiers
+    }
+  };
+}
+
+function applyMeasuredMinimumTick(update: ArtistMarketUpdate): ArtistMarketUpdate {
+  const reliabilityDetails = getObjectRecord(update.rawPayload.reliabilityDetails);
+  const sourceCount = getNumber(reliabilityDetails.sourceCount, 0);
+  const statCount = getNumber(reliabilityDetails.statCount, 0);
+  const reliability = getNumber(update.rawPayload.signalReliability, 0);
+  const sourceQualityMultiplier = getNumber(reliabilityDetails.sourceQualityMultiplier, 0);
+  const anomalyCount = getNumber(reliabilityDetails.sourceQualityAnomalyCount, 0);
+  const staleCount = getNumber(reliabilityDetails.sourceQualityStaleCount, 0);
+  const measuredSignalDelta = getNumber(update.rawPayload.measuredSignalDelta, 0);
+  const oldPrice = roundPrice(update.oldPrice);
+  const previousClose = roundPrice(update.previousClose);
+  const roundedPrice = roundPrice(update.currentPrice);
+  const direction = Math.sign(measuredSignalDelta);
+  const signalDirection = Math.sign(update.signalDelta);
+  const eligible =
+    update.rawPayload.hasMomentumSignal === true &&
+    sourceCount >= 2 &&
+    statCount >= 2 &&
+    reliability >= 0.55 &&
+    sourceQualityMultiplier >= 0.65 &&
+    anomalyCount === 0 &&
+    staleCount === 0 &&
+    Math.abs(measuredSignalDelta) >= 0.00075 &&
+    direction !== 0 &&
+    direction === signalDirection &&
+    roundedPrice === oldPrice &&
+    oldPrice === previousClose;
+  const audit = {
+    applied: false,
+    eligible,
+    measuredSignalDelta,
+    sourceCount,
+    statCount,
+    reliability,
+    sourceQualityMultiplier,
+    reason: eligible ? "price_tick_check" : "criteria_not_met"
+  };
+
+  if (!eligible) {
+    return {
+      ...update,
+      rawPayload: {
+        ...update.rawPayload,
+        measuredMinimumTick: audit
+      }
+    };
+  }
+
+  const candidatePrice = roundPrice(oldPrice + direction * 0.01);
+  const dailyCap = getNumber(update.rawPayload.dailyCap, 0.18);
+  const minimumPrice = previousClose * (1 - dailyCap);
+  const maximumPrice = previousClose * (1 + dailyCap);
+
+  if (candidatePrice === oldPrice || candidatePrice < minimumPrice || candidatePrice > maximumPrice) {
+    return {
+      ...update,
+      rawPayload: {
+        ...update.rawPayload,
+        measuredMinimumTick: {
+          ...audit,
+          reason: "tick_outside_price_bounds"
+        }
+      }
+    };
+  }
+
+  const dailyChangePercent = getDailyChangePercent(candidatePrice, previousClose);
+
+  return {
+    ...update,
+    currentPrice: candidatePrice,
+    dailyChangePercent,
+    explanation: `${update.ticker} edged ${direction > 0 ? "higher" : "lower"} on fresh, corroborated measured signals.`,
+    rawPayload: {
+      ...update.rawPayload,
+      measuredMinimumTick: {
+        ...audit,
+        applied: true,
+        reason: "rounded_model_move_restored_as_one_cent_tick",
+        previousPrice: oldPrice,
+        modelPrice: roundedPrice,
+        appliedPrice: candidatePrice,
+        dailyChangePercent
+      }
     }
   };
 }

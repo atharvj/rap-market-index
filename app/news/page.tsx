@@ -4,13 +4,14 @@ import { useGame } from "@/components/GameProvider";
 import { MarketNewsFeed, type MarketNewsItem } from "@/components/MarketNewsFeed";
 import { ArtistIdentity, ChangeText, RmiButton } from "@/components/RmiPrimitives";
 import type { MarketNewsSort } from "@/lib/market-news-sort";
-import { Activity, ArrowUpDown, Music, Radio, ShieldCheck } from "lucide-react";
+import { Activity, ArrowUpDown, ListFilter, Music, Radio, ShieldCheck } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
 
 export default function NewsPage() {
   const { state } = useGame();
   const [newsArtistIds, setNewsArtistIds] = useState<Set<string>>(new Set());
   const [newsSort, setNewsSort] = useState<MarketNewsSort>("top");
+  const [eventType, setEventType] = useState("");
   const movers = useMemo(
     () => [...state.artists]
       .filter((artist) => newsArtistIds.has(artist.id) && Math.abs(artist.dailyChangePercent) >= 0.01)
@@ -31,27 +32,52 @@ export default function NewsPage() {
         <div className="rmi-page-head flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <div className="rmi-kicker"><Radio className="h-4 w-4" /> RMI Market Wire</div>
-            <h1 className="mt-3 text-4xl font-bold">Market Intelligence</h1>
+            <h1 className="mt-3 text-4xl font-bold">Market News</h1>
             <p className="mt-2 max-w-2xl text-sm text-paper/60">Price-relevant artist events ranked by impact, source confidence, and recency.</p>
           </div>
-          <label className="rmi-terminal-input flex w-full items-center gap-2 px-3 text-xs font-medium text-paper/55 sm:w-auto">
-            <ArrowUpDown className="h-4 w-4" aria-hidden="true" />
-            <span>Sort</span>
-            <select
-              value={newsSort}
-              onChange={(event) => setNewsSort(event.target.value as MarketNewsSort)}
-              className="min-w-32 bg-transparent font-semibold text-paper outline-none"
-              aria-label="Sort market news"
-            >
-              <option value="top">Top Stories</option>
-              <option value="latest">Latest</option>
-              <option value="impact">Highest Impact</option>
-              <option value="confidence">Most Verified</option>
-            </select>
-          </label>
+          <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+            <label className="rmi-terminal-input flex items-center gap-2 px-3 text-xs font-medium text-paper/55">
+              <ListFilter className="h-4 w-4" aria-hidden="true" />
+              <span>Filter</span>
+              <select
+                value={eventType}
+                onChange={(event) => setEventType(event.target.value)}
+                className="min-w-28 bg-transparent font-semibold text-paper outline-none"
+                aria-label="Filter market news"
+              >
+                <option value="">All Stories</option>
+                <option value="release">Releases</option>
+                <option value="review">Reviews</option>
+                <option value="controversy">Controversy</option>
+                <option value="viral">Viral</option>
+                <option value="tour">Tours</option>
+                <option value="award">Awards</option>
+                <option value="news">Other News</option>
+              </select>
+            </label>
+            <label className="rmi-terminal-input flex items-center gap-2 px-3 text-xs font-medium text-paper/55">
+              <ArrowUpDown className="h-4 w-4" aria-hidden="true" />
+              <span>Sort</span>
+              <select
+                value={newsSort}
+                onChange={(event) => setNewsSort(event.target.value as MarketNewsSort)}
+                className="min-w-28 bg-transparent font-semibold text-paper outline-none"
+                aria-label="Sort market news"
+              >
+                <option value="top">Top Stories</option>
+                <option value="latest">Latest</option>
+              </select>
+            </label>
+          </div>
         </div>
         <div className="rmi-card mt-5 px-5">
-          <MarketNewsFeed limit={40} variant="full" sort={newsSort} onItemsChange={handleNewsItems} />
+          <MarketNewsFeed
+            limit={40}
+            variant="full"
+            sort={newsSort}
+            eventType={eventType || undefined}
+            onItemsChange={handleNewsItems}
+          />
         </div>
       </main>
 

@@ -1,7 +1,7 @@
 import type { HypeStats } from "@/lib/types";
 
 export const MARKET_SCORE_EXPLANATION =
-  "RMI Score is a 1-99 measure of current signal strength across audience momentum, public attention, verified catalysts, reception, and eligible trading demand. A score near 50 is neutral or mixed, below 40 is weakening, and above 60 is strengthening. It is not a price target, forecast, or daily return.";
+  "RMI Score summarizes current market signals from 1-99. Around 50 is neutral; higher is stronger and lower is weaker. It is not a price forecast.";
 
 const LOW_SIGNAL_EXPLANATION_TERMS = [
   "#explorepage",
@@ -73,7 +73,8 @@ export function sanitizeMoveExplanation(
     resolvedExplanation,
     stats,
     dailyChangePercent,
-    hasVerifiedCatalyst
+    hasVerifiedCatalyst,
+    !shouldUseFallback && !hasCurrentNoCatalystClaim
   );
 }
 
@@ -102,16 +103,13 @@ function getFallbackMoveExplanation(ticker: string, dailyChangePercent?: number)
   const hasChange = typeof dailyChangePercent === "number" && Number.isFinite(dailyChangePercent);
   const direction = hasChange
     ? dailyChangePercent > 0
-      ? "moved higher"
+      ? "rose"
       : dailyChangePercent < 0
-        ? "moved lower"
-        : "held unchanged"
+        ? "fell"
+        : "was unchanged"
     : "moved";
-  const magnitude = hasChange && Math.abs(dailyChangePercent) >= 0.005
-    ? ` by ${Math.abs(dailyChangePercent).toFixed(2)}%`
-    : "";
 
-  return `${ticker} ${direction}${magnitude} at the latest recorded close.`;
+  return `${ticker} ${direction} at the latest recorded close.`;
 }
 
 type MovementInput = {
@@ -125,70 +123,58 @@ function appendEvidenceSummary(
   explanation: string,
   stats: HypeStats | undefined,
   dailyChangePercent: number | undefined,
-  hasVerifiedCatalyst: boolean
+  hasVerifiedCatalyst: boolean,
+  preserveRecordedAttribution: boolean
 ) {
-  if (!stats) {
-    return explanation;
+  const compactExplanation = explanation
+    .replace(/ became the main market catalyst, with limited outside confirmation\.?/gi, " led the move.")
+    .replace(/ became the main market catalyst\.?/gi, " led the move.")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  if (hasVerifiedCatalyst || !stats) {
+    return compactExplanation;
+  }
+
+  if (preserveRecordedAttribution) {
+    return `${compactExplanation} No major verified story led the move.`;
   }
 
   const hasChange = typeof dailyChangePercent === "number" && Number.isFinite(dailyChangePercent);
   const moveDirection = hasChange ? Math.sign(dailyChangePercent) : 0;
-  const inputs = getMovementInputs(stats)
-    .filter((input) => Math.abs(input.adjustedValue) >= input.minimumMaterialValue);
-  const alignedInputs = moveDirection === 0
-    ? []
-    : inputs
-      .filter((input) => Math.sign(input.adjustedValue) === moveDirection)
-      .sort((first, second) => second.rankValue - first.rankValue);
-  const counterInputs = moveDirection === 0
-    ? []
-    : inputs
-      .filter((input) => Math.sign(input.adjustedValue) === -moveDirection)
-      .sort((first, second) => second.rankValue - first.rankValue);
-  const sentences = [explanation];
-
-  const alreadyStatesNoCatalyst = CURRENT_NO_CATALYST_TERMS.some((term) =>
-    explanation.toLowerCase().includes(term)
-  );
-
-  if (!hasVerifiedCatalyst && !alreadyStatesNoCatalyst) {
-    sentences.push("No verified headline or event was strong enough to attribute as the primary cause.");
-  }
 
   if (moveDirection === 0) {
-    const selected = inputs
-      .sort((first, second) => second.rankValue - first.rankValue)
-      .slice(0, 2);
-
-    if (selected.length) {
-      sentences.push(
-        `Recorded movement inputs included ${formatInputList(selected)}, but the quote closed unchanged.`
-      );
-    } else {
-      sentences.push("No measured movement input materially separated from neutral in this run.");
-    }
-  } else if (alignedInputs.length) {
-    sentences.push(
-      `Movement evidence aligned with the quote: ${formatInputList(alignedInputs.slice(0, 2))}.`
-    );
-  } else {
-    sentences.push("No measured movement input clearly aligned with the quote direction.");
+    return `${compactExplanation} No major verified story changed the outlook.`;
   }
 
-  if (counterInputs.length) {
-    sentences.push(`Counter-signal: ${formatInput(counterInputs[0])} opposed the move.`);
+  const strongestAlignedInput = getMovementInputs(stats)
+    .filter((input) => Math.abs(input.adjustedValue) >= input.minimumMaterialValue)
+    .filter((input) => Math.sign(input.adjustedValue) === moveDirection)
+    .sort((first, second) => second.rankValue - first.rankValue)[0];
+
+  if (!strongestAlignedInput) {
+    return `${compactExplanation} No single verified event or measured signal clearly led the move.`;
   }
 
-  sentences.push(`Background context: verified media and review tone was ${formatMediaTone(stats.newsScore)}.`);
-  sentences.push(getConfidenceSentence({
-    alignedInputCount: alignedInputs.length,
-    explanation,
-    hasVerifiedCatalyst,
-    hasCounterSignal: counterInputs.length > 0,
-    moveDirection
-  }));
+  const direction = moveDirection > 0 ? "rose" : "fell";
+  const signalDirection = moveDirection > 0 ? "strengthened" : "weakened";
+  return `${extractTicker(compactExplanation, explanation)} ${direction} as ${getPublicSignalLabel(strongestAlignedInput.label)} ${signalDirection}. No major verified story led the move.`;
+}
 
-  return sentences.join(" ");
+function extractTicker(compactExplanation: string, fallback: string) {
+  return compactExplanation.split(/\s+/)[0] || fallback.split(/\s+/)[0] || "The quote";
+}
+
+function getPublicSignalLabel(label: string) {
+  const labels: Record<string, string> = {
+    "audience momentum": "audience activity",
+    "video momentum": "video activity",
+    "public attention": "public interest",
+    "fan reception": "fan response",
+    "eligible trading demand": "eligible trading activity"
+  };
+
+  return labels[label] ?? label;
 }
 
 function getMovementInputs(stats: HypeStats): MovementInput[] {
@@ -213,67 +199,6 @@ function createMovementInput(
     minimumMaterialValue,
     rankValue: Math.abs(value) * weight
   };
-}
-
-function formatInput(input: MovementInput) {
-  return `${input.label} (${input.adjustedValue >= 0 ? "+" : ""}${input.adjustedValue.toFixed(2)}%)`;
-}
-
-function formatInputList(inputs: MovementInput[]) {
-  const formatted = inputs.map(formatInput);
-  if (formatted.length < 2) {
-    return formatted[0] ?? "none";
-  }
-  return `${formatted[0]} and ${formatted[1]}`;
-}
-
-function formatMediaTone(newsScore: number) {
-  const roundedScore = Math.round(newsScore);
-  const tone = roundedScore >= 60
-    ? "positive"
-    : roundedScore <= 40
-      ? "negative"
-      : "mixed";
-
-  return `${tone} at ${roundedScore}/100`;
-}
-
-function getConfidenceSentence({
-  alignedInputCount,
-  explanation,
-  hasVerifiedCatalyst,
-  hasCounterSignal,
-  moveDirection
-}: {
-  alignedInputCount: number;
-  explanation: string;
-  hasVerifiedCatalyst: boolean;
-  hasCounterSignal: boolean;
-  moveDirection: number;
-}) {
-  const normalized = explanation.toLowerCase();
-
-  if (!hasVerifiedCatalyst) {
-    return "Evidence confidence is limited because no single verified catalyst led the move.";
-  }
-
-  if (normalized.includes("limited outside confirmation")) {
-    return "Evidence confidence is limited because the catalyst had only one confirmed source.";
-  }
-
-  if (normalized.includes("broader reaction stayed mixed") || hasCounterSignal) {
-    return "Evidence confidence is moderate because verified evidence was present, but recorded signals conflicted.";
-  }
-
-  if (moveDirection === 0) {
-    return "Evidence confidence is moderate: a verified catalyst was recorded, but the quote closed unchanged.";
-  }
-
-  if (alignedInputCount >= 1) {
-    return "Evidence confidence is moderate because a verified catalyst and measured movement evidence aligned.";
-  }
-
-  return "Evidence confidence is moderate because a verified catalyst was recorded without confirming movement in the measured inputs.";
 }
 
 function describesPositiveMove(value: string) {
