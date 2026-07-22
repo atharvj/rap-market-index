@@ -2,6 +2,7 @@
 
 import { ArtistAvatar } from "@/components/ArtistAvatar";
 import { useGame } from "@/components/GameProvider";
+import { MiniSparkline } from "@/components/MiniSparkline";
 import { ChangeText, RmiButton, RmiSection } from "@/components/RmiPrimitives";
 import { PriceChart } from "@/components/PriceChart";
 import { WatchlistButton } from "@/components/WatchlistButton";
@@ -11,7 +12,7 @@ import { Activity, ArrowDown, ArrowDownAZ, ArrowUp, ArrowUpAZ, Radar, Search, Si
 import Link from "next/link";
 import { useMemo, useState } from "react";
 
-type SortKey = "name" | "price" | "change";
+type SortKey = "name" | "score" | "price" | "change";
 
 export default function MarketsPage() {
   const { state } = useGame();
@@ -38,8 +39,16 @@ export default function MarketsPage() {
           return first.name.localeCompare(second.name) * direction;
         }
 
-        const firstValue = sortKey === "price" ? first.currentPrice : first.dailyChangePercent;
-        const secondValue = sortKey === "price" ? second.currentPrice : second.dailyChangePercent;
+        const firstValue = sortKey === "price"
+          ? first.currentPrice
+          : sortKey === "score"
+            ? first.hypeScore
+            : first.dailyChangePercent;
+        const secondValue = sortKey === "price"
+          ? second.currentPrice
+          : sortKey === "score"
+            ? second.hypeScore
+            : second.dailyChangePercent;
         return (firstValue - secondValue) * direction;
       });
   }, [query, sortDescending, sortKey, state.artists]);
@@ -106,6 +115,7 @@ export default function MarketsPage() {
         </label>
         <div className="flex items-center gap-1 rounded-md border border-line bg-panel p-1" aria-label="Sort markets">
           <SortButton active={sortKey === "name"} onClick={() => chooseSort("name")}>Name</SortButton>
+          <SortButton active={sortKey === "score"} onClick={() => chooseSort("score")}>Score</SortButton>
           <SortButton active={sortKey === "price"} onClick={() => chooseSort("price")}>Price</SortButton>
           <SortButton active={sortKey === "change"} onClick={() => chooseSort("change")}>24h</SortButton>
           <button
@@ -125,8 +135,10 @@ export default function MarketsPage() {
       </div>
 
       <section className="rmi-card overflow-hidden">
-        <div className="rmi-table-head grid grid-cols-[minmax(0,1fr)_104px_84px_44px] gap-x-4 px-4 py-3">
+        <div className="rmi-table-head grid grid-cols-[minmax(0,1fr)_104px_84px_44px] gap-x-4 px-4 py-3 lg:grid-cols-[minmax(220px,1fr)_140px_108px_104px_84px_44px]">
           <span>Artist</span>
+          <span className="hidden text-right lg:block">Recorded trend</span>
+          <span className="hidden text-right lg:block">RMI Score</span>
           <span className="text-right">Price</span>
           <span className="text-right">24h</span>
           <span className="sr-only">watchlist</span>
@@ -134,7 +146,7 @@ export default function MarketsPage() {
         {artists.map((artist) => (
           <div
             key={artist.id}
-            className="rmi-table-row grid grid-cols-[minmax(0,1fr)_104px_84px_44px] items-center gap-x-4 px-4 py-3 last:border-b-0"
+            className="rmi-table-row grid grid-cols-[minmax(0,1fr)_104px_84px_44px] items-center gap-x-4 px-4 py-3 last:border-b-0 lg:grid-cols-[minmax(220px,1fr)_140px_108px_104px_84px_44px]"
           >
             <Link href={`/artists/${artist.id}`} className="flex min-w-0 items-center gap-3">
               <ArtistAvatar artist={artist} />
@@ -143,6 +155,15 @@ export default function MarketsPage() {
                 <span className="block truncate text-xs font-medium text-paper/45">${artist.ticker}</span>
               </span>
             </Link>
+            <div className="hidden justify-end lg:flex">
+              <MiniSparkline
+                data={artist.priceHistory}
+                positive={getSeriesChangePercent(artist.priceHistory.slice(-18)) >= 0}
+                width={116}
+                height={30}
+              />
+            </div>
+            <ScoreCell value={artist.hypeScore} />
             <span className="text-right text-sm font-semibold number-tabular">{formatCurrency(artist.currentPrice)}</span>
             <span className="text-right text-xs">
               <ChangeText value={artist.dailyChangePercent} />
@@ -151,6 +172,19 @@ export default function MarketsPage() {
           </div>
         ))}
       </section>
+    </div>
+  );
+}
+
+function ScoreCell({ value }: { value: number }) {
+  const tone = value >= 70 ? "bg-mint" : value >= 45 ? "bg-cyan" : "bg-ember";
+
+  return (
+    <div className="hidden items-center justify-end gap-2 lg:flex" aria-label={`RMI Score ${value} out of 100`}>
+      <span className="h-1.5 w-12 overflow-hidden rounded-full bg-paper/10" aria-hidden="true">
+        <span className={`block h-full rounded-full ${tone}`} style={{ width: `${Math.max(0, Math.min(100, value))}%` }} />
+      </span>
+      <span className="w-6 text-right text-xs font-semibold text-paper/70 number-tabular">{value}</span>
     </div>
   );
 }

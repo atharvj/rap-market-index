@@ -23,7 +23,7 @@
     "react-dom": "^19.0.0",
     "recharts": "^3.9.2",
     "server-only": "^0.0.1",
-    "sharp": "^0.34.5"
+    "sharp": "^0.35.3"
   },
   "devDependencies": {
     "@playwright/test": "^1.61.1",
@@ -37,6 +37,8 @@
     "vitest": "^4.1.10"
   },
   "overrides": {
-    "postcss": "$postcss"
+    "fast-uri": "^4.1.1",
+    "postcss": "$postcss",
+    "sharp": "$sharp"
   }
 }

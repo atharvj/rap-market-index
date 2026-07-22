@@ -221,16 +221,14 @@ test("markets visual contract", async ({ page }) => {
   await assertStablePublicPage(page, "/markets", "Artist Markets", "markets.png");
 });
 
-test("markets search keeps focus on the complete search control", async ({ page }) => {
+test("markets search avoids a partial input outline", async ({ page }) => {
   await page.goto("/markets");
   await expect(page.locator('[aria-busy="true"]')).toHaveCount(0, { timeout: 15_000 });
 
   const search = page.getByRole("textbox", { name: "Search artist or ticker" });
-  const searchControl = search.locator("..");
   await search.focus();
 
-  await expect(search).toHaveCSS("outline-style", "none");
-  await expect(searchControl).toHaveCSS("border-style", "solid");
+  await expect(search).toHaveCSS("outline-color", "rgba(0, 0, 0, 0)");
 });
 
 test("news visual contract", async ({ page }) => {

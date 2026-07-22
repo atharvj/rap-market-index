@@ -4,6 +4,10 @@ export type FeedbackCategory = (typeof FEEDBACK_CATEGORIES)[number];
 
 export const FEEDBACK_MESSAGE_MIN_LENGTH = 15;
 export const FEEDBACK_MESSAGE_MAX_LENGTH = 4000;
+export const FEEDBACK_RATE_WINDOW_SECONDS = 3600;
+export const FEEDBACK_IP_RATE_LIMIT = 5;
+export const ANONYMOUS_FEEDBACK_RATE_LIMIT = 2;
+export const SIGNED_IN_FEEDBACK_RATE_LIMIT = 5;
 
 export type ValidFeedbackSubmission = {
   category: FeedbackCategory;

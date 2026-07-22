@@ -1,5 +1,12 @@
 import { NextResponse } from "next/server";
-import { hasFilledFeedbackHoneypot, validateFeedbackSubmission } from "@/lib/feedback";
+import {
+  ANONYMOUS_FEEDBACK_RATE_LIMIT,
+  FEEDBACK_IP_RATE_LIMIT,
+  FEEDBACK_RATE_WINDOW_SECONDS,
+  hasFilledFeedbackHoneypot,
+  SIGNED_IN_FEEDBACK_RATE_LIMIT,
+  validateFeedbackSubmission
+} from "@/lib/feedback";
 import { createServiceRoleClient, getSupabaseConfigStatus } from "@/lib/supabase/server";
 import { reportServerError } from "@/server/observability";
 import { enforceRateLimit, getRequestIp } from "@/server/rate-limit";
@@ -22,13 +29,37 @@ export async function POST(request: Request) {
   const limited = await enforceRateLimit({
     request,
     identifier: getRequestIp(request),
-    scope: "feedback-submit",
-    limit: 5,
-    windowSeconds: 3600
+    scope: "feedback-submit-ip",
+    limit: FEEDBACK_IP_RATE_LIMIT,
+    windowSeconds: FEEDBACK_RATE_WINDOW_SECONDS
   });
 
   if (limited) {
     return limited;
+  }
+
+  let userId: string | null = null;
+
+  if (request.headers.has("authorization")) {
+    const auth = await requireConfirmedUser(request);
+
+    if (!auth.ok) {
+      return auth.response;
+    }
+
+    userId = auth.user.id;
+  }
+
+  const audienceLimited = await enforceRateLimit({
+    request,
+    identifier: userId ?? getRequestIp(request),
+    scope: userId ? "feedback-submit-user" : "feedback-submit-anonymous",
+    limit: userId ? SIGNED_IN_FEEDBACK_RATE_LIMIT : ANONYMOUS_FEEDBACK_RATE_LIMIT,
+    windowSeconds: FEEDBACK_RATE_WINDOW_SECONDS
+  });
+
+  if (audienceLimited) {
+    return audienceLimited;
   }
 
   const body = await parseBody(request);
@@ -44,18 +75,6 @@ export async function POST(request: Request) {
       { ok: false, error: validation.error },
       { status: 400, headers: PRIVATE_HEADERS }
     );
-  }
-
-  let userId: string | null = null;
-
-  if (request.headers.has("authorization")) {
-    const auth = await requireConfirmedUser(request);
-
-    if (!auth.ok) {
-      return auth.response;
-    }
-
-    userId = auth.user.id;
   }
 
   try {

@@ -277,7 +277,7 @@ export default function HelpPage() {
           </div>
           <h2 id="feedback-title" className="mt-3 text-2xl font-bold">Help improve RMI</h2>
           <p className="mt-2 max-w-md text-sm leading-6 text-paper/60">
-            Report a bug or questionable market data, ask for account help, or share an idea. You can submit without signing in.
+            Report a bug or questionable market data, ask for account help, or share an idea. Anonymous reports are allowed; signing in links the report to your account.
           </p>
         </div>
 
@@ -321,7 +321,7 @@ export default function HelpPage() {
               maxLength={FEEDBACK_MESSAGE_MAX_LENGTH}
               rows={6}
               required
-              className="rmi-terminal-input min-h-36 resize-y px-3 py-3 text-sm font-medium leading-6"
+              className="rmi-terminal-input h-40 resize-none px-3 py-3 text-sm font-medium leading-6"
               placeholder="Describe what happened, what looks wrong, or what you would improve."
               disabled={feedbackState.status === "sending"}
             />

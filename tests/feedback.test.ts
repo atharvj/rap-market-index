@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
+  ANONYMOUS_FEEDBACK_RATE_LIMIT,
+  FEEDBACK_IP_RATE_LIMIT,
+  FEEDBACK_RATE_WINDOW_SECONDS,
   hasFilledFeedbackHoneypot,
+  SIGNED_IN_FEEDBACK_RATE_LIMIT,
   validateFeedbackSubmission
 } from "@/lib/feedback";
 import { enforceRateLimit } from "@/server/rate-limit";
@@ -40,6 +44,12 @@ describe("feedback validation", () => {
 });
 
 describe("feedback rate limiting", () => {
+  it("keeps anonymous reports stricter than signed-in reports", () => {
+    expect(ANONYMOUS_FEEDBACK_RATE_LIMIT).toBe(2);
+    expect(SIGNED_IN_FEEDBACK_RATE_LIMIT).toBe(5);
+    expect(FEEDBACK_IP_RATE_LIMIT).toBe(5);
+  });
+
   it("allows five submissions per IP per hour and rejects the sixth", async () => {
     const identifier = `feedback-test-${Date.now()}-${Math.random()}`;
     const request = new Request("https://rmi.test/api/feedback");
@@ -52,8 +62,8 @@ describe("feedback rate limiting", () => {
           request,
           identifier,
           scope: "feedback-submit-test",
-          limit: 5,
-          windowSeconds: 3600
+          limit: FEEDBACK_IP_RATE_LIMIT,
+          windowSeconds: FEEDBACK_RATE_WINDOW_SECONDS
         })).toBeNull();
       }
 
@@ -61,8 +71,8 @@ describe("feedback rate limiting", () => {
         request,
         identifier,
         scope: "feedback-submit-test",
-        limit: 5,
-        windowSeconds: 3600
+        limit: FEEDBACK_IP_RATE_LIMIT,
+        windowSeconds: FEEDBACK_RATE_WINDOW_SECONDS
       });
 
       expect(limited?.status).toBe(429);

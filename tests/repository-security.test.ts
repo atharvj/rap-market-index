@@ -198,7 +198,8 @@ describe("repository security boundaries", () => {
     const route = readTrackedFile("app/api/feedback/route.ts");
     const migration = readTrackedFile("supabase/migrations/028_user_feedback.sql");
 
-    expect(route).toContain('scope: "feedback-submit"');
+    expect(route).toContain('scope: "feedback-submit-ip"');
+    expect(route).toContain('"feedback-submit-user" : "feedback-submit-anonymous"');
     expect(route).toContain("getRequestIp(request)");
     expect(route).toContain("requireConfirmedUser(request)");
     expect(route).toContain('createServiceRoleClient().from("user_feedback").insert');
