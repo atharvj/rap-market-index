@@ -269,13 +269,10 @@ type ArtistRosterRecord = {
   volatility: number;
   category: ArtistCategory;
   accent: string;
-  isActive: boolean;
 };
 
 type ArtistRosterDirectory = {
   artistCount: number;
-  activeCount: number;
-  inactiveCount: number;
   records: ArtistRosterRecord[];
 };
 
@@ -288,7 +285,6 @@ type ArtistRosterForm = {
   previousClose: string;
   volatility: string;
   category: ArtistCategory;
-  isActive: boolean;
 };
 
 type ArtistRosterSaveState =
@@ -761,8 +757,7 @@ const emptyArtistRosterForm: ArtistRosterForm = {
   currentPrice: "",
   previousClose: "",
   volatility: "1.4",
-  category: "underground",
-  isActive: true
+  category: "underground"
 };
 
 export default function DevPage() {
@@ -1236,8 +1231,6 @@ export default function DevPage() {
         status: "ready",
         data: {
           artistCount: payload.artistCount ?? 0,
-          activeCount: payload.activeCount ?? 0,
-          inactiveCount: payload.inactiveCount ?? 0,
           records: payload.records ?? []
         }
       });
@@ -1792,53 +1785,6 @@ export default function DevPage() {
     }
   }
 
-  async function setRosterArtistActive(isActive: boolean) {
-    const artistId = selectedRosterRecord?.id ?? artistRosterForm.id;
-
-    if (!artistId) {
-      setArtistRosterSave({
-        status: "error",
-        message: "Choose an artist before changing active status."
-      });
-      return;
-    }
-
-    setArtistRosterSave({ status: "saving" });
-
-    try {
-      const response = await fetch("/api/admin/artist-roster", {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
-          ...adminHeaders
-        },
-        body: JSON.stringify({
-          artistId,
-          isActive
-        })
-      });
-      const payload = await response.json();
-
-      if (!response.ok || !payload.ok) {
-        throw new Error(payload.error ?? "Artist active status update failed.");
-      }
-
-      setArtistRosterSave({
-        status: "saved",
-        message: `${payload.record?.ticker ?? artistId} is now ${isActive ? "active" : "archived"}.`
-      });
-      setArtistRosterForm(payload.record ? buildArtistRosterForm(payload.record) : artistRosterForm);
-      await refreshArtistRoster();
-      await refreshSourceIds();
-      await refreshMarketHealth();
-    } catch (error) {
-      setArtistRosterSave({
-        status: "error",
-        message: error instanceof Error ? error.message : "Artist active status update failed."
-      });
-    }
-  }
-
   async function deleteRosterArtist() {
     const artist = selectedRosterRecord;
 
@@ -2289,7 +2235,6 @@ export default function DevPage() {
         onSelectArtist={selectRosterArtist}
         onChange={updateRosterField}
         onSave={saveRosterArtist}
-        onSetActive={setRosterArtistActive}
         onDelete={deleteRosterArtist}
         onAutoNameChange={(value) => {
           setAutoArtistName(value);
@@ -3312,7 +3257,6 @@ function MarketControlsPanel({
               >
                 <option value="">Select artist</option>
                 {artistRecords
-                  .filter((artist) => artist.isActive)
                   .map((artist) => (
                     <option key={artist.id} value={artist.id}>
                       {artist.ticker} - {artist.name}
@@ -4111,7 +4055,6 @@ function ArtistRosterManager({
   onSelectArtist,
   onChange,
   onSave,
-  onSetActive,
   onDelete,
   onAutoNameChange,
   onAutoPreview,
@@ -4128,7 +4071,6 @@ function ArtistRosterManager({
   onSelectArtist: (artistId: string) => void;
   onChange: (field: keyof Omit<ArtistRosterForm, "selectedId">, value: string | boolean) => void;
   onSave: () => void;
-  onSetActive: (isActive: boolean) => void;
   onDelete: () => void;
   onAutoNameChange: (value: string) => void;
   onAutoPreview: () => void;
@@ -4144,7 +4086,7 @@ function ArtistRosterManager({
           <p className="text-xs font-bold uppercase tracking-wide text-paper/45">Roster control</p>
           <h2 className="mt-1 text-2xl font-black">Artist roster</h2>
           <p className="mt-2 text-sm leading-6 text-paper/55">
-            Add artists, or archive a listing to hide it and pause market updates while preserving its history.
+            Every saved artist is public and receives market updates. Remove a listing only with permanent delete.
           </p>
         </div>
         <div className="flex flex-col gap-2 sm:flex-row">
@@ -4236,7 +4178,7 @@ function ArtistRosterManager({
                 <option value="">New artist</option>
                 {records.map((record) => (
                   <option key={record.id} value={record.id}>
-                    {record.ticker} - {record.name} {record.isActive ? "" : "(archived)"}
+                    {record.ticker} - {record.name}
                   </option>
                 ))}
               </select>
@@ -4244,15 +4186,12 @@ function ArtistRosterManager({
 
             <div className="mt-4 grid gap-2">
               <PreviewMetric label="Total listings" value={String(state.data.artistCount)} />
-              <PreviewMetric label="Active" value={String(state.data.activeCount)} />
-              <PreviewMetric label="Archived" value={String(state.data.inactiveCount)} />
             </div>
 
             {selectedRecord ? (
               <div className="mt-4 rounded-md border border-line bg-black/25 p-3">
                 <p className="text-xs font-black uppercase tracking-wide text-paper/45">Selected listing</p>
                 <div className="mt-2 grid gap-2">
-                  <PreviewMetric label="Status" value={selectedRecord.isActive ? "Active" : "Archived"} />
                   <PreviewMetric label="Price" value={`$${selectedRecord.currentPrice.toFixed(2)}`} />
                   <PreviewMetric label="Hype score" value={String(selectedRecord.hypeScore)} />
                 </div>
@@ -4344,16 +4283,6 @@ function ArtistRosterManager({
                   ))}
                 </select>
               </label>
-              <label className="flex min-h-11 items-center gap-3 rounded-md border border-line bg-ink px-3 text-sm font-bold text-paper md:col-span-2">
-                <input
-                  type="checkbox"
-                  checked={form.isActive}
-                  onChange={(event) => onChange("isActive", event.target.checked)}
-                  disabled={selectedDisabled}
-                  className="h-4 w-4 accent-cyan"
-                />
-                Active listing (turning this off archives it and pauses market updates)
-              </label>
             </div>
 
             <div className="mt-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
@@ -4363,24 +4292,14 @@ function ArtistRosterManager({
               </div>
               <div className="flex flex-col gap-2 sm:flex-row">
                 {selectedRecord ? (
-                  <>
-                    <button
-                      type="button"
-                      onClick={() => onSetActive(!selectedRecord.isActive)}
-                      disabled={saveState.status === "saving"}
-                      className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md border border-brass/45 bg-brass/10 px-4 text-sm font-black text-brass disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      {selectedRecord.isActive ? "Archive" : "Restore"}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={onDelete}
-                      disabled={saveState.status === "saving"}
-                      className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md border border-ember/45 bg-ember/10 px-4 text-sm font-black text-ember disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      Delete completely
-                    </button>
-                  </>
+                  <button
+                    type="button"
+                    onClick={onDelete}
+                    disabled={saveState.status === "saving"}
+                    className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md border border-ember/45 bg-ember/10 px-4 text-sm font-black text-ember disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    Delete completely
+                  </button>
                 ) : null}
                 <button
                   type="button"
@@ -4728,8 +4647,7 @@ function buildArtistRosterForm(record: ArtistRosterRecord): ArtistRosterForm {
     currentPrice: String(record.currentPrice),
     previousClose: String(record.previousClose),
     volatility: String(record.volatility),
-    category: record.category,
-    isActive: record.isActive
+    category: record.category
   };
 }
 
@@ -4748,8 +4666,7 @@ function buildArtistRosterPayload(form: ArtistRosterForm) {
     currentPrice,
     previousClose,
     volatility,
-    category: form.category,
-    isActive: form.isActive
+    category: form.category
   };
 }
 

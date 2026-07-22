@@ -19,14 +19,12 @@ type ArtistRosterInput = {
   volatility?: number;
   category?: ArtistCategory;
   accent?: string;
-  isActive?: boolean;
 };
 
 type ArtistRosterBody = {
   artist?: ArtistRosterInput;
   artistId?: string;
   ticker?: string;
-  isActive?: boolean;
   confirmDelete?: string;
 };
 
@@ -65,7 +63,6 @@ export async function GET(request: Request) {
     const { data, error } = await createServiceRoleClient()
       .from("artists")
       .select("*")
-      .order("is_active", { ascending: false })
       .order("ticker", { ascending: true });
 
     if (error) {
@@ -78,8 +75,6 @@ export async function GET(request: Request) {
       ok: true,
       config,
       artistCount: records.length,
-      activeCount: records.filter((artist) => artist.isActive).length,
-      inactiveCount: records.filter((artist) => !artist.isActive).length,
       records
     });
   } catch (error) {
@@ -146,50 +141,13 @@ export async function POST(request: Request) {
       });
     }
 
-    const artistId = normalizeLookupId(body.artistId);
-    const ticker = normalizeOptionalTicker(body.ticker);
-
-    if (!artistId && !ticker) {
-      return NextResponse.json(
-        {
-          ok: false,
-          error: "Provide artist data, artistId, or ticker."
-        },
-        { status: 400 }
-      );
-    }
-
-    if (typeof body.isActive !== "boolean") {
-      return NextResponse.json(
-        {
-          ok: false,
-          error: "Provide isActive as true or false."
-        },
-        { status: 400 }
-      );
-    }
-
-    const query = supabase
-      .from("artists")
-      .update({
-        is_active: body.isActive,
-        last_move_explanation: body.isActive
-          ? "Artist returned to the active market roster."
-          : "Listing archived: hidden publicly and excluded from market updates while history is preserved."
-      })
-      .select("*");
-    const result = artistId ? await query.eq("id", artistId).single() : await query.eq("ticker", ticker).single();
-
-    if (result.error) {
-      throw new Error(result.error.message);
-    }
-
-    return NextResponse.json({
-      ok: true,
-      persisted: true,
-      config,
-      record: mapArtistRow(result.data as ArtistRow)
-    });
+    return NextResponse.json(
+      {
+        ok: false,
+        error: "Archiving is disabled. Keep the listing active or permanently delete it."
+      },
+      { status: 400 }
+    );
   } catch (error) {
     return NextResponse.json(
       {
@@ -404,7 +362,7 @@ function normalizeArtistInput(
     category,
     accent: input.accent?.trim() || existing?.accent || DEFAULT_ACCENT,
     last_move_explanation: existing?.last_move_explanation ?? `${ticker} was added to the market roster.`,
-    is_active: input.isActive ?? existing?.is_active ?? true
+    is_active: true
   };
 }
 
@@ -419,8 +377,7 @@ function mapArtistRow(row: ArtistRow) {
     hypeScore: row.hype_score,
     volatility: Number(row.volatility),
     category: row.category,
-    accent: row.accent,
-    isActive: row.is_active
+    accent: row.accent
   };
 }
 
