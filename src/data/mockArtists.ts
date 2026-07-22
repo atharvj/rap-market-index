@@ -72,13 +72,24 @@ const roster: RosterSeed[] = [
   { id: "nine-vicious", name: "Nine Vicious", ticker: "NINEV", price: 6.85, previousClose: 7.1, volatility: 2.12, category: "underground", historyBias: 6.6 },
   { id: "yung-fazo", name: "Yung Fazo", ticker: "FAZO", price: 11.3, previousClose: 12.1, volatility: 1.92, category: "underground", historyBias: 5.8 },
   { id: "feng", name: "Feng", ticker: "FENG", price: 5.95, previousClose: 5.5, volatility: 2.2, category: "underground", historyBias: 7.1 },
-  { id: "bleood", name: "Bleood", ticker: "BLEOD", price: 7.85, previousClose: 6.4, volatility: 2.05, category: "underground", historyBias: 6.4 },
   { id: "slayr", name: "Slayr", ticker: "SLAYR", price: 8.6, previousClose: 8.25, volatility: 2.06, category: "underground", historyBias: 6.2 },
   { id: "lazerdim700", name: "Lazer Dim 700", ticker: "LZR700", price: 19.75, previousClose: 17.9, volatility: 1.98, category: "underground", historyBias: 6 },
   { id: "protect", name: "Protect", ticker: "PRTCT", price: 6.7, previousClose: 6.45, volatility: 2.12, category: "underground", historyBias: 6.6 },
   { id: "xaviersobased", name: "xaviersobased", ticker: "XAVIER", price: 12.95, previousClose: 12.2, volatility: 1.96, category: "underground", historyBias: 5.6 },
   { id: "prettifun", name: "prettifun", ticker: "PRETTI", price: 6.25, previousClose: 5.85, volatility: 2.18, category: "underground", historyBias: 7 },
-  { id: "babychiefdoit", name: "BabyChiefDoIt", ticker: "BCDOIT", price: 8.2, previousClose: 7.7, volatility: 2.14, category: "underground", historyBias: 6.8 }
+  { id: "babychiefdoit", name: "BabyChiefDoIt", ticker: "BCDOIT", price: 8.2, previousClose: 7.7, volatility: 2.14, category: "underground", historyBias: 6.8 },
+  { id: "chief-keef", name: "Chief Keef", ticker: "KEEF", price: 74.09, previousClose: 74.09, volatility: 1.15, category: "mainstream", historyBias: 2.1 },
+  { id: "nicki-minaj", name: "Nicki Minaj", ticker: "NICKI", price: 118.78, previousClose: 118.78, volatility: 0.85, category: "superstar", historyBias: 1.1 },
+  { id: "rod-wave", name: "Rod Wave", ticker: "ROD", price: 72.85, previousClose: 72.85, volatility: 1.15, category: "mainstream", historyBias: 2.2 },
+  { id: "nle-choppa", name: "NLE Choppa", ticker: "NLE", price: 81.17, previousClose: 81.17, volatility: 1.15, category: "mainstream", historyBias: 2.4 },
+  { id: "g-herbo", name: "G Herbo", ticker: "HERBO", price: 54.91, previousClose: 54.91, volatility: 1.6, category: "rising", historyBias: 3.2 },
+  { id: "pooh-shiesty", name: "Pooh Shiesty", ticker: "POOH", price: 54.52, previousClose: 54.52, volatility: 1.6, category: "rising", historyBias: 3.5 },
+  { id: "bossman-dlow", name: "BossMan Dlow", ticker: "DLOW", price: 45.3, previousClose: 45.3, volatility: 1.6, category: "rising", historyBias: 3.8 },
+  { id: "sahbabii", name: "SahBabii", ticker: "SAH", price: 37.34, previousClose: 37.34, volatility: 1.6, category: "rising", historyBias: 4.2 },
+  { id: "nemzzz", name: "Nemzzz", ticker: "NEMZZZ", price: 47.42, previousClose: 47.42, volatility: 1.6, category: "rising", historyBias: 4 },
+  { id: "luh-tyler", name: "Luh Tyler", ticker: "LUHT", price: 35.01, previousClose: 35.01, volatility: 1.6, category: "rising", historyBias: 4.5 },
+  { id: "1900rugrat", name: "1900Rugrat", ticker: "RUGRAT", price: 30.2, previousClose: 30.2, volatility: 1.6, category: "rising", historyBias: 4.8 },
+  { id: "hurricane-wisdom", name: "Hurricane Wisdom", ticker: "WISDOM", price: 29.71, previousClose: 29.71, volatility: 1.6, category: "rising", historyBias: 5 }
 ];
 
 export function createInitialArtists(): Artist[] {

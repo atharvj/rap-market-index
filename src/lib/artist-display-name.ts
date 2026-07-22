@@ -1,5 +1,6 @@
 const DISPLAY_NAME_OVERRIDES: Record<string, string> = {
   "1oneam": "1oneam",
+  "1900rugrat": "1900Rugrat",
   "2hollis": "2hollis",
   "2slimey": "2slimey",
   "a boogie wit da hoodie": "A Boogie wit da Hoodie",
@@ -42,7 +43,10 @@ const TICKER_OVERRIDES: Record<string, string> = {
   "big x tha plug": "BIGX",
   "bossman dlow": "DLOW",
   "cardi b": "CARDI",
+  "chief keef": "KEEF",
+  "g herbo": "HERBO",
   "glorilla": "GLORILLA",
+  "hurricane wisdom": "WISDOM",
   "ice spice": "ICE",
   "j cole": "JCOLE",
   "j. cole": "JCOLE",
@@ -52,9 +56,12 @@ const TICKER_OVERRIDES: Record<string, string> = {
   "lil tecca": "TECCA",
   "megan thee stallion": "MEGAN",
   "nle choppa": "NLE",
+  "nicki minaj": "NICKI",
   "plaqueboymax": "PBM",
+  "pooh shiesty": "POOH",
   "prettifun": "PRETTI",
   "that mexican ot": "MXOT",
+  "1900rugrat": "RUGRAT",
   "ynw melly": "MELLY",
   "youngboy never broke again": "YB"
 };

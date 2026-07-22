@@ -1825,7 +1825,7 @@ export default function DevPage() {
 
       setArtistRosterSave({
         status: "saved",
-        message: `${payload.record?.ticker ?? artistId} is now ${isActive ? "active" : "inactive"}.`
+        message: `${payload.record?.ticker ?? artistId} is now ${isActive ? "active" : "archived"}.`
       });
       setArtistRosterForm(payload.record ? buildArtistRosterForm(payload.record) : artistRosterForm);
       await refreshArtistRoster();
@@ -4144,7 +4144,7 @@ function ArtistRosterManager({
           <p className="text-xs font-bold uppercase tracking-wide text-paper/45">Roster control</p>
           <h2 className="mt-1 text-2xl font-black">Artist roster</h2>
           <p className="mt-2 text-sm leading-6 text-paper/55">
-            Add artists or move unreliable listings inactive without creating one-off SQL migrations.
+            Add artists, or archive a listing to hide it and pause market updates while preserving its history.
           </p>
         </div>
         <div className="flex flex-col gap-2 sm:flex-row">
@@ -4236,7 +4236,7 @@ function ArtistRosterManager({
                 <option value="">New artist</option>
                 {records.map((record) => (
                   <option key={record.id} value={record.id}>
-                    {record.ticker} - {record.name} {record.isActive ? "" : "(inactive)"}
+                    {record.ticker} - {record.name} {record.isActive ? "" : "(archived)"}
                   </option>
                 ))}
               </select>
@@ -4245,14 +4245,14 @@ function ArtistRosterManager({
             <div className="mt-4 grid gap-2">
               <PreviewMetric label="Total listings" value={String(state.data.artistCount)} />
               <PreviewMetric label="Active" value={String(state.data.activeCount)} />
-              <PreviewMetric label="Inactive" value={String(state.data.inactiveCount)} />
+              <PreviewMetric label="Archived" value={String(state.data.inactiveCount)} />
             </div>
 
             {selectedRecord ? (
               <div className="mt-4 rounded-md border border-line bg-black/25 p-3">
                 <p className="text-xs font-black uppercase tracking-wide text-paper/45">Selected listing</p>
                 <div className="mt-2 grid gap-2">
-                  <PreviewMetric label="Status" value={selectedRecord.isActive ? "Active" : "Inactive"} />
+                  <PreviewMetric label="Status" value={selectedRecord.isActive ? "Active" : "Archived"} />
                   <PreviewMetric label="Price" value={`$${selectedRecord.currentPrice.toFixed(2)}`} />
                   <PreviewMetric label="Hype score" value={String(selectedRecord.hypeScore)} />
                 </div>
@@ -4352,7 +4352,7 @@ function ArtistRosterManager({
                   disabled={selectedDisabled}
                   className="h-4 w-4 accent-cyan"
                 />
-                Active listing
+                Active listing (turning this off archives it and pauses market updates)
               </label>
             </div>
 
@@ -4370,7 +4370,7 @@ function ArtistRosterManager({
                       disabled={saveState.status === "saving"}
                       className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md border border-brass/45 bg-brass/10 px-4 text-sm font-black text-brass disabled:cursor-not-allowed disabled:opacity-50"
                     >
-                      {selectedRecord.isActive ? "Deactivate" : "Reactivate"}
+                      {selectedRecord.isActive ? "Archive" : "Restore"}
                     </button>
                     <button
                       type="button"

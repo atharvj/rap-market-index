@@ -175,7 +175,7 @@ export async function POST(request: Request) {
         is_active: body.isActive,
         last_move_explanation: body.isActive
           ? "Artist returned to the active market roster."
-          : "Artist is inactive while source coverage is reviewed."
+          : "Listing archived: hidden publicly and excluded from market updates while history is preserved."
       })
       .select("*");
     const result = artistId ? await query.eq("id", artistId).single() : await query.eq("ticker", ticker).single();

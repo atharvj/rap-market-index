@@ -70,7 +70,6 @@ values
   (44, 'nine-vicious', 'Nine Vicious', 'NINEV', 6.85, 7.10, 2.120, 'underground', 'from-violet-300 via-zinc-100 to-emerald-300'),
   (45, 'yung-fazo', 'Yung Fazo', 'FAZO', 11.30, 12.10, 1.920, 'underground', 'from-red-300 via-zinc-100 to-cyan-300'),
   (46, 'feng', 'Feng', 'FENG', 5.95, 5.50, 2.200, 'underground', 'from-blue-300 via-stone-100 to-emerald-300'),
-  (47, 'bleood', 'Bleood', 'BLEOD', 7.85, 6.40, 2.050, 'underground', 'from-amber-200 via-fuchsia-200 to-cyan-300'),
   (48, 'slayr', 'Slayr', 'SLAYR', 8.60, 8.25, 2.060, 'underground', 'from-fuchsia-300 via-lime-200 to-cyan-300'),
   (50, 'lazerdim700', 'Lazer Dim 700', 'LZR700', 19.75, 17.90, 1.980, 'underground', 'from-lime-300 via-cyan-200 to-zinc-100'),
   (51, 'protect', 'Protect', 'PRTCT', 6.70, 6.45, 2.120, 'underground', 'from-rose-300 via-emerald-200 to-stone-100'),
@@ -162,10 +161,6 @@ on conflict (id) do update set
   accent = excluded.accent,
   last_move_explanation = excluded.last_move_explanation,
   is_active = true;
-
-update public.artists
-set is_active = false
-where id not in (select id from tmp_artist_roster_stats);
 
 insert into public.artist_stats (
   artist_id,
