@@ -1,8 +1,8 @@
-const PACIFIC_TIME_ZONE = "America/Los_Angeles";
+export const MARKET_TIME_ZONE = "America/New_York";
 
-export function getPacificMarketDate(now = new Date()) {
+export function getMarketDate(now = new Date()) {
   const parts = new Intl.DateTimeFormat("en-US", {
-    timeZone: PACIFIC_TIME_ZONE,
+    timeZone: MARKET_TIME_ZONE,
     year: "numeric",
     month: "2-digit",
     day: "2-digit"
@@ -12,17 +12,17 @@ export function getPacificMarketDate(now = new Date()) {
   return `${values.year}-${values.month}-${values.day}`;
 }
 
-export function getPacificMarketDayBoundsUtc(date: string) {
+export function getMarketDayBoundsUtc(date: string) {
   return {
-    start: getPacificLocalMidnightUtc(date),
-    end: getPacificLocalMidnightUtc(shiftMarketDate(date, 1))
+    start: getMarketLocalMidnightUtc(date),
+    end: getMarketLocalMidnightUtc(shiftMarketDate(date, 1))
   };
 }
 
-export function getPacificMarketLookbackBoundsUtc(runDate: string, lookbackDays: number) {
+export function getMarketLookbackBoundsUtc(runDate: string, lookbackDays: number) {
   return {
-    start: getPacificLocalMidnightUtc(shiftMarketDate(runDate, -lookbackDays)),
-    end: getPacificLocalMidnightUtc(runDate)
+    start: getMarketLocalMidnightUtc(shiftMarketDate(runDate, -lookbackDays)),
+    end: getMarketLocalMidnightUtc(runDate)
   };
 }
 
@@ -33,13 +33,13 @@ export function shiftMarketDate(date: string, days: number) {
   return value.toISOString().slice(0, 10);
 }
 
-function getPacificLocalMidnightUtc(date: string) {
+function getMarketLocalMidnightUtc(date: string) {
   const [year, month, day] = date.split("-").map(Number);
   const desiredLocalTimestamp = Date.UTC(year, month - 1, day, 0, 0, 0);
   let guessTimestamp = Date.UTC(year, month - 1, day, 8, 0, 0);
 
   for (let index = 0; index < 4; index += 1) {
-    const actual = getPacificParts(new Date(guessTimestamp));
+    const actual = getMarketParts(new Date(guessTimestamp));
     const actualLocalTimestamp = Date.UTC(
       actual.year,
       actual.month - 1,
@@ -55,9 +55,9 @@ function getPacificLocalMidnightUtc(date: string) {
   return new Date(guessTimestamp).toISOString();
 }
 
-function getPacificParts(value: Date) {
+function getMarketParts(value: Date) {
   const parts = new Intl.DateTimeFormat("en-US", {
-    timeZone: PACIFIC_TIME_ZONE,
+    timeZone: MARKET_TIME_ZONE,
     hourCycle: "h23",
     year: "numeric",
     month: "2-digit",

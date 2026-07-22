@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { createServiceRoleClient, getSupabaseConfigStatus } from "@/lib/supabase/server";
 import { deleteExpiredAccountRecreationCooldowns } from "@/server/account-recreation";
 import type { MarketUpdateSource } from "@/server/market/daily-update";
-import { getPacificMarketDate } from "@/server/market/market-date";
+import { getMarketDate } from "@/server/market/market-date";
 import { enforceRateLimit, getRequestIp } from "@/server/rate-limit";
 import { secureCompare } from "@/server/secrets";
 import {
@@ -76,7 +76,7 @@ export async function GET(request: Request) {
   const url = new URL(request.url);
   const force = url.searchParams.get("force") === "1";
   const dryRun = url.searchParams.get("dryRun") === "1";
-  const runDate = normalizeDate(url.searchParams.get("runDate")) ?? getPacificMarketDate();
+  const runDate = normalizeDate(url.searchParams.get("runDate")) ?? getMarketDate();
   const source = normalizeSource(process.env.MARKET_CRON_SOURCE);
   const artistLimit = getInteger(process.env.MARKET_CRON_ARTIST_LIMIT, DEFAULT_ARTIST_LIMIT, 1, 100);
   const maxBatches = getInteger(process.env.MARKET_CRON_MAX_BATCHES, DEFAULT_MAX_BATCHES, 1, 10);

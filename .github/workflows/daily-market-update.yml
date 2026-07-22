@@ -1,12 +1,15 @@
-name: Run daily market update
+name: Open daily release window
 
 on:
   schedule:
-    # GitHub schedules can start late. Every slot calls the same idempotent
-    # Pacific market date, so later slots recover from delayed or interrupted
-    # runs without writing a second close for that date.
-    - cron: "15 10,11,12,13 * * *"
+    # These slots cover midnight Eastern across daylight and standard time.
+    # The endpoint is idempotent, so later slots become recovery attempts and
+    # return immediately after a successful release scan and market update.
+    - cron: "7 4,5,6 * * *"
   workflow_dispatch:
+
+permissions:
+  contents: read
 
 concurrency:
   group: daily-market-update
@@ -17,7 +20,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 12
     steps:
-      - name: Persist the daily market update
+      - name: Scan releases, update quotes, and reopen trading
         env:
           MARKET_UPDATE_SECRET: ${{ secrets.MARKET_UPDATE_SECRET }}
         run: |
@@ -31,4 +34,4 @@ jobs:
             --retry-delay 15 \
             --retry-all-errors \
             --header "x-market-update-secret: $MARKET_UPDATE_SECRET" \
-            https://rap-market-index.vercel.app/api/cron/daily-market-update
+            https://rap-market-index.vercel.app/api/cron/release-window

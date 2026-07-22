@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { createServiceRoleClient, getSupabaseConfigStatus } from "@/lib/supabase/server";
 import type { Database } from "@/lib/supabase/database.types";
 import type { MarketObservationSeries } from "@/lib/types";
-import { getPacificMarketDate, shiftMarketDate } from "@/server/market/market-date";
+import { getMarketDate, shiftMarketDate } from "@/server/market/market-date";
 import { reportServerError } from "@/server/observability";
 
 export const dynamic = "force-dynamic";
@@ -275,7 +275,7 @@ async function loadObservationSeries({
     .order("observed_date", { ascending: true });
 
   if (range !== "ALL") {
-    query = query.gte("observed_date", shiftMarketDate(getPacificMarketDate(), -RANGE_DAYS[range]));
+    query = query.gte("observed_date", shiftMarketDate(getMarketDate(), -RANGE_DAYS[range]));
   }
 
   const { data, error } = await query;

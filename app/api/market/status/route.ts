@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
-import { createAnonServerClient, getSupabaseConfigStatus } from "@/lib/supabase/server";
-import { getPacificMarketDate } from "@/server/market/market-date";
+import { createAnonServerClient, createServiceRoleClient, getSupabaseConfigStatus } from "@/lib/supabase/server";
+import { getMarketDate } from "@/server/market/market-date";
+import { loadReleaseWindowStatus } from "@/server/market/release-window";
 import { reportServerError } from "@/server/observability";
 
 export const dynamic = "force-dynamic";
@@ -39,10 +40,23 @@ export async function GET(request: Request) {
 
     const row = (data?.[0] ?? null) as TradingStatusRow | null;
 
+    const status = buildStatus(row, { artistId });
+
+    if (config.serviceRoleConfigured) {
+      const releaseWindow = await loadReleaseWindowStatus(createServiceRoleClient());
+
+      if (!releaseWindow.ready) {
+        status.marketDate = releaseWindow.marketDate;
+        status.isOpen = false;
+        status.marketImpactEnabled = false;
+        status.statusNote = releaseWindow.reason;
+      }
+    }
+
     return NextResponse.json({
       ok: true,
       source: "supabase",
-      status: buildStatus(row, { artistId })
+      status
     }, { headers: CACHE_HEADERS });
   } catch (error) {
     reportServerError(error, "market.status");
@@ -79,13 +93,13 @@ function buildStatus(row: TradingStatusRow | null, { artistId }: { artistId: str
 
 function buildFallbackStatus({ artistId }: { artistId: string | null }) {
   return {
-    marketDate: getPacificMarketDate(),
+    marketDate: getMarketDate(),
     tradingMode: "continuous",
     isOpen: true,
     marketImpactEnabled: true,
     artistHalted: false,
     artistId,
-    dayChangeReset: "12:01 AM PT",
+    dayChangeReset: "12:01 AM ET",
     supportsShorting: false,
     statusNote: "Continuous virtual trading is open.",
     mechanics: {

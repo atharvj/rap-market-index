@@ -7,7 +7,7 @@ authentication, database, or deployment changes.
 ## Required Deployment Steps
 
 1. Run every numbered file in `supabase/migrations/` through
-   `030_signup_username_guard.sql` in order. Migration 024 adds distributed
+   `031_release_window_guard.sql` in order. Migration 024 adds distributed
    API rate limiting, migration 025 adds the disposable-email signup hook, and
    migrations 028-030 add private feedback storage, case-insensitive username
    uniqueness, and pre-email username rejection.
@@ -128,7 +128,7 @@ Before a public announcement:
 
 - `npm audit` reports no known vulnerabilities.
 - `npm test`, `npm run typecheck`, and `npm run build` pass.
-- All numbered migrations through 030 are installed, and the signup-validation
+- All numbered migrations through 031 are installed, and the signup-validation
   Before User Created hook from migration 025 is enabled in Supabase Auth.
 - CAPTCHA, email confirmation, redirect allowlists, MFA, and deployment
   protection are verified manually.

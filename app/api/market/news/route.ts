@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServiceRoleClient, getSupabaseConfigStatus } from "@/lib/supabase/server";
 import type { Database } from "@/lib/supabase/database.types";
-import { getPacificMarketDate, shiftMarketDate } from "@/server/market/market-date";
+import { getMarketDate, shiftMarketDate } from "@/server/market/market-date";
 import { getArtistStatusSubtype } from "@/server/market/status-events";
 import { loadArtistImageUrls } from "@/server/market/artist-images";
 import {
@@ -93,7 +93,7 @@ export async function GET(request: Request) {
 
   try {
     const url = new URL(request.url);
-    const runDate = normalizeDate(url.searchParams.get("runDate")) ?? getPacificMarketDate();
+    const runDate = normalizeDate(url.searchParams.get("runDate")) ?? getMarketDate();
     const lookbackDays = getInteger(url.searchParams.get("lookbackDays"), DEFAULT_LOOKBACK_DAYS, 1, MAX_LOOKBACK_DAYS);
     const limit = getInteger(url.searchParams.get("limit"), DEFAULT_LIMIT, 1, MAX_LIMIT);
     const artistId = url.searchParams.get("artistId");

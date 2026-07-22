@@ -117,7 +117,9 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
 
     let active = true;
 
-    fetch("/api/market/snapshot")
+    const controller = new AbortController();
+    let firstLoad = true;
+    const loadMarketSnapshot = () => fetch("/api/market/snapshot", { signal: controller.signal })
       .then(async (response) => {
         const payload = await response.json() as MarketSnapshotResponse;
 
@@ -154,16 +156,44 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
         setMarketReady(true);
       })
       .catch(() => {
-        if (active) {
+        if (active && !controller.signal.aborted) {
+          if (!firstLoad) {
+            setMarketError("Live quote refresh is temporarily delayed. The last verified quote is still shown.");
+            setSyncStatus("Market refresh delayed");
+            return;
+          }
+
           setState((current) => clearMarketQuotes(current));
           setMarketError("Live market data is temporarily unavailable. Quotes and trading are paused until the feed recovers.");
           setSyncStatus("Market feed unavailable");
           setMarketReady(true);
         }
+      })
+      .finally(() => {
+        firstLoad = false;
       });
+
+    void loadMarketSnapshot();
+
+    const interval = window.setInterval(() => {
+      if (document.visibilityState === "visible") {
+        void loadMarketSnapshot();
+      }
+    }, 60_000);
+    const refreshVisibleMarket = () => {
+      if (document.visibilityState === "visible") {
+        void loadMarketSnapshot();
+      }
+    };
+    window.addEventListener("focus", refreshVisibleMarket);
+    document.addEventListener("visibilitychange", refreshVisibleMarket);
 
     return () => {
       active = false;
+      controller.abort();
+      window.clearInterval(interval);
+      window.removeEventListener("focus", refreshVisibleMarket);
+      document.removeEventListener("visibilitychange", refreshVisibleMarket);
     };
   }, [authConfigured, hydrated]);
 

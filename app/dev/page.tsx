@@ -3238,7 +3238,7 @@ function MarketControlsPanel({
         <ReadinessTile
           label="Daily reset"
           ready={Boolean(controls?.day_change_reset)}
-          readyText={controls?.day_change_reset ?? "12:01 AM PT"}
+          readyText={controls?.day_change_reset ?? "12:01 AM ET"}
           pendingText="Unknown"
           icon={<RefreshCcw className="h-4 w-4" />}
         />

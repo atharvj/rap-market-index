@@ -2,7 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { clamp } from "@/lib/pricing";
 import type { Database } from "@/lib/supabase/database.types";
 import type { MarketUpdateArtist } from "@/server/market/daily-update";
-import { getPacificMarketLookbackBoundsUtc } from "@/server/market/market-date";
+import { getMarketLookbackBoundsUtc } from "@/server/market/market-date";
 import type { AdapterSignals, MarketObservation } from "@/server/market/market-data";
 import type { HypeStats } from "@/lib/types";
 
@@ -72,7 +72,7 @@ export async function collectTradeFlowMarketSignals({
   }
 
   const artistIds = artists.map((artist) => artist.id);
-  const { start: windowStart, end: windowEnd } = getPacificMarketLookbackBoundsUtc(runDate, lookbackDays);
+  const { start: windowStart, end: windowEnd } = getMarketLookbackBoundsUtc(runDate, lookbackDays);
   const { data, error } = await supabase
     .from("market_trade_events")
     .select("artist_id,user_id,type,shares,price,cash_delta,gross_value,market_eligible,created_at")

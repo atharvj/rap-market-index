@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { createAnonServerClient, createServiceRoleClient, getSupabaseConfigStatus } from "@/lib/supabase/server";
 import { enforceRateLimit } from "@/server/rate-limit";
+import { isPendingCatalyst } from "@/server/market/pending-catalyst";
+import { loadReleaseWindowStatus } from "@/server/market/release-window";
 import { reportServerError } from "@/server/observability";
 import { requireConfirmedUser } from "@/server/user-auth";
 
@@ -88,6 +90,7 @@ export async function POST(request: Request) {
   }
 
   const { supabase, user: authUser } = auth;
+  const serviceSupabase = createServiceRoleClient();
   const email = (authUser.email ?? "").toLowerCase();
   const impactExempt = isMarketImpactExemptEmail(email);
   const marketEligible = !impactExempt && isAccountOldEnoughForMarketImpact(authUser.created_at);
@@ -97,7 +100,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: false, error: "Exempt test trading is not configured safely." }, { status: 503 });
     }
 
-    const { error: exemptionError } = await createServiceRoleClient()
+    const { error: exemptionError } = await serviceSupabase
       .from("profiles")
       .update({ market_impact_exempt: true })
       .eq("id", authUser.id);
@@ -122,8 +125,35 @@ export async function POST(request: Request) {
     );
   }
 
+  try {
+    const releaseWindow = await loadReleaseWindowStatus(serviceSupabase);
+
+    if (!releaseWindow.ready) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: releaseWindow.reason,
+          marketStatus: {
+            ...(tradingStatus ? mapTradingStatus(tradingStatus) : {}),
+            isOpen: false,
+            marketImpactEnabled: false,
+            statusNote: releaseWindow.reason,
+            marketDate: releaseWindow.marketDate
+          }
+        },
+        { status: 423 }
+      );
+    }
+  } catch (error) {
+    reportServerError(error, "trade.release-window");
+    return NextResponse.json(
+      { ok: false, error: "Trading is paused while today’s market update is verified." },
+      { status: 503 }
+    );
+  }
+
   const pendingCatalyst = await loadPendingCatalyst(
-    config.serviceRoleConfigured ? createServiceRoleClient() : supabase,
+    serviceSupabase,
     artistId
   );
 
@@ -138,7 +168,7 @@ export async function POST(request: Request) {
     );
   }
 
-  const { data, error } = await createServiceRoleClient().rpc("execute_artist_trade_as_user", {
+  const { data, error } = await serviceSupabase.rpc("execute_artist_trade_as_user", {
     p_user_id: authUser.id,
     p_side: side,
     p_artist_id: artistId,
@@ -212,13 +242,12 @@ async function loadPendingCatalyst(
   const [eventResult, quoteResult] = await Promise.all([
     supabase
       .from("market_events")
-      .select("title,created_at")
+      .select("title,created_at,event_date,event_type")
       .eq("artist_id", artistId)
       .gte("confidence", PENDING_CATALYST_MIN_CONFIDENCE)
       .or(`impact_score.gte.${PENDING_CATALYST_MIN_IMPACT},impact_score.lte.-${PENDING_CATALYST_MIN_IMPACT}`)
       .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle(),
+      .limit(20),
     supabase
       .from("price_ticks")
       .select("observed_at")
@@ -231,20 +260,27 @@ async function loadPendingCatalyst(
 
   // Older projects may not have the event or tick migrations yet. In that case,
   // preserve trading and let the existing market-status RPC remain authoritative.
-  if (eventResult.error || quoteResult.error || !eventResult.data) {
+  if (eventResult.error || quoteResult.error || !eventResult.data?.length) {
     return null;
   }
 
-  const detectedAt = new Date(eventResult.data.created_at).getTime();
-  const quotedAt = quoteResult.data ? new Date(quoteResult.data.observed_at).getTime() : Number.NEGATIVE_INFINITY;
+  const quotedAt = quoteResult.data?.observed_at ?? null;
+  const event = eventResult.data.find((candidate) => isPendingCatalyst({
+    event: {
+      createdAt: candidate.created_at,
+      eventDate: candidate.event_date,
+      eventType: candidate.event_type
+    },
+    quotedAt
+  }));
 
-  if (!Number.isFinite(detectedAt) || detectedAt <= quotedAt) {
+  if (!event) {
     return null;
   }
 
   return {
-    title: eventResult.data.title,
-    detectedAt: eventResult.data.created_at
+    title: event.title,
+    detectedAt: event.created_at
   };
 }
 

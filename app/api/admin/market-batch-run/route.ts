@@ -3,7 +3,7 @@ import { createServiceRoleClient, getSupabaseConfigStatus } from "@/lib/supabase
 import type { Json } from "@/lib/supabase/database.types";
 import { requireAdminRequest } from "@/server/admin-auth";
 import type { MarketUpdateSource } from "@/server/market/daily-update";
-import { getPacificMarketDate } from "@/server/market/market-date";
+import { getMarketDate } from "@/server/market/market-date";
 import { getMarketModelVersion } from "@/server/market/model-version";
 
 export const dynamic = "force-dynamic";
@@ -163,7 +163,7 @@ export async function POST(request: Request) {
   const body = await parseBody(request);
   const source = normalizeSource(body.source);
   const dryRun = body.dryRun !== false;
-  const runDate = body.runDate ?? getPacificMarketDate();
+  const runDate = body.runDate ?? getMarketDate();
   const modelVersion = getMarketModelVersion();
   const artistLimit = normalizePositiveInteger(body.artistLimit, DEFAULT_BATCH_SIZE, MAX_BATCH_SIZE);
   const maxBatches = normalizePositiveInteger(body.maxBatches, 1, MAX_BATCHES_PER_REQUEST);

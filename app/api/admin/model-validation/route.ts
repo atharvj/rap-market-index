@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServiceRoleClient, getSupabaseConfigStatus } from "@/lib/supabase/server";
 import { requireAdminRequest } from "@/server/admin-auth";
-import { getPacificMarketDate, shiftMarketDate } from "@/server/market/market-date";
+import { getMarketDate, shiftMarketDate } from "@/server/market/market-date";
 import {
   evaluateMarketModel,
   type ValidationAudienceObservation,
@@ -39,7 +39,7 @@ export async function GET(request: Request) {
 
   try {
     const url = new URL(request.url);
-    const runDate = normalizeDate(url.searchParams.get("runDate")) ?? getPacificMarketDate();
+    const runDate = normalizeDate(url.searchParams.get("runDate")) ?? getMarketDate();
     const horizonDays = getInteger(url.searchParams.get("horizonDays"), 7, 3, 30);
     const lookbackDays = getInteger(url.searchParams.get("lookbackDays"), 60, 21, 180);
     const supabase = createServiceRoleClient();

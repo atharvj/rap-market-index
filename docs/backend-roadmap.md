@@ -368,7 +368,7 @@ GET /api/cron/daily-market-update
 }
 ```
 
-Vercel schedules this fallback in UTC, so it runs around 6 AM Pacific during daylight saving time and 5 AM Pacific during standard time. The GitHub Actions workflow is the primary scheduler and uses two idempotent early-morning attempts; GitHub can delay scheduled jobs, so neither attempt requires an exact local start hour. The route verifies `Authorization: Bearer <CRON_SECRET>`, then calls the protected batch runner with:
+Vercel schedules a late fallback in UTC. The GitHub Actions workflow is the primary scheduler and uses idempotent slots around midnight Eastern; GitHub can delay scheduled jobs, so later attempts recover automatically. The release-window route first scans verified news and releases, then calls the protected daily batch runner. Trading stays paused for the new Eastern market date until that run is verified as complete.
 
 - `source`: `MARKET_CRON_SOURCE`, default `core`
 - `artistLimit`: `MARKET_CRON_ARTIST_LIMIT`, default `100`

@@ -98,7 +98,7 @@ export function MarketNewsFeed({
       params.set("eventType", eventType);
     }
 
-    fetch(`/api/market/news?${params.toString()}`, {
+    const loadNews = () => fetch(`/api/market/news?${params.toString()}`, {
       signal: controller.signal
     })
       .then((response) => response.json() as Promise<MarketNewsResponse>)
@@ -119,8 +119,26 @@ export function MarketNewsFeed({
         }
       });
 
+    void loadNews();
+
+    const interval = window.setInterval(() => {
+      if (document.visibilityState === "visible") {
+        void loadNews();
+      }
+    }, 5 * 60_000);
+    const refreshVisibleNews = () => {
+      if (document.visibilityState === "visible") {
+        void loadNews();
+      }
+    };
+    window.addEventListener("focus", refreshVisibleNews);
+    document.addEventListener("visibilitychange", refreshVisibleNews);
+
     return () => {
       controller.abort();
+      window.clearInterval(interval);
+      window.removeEventListener("focus", refreshVisibleNews);
+      document.removeEventListener("visibilitychange", refreshVisibleNews);
     };
   }, [artistId, artistIdsKey, eventType, limit, onItemsChange, resolvedVariant, sort]);
 

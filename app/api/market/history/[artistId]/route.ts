@@ -9,7 +9,7 @@ import {
 import { createServiceRoleClient, getSupabaseConfigStatus } from "@/lib/supabase/server";
 import type { Database } from "@/lib/supabase/database.types";
 import type { PricePoint } from "@/lib/types";
-import { getPacificMarketDate, shiftMarketDate } from "@/server/market/market-date";
+import { getMarketDate, shiftMarketDate } from "@/server/market/market-date";
 import { reportServerError } from "@/server/observability";
 
 export const dynamic = "force-dynamic";
@@ -86,7 +86,7 @@ export async function GET(request: Request, context: { params: Promise<{ artistI
       : buildDailyPriceSeries({
           dailyHistory: history,
           currentPrice,
-          marketDate: getPacificMarketDate(),
+          marketDate: getMarketDate(),
           includeCurrentQuote: false
         });
 
@@ -132,7 +132,7 @@ async function loadArtistHistory({
     .order("price_date", { ascending: true });
 
   if (range !== "ALL") {
-    query = query.gte("price_date", shiftMarketDate(getPacificMarketDate(), -RANGE_DAYS[range]));
+    query = query.gte("price_date", shiftMarketDate(getMarketDate(), -RANGE_DAYS[range]));
   }
 
   const { data, error } = await query;
@@ -193,7 +193,7 @@ function getTickMarketDate(point: PriceTickRow) {
     }
   }
 
-  return getPacificMarketDate(new Date(point.observed_at));
+  return getMarketDate(new Date(point.observed_at));
 }
 
 function isMissingPriceTicksError(message: string) {
@@ -215,7 +215,7 @@ function getMockHistoryResponse(artistId: string, range: HistoryRange) {
     };
   }
 
-  const cutoff = range === "ALL" ? null : shiftMarketDate(getPacificMarketDate(), -RANGE_DAYS[range]);
+  const cutoff = range === "ALL" ? null : shiftMarketDate(getMarketDate(), -RANGE_DAYS[range]);
   const points = cutoff
     ? artist.priceHistory.filter((point) => point.date >= cutoff)
     : artist.priceHistory;

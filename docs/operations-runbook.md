@@ -1,5 +1,25 @@
 # RMI Operations Runbook
 
+## Daily Release Window
+
+RMI uses an Eastern market date because major music releases commonly arrive at
+midnight Eastern. At the start of each new date, trading fails closed until the
+release-window automation has completed both stages:
+
+1. scan verified media feeds for new releases and other price-relevant events;
+2. run the full source-based market update for every active artist.
+
+The GitHub workflow calls `/api/cron/release-window` in several daylight-saving-safe
+slots. The endpoint is idempotent: after all active artists have a verified close
+for the current date, later retries return without scanning or repricing again.
+Vercel runs a later fallback. A newly detected high-confidence catalyst can also
+pause only the affected artist until a subsequent market-run quote incorporates it.
+
+If trading remains paused, check the **Open daily release window** GitHub Action,
+then Vercel function logs for the `release-scan`, `market-update`, or `verification`
+stage. Re-run the workflow manually after fixing the reported source or deployment
+problem. Do not bypass the gate by marking a run successful or fabricating a price.
+
 ## Error Monitoring
 
 RMI supports Sentry without sending default personally identifiable information. The SDK removes user objects, cookies, authorization headers, request bodies, query strings, and sensitive breadcrumb fields before an event leaves the app.

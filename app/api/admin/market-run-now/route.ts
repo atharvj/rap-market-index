@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServiceRoleClient, getSupabaseConfigStatus } from "@/lib/supabase/server";
 import { requireAdminRequest } from "@/server/admin-auth";
-import { getPacificMarketDate } from "@/server/market/market-date";
+import { getMarketDate } from "@/server/market/market-date";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
@@ -123,7 +123,7 @@ export async function POST(request: Request) {
   const force = body.force === true;
   const runDate = body.runDate && /^\d{4}-\d{2}-\d{2}$/.test(body.runDate)
     ? body.runDate
-    : getPacificMarketDate();
+    : getMarketDate();
   const artistLimit = normalizeInteger(body.artistLimit, DEFAULT_RUN_NOW_ARTIST_LIMIT, 1, MAX_RUN_NOW_ARTIST_LIMIT);
   const artistOffset = normalizeInteger(body.artistOffset, 0, 0, Number.MAX_SAFE_INTEGER);
   const maxBatches = normalizeInteger(body.maxBatches, DEFAULT_RUN_NOW_MAX_BATCHES, 1, MAX_RUN_NOW_MAX_BATCHES);

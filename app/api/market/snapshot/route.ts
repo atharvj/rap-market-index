@@ -5,7 +5,7 @@ import { createServiceRoleClient, getSupabaseConfigStatus } from "@/lib/supabase
 import type { Database } from "@/lib/supabase/database.types";
 import type { Artist, GameState, HypeStats, PricePoint } from "@/lib/types";
 import { loadArtistImageUrls } from "@/server/market/artist-images";
-import { getPacificMarketDate, shiftMarketDate } from "@/server/market/market-date";
+import { getMarketDate, shiftMarketDate } from "@/server/market/market-date";
 import { reportServerError } from "@/server/observability";
 
 export const dynamic = "force-dynamic";
@@ -76,7 +76,7 @@ export async function GET() {
       holdings: [],
       shortPositions: [],
       transactions: [],
-      lastUpdatedAt: getPacificMarketDate()
+      lastUpdatedAt: getMarketDate()
     };
 
     return NextResponse.json({
@@ -129,7 +129,7 @@ async function loadHistoryByArtist(
     .from("price_history")
     .select("artist_id, price_date, price")
     .in("artist_id", artistIds)
-    .gte("price_date", shiftMarketDate(getPacificMarketDate(), -PRICE_HISTORY_LOOKBACK_DAYS))
+    .gte("price_date", shiftMarketDate(getMarketDate(), -PRICE_HISTORY_LOOKBACK_DAYS))
     .order("price_date", { ascending: true });
 
   if (error) {
@@ -149,7 +149,7 @@ async function loadHistoryByArtist(
 function mapArtist(row: ArtistRow, stats: ArtistStatsRow | null, history: PricePoint[], imageUrl?: string): Artist {
   const fallbackHistory = [
     {
-      date: getPacificMarketDate(),
+      date: getMarketDate(),
       price: Number(row.current_price)
     }
   ];

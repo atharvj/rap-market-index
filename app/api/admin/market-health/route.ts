@@ -3,9 +3,9 @@ import { createServiceRoleClient, getSupabaseConfigStatus } from "@/lib/supabase
 import type { Database } from "@/lib/supabase/database.types";
 import { requireAdminRequest } from "@/server/admin-auth";
 import {
-  getPacificMarketDayBoundsUtc,
-  getPacificMarketDate,
-  getPacificMarketLookbackBoundsUtc
+  getMarketDayBoundsUtc,
+  getMarketDate,
+  getMarketLookbackBoundsUtc
 } from "@/server/market/market-date";
 import { DEFAULT_MARKET_MODEL_VERSION, getMarketModelVersion } from "@/server/market/model-version";
 import { loadActiveArtists, loadArtistExternalIds } from "@/server/market/supabase-repository";
@@ -175,7 +175,7 @@ export async function GET(request: Request) {
 
   try {
     const url = new URL(request.url);
-    const runDate = url.searchParams.get("runDate") ?? getPacificMarketDate();
+    const runDate = url.searchParams.get("runDate") ?? getMarketDate();
     const lookbackDays = getInteger(url.searchParams.get("lookbackDays"), 30, 1, 180);
     const freshnessDays = getInteger(url.searchParams.get("freshnessDays"), 2, 0, 30);
     const configuredModelVersion = getMarketModelVersion();
@@ -517,7 +517,7 @@ async function loadRecentPriceTicks({
     return [];
   }
 
-  const { start, end } = getPacificMarketLookbackBoundsUtc(shiftDate(runDate, 1), lookbackDays + 1);
+  const { start, end } = getMarketLookbackBoundsUtc(shiftDate(runDate, 1), lookbackDays + 1);
   const { data, error } = await supabase
     .from("price_ticks")
     .select("artist_id, observed_at, source")
@@ -680,7 +680,7 @@ function buildPriceTickHealth({
   runDate: string;
   freshnessDays: number;
 }): PriceTickHealth {
-  const freshAt = getPacificMarketDayBoundsUtc(shiftDate(runDate, -freshnessDays)).start;
+  const freshAt = getMarketDayBoundsUtc(shiftDate(runDate, -freshnessDays)).start;
   const latestByArtist = new Map<string, string>();
 
   for (const tick of priceTicks) {

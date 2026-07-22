@@ -42,7 +42,7 @@ import { collectWikimediaMarketSignals } from "@/server/market/wikimedia-source"
 import { collectYoutubeMarketSignals } from "@/server/market/youtube-source";
 import { collectYoutubeCommentMarketSignals } from "@/server/market/youtube-comments-source";
 import { collectYoutubeUploadEvents } from "@/server/market/youtube-upload-events-source";
-import { getPacificMarketDate } from "@/server/market/market-date";
+import { getMarketDate } from "@/server/market/market-date";
 import { getMarketModelVersion } from "@/server/market/model-version";
 import { getMockMarketArtists } from "@/server/market/mock-source";
 import type {
@@ -107,7 +107,7 @@ export async function POST(request: Request) {
   const body = await parseBody(request);
   const dryRun = body.dryRun !== false;
   const source = normalizeSource(body.source);
-  const runDate = body.runDate ?? getPacificMarketDate();
+  const runDate = body.runDate ?? getMarketDate();
   const config = getSupabaseConfigStatus();
   const auth = await requireAdminRequest(request, { allowMarketSecret: true });
 

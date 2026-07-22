@@ -3,7 +3,7 @@ import { calculateHypeScore, roundPrice } from "@/lib/pricing";
 import { createServiceRoleClient, getSupabaseConfigStatus } from "@/lib/supabase/server";
 import { requireAdminRequest } from "@/server/admin-auth";
 import { buildAudienceScaleCalibration } from "@/server/market/audience-scale";
-import { getPacificMarketDate, shiftMarketDate } from "@/server/market/market-date";
+import { getMarketDate, shiftMarketDate } from "@/server/market/market-date";
 import { getMarketModelVersion } from "@/server/market/model-version";
 import { loadObservationBaselines } from "@/server/market/supabase-repository";
 import type { HypeStats } from "@/lib/types";
@@ -129,7 +129,7 @@ export async function POST(request: Request) {
 
     const resetProfileCount = await resetProfiles(supabase, startingCash);
     const resetArtistCount = await resetArtists(supabase, calibration);
-    const resetDate = getPacificMarketDate();
+    const resetDate = getMarketDate();
     const seededHistoryCount = await seedResetHistory(supabase, calibration, resetDate);
 
     return NextResponse.json({
@@ -276,7 +276,7 @@ async function buildResetCalibration(
 
   const artists = (data ?? []) as ResetArtist[];
   const artistIds = artists.map((artist) => artist.id);
-  const beforeDate = shiftMarketDate(getPacificMarketDate(), 1);
+  const beforeDate = shiftMarketDate(getMarketDate(), 1);
   const [lastfm, youtube, wikimedia] = await Promise.all([
     loadObservationBaselines({
       supabase,

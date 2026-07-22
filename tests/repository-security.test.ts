@@ -192,9 +192,8 @@ describe("repository security boundaries", () => {
     const shortRpc = readTrackedFile("supabase/migrations/018_short_selling_foundation.sql");
 
     expect(tradeRoute).not.toMatch(/request(?:Body|Data|Payload)?\.userId/);
-    expect(tradeRoute).toContain(
-      'createServiceRoleClient().rpc("execute_artist_trade_as_user"'
-    );
+    expect(tradeRoute).toContain("const serviceSupabase = createServiceRoleClient()");
+    expect(tradeRoute).toContain('serviceSupabase.rpc("execute_artist_trade_as_user"');
     expect(tradeRoute).toContain("p_user_id: authUser.id");
     expect(longRpc.match(/v_user_id uuid := auth\.uid\(\);/g)?.length).toBeGreaterThanOrEqual(2);
     expect(shortRpc.match(/v_user_id uuid := auth\.uid\(\);/g)?.length).toBeGreaterThanOrEqual(2);
@@ -286,5 +285,17 @@ describe("repository security boundaries", () => {
     expect(signupGuard).toContain("That username is already taken.");
     expect(signupGuard).toContain("user_metadata");
     expect(signupGuard).toContain("lower(profile.username) = lower(requested_username)");
+  });
+
+  it("keeps trading closed until the Eastern release window is repriced", () => {
+    const migration = readTrackedFile("supabase/migrations/031_release_window_guard.sql");
+    const tradeRoute = readTrackedFile("app/api/trades/route.ts");
+
+    expect(migration).toContain("America/New_York");
+    expect(migration).toContain("run.status = 'succeeded'");
+    expect(migration).toContain("e.event_type = 'release'");
+    expect(migration).toContain("v_latest_quote_at");
+    expect(tradeRoute).toContain("loadReleaseWindowStatus(serviceSupabase)");
+    expect(tradeRoute).toContain("isPendingCatalyst");
   });
 });
