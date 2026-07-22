@@ -56,14 +56,9 @@ values
 on conflict (id) do update set
   name = excluded.name,
   ticker = excluded.ticker,
-  current_price = excluded.current_price,
-  previous_close = excluded.previous_close,
-  daily_change_percent = excluded.daily_change_percent,
-  hype_score = excluded.hype_score,
   volatility = excluded.volatility,
   category = excluded.category,
   accent = excluded.accent,
-  last_move_explanation = excluded.last_move_explanation,
   is_active = true;
 
 insert into public.artist_stats (
@@ -81,13 +76,9 @@ where id in (
   'chief-keef', 'nicki-minaj', 'rod-wave', 'nle-choppa', 'g-herbo', 'pooh-shiesty',
   'bossman-dlow', 'sahbabii', 'nemzzz', 'luh-tyler', '1900rugrat', 'hurricane-wisdom'
 )
-on conflict (artist_id) do update set
-  streaming_growth = excluded.streaming_growth,
-  youtube_growth = excluded.youtube_growth,
-  search_growth = excluded.search_growth,
-  social_growth = excluded.social_growth,
-  news_score = excluded.news_score,
-  trader_demand = excluded.trader_demand;
+-- Never erase live signals if this data migration is discovered by a later
+-- migration-ledger sync after the roster has already been created.
+on conflict (artist_id) do nothing;
 
 insert into public.artist_external_ids (
   artist_id,
@@ -137,11 +128,9 @@ where id in (
   'chief-keef', 'nicki-minaj', 'rod-wave', 'nle-choppa', 'g-herbo', 'pooh-shiesty',
   'bossman-dlow', 'sahbabii', 'nemzzz', 'luh-tyler', '1900rugrat', 'hurricane-wisdom'
 )
-on conflict (artist_id, price_date) do update set
-  price = excluded.price,
-  hype_score = excluded.hype_score,
-  model_version = excluded.model_version,
-  explanation = excluded.explanation;
+-- Existing daily history is market evidence and must not be rewritten by a
+-- rerun or delayed migration-ledger sync.
+on conflict (artist_id, price_date) do nothing;
 
 insert into public.price_ticks (
   artist_id,
