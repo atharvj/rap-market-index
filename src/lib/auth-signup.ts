@@ -1,3 +1,5 @@
+export const EMAIL_CONFIRMATION_PENDING_KEY = "rmi.email-confirmation-pending";
+
 export function isObfuscatedExistingSignup(
   user: { identities?: unknown[] | null } | null | undefined
 ) {

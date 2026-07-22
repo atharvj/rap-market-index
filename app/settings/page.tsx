@@ -8,6 +8,7 @@ import { RmiButton } from "@/components/RmiPrimitives";
 import { TurnstileWidget } from "@/components/TurnstileWidget";
 import { getBrowserSupabaseClient } from "@/lib/supabase/client";
 import { applyThemePreference, getStoredThemePreference, type ThemePreference } from "@/lib/theme";
+import { getUsernameValidationError, normalizeUsernameInput, USERNAME_REQUIREMENTS } from "@/lib/username";
 import { Eye, EyeOff, Trash2, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
@@ -19,6 +20,7 @@ export default function SettingsPage() {
   const { configured, session, user, signOut } = useAuth();
   const { state, avatarUrl, isAdminUser, refreshServerState } = useGame();
   const [username, setUsername] = useState(state.username);
+  const [usernameMessage, setUsernameMessage] = useState("");
   const [message, setMessage] = useState("");
   const [theme, setTheme] = useState<ThemePreference>("system");
   const [profileIsPublic, setProfileIsPublic] = useState(true);
@@ -86,20 +88,43 @@ export default function SettingsPage() {
   }
 
   async function saveUsername() {
-    const next = username.trim();
+    const next = normalizeUsernameInput(username);
+    const validationError = getUsernameValidationError(next);
 
-    if (next.length < 2) {
-      setMessage("Display name must be at least 2 characters.");
+    if (validationError) {
+      setUsernameMessage(validationError);
       return;
     }
 
-    if (!/^[A-Za-z0-9_.-]{2,32}$/.test(next)) {
-      setMessage("Use 2-32 letters, numbers, periods, hyphens, or underscores.");
+    if (!session) {
+      setUsernameMessage("Sign in again to save your username.");
       return;
     }
 
-    const ok = await refreshServerState(next);
-    setMessage(ok ? "Profile saved." : "Could not save profile.");
+    setUsernameMessage("");
+    setMessage("");
+    const response = await fetch("/api/profile/bootstrap", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        authorization: `Bearer ${session.access_token}`
+      },
+      body: JSON.stringify({ username: next })
+    });
+    const payload = await response.json() as {
+      ok?: boolean;
+      error?: string;
+      profile?: { username?: string };
+    };
+
+    if (!response.ok || !payload.ok) {
+      setUsernameMessage(payload.error ?? "Could not save this username.");
+      return;
+    }
+
+    setUsername(payload.profile?.username ?? next);
+    setUsernameMessage("Username saved.");
+    await refreshServerState();
   }
 
   async function sendPasswordReset() {
@@ -208,18 +233,33 @@ export default function SettingsPage() {
 
       <SettingsGroup title="Account">
         <SettingsRow label="Display name">
-          <div className="flex flex-1 gap-2">
-            <input
-              value={username}
-              onChange={(event) => setUsername(event.target.value)}
-              maxLength={32}
-              pattern="[A-Za-z0-9_.-]{2,32}"
-              title="Use 2-32 letters, numbers, periods, hyphens, or underscores."
-              className="rmi-terminal-input h-9 min-w-0 flex-1 px-3 text-sm font-medium"
-            />
-            <button type="button" onClick={saveUsername} className="rmi-button-secondary px-3 text-sm">
-              Save
-            </button>
+          <div className="flex flex-1 flex-col gap-1.5">
+            <div className="flex gap-2">
+              <input
+                value={username}
+                onChange={(event) => {
+                  setUsername(event.target.value);
+                  setUsernameMessage("");
+                }}
+                maxLength={32}
+                pattern="[A-Za-z0-9_.-]+( [A-Za-z0-9_.-]+)*"
+                title={USERNAME_REQUIREMENTS}
+                aria-describedby="username-save-message"
+                className="rmi-terminal-input h-9 min-w-0 flex-1 px-3 text-sm font-medium"
+              />
+              <button type="button" onClick={saveUsername} className="rmi-button-secondary px-3 text-sm">
+                Save
+              </button>
+            </div>
+            {usernameMessage ? (
+              <p
+                id="username-save-message"
+                className={`text-xs font-semibold ${usernameMessage === "Username saved." ? "text-mint" : "text-ember"}`}
+                aria-live="polite"
+              >
+                {usernameMessage}
+              </p>
+            ) : null}
           </div>
         </SettingsRow>
         <SettingsRow label="Email">
@@ -337,7 +377,7 @@ export default function SettingsPage() {
               </button>
             </div>
             <p className="mt-3 text-sm leading-6 text-paper/60">
-              This removes your RMI account, every linked sign-in method, profile, watchlist, portfolio, and trade records. To protect fair play, the same email cannot create another account for 30 days.
+              This removes your RMI account, every linked sign-in method, profile, watchlist, portfolio, and trade records. To protect fair play, the same email cannot create another account for 7 days.
             </p>
             {hasPasswordIdentity ? (
               <>

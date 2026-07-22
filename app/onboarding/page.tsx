@@ -67,6 +67,7 @@ export default function OnboardingPage() {
           return;
         }
 
+        setMessage("");
         setSelectedArtists((payload.profile.favoriteArtistIds ?? []).slice(0, MAX_FAVORITE_ARTISTS));
       })
       .catch((error) => setMessage(error instanceof Error ? error.message : "Could not load onboarding."))
@@ -102,6 +103,7 @@ export default function OnboardingPage() {
   }
 
   function toggleArtist(artistId: string) {
+    setMessage("");
     setSelectedArtists((current) =>
       current.includes(artistId)
         ? current.filter((id) => id !== artistId)

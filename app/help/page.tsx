@@ -203,7 +203,7 @@ export default function HelpPage() {
       </header>
 
       <div className="grid gap-6 lg:grid-cols-[220px_minmax(0,1fr)]">
-        <aside className="rmi-card h-fit border-t-2 border-t-cyan/70 p-4 lg:sticky lg:top-24">
+        <aside className="rmi-card h-fit border-t-2 border-t-cyan/70 p-4 lg:sticky lg:top-20">
           <h2 className="text-xs font-semibold uppercase tracking-wide text-paper/45">Browse by Topic</h2>
           <div className="mt-3 grid gap-1 sm:grid-cols-4 lg:grid-cols-1">
             {categories.map((item) => (

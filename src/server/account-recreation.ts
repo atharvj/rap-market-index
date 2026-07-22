@@ -3,10 +3,21 @@ import { createHmac } from "node:crypto";
 import type { Database, Json } from "@/lib/supabase/database.types";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-export const ACCOUNT_RECREATION_COOLDOWN_DAYS = 30;
+export const ACCOUNT_RECREATION_COOLDOWN_DAYS = 7;
 export const ACCOUNT_RECREATION_ACTION = "account_self_delete";
 
 type ServiceClient = SupabaseClient<Database>;
+
+export function isAccountRecreationCooldownExempt(email: string) {
+  const normalizedEmail = normalizeEmail(email);
+  const exemptEmails = process.env.ACCOUNT_RECREATION_COOLDOWN_EXEMPT_EMAILS ?? "";
+
+  return exemptEmails
+    .split(",")
+    .map(normalizeEmail)
+    .filter(Boolean)
+    .includes(normalizedEmail);
+}
 
 export function getAccountIdentifierHash(email: string) {
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -16,7 +27,7 @@ export function getAccountIdentifierHash(email: string) {
   }
 
   return createHmac("sha256", key)
-    .update(`rmi-account-recreation:v1:${email.normalize("NFKC").trim().toLocaleLowerCase("en-US")}`)
+    .update(`rmi-account-recreation:v1:${normalizeEmail(email)}`)
     .digest("hex");
 }
 
@@ -29,6 +40,10 @@ export async function recordAccountDeletionCooldown({
   userId: string;
   email: string;
 }) {
+  if (isAccountRecreationCooldownExempt(email)) {
+    return null;
+  }
+
   const deletedAt = new Date();
   const cooldownUntil = new Date(deletedAt);
   cooldownUntil.setUTCDate(cooldownUntil.getUTCDate() + ACCOUNT_RECREATION_COOLDOWN_DAYS);
@@ -84,6 +99,10 @@ export async function deleteExpiredAccountRecreationCooldowns({
   return data?.length ?? 0;
 }
 
+function normalizeEmail(email: string) {
+  return email.normalize("NFKC").trim().toLocaleLowerCase("en-US");
+}
+
 export async function getActiveAccountRecreationCooldown({
   supabase,
   email,
@@ -93,6 +112,10 @@ export async function getActiveAccountRecreationCooldown({
   email: string;
   now?: Date;
 }) {
+  if (isAccountRecreationCooldownExempt(email)) {
+    return null;
+  }
+
   const identifierHash = getAccountIdentifierHash(email);
   const { data, error } = await supabase
     .from("admin_action_log")

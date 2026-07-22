@@ -46,7 +46,7 @@ export function PolicyDocument({
       </header>
 
       <div className="grid gap-5 lg:grid-cols-[250px_minmax(0,1fr)]">
-        <aside className="rmi-card h-fit p-4 lg:sticky lg:top-32 lg:self-start">
+        <aside className="rmi-card h-fit p-4 lg:sticky lg:top-20 lg:self-start">
           <p className="rmi-data-label text-cyan">Document Index</p>
           <nav className="mt-3 grid gap-1 text-sm font-medium text-paper/60" aria-label={`${title} sections`}>
             {sections.map((section, index) => (

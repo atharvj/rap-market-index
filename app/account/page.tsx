@@ -10,6 +10,7 @@ import { TurnstileWidget } from "@/components/TurnstileWidget";
 import { formatCurrency } from "@/lib/formatters";
 import { formatAuthErrorMessage } from "@/lib/auth-errors";
 import { getEmailDomainWarning } from "@/lib/email-address";
+import { getUsernameValidationError, normalizeUsernameInput, USERNAME_REQUIREMENTS } from "@/lib/username";
 import { getBrowserSupabaseClient } from "@/lib/supabase/client";
 import { Camera, CalendarDays, Eye, EyeOff, ImagePlus, LogOut, Plus, Search, Star, WalletCards, X } from "lucide-react";
 import Link from "next/link";
@@ -47,6 +48,7 @@ function AccountPageContent() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [username, setUsername] = useState("");
+  const [usernameMessage, setUsernameMessage] = useState("");
   const [bio, setBio] = useState("");
   const [favoriteArtistIds, setFavoriteArtistIds] = useState<string[]>([]);
   const [favoriteQuery, setFavoriteQuery] = useState("");
@@ -167,10 +169,26 @@ function AccountPageContent() {
 
     setSubmitting(true);
     const normalizedEmail = email.trim();
+    const normalizedUsername = normalizeUsernameInput(username);
+
+    if (mode === "signup") {
+      const validationError = getUsernameValidationError(normalizedUsername);
+
+      if (validationError) {
+        setUsernameMessage(validationError);
+        setSubmitting(false);
+        return;
+      }
+    }
+
+    setUsernameMessage("");
     const result =
       mode === "signin"
         ? await signIn(normalizedEmail, password, captchaToken ?? undefined)
-        : await signUp(normalizedEmail, password, username || normalizedEmail, captchaToken ?? undefined);
+        : await signUp(normalizedEmail, password, normalizedUsername, captchaToken ?? undefined);
+    if (mode === "signup" && /username/i.test(result.message)) {
+      setUsernameMessage(result.message);
+    }
     setMessage(result.message);
     setConfirmationPending(mode === "signup" && result.ok);
     setSubmitting(false);
@@ -227,7 +245,7 @@ function AccountPageContent() {
       type: "signup",
       email: normalizedEmail,
       options: {
-        emailRedirectTo: `${window.location.origin}/account?confirmed=1`,
+        emailRedirectTo: `${window.location.origin}/account/confirmed`,
         captchaToken: captchaToken ?? undefined
       }
     });
@@ -346,18 +364,26 @@ function AccountPageContent() {
             <p className="mt-1 text-sm font-semibold">{mode === "signup" ? "Create account" : "Sign in"}</p>
           </div>
           {mode === "signup" ? (
-            <input
-              value={username}
-              onChange={(event) => setUsername(event.target.value)}
-              className="rmi-terminal-input h-11 px-3 text-sm font-bold"
-              placeholder="Username"
-              autoComplete="username"
-              pattern="[A-Za-z0-9_.-]{2,32}"
-              title="Use 2-32 letters, numbers, periods, hyphens, or underscores."
-              minLength={2}
-              maxLength={32}
-              required
-            />
+            <>
+              <input
+                value={username}
+                onChange={(event) => {
+                  setUsername(event.target.value);
+                  setUsernameMessage("");
+                }}
+                className="rmi-terminal-input h-11 px-3 text-sm font-bold"
+                placeholder="Username"
+                autoComplete="username"
+                pattern="[A-Za-z0-9_.-]+( [A-Za-z0-9_.-]+)*"
+                title={USERNAME_REQUIREMENTS}
+                minLength={2}
+                maxLength={32}
+                required
+              />
+              {usernameMessage ? (
+                <p className="-mt-1 text-xs font-semibold text-ember" aria-live="polite">{usernameMessage}</p>
+              ) : null}
+            </>
           ) : null}
           <input
             value={email}

@@ -103,6 +103,7 @@ describe("repository security boundaries", () => {
       "MARKET_UPDATE_SECRET",
       "CRON_SECRET",
       "RATE_LIMIT_SECRET",
+      "ACCOUNT_RECREATION_COOLDOWN_EXEMPT_EMAILS",
       "GROQ_API_KEY",
       "LASTFM_API_KEY",
       "YOUTUBE_API_KEY",
@@ -274,6 +275,7 @@ describe("repository security boundaries", () => {
   it("prevents usernames that differ only by letter case", () => {
     const profileRoute = readTrackedFile("app/api/profile/bootstrap/route.ts");
     const migration = readTrackedFile("supabase/migrations/029_case_insensitive_usernames.sql");
+    const signupGuard = readTrackedFile("supabase/migrations/030_signup_username_guard.sql");
 
     expect(profileRoute).toContain("hasUsernameConflict");
     expect(profileRoute).toContain('.ilike("username", escapedUsername)');
@@ -281,5 +283,8 @@ describe("repository security boundaries", () => {
     expect(migration).toContain("having count(*) > 1");
     expect(migration).toContain("unique index if not exists profiles_username_case_insensitive_unique");
     expect(migration).toContain("on public.profiles (lower(username))");
+    expect(signupGuard).toContain("That username is already taken.");
+    expect(signupGuard).toContain("user_metadata");
+    expect(signupGuard).toContain("lower(profile.username) = lower(requested_username)");
   });
 });

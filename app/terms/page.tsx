@@ -14,7 +14,7 @@ const sections = [
   {
     id: "fair-play",
     title: "Fair Play",
-    body: "Do not create or coordinate multiple accounts, delete and recreate an account to reset fantasy cash or rankings, automate orders, manipulate quotes, exploit defects, impersonate another person, scrape protected account data, or interfere with the service. Deleted accounts have a 30-day recreation cooldown. RMI may exclude suspicious activity, pause trading, reverse a broken operation, or restrict an account to protect fair play."
+    body: "Do not create or coordinate multiple accounts, delete and recreate an account to reset fantasy cash or rankings, automate orders, manipulate quotes, exploit defects, impersonate another person, scrape protected account data, or interfere with the service. Deleted accounts have a 7-day recreation cooldown; limited operator test accounts may be exempt. RMI may exclude suspicious activity, pause trading, reverse a broken operation, or restrict an account to protect fair play."
   },
   {
     id: "market-data",

@@ -3,7 +3,8 @@
 import { getBrowserSupabaseClient, isBrowserSupabaseConfigured } from "@/lib/supabase/client";
 import { formatAuthErrorMessage } from "@/lib/auth-errors";
 import { getEmailDomainSuggestion, isDisposableEmailAddress } from "@/lib/email-address";
-import { isObfuscatedExistingSignup } from "@/lib/auth-signup";
+import { EMAIL_CONFIRMATION_PENDING_KEY, isObfuscatedExistingSignup } from "@/lib/auth-signup";
+import { getUsernameValidationError, normalizeUsernameInput } from "@/lib/username";
 import type { Session, User } from "@supabase/supabase-js";
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 
@@ -49,6 +50,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const verifiedUser = verified.user;
       const verifiedSession = error || !verifiedUser ? null : data.session;
 
+      if (
+        verifiedSession &&
+        window.localStorage.getItem(EMAIL_CONFIRMATION_PENDING_KEY) &&
+        window.location.pathname !== "/account/confirmed"
+      ) {
+        setSession(null);
+        setLoading(false);
+        return;
+      }
+
       if (verifiedSession && verifiedUser && !verifiedUser.email_confirmed_at) {
         await supabase.auth.signOut();
         setSession(null);
@@ -61,6 +72,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const {
       data: { subscription }
     } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+      if (
+        nextSession &&
+        window.localStorage.getItem(EMAIL_CONFIRMATION_PENDING_KEY) &&
+        window.location.pathname !== "/account/confirmed"
+      ) {
+        setSession(null);
+        return;
+      }
+
       if (nextSession && !nextSession.user.email_confirmed_at) {
         setSession(null);
         void supabase.auth.signOut();
@@ -96,6 +116,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return { ok: false, message: "Confirm your email address before logging in." };
       }
 
+      window.localStorage.removeItem(EMAIL_CONFIRMATION_PENDING_KEY);
       setSession(data.session);
       return { ok: true, message: "Signed in." };
     },
@@ -124,15 +145,44 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         };
       }
 
+      const normalizedUsername = normalizeUsernameInput(username);
+      const usernameValidationError = getUsernameValidationError(normalizedUsername);
+
+      if (usernameValidationError) {
+        return { ok: false, message: usernameValidationError };
+      }
+
+      try {
+        const availabilityResponse = await fetch("/api/auth/username-availability", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ username: normalizedUsername })
+        });
+        const availability = await availabilityResponse.json() as {
+          ok?: boolean;
+          available?: boolean;
+          error?: string;
+        };
+
+        if (!availabilityResponse.ok || !availability.ok || !availability.available) {
+          return {
+            ok: false,
+            message: availability.error ?? "Could not check that username."
+          };
+        }
+      } catch {
+        return { ok: false, message: "Could not check that username. Try again." };
+      }
+
       const supabase = getBrowserSupabaseClient();
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
-          emailRedirectTo: `${window.location.origin}/account?confirmed=1`,
+          emailRedirectTo: `${window.location.origin}/account/confirmed`,
           captchaToken,
           data: {
-            username,
+            username: normalizedUsername,
             username_is_user_selected: true
           }
         }
@@ -153,6 +203,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         await supabase.auth.signOut();
       }
 
+      window.localStorage.setItem(EMAIL_CONFIRMATION_PENDING_KEY, email.normalize("NFKC").trim().toLowerCase());
       setSession(null);
       return {
         ok: true,
@@ -167,6 +218,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return { ok: false, message: "Supabase is not configured yet." };
     }
 
+    window.localStorage.removeItem(EMAIL_CONFIRMATION_PENDING_KEY);
     const { error } = await getBrowserSupabaseClient().auth.signInWithOAuth({
       provider: "google",
       options: {

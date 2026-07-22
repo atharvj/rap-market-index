@@ -24,7 +24,7 @@ const sections = [
   {
     id: "security",
     title: "Security and Retention",
-    body: "RMI separates public market data from authenticated account data, validates protected requests, and limits administrative operations to authorized accounts. After account deletion, RMI retains a keyed, non-public fingerprint of the normalized email and the deletion time for the 30-day cooldown solely to prevent deletion from being used as a fantasy-cash reset; the raw deleted email is not stored in that record, and daily cleanup removes expired cooldown records. Operational and security logs are retained only as needed to run, diagnose, and protect the service. No internet service can guarantee absolute security."
+    body: "RMI separates public market data from authenticated account data, validates protected requests, and limits administrative operations to authorized accounts. After account deletion, RMI retains a keyed, non-public fingerprint of the normalized email and the deletion time for the 7-day cooldown solely to prevent deletion from being used as a fantasy-cash reset; the raw deleted email is not stored in that record, and daily cleanup removes expired cooldown records. Limited operator test accounts may be exempt from this cooldown. Operational and security logs are retained only as needed to run, diagnose, and protect the service. No internet service can guarantee absolute security."
   }
 ];
 

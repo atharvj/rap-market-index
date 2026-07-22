@@ -138,12 +138,14 @@ export async function DELETE(request: Request) {
   const { error: deleteError } = await service.auth.admin.deleteUser(auth.user.id);
 
   if (deleteError) {
-    await removeAccountDeletionCooldown(service, cooldown.logId);
+    if (cooldown) {
+      await removeAccountDeletionCooldown(service, cooldown.logId);
+    }
     return NextResponse.json({ ok: false, error: "Could not delete the account." }, { status: 500 });
   }
 
   return NextResponse.json(
-    { ok: true, recreationAvailableAt: cooldown.cooldownUntil },
+    { ok: true, recreationAvailableAt: cooldown?.cooldownUntil ?? null },
     {
       headers: {
         "Cache-Control": "no-store"

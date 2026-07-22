@@ -3,6 +3,7 @@ import { MAX_FAVORITE_ARTISTS, MAX_FAVORITE_GENRES, MIN_FAVORITE_ARTISTS } from 
 import { createServiceRoleClient, getSupabaseConfigStatus } from "@/lib/supabase/server";
 import type { Database } from "@/lib/supabase/database.types";
 import type { Holding, ShortPosition, Transaction } from "@/lib/types";
+import { getUsernameValidationError, normalizeUsernameInput, normalizeUsernameKey } from "@/lib/username";
 import { getActiveAccountRecreationCooldown } from "@/server/account-recreation";
 import { isAdminEmail } from "@/server/admin-auth";
 import { reportServerError } from "@/server/observability";
@@ -69,7 +70,8 @@ export async function POST(request: Request) {
         supabase: profileSupabase,
         userId: user.id,
         email: user.email,
-        username: body.username ?? user.user_metadata?.username,
+        requestedUsername: bodyHasUsername ? body.username : undefined,
+        signupUsername: bodyHasUsername ? body.username : user.user_metadata?.username,
         profileBio: body.profileBio,
         favoriteArtistIds: body.favoriteArtistIds,
         favoriteGenres: body.favoriteGenres,
@@ -110,7 +112,7 @@ export async function POST(request: Request) {
     const message = error instanceof Error ? error.message : "";
     const migrationPending = /profile_is_public|portfolio_is_public|favorite_genres|onboarding_completed|market_impact_exempt|is_admin/i.test(message);
     const recreationCooldownMessage = message.startsWith("A deleted account cannot be recreated until ");
-    const safeValidationMessage = /^(That username is already taken\.|Username must be |Choose at least |A deleted account cannot be recreated until )/.test(message)
+    const safeValidationMessage = /^(That username is already taken\.|Use 2-32 characters:|Choose at least |A deleted account cannot be recreated until )/.test(message)
       ? message
       : null;
 
@@ -137,7 +139,8 @@ async function getOrCreateProfile({
   supabase,
   userId,
   email,
-  username,
+  requestedUsername,
+  signupUsername,
   profileBio,
   favoriteArtistIds,
   favoriteGenres,
@@ -150,7 +153,8 @@ async function getOrCreateProfile({
   supabase: ReturnType<typeof createServiceRoleClient>;
   userId: string;
   email?: string;
-  username?: string;
+  requestedUsername?: string;
+  signupUsername?: string;
   profileBio?: string;
   favoriteArtistIds?: string[];
   favoriteGenres?: string[];
@@ -169,7 +173,9 @@ async function getOrCreateProfile({
   if (existing.data) {
     const profile = existing.data as ProfileRow;
     const preferredUsername =
-      typeof username === "string" && username.trim() ? normalizeUsername(username, undefined) : null;
+      typeof requestedUsername === "string" && requestedUsername.trim()
+        ? normalizeProfileUsername(requestedUsername, undefined)
+        : null;
     const update: Partial<ProfileRow> = {};
 
     if (onboardingCompleted === true) {
@@ -249,7 +255,7 @@ async function getOrCreateProfile({
     );
   }
 
-  let safeUsername = normalizeUsername(username, email);
+  let safeUsername = normalizeProfileUsername(signupUsername, email);
 
   if (await hasUsernameConflict(supabase, safeUsername, userId)) {
     if (usernameWasSelected) {
@@ -402,16 +408,26 @@ async function parseBody(request: Request): Promise<BootstrapBody> {
   }
 }
 
-function normalizeUsername(username: unknown, email: string | undefined) {
+function normalizeProfileUsername(username: unknown, email: string | undefined) {
   const provided = typeof username === "string" && Boolean(username.trim());
   const raw = provided ? username : email?.split("@")[0] ?? "trader";
-  const normalized = raw.normalize("NFKC").trim().slice(0, 32);
+  const normalized = normalizeUsernameInput(raw);
 
-  if (provided && !/^[A-Za-z0-9_.-]{2,32}$/.test(normalized)) {
-    throw new Error("Username must be 2-32 characters using letters, numbers, periods, hyphens, or underscores.");
+  if (provided) {
+    const validationError = getUsernameValidationError(normalized);
+
+    if (validationError) {
+      throw new Error(validationError);
+    }
+
+    return normalized;
   }
 
-  const fallback = normalized.replace(/[^A-Za-z0-9_.-]/g, "");
+  const fallback = normalized
+    .replace(/[^A-Za-z0-9_. -]/g, "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 32);
 
   return fallback.length >= 2 ? fallback : "trader";
 }
@@ -464,10 +480,10 @@ async function hasUsernameConflict(
     throw new Error(`Could not verify username availability: ${error.message}`);
   }
 
-  const normalized = username.normalize("NFKC").toLocaleLowerCase("en-US");
+  const normalized = normalizeUsernameKey(username);
 
   return (data ?? []).some(
-    (profile) => profile.username.normalize("NFKC").toLocaleLowerCase("en-US") === normalized
+    (profile) => normalizeUsernameKey(profile.username) === normalized
   );
 }
 
