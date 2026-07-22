@@ -54,7 +54,6 @@ values
   (27, 'ian', 'ian', 'IAN', 44.80, 42.30, 1.520, 'rising', 'from-rose-300 via-emerald-200 to-stone-100'),
   (28, '2hollis', '2hollis', '2HOL', 31.60, 29.90, 1.680, 'rising', 'from-violet-300 via-zinc-100 to-emerald-300'),
   (29, 'homixide-gang', 'Homixide Gang', 'HXG', 34.20, 32.60, 1.620, 'rising', 'from-red-300 via-zinc-100 to-cyan-300'),
-  (30, 'jane-remover', 'Jane Remover', 'JANE', 22.50, 21.40, 1.720, 'rising', 'from-blue-300 via-stone-100 to-emerald-300'),
   (31, 'osamason', 'Osamason', 'OSAMA', 24.65, 21.80, 1.820, 'underground', 'from-amber-200 via-fuchsia-200 to-cyan-300'),
   (32, 'fakemink', 'Fakemink', 'FAKEM', 12.40, 11.75, 1.950, 'underground', 'from-fuchsia-300 via-lime-200 to-cyan-300'),
   (33, 'lucy-bedrouqe', 'Lucy Bedrouqe', 'LUCYB', 9.85, 10.20, 1.880, 'underground', 'from-sky-300 via-pink-200 to-yellow-200'),

@@ -56,7 +56,6 @@ const roster: RosterSeed[] = [
   { id: "ian", name: "ian", ticker: "IAN", price: 44.8, previousClose: 42.3, volatility: 1.52, category: "rising", historyBias: 3.6 },
   { id: "2hollis", name: "2hollis", ticker: "2HOL", price: 31.6, previousClose: 29.9, volatility: 1.68, category: "rising", historyBias: 4.3 },
   { id: "homixide-gang", name: "Homixide Gang", ticker: "HXG", price: 34.2, previousClose: 32.6, volatility: 1.62, category: "rising", historyBias: 3.9 },
-  { id: "jane-remover", name: "Jane Remover", ticker: "JANE", price: 22.5, previousClose: 21.4, volatility: 1.72, category: "rising", historyBias: 4.4 },
   { id: "osamason", name: "Osamason", ticker: "OSAMA", price: 24.65, previousClose: 21.8, volatility: 1.82, category: "underground", historyBias: 5.2 },
   { id: "fakemink", name: "Fakemink", ticker: "FAKEM", price: 12.4, previousClose: 11.75, volatility: 1.95, category: "underground", historyBias: 5.9 },
   { id: "lucy-bedrouqe", name: "Lucy Bedrouqe", ticker: "LUCYB", price: 9.85, previousClose: 10.2, volatility: 1.88, category: "underground", historyBias: 5.5 },
