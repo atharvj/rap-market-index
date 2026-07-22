@@ -258,4 +258,16 @@ describe("repository security boundaries", () => {
       "revoke execute on functions from public, anon, authenticated, service_role"
     );
   });
+
+  it("prevents usernames that differ only by letter case", () => {
+    const profileRoute = readTrackedFile("app/api/profile/bootstrap/route.ts");
+    const migration = readTrackedFile("supabase/migrations/029_case_insensitive_usernames.sql");
+
+    expect(profileRoute).toContain("hasUsernameConflict");
+    expect(profileRoute).toContain('.ilike("username", escapedUsername)');
+    expect(migration).toContain("group by lower(username)");
+    expect(migration).toContain("having count(*) > 1");
+    expect(migration).toContain("unique index if not exists profiles_username_case_insensitive_unique");
+    expect(migration).toContain("on public.profiles (lower(username))");
+  });
 });

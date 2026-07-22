@@ -5,29 +5,16 @@ import { useAuth } from "@/components/AuthProvider";
 import { useGame } from "@/components/GameProvider";
 import { RmiButton } from "@/components/RmiPrimitives";
 import { formatCurrency } from "@/lib/formatters";
-import { MAX_FAVORITE_ARTISTS, MAX_FAVORITE_GENRES, MIN_FAVORITE_ARTISTS } from "@/lib/onboarding";
-import { Search, Trophy, WalletCards } from "lucide-react";
+import { MAX_FAVORITE_ARTISTS, MIN_FAVORITE_ARTISTS } from "@/lib/onboarding";
+import { Check, Search, Trophy, WalletCards } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
-
-const genres = [
-  "Mainstream",
-  "Underground",
-  "Trap",
-  "Drill",
-  "Melodic",
-  "Alternative",
-  "Experimental",
-  "Conscious",
-  "Southern"
-];
 
 type BootstrapResponse = {
   ok: boolean;
   error?: string;
   profile?: {
     favoriteArtistIds?: string[];
-    favoriteGenres?: string[];
     onboardingCompleted?: boolean;
   };
 };
@@ -37,7 +24,6 @@ export default function OnboardingPage() {
   const { configured, session } = useAuth();
   const { state, toggleWatchlist, isWatchlisted, refreshServerState } = useGame();
   const [step, setStep] = useState(0);
-  const [selectedGenres, setSelectedGenres] = useState<string[]>([]);
   const [selectedArtists, setSelectedArtists] = useState<string[]>([]);
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(true);
@@ -81,7 +67,6 @@ export default function OnboardingPage() {
           return;
         }
 
-        setSelectedGenres((payload.profile.favoriteGenres ?? []).slice(0, MAX_FAVORITE_GENRES));
         setSelectedArtists((payload.profile.favoriteArtistIds ?? []).slice(0, MAX_FAVORITE_ARTISTS));
       })
       .catch((error) => setMessage(error instanceof Error ? error.message : "Could not load onboarding."))
@@ -113,17 +98,6 @@ export default function OnboardingPage() {
           {Array.from({ length: 6 }).map((_, index) => <div key={index} className="rmi-skeleton h-14 rounded-md" />)}
         </div>
       </div>
-    );
-  }
-
-  function toggleGenre(genre: string) {
-    const normalized = genre.toLowerCase();
-    setSelectedGenres((current) =>
-      current.includes(normalized)
-        ? current.filter((candidate) => candidate !== normalized)
-        : current.length < MAX_FAVORITE_GENRES
-          ? [...current, normalized]
-          : current
     );
   }
 
@@ -163,7 +137,6 @@ export default function OnboardingPage() {
           authorization: `Bearer ${session.access_token}`
         },
         body: JSON.stringify({
-          favoriteGenres: selectedGenres,
           favoriteArtistIds: selectedArtists,
           onboardingCompleted: true
         })
@@ -182,58 +155,25 @@ export default function OnboardingPage() {
     }
   }
 
-  const canContinue = step === 0
-    ? selectedGenres.length > 0
-    : step === 1
-      ? selectedArtists.length >= MIN_FAVORITE_ARTISTS
-      : true;
+  const canContinue = step === 0 ? selectedArtists.length >= MIN_FAVORITE_ARTISTS : true;
 
   return (
     <div className="rmi-auth-surface mx-auto max-w-4xl space-y-6 p-5 sm:p-8">
       <div className="flex items-center justify-center gap-2 text-center text-sm font-semibold text-cyan">
         <span className="rmi-live-dot" /> RMI Profile Sequence
       </div>
-      <div className="grid grid-cols-4 gap-2" aria-label={`Step ${step + 1} of 4`}>
-        {Array.from({ length: 4 }).map((_, index) => (
+      <div className="grid grid-cols-3 gap-2" aria-label={`Step ${step + 1} of 3`}>
+        {Array.from({ length: 3 }).map((_, index) => (
           <span key={index} className={index <= step ? "h-1 rounded-full bg-cyan" : "h-1 rounded-full bg-panelSoft"} />
         ))}
       </div>
 
       {step === 0 ? (
-        <OnboardingStep eyebrow="Step 1 of 4" title="Choose your rap lanes" description="RMI uses these to shape discovery and your first market view.">
-          <div className="flex items-center justify-between text-xs font-medium text-paper/50">
-            <span>Choose up to {MAX_FAVORITE_GENRES}</span>
-            <span className="number-tabular">{selectedGenres.length} of {MAX_FAVORITE_GENRES} selected</span>
-          </div>
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-            {genres.map((genre) => {
-              const active = selectedGenres.includes(genre.toLowerCase());
-              const unavailable = !active && selectedGenres.length >= MAX_FAVORITE_GENRES;
-
-              return (
-                <button
-                  key={genre}
-                  type="button"
-                  onClick={() => toggleGenre(genre)}
-                  disabled={unavailable}
-                  aria-pressed={active}
-                  className={active
-                    ? "rmi-card min-h-14 border-cyan/60 bg-cyan/10 p-4 text-left ring-1 ring-cyan/50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan/60"
-                    : unavailable
-                      ? "rmi-card min-h-14 cursor-not-allowed p-4 text-left opacity-40"
-                      : "rmi-card min-h-14 p-4 text-left transition-colors hover:border-cyan/60 hover:bg-panelSoft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan/60"
-                  }
-                >
-                  <span className="text-sm font-bold">{genre}</span>
-                </button>
-              );
-            })}
-          </div>
-        </OnboardingStep>
-      ) : null}
-
-      {step === 1 ? (
-        <OnboardingStep eyebrow="Step 2 of 4" title="Pick artists to follow" description={`Choose ${MIN_FAVORITE_ARTISTS} to ${MAX_FAVORITE_ARTISTS}. They will appear in your watchlist and on your public profile.`}>
+        <OnboardingStep
+          eyebrow="Step 1 of 3"
+          title="Add artists to your watchlist"
+          description={`Choose ${MIN_FAVORITE_ARTISTS} to ${MAX_FAVORITE_ARTISTS} to start. You can add or remove artists anytime after setup; these first picks also appear as favorites on your profile.`}
+        >
           <div className="relative mb-3">
             <Search className="pointer-events-none absolute left-3 top-3 h-4 w-4 text-paper/35" />
             <input
@@ -260,10 +200,10 @@ export default function OnboardingPage() {
                   disabled={unavailable}
                   aria-pressed={active}
                   className={active
-                    ? "rmi-card flex items-center gap-3 border-cyan/60 bg-cyan/10 p-4 text-left ring-1 ring-cyan/50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan/60"
+                    ? "rmi-card flex items-center justify-between gap-3 !border-cyan/70 !bg-cyan/15 p-4 text-left ring-2 ring-cyan/55 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan"
                     : unavailable
-                      ? "rmi-card flex cursor-not-allowed items-center gap-3 p-4 text-left opacity-40"
-                      : "rmi-card flex items-center gap-3 p-4 text-left transition-colors hover:border-cyan/60 hover:bg-panelSoft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan/60"
+                      ? "rmi-card flex cursor-not-allowed items-center justify-between gap-3 p-4 text-left opacity-40"
+                      : "rmi-card flex items-center justify-between gap-3 p-4 text-left transition-colors hover:!border-cyan/60 hover:!bg-panelSoft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan/60"
                   }
                 >
                   <span className="flex min-w-0 items-center gap-3">
@@ -273,6 +213,11 @@ export default function OnboardingPage() {
                       <span className="text-xs text-paper/45">${artist.ticker}</span>
                     </span>
                   </span>
+                  {active ? (
+                    <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-cyan text-ink" aria-label="Selected">
+                      <Check className="h-4 w-4" aria-hidden="true" />
+                    </span>
+                  ) : null}
                 </button>
               );
             })}
@@ -280,8 +225,8 @@ export default function OnboardingPage() {
         </OnboardingStep>
       ) : null}
 
-      {step === 2 ? (
-        <OnboardingStep eyebrow="Step 3 of 4" title="Your opening balance" description="Every trader starts on equal footing. Starter cash cannot be purchased or withdrawn.">
+      {step === 1 ? (
+        <OnboardingStep eyebrow="Step 2 of 3" title="Your opening balance" description="Every trader starts on equal footing. Starter cash cannot be purchased or withdrawn.">
           <div className="rmi-soft-card grid place-items-center gap-3 border-t-2 border-t-mint p-8 text-center sm:p-10">
             <WalletCards className="h-8 w-8 text-mint" />
             <p className="text-4xl font-semibold number-tabular">{formatCurrency(100_000)}</p>
@@ -290,8 +235,8 @@ export default function OnboardingPage() {
         </OnboardingStep>
       ) : null}
 
-      {step === 3 ? (
-        <OnboardingStep eyebrow="Step 4 of 4" title="Start in global rankings" description="Private leagues are coming later. Your portfolio can compete globally from day one.">
+      {step === 2 ? (
+        <OnboardingStep eyebrow="Step 3 of 3" title="Start in global rankings" description="Private leagues are coming later. Your portfolio can compete globally from day one.">
           <div className="rmi-soft-card grid place-items-center gap-3 border-t-2 border-t-brass p-8 text-center sm:p-10">
             <Trophy className="h-8 w-8 text-brass" />
             <p className="text-xl font-semibold">Global market access</p>
@@ -313,11 +258,11 @@ export default function OnboardingPage() {
         </button>
         <button
           type="button"
-          onClick={() => step === 3 ? void finishOnboarding() : setStep((current) => Math.min(3, current + 1))}
+          onClick={() => step === 2 ? void finishOnboarding() : setStep((current) => Math.min(2, current + 1))}
           disabled={!canContinue || saving}
           className="rmi-button-primary min-h-10 text-sm disabled:opacity-40"
         >
-          {step === 3 ? saving ? "Finishing..." : "Enter RMI" : "Continue"}
+          {step === 2 ? saving ? "Finishing..." : "Enter RMI" : "Continue"}
         </button>
       </div>
     </div>

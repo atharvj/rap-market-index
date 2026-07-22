@@ -1,7 +1,7 @@
 import type { HypeStats } from "@/lib/types";
 
 export const MARKET_SCORE_EXPLANATION =
-  "RMI Score summarizes current market signals from 1-99. Around 50 is neutral; higher is stronger and lower is weaker. It is not a price forecast.";
+  "RMI Score runs from 1-99. Around 50 means neutral or limited evidence; unusually strong or weak signals can move it toward either extreme. It is not a price forecast.";
 
 const LOW_SIGNAL_EXPLANATION_TERMS = [
   "#explorepage",

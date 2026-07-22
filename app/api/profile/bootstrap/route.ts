@@ -170,7 +170,6 @@ async function getOrCreateProfile({
     if (onboardingCompleted === true) {
       await assertOnboardingSelection({
         supabase,
-        favoriteGenres: Array.isArray(favoriteGenres) ? normalizeFavoriteGenres(favoriteGenres) : getFavoriteGenres(profile),
         favoriteArtistIds: Array.isArray(favoriteArtistIds)
           ? normalizeFavoriteArtistIds(favoriteArtistIds)
           : getFavoriteArtistIds(profile)
@@ -178,6 +177,10 @@ async function getOrCreateProfile({
     }
 
     if (preferredUsername && preferredUsername !== profile.username) {
+      if (await hasUsernameConflict(supabase, preferredUsername, userId)) {
+        throw new Error("That username is already taken.");
+      }
+
       update.username = preferredUsername;
     }
 
@@ -226,12 +229,19 @@ async function getOrCreateProfile({
     return profile;
   }
 
-  const safeUsername = normalizeUsername(username, email);
+  let safeUsername = normalizeUsername(username, email);
+
+  if (await hasUsernameConflict(supabase, safeUsername, userId)) {
+    if (usernameWasSelected) {
+      throw new Error("That username is already taken.");
+    }
+
+    safeUsername = buildFallbackUsername(safeUsername, userId);
+  }
 
   if (onboardingCompleted === true) {
     await assertOnboardingSelection({
       supabase,
-      favoriteGenres: Array.isArray(favoriteGenres) ? normalizeFavoriteGenres(favoriteGenres) : [],
       favoriteArtistIds: Array.isArray(favoriteArtistIds) ? normalizeFavoriteArtistIds(favoriteArtistIds) : []
     });
   }
@@ -408,6 +418,30 @@ function isDuplicateKeyError(message: string) {
   return message.toLowerCase().includes("duplicate key") || message.includes("23505");
 }
 
+async function hasUsernameConflict(
+  supabase: ReturnType<typeof createServiceRoleClient>,
+  username: string,
+  userId: string
+) {
+  const escapedUsername = username.replace(/[\\%_]/g, (character) => `\\${character}`);
+  const { data, error } = await supabase
+    .from("profiles")
+    .select("id,username")
+    .ilike("username", escapedUsername)
+    .neq("id", userId)
+    .limit(1);
+
+  if (error) {
+    throw new Error(`Could not verify username availability: ${error.message}`);
+  }
+
+  const normalized = username.normalize("NFKC").toLocaleLowerCase("en-US");
+
+  return (data ?? []).some(
+    (profile) => profile.username.normalize("NFKC").toLocaleLowerCase("en-US") === normalized
+  );
+}
+
 function buildFallbackUsername(username: string, userId: string) {
   const suffix = userId.replace(/[^A-Za-z0-9]/g, "").slice(0, 6).toLowerCase();
   const base = username.slice(0, Math.max(2, 31 - suffix.length)).replace(/[_.-]+$/, "") || "trader";
@@ -455,23 +489,17 @@ function normalizeFavoriteGenres(value: string[]) {
 
 async function assertOnboardingSelection({
   supabase,
-  favoriteGenres,
   favoriteArtistIds
 }: {
   supabase: ReturnType<typeof createServiceRoleClient>;
-  favoriteGenres: string[];
   favoriteArtistIds: string[];
 }) {
-  if (!favoriteGenres.length) {
-    throw new Error("Choose at least one rap lane before finishing account setup.");
-  }
-
   if (favoriteArtistIds.length < MIN_FAVORITE_ARTISTS) {
-    throw new Error("Choose at least three artists before finishing account setup.");
+    throw new Error("Add at least three artists to your watchlist before finishing account setup.");
   }
 
   if (favoriteArtistIds.length > MAX_FAVORITE_ARTISTS) {
-    throw new Error("Choose no more than five artists before finishing account setup.");
+    throw new Error("Add no more than five artists to your starting watchlist.");
   }
 
   const { count, error } = await supabase
@@ -481,7 +509,7 @@ async function assertOnboardingSelection({
     .eq("is_active", true);
 
   if (error || (count ?? 0) < MIN_FAVORITE_ARTISTS) {
-    throw new Error("Choose at least three active artists before finishing account setup.");
+    throw new Error("Add at least three active artists to your watchlist before finishing account setup.");
   }
 }
 

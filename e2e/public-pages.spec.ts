@@ -268,6 +268,73 @@ test("help feedback can be submitted without signing in", async ({ page }) => {
   });
 });
 
+test("onboarding watchlist selections stay visibly selected", async ({ page }) => {
+  const userId = "11111111-1111-4111-8111-111111111111";
+  const timestamp = "2026-07-21T12:00:00.000Z";
+  const user = {
+    id: userId,
+    aud: "authenticated",
+    role: "authenticated",
+    email: "onboarding@example.com",
+    email_confirmed_at: timestamp,
+    app_metadata: { provider: "email", providers: ["email"] },
+    user_metadata: { username: "OnboardingTester" },
+    identities: [],
+    created_at: timestamp,
+    updated_at: timestamp
+  };
+  const session = {
+    access_token: createTestAccessToken(userId),
+    refresh_token: "onboarding-refresh-token",
+    token_type: "bearer",
+    expires_in: 3600,
+    expires_at: Math.floor(Date.now() / 1000) + 3600,
+    user
+  };
+
+  await page.addInitScript((value) => {
+    window.localStorage.setItem("sb-example-auth-token", JSON.stringify(value));
+  }, session);
+  await page.route("https://example.supabase.co/auth/v1/user", (route) =>
+    route.fulfill({ contentType: "application/json", body: JSON.stringify(user) })
+  );
+  await page.route("**/api/profile/bootstrap", (route) =>
+    route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({
+        ok: true,
+        profile: {
+          id: userId,
+          username: "OnboardingTester",
+          cashBalance: 100_000,
+          favoriteArtistIds: [],
+          onboardingCompleted: false,
+          isAdmin: false
+        },
+        holdings: [],
+        shortPositions: [],
+        transactions: []
+      })
+    })
+  );
+  await page.route("**/api/watchlist", (route) =>
+    route.fulfill({ contentType: "application/json", body: JSON.stringify({ ok: true, watchlist: [] }) })
+  );
+
+  await page.goto("/onboarding");
+  await expect(page.getByRole("heading", { name: "Add artists to your watchlist" })).toBeVisible();
+  await expect(page.getByText("Choose your rap lanes")).toHaveCount(0);
+
+  const artistChoices = page.locator("section button");
+  await artistChoices.nth(0).click();
+  await artistChoices.nth(1).click();
+  await artistChoices.nth(2).click();
+
+  await expect(page.getByLabel("Selected")).toHaveCount(3);
+  await expect(page.getByText("3 of 5 selected")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Continue" })).toBeEnabled();
+});
+
 test("primary public pages do not overflow a mobile viewport", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
 
@@ -284,3 +351,17 @@ test("primary public pages do not overflow a mobile viewport", async ({ page }) 
     );
   }
 });
+
+function createTestAccessToken(userId: string) {
+  const encode = (value: object) => Buffer.from(JSON.stringify(value)).toString("base64url");
+  const now = Math.floor(Date.now() / 1000);
+
+  return `${encode({ alg: "HS256", typ: "JWT" })}.${encode({
+    aud: "authenticated",
+    exp: now + 3600,
+    iat: now,
+    sub: userId,
+    email: "onboarding@example.com",
+    role: "authenticated"
+  })}.test-signature`;
+}
