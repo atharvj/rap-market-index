@@ -358,6 +358,15 @@ function AccountPageContent() {
           </p>
         </header>
 
+        {mode === "signup" ? (
+          <div className="rounded-[var(--radius-panel)] border border-brass/35 bg-brass/10 px-4 py-3 text-sm leading-6 text-paper/75">
+            <p className="font-bold text-paper">Testing RMI? Continue with Google.</p>
+            <p>
+              Email confirmation delivery is limited during the testing period. Google sign-in is the reliable way to join right now.
+            </p>
+          </div>
+        ) : null}
+
         <form onSubmit={submitAuth} className="rmi-auth-surface grid gap-3 p-5 sm:p-7">
           <div className="mb-2 border-b border-line/70 pb-4">
             <p className="rmi-data-label">Account</p>
