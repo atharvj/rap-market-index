@@ -159,6 +159,9 @@ export async function collectMediaRssMarketEvents({
       return { artist, query, result };
     })
   );
+  const allArtistSearchItems = dedupeItems(
+    artistSearchResults.flatMap(({ result }) => result?.ok ? result.items : [])
+  );
 
   for (const { artist, query, result } of artistSearchResults) {
     let artistSearchItems: MediaFeedItem[] = [];
@@ -185,7 +188,13 @@ export async function collectMediaRssMarketEvents({
       artist,
       runDate,
       query,
-      items: dedupeItems([...globalItems, ...artistSearchItems]),
+      items: dedupeItems([
+        ...globalItems,
+        ...artistSearchItems,
+        ...allArtistSearchItems.filter(
+          (item) => item.searchArtistId !== artist.id && mentionsArtist(item.title, artist.name, query)
+        )
+      ]),
       lookbackDays,
       maxEventsPerArtist
     });
@@ -221,7 +230,12 @@ function buildArtistEvents({
   maxEventsPerArtist: number;
 }) {
   const matchedItems = items
-    .filter((item) => !item.searchArtistId || item.searchArtistId === artist.id)
+    .filter(
+      (item) =>
+        !item.searchArtistId ||
+        item.searchArtistId === artist.id ||
+        mentionsArtist(item.title, artist.name, query)
+    )
     .filter((item) => isWithinLookback(item.publishedDate ?? runDate, runDate, lookbackDays))
     .map((item) => ({
       item,

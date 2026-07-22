@@ -112,7 +112,7 @@ describe("news story groups", () => {
     expect(groupNewsStoryEvents([first, second])).toHaveLength(1);
   });
 
-  it("includes exact structured related-artist attributions without scanning arbitrary headline words", () => {
+  it("includes exact structured related-artist attributions", () => {
     const primary = {
       ...baseEvent,
       id: "one",
@@ -131,6 +131,43 @@ describe("news story groups", () => {
     expect(resolveNewsStoryArtists({ primary, events: [primary], artists }).map((artist) => artist.ticker)).toEqual([
       "CHE",
       "NINEV"
+    ]);
+  });
+
+  it("recovers unambiguous co-artists named explicitly in a headline", () => {
+    const primary = {
+      ...baseEvent,
+      id: "latto-story",
+      artist_id: "latto",
+      title: "Doja Cat & Latto Team Up for 'Okayyy' Video and Ma Vie World Tour"
+    };
+    const artists = [
+      { id: "latto", name: "Latto", ticker: "LATTO" },
+      { id: "doja-cat", name: "Doja Cat", ticker: "DOJA" },
+      { id: "future", name: "Future", ticker: "FUTR" }
+    ];
+
+    expect(resolveNewsStoryArtists({ primary, events: [primary], artists }).map((artist) => artist.ticker)).toEqual([
+      "LATTO",
+      "DOJA"
+    ]);
+  });
+
+  it("does not infer short or common-word artist names from arbitrary headline language", () => {
+    const primary = {
+      ...baseEvent,
+      id: "latto-story",
+      artist_id: "latto",
+      title: "Latto discusses the future with Ian after her tour"
+    };
+    const artists = [
+      { id: "latto", name: "Latto", ticker: "LATTO" },
+      { id: "future", name: "Future", ticker: "FUTR" },
+      { id: "ian", name: "ian", ticker: "IAN" }
+    ];
+
+    expect(resolveNewsStoryArtists({ primary, events: [primary], artists }).map((artist) => artist.ticker)).toEqual([
+      "LATTO"
     ]);
   });
 });

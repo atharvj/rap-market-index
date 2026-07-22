@@ -99,6 +99,19 @@ export function resolveNewsStoryArtists<T extends NewsStoryEvent>({
     }
   }
 
+  // Older feed rows and third-party RSS results do not always include structured
+  // co-artist metadata. Recover only exact, unambiguous roster names from the
+  // visible headline so collaboration stories are not credited to one artist.
+  for (const event of orderedEvents) {
+    const headline = normalizeArtistMentionText(event.title);
+
+    for (const artist of artists) {
+      if (isSafeExplicitHeadlineMention(headline, artist.name)) {
+        addArtist(artist);
+      }
+    }
+  }
+
   return selected;
 }
 
@@ -142,6 +155,45 @@ function normalizeNewsStoryHeadline(value: string) {
 
 function normalizeArtistIdentity(value: string) {
   return value.toLowerCase().replace(/[^a-z0-9]+/g, "");
+}
+
+const AMBIGUOUS_HEADLINE_ARTIST_NAMES = new Set([
+  "autumn",
+  "che",
+  "feng",
+  "future",
+  "ian",
+  "nav",
+  "protect",
+  "tana",
+  "ye"
+]);
+
+function isSafeExplicitHeadlineMention(normalizedHeadline: string, artistName: string) {
+  const normalizedArtist = normalizeArtistMentionText(artistName);
+  const compactArtist = normalizedArtist.replace(/\s+/g, "");
+
+  if (
+    !normalizedArtist ||
+    compactArtist.length <= 4 ||
+    AMBIGUOUS_HEADLINE_ARTIST_NAMES.has(normalizedArtist)
+  ) {
+    return false;
+  }
+
+  return ` ${normalizedHeadline} `.includes(` ${normalizedArtist} `);
+}
+
+function normalizeArtistMentionText(value: string) {
+  return value
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/&/g, " and ")
+    .replace(/\$/g, "s")
+    .replace(/[^a-z0-9]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 function toRecord(value: unknown): Record<string, unknown> {
