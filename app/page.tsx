@@ -194,11 +194,11 @@ export default function HomePage() {
       <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1.55fr)_minmax(300px,0.65fr)]">
         <RmiSection
           title="Market Catalysts"
-          subtitle="Verified stories with enough evidence and relevance to inform an RMI quote."
+          subtitle="Top verified stories, ranked by impact, confidence, recency, source quality, and reach."
           action={<Link href="/news" className="text-xs font-bold text-cyan hover:text-cyan/75">All News</Link>}
         >
           <div className="px-4">
-            <MarketNewsFeed limit={5} variant="full" />
+            <MarketNewsFeed limit={10} variant="full" />
           </div>
         </RmiSection>
 
