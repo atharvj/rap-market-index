@@ -154,11 +154,12 @@ export async function GET(request: Request) {
 
     const initialEvents = (data ?? []) as MarketEventRow[];
     const candidateEvents = selectedArtistIds.length
-      ? await loadRelatedStoryEvents({
+      ? await loadArtistFeedCandidateEvents({
           supabase,
           initialEvents,
           startDate: shiftMarketDate(runDate, -lookbackDays),
-          runDate
+          runDate,
+          eventType
         })
       : initialEvents;
     const rankedEvents = sortMarketNewsEvents(
@@ -174,10 +175,19 @@ export async function GET(request: Request) {
       (event) => getNewsImportanceScore(event, runDate)
     );
     const preferredArtistIds = new Set(selectedArtistIds);
+    const storyArtistRoster = artists.map((artist) => ({
+      id: artist.id,
+      name: artist.name,
+      ticker: artist.ticker
+    }));
     const storyGroups = groupNewsStoryEvents(rankedEvents, preferredArtistIds).filter(
       (group) =>
         !selectedArtistIds.length ||
-        group.events.some((event) => preferredArtistIds.has(event.artist_id))
+        resolveNewsStoryArtists({
+          primary: group.primary,
+          events: group.events,
+          artists: storyArtistRoster
+        }).some((artist) => preferredArtistIds.has(artist.id))
     );
     const storyByPrimaryId = new Map(storyGroups.map((group) => [group.primary.id, group]));
     const groupedEvents = storyGroups.map((group) => group.primary);
@@ -241,69 +251,48 @@ async function loadArtists(supabase: ReturnType<typeof createServiceRoleClient>)
   return (data ?? []) as ArtistRow[];
 }
 
-async function loadRelatedStoryEvents({
+async function loadArtistFeedCandidateEvents({
   supabase,
   initialEvents,
   startDate,
-  runDate
+  runDate,
+  eventType
 }: {
   supabase: ReturnType<typeof createServiceRoleClient>;
   initialEvents: MarketEventRow[];
   startDate: string;
   runDate: string;
+  eventType: MarketNewsType | null;
 }) {
-  if (!initialEvents.length) {
-    return [];
+  // Artist rows can be related through structured metadata or an exact roster
+  // name in the headline even when the event was originally stored under a
+  // different primary artist. Load a bounded recent story pool, then apply the
+  // same resolver used to render the badges before filtering the artist feed.
+  let relatedQuery = supabase
+    .from("market_events")
+    .select("*")
+    .gte("event_date", startDate)
+    .lte("event_date", runDate)
+    .order("event_date", { ascending: false })
+    .order("created_at", { ascending: false })
+    .limit(500);
+
+  if (eventType) {
+    relatedQuery = relatedQuery.eq("event_type", eventType);
   }
 
-  const sourceUrls = Array.from(
-    new Set(initialEvents.map((event) => event.source_url).filter((value): value is string => Boolean(value)))
-  );
-  const titles = Array.from(new Set(initialEvents.map((event) => event.title).filter(Boolean)));
-  const requests = [
-    ...chunkValues(sourceUrls, 12).map((batch) =>
-      supabase
-        .from("market_events")
-        .select("*")
-        .in("source_url", batch)
-        .gte("event_date", startDate)
-        .lte("event_date", runDate)
-        .limit(500)
-    ),
-    ...chunkValues(titles, 30).map((batch) =>
-      supabase
-        .from("market_events")
-        .select("*")
-        .in("title", batch)
-        .gte("event_date", startDate)
-        .lte("event_date", runDate)
-        .limit(500)
-    )
-  ];
-  const results = await Promise.all(requests);
+  const result = await relatedQuery;
   const eventsById = new Map(initialEvents.map((event) => [event.id, event]));
 
-  for (const result of results) {
-    if (result.error) {
-      throw new Error(`Could not load related market-news artists: ${result.error.message}`);
-    }
+  if (result.error) {
+    throw new Error(`Could not load related market-news artists: ${result.error.message}`);
+  }
 
-    for (const event of (result.data ?? []) as MarketEventRow[]) {
-      eventsById.set(event.id, event);
-    }
+  for (const event of (result.data ?? []) as MarketEventRow[]) {
+    eventsById.set(event.id, event);
   }
 
   return [...eventsById.values()];
-}
-
-function chunkValues<T>(values: T[], size: number) {
-  const chunks: T[][] = [];
-
-  for (let index = 0; index < values.length; index += size) {
-    chunks.push(values.slice(index, index + size));
-  }
-
-  return chunks;
 }
 
 function mapMarketEventToNewsItem(
