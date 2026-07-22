@@ -6,9 +6,11 @@ authentication, database, or deployment changes.
 
 ## Required Deployment Steps
 
-1. Run `supabase/migrations/024_security_rate_limits.sql` in the Supabase SQL
-   editor. The migration adds distributed API rate limiting and indexes used by
-   hot trade-validation paths.
+1. Run every numbered file in `supabase/migrations/` through
+   `029_case_insensitive_usernames.sql` in order. Migration 024 adds distributed
+   API rate limiting, migration 025 adds the disposable-email signup hook, and
+   migrations 028-029 add private feedback storage and case-insensitive username
+   uniqueness.
 2. Generate a server-only rate-limit secret locally:
 
    ```bash
@@ -58,6 +60,10 @@ multi-instance production deployment.
   for measured slow queries because excess indexes increase write cost.
 - Configure custom SMTP before a large launch so confirmation and recovery email
   delivery is not dependent on development limits.
+- Verify account deletion once with an email/password-only account, once with a
+  Google-only account, and once with a linked email/password plus Google account.
+  Confirm that each linked method stops working and the deleted email receives a
+  30-day profile-creation cooldown.
 - Export data regularly. A free project can be paused for inactivity and does
   not provide the same backup guarantees as a paid production database.
 
@@ -118,12 +124,14 @@ Before a public announcement:
 
 - `npm audit` reports no known vulnerabilities.
 - `npm test`, `npm run typecheck`, and `npm run build` pass.
-- All migrations through 024 are installed.
+- All numbered migrations through 029 are installed, and the disposable-email
+  Before User Created hook from migration 025 is enabled in Supabase Auth.
 - CAPTCHA, email confirmation, redirect allowlists, MFA, and deployment
   protection are verified manually.
 - A new non-admin account can sign up, confirm email, trade, update a watchlist,
   recover its password, and delete its account without seeing another user's
-  private data.
+  private data. Google-only deletion and the 30-day recreation cooldown are also
+  verified in production.
 - An unauthenticated visitor cannot call admin routes, mutate profiles, trade, or
   read private holdings.
 - Backup/export and key-rotation procedures have been tested once.

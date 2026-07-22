@@ -153,6 +153,18 @@ describe("repository security boundaries", () => {
     expect(unprotected).toEqual([]);
   });
 
+  it("prevents account deletion from becoming an immediate fantasy-cash reset", () => {
+    const deletionRoute = readTrackedFile("app/api/profile/delete/route.ts");
+    const bootstrapRoute = readTrackedFile("app/api/profile/bootstrap/route.ts");
+    const recreationProtection = readTrackedFile("src/server/account-recreation.ts");
+
+    expect(deletionRoute).toContain("recordAccountDeletionCooldown");
+    expect(deletionRoute).toContain("wasRecentlyAuthenticated");
+    expect(bootstrapRoute).toContain("getActiveAccountRecreationCooldown");
+    expect(recreationProtection).toContain('createHmac("sha256"');
+    expect(recreationProtection).not.toContain("details: { email");
+  });
+
   it("binds watchlist and portfolio reads to the authenticated user", () => {
     const watchlist = readTrackedFile("app/api/watchlist/route.ts");
     const bootstrap = readTrackedFile("app/api/profile/bootstrap/route.ts");

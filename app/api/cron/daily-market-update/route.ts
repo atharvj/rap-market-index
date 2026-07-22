@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createServiceRoleClient, getSupabaseConfigStatus } from "@/lib/supabase/server";
+import { deleteExpiredAccountRecreationCooldowns } from "@/server/account-recreation";
 import type { MarketUpdateSource } from "@/server/market/daily-update";
 import { getPacificMarketDate } from "@/server/market/market-date";
 import { enforceRateLimit, getRequestIp } from "@/server/rate-limit";
@@ -79,6 +80,7 @@ export async function GET(request: Request) {
   const source = normalizeSource(process.env.MARKET_CRON_SOURCE);
   const artistLimit = getInteger(process.env.MARKET_CRON_ARTIST_LIMIT, DEFAULT_ARTIST_LIMIT, 1, 100);
   const maxBatches = getInteger(process.env.MARKET_CRON_MAX_BATCHES, DEFAULT_MAX_BATCHES, 1, 10);
+  const accountCooldownCleanup = await runAccountCooldownCleanup();
   const existing = await loadExistingRun(runDate);
   const coverage = await loadRunCoverage(runDate);
 
@@ -96,6 +98,7 @@ export async function GET(request: Request) {
         reason: decision.reason,
         runDate,
         source,
+        accountCooldownCleanup,
         coverage,
         existing
       });
@@ -160,9 +163,22 @@ export async function GET(request: Request) {
     artistLimit,
     maxBatches,
     coverageBeforeRun: coverage,
+    accountCooldownCleanup,
     eventScan,
     result: payload
   });
+}
+
+async function runAccountCooldownCleanup() {
+  try {
+    const removedCount = await deleteExpiredAccountRecreationCooldowns({
+      supabase: createServiceRoleClient()
+    });
+
+    return { ok: true, removedCount };
+  } catch {
+    return { ok: false, removedCount: 0 };
+  }
 }
 
 function validateCronRequest(request: Request): { ok: true } | { ok: false; error: string } {

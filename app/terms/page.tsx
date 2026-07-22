@@ -9,12 +9,12 @@ const sections = [
   {
     id: "accounts",
     title: "Accounts and Access",
-    body: "Provide accurate registration information, protect your login credentials, and use only accounts you are authorized to control. Email confirmation may be required before trading. You are responsible for activity performed through your account."
+    body: "Provide accurate registration information, protect your login credentials, and maintain only one RMI account. A verified email/password login and Google login using the same email may be linked to that one account. Email confirmation may be required before trading, and you are responsible for activity performed through your account."
   },
   {
     id: "fair-play",
     title: "Fair Play",
-    body: "Do not automate orders, coordinate accounts to manipulate quotes or rankings, exploit defects, impersonate another person, scrape protected account data, or interfere with the service. RMI may exclude suspicious activity, pause trading, reverse a broken operation, or restrict an account to protect fair play."
+    body: "Do not create or coordinate multiple accounts, delete and recreate an account to reset fantasy cash or rankings, automate orders, manipulate quotes, exploit defects, impersonate another person, scrape protected account data, or interfere with the service. Deleted accounts have a 30-day recreation cooldown. RMI may exclude suspicious activity, pause trading, reverse a broken operation, or restrict an account to protect fair play."
   },
   {
     id: "market-data",
@@ -38,7 +38,7 @@ export default function TermsPage() {
     <PolicyDocument
       title="Terms of Use"
       summary="These terms establish the rules for using RMI's fantasy artist market and participating in its public rankings."
-      effectiveDate="July 11, 2026"
+      effectiveDate="July 21, 2026"
       sections={sections}
       link={{ href: "/about", label: "Read How RMI Works" }}
     />

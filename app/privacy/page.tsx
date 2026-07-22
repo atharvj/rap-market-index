@@ -19,12 +19,12 @@ const sections = [
   {
     id: "controls",
     title: "Your Controls",
-    body: "You can edit your display name, profile details, avatar, favorite artists, and public visibility. A non-administrator account can be permanently deleted from Account Settings after password verification. Deletion removes the authentication user and associated profile, portfolio, watchlist, and trading records."
+    body: "You can edit your display name, profile details, avatar, favorite artists, and public visibility. A non-administrator account can be deleted from Account Settings after password verification or recent Google authentication. Deletion removes the Supabase authentication user—including linked sign-in methods—and the associated profile, portfolio, watchlist, and trading records. It does not delete the user's Google account."
   },
   {
     id: "security",
     title: "Security and Retention",
-    body: "RMI separates public market data from authenticated account data, validates protected requests, and limits administrative operations to authorized accounts. Operational logs are retained only as needed to run, diagnose, and protect the service. No internet service can guarantee absolute security."
+    body: "RMI separates public market data from authenticated account data, validates protected requests, and limits administrative operations to authorized accounts. After account deletion, RMI retains a keyed, non-public fingerprint of the normalized email and the deletion time for the 30-day cooldown solely to prevent deletion from being used as a fantasy-cash reset; the raw deleted email is not stored in that record, and daily cleanup removes expired cooldown records. Operational and security logs are retained only as needed to run, diagnose, and protect the service. No internet service can guarantee absolute security."
   }
 ];
 
@@ -33,7 +33,7 @@ export default function PrivacyPage() {
     <PolicyDocument
       title="Privacy Policy"
       summary="This policy explains what account information RMI uses, what other traders can see, and the controls available to you."
-      effectiveDate="July 11, 2026"
+      effectiveDate="July 21, 2026"
       sections={sections}
       link={{ href: "/settings", label: "Open Account Settings" }}
     />

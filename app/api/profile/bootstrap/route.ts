@@ -3,6 +3,7 @@ import { MAX_FAVORITE_ARTISTS, MAX_FAVORITE_GENRES, MIN_FAVORITE_ARTISTS } from 
 import { createServiceRoleClient, getSupabaseConfigStatus } from "@/lib/supabase/server";
 import type { Database } from "@/lib/supabase/database.types";
 import type { Holding, ShortPosition, Transaction } from "@/lib/types";
+import { getActiveAccountRecreationCooldown } from "@/server/account-recreation";
 import { isAdminEmail } from "@/server/admin-auth";
 import { reportServerError } from "@/server/observability";
 import { enforceRateLimit } from "@/server/rate-limit";
@@ -108,7 +109,8 @@ export async function POST(request: Request) {
   } catch (error) {
     const message = error instanceof Error ? error.message : "";
     const migrationPending = /profile_is_public|portfolio_is_public|favorite_genres|onboarding_completed|market_impact_exempt|is_admin/i.test(message);
-    const safeValidationMessage = /^(That username is already taken\.|Username must be |Choose at least )/.test(message)
+    const recreationCooldownMessage = message.startsWith("A deleted account cannot be recreated until ");
+    const safeValidationMessage = /^(That username is already taken\.|Username must be |Choose at least |A deleted account cannot be recreated until )/.test(message)
       ? message
       : null;
 
@@ -123,7 +125,10 @@ export async function POST(request: Request) {
           ? "Account privacy setup is incomplete. Run Supabase migration 022_account_privacy_and_onboarding.sql."
           : "Could not load this account.")
       },
-      { status: safeValidationMessage ? 409 : 500, headers: { "Cache-Control": "private, no-store, max-age=0" } }
+      {
+        status: recreationCooldownMessage ? 403 : safeValidationMessage ? 409 : 500,
+        headers: { "Cache-Control": "private, no-store, max-age=0" }
+      }
     );
   }
 }
@@ -229,6 +234,21 @@ async function getOrCreateProfile({
     return profile;
   }
 
+  if (!email) {
+    throw new Error("Could not verify account recreation eligibility.");
+  }
+
+  const recreationCooldown = await getActiveAccountRecreationCooldown({
+    supabase,
+    email
+  });
+
+  if (recreationCooldown) {
+    throw new Error(
+      `A deleted account cannot be recreated until ${formatCooldownDate(recreationCooldown.cooldownUntil)}. This prevents account deletion from becoming a fantasy-cash reset.`
+    );
+  }
+
   let safeUsername = normalizeUsername(username, email);
 
   if (await hasUsernameConflict(supabase, safeUsername, userId)) {
@@ -294,6 +314,15 @@ async function getOrCreateProfile({
   }
 
   return inserted.data as ProfileRow;
+}
+
+function formatCooldownDate(value: string) {
+  return new Intl.DateTimeFormat("en-US", {
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+    timeZone: "UTC"
+  }).format(new Date(value));
 }
 
 async function loadHoldings(

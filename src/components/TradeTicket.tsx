@@ -61,7 +61,7 @@ export function TradeTicket({
     }
 
     if (side === "buy") {
-      return `Cash ${formatCurrency(state.cashBalance)} · Max ${formatShares(maxBuy)}`;
+      return `Fantasy cash ${formatCurrency(state.cashBalance)} · Max ${formatShares(maxBuy)}`;
     }
 
     return `Your shares ${formatShares(maxSell)} · Value ${formatCurrency(maxSell * artist.currentPrice)}`;
@@ -206,6 +206,9 @@ export function TradeTicket({
         </button>
 
         <p className="mt-3 min-h-5 text-sm text-paper/60" aria-live="polite">{message}</p>
+        <p className="border-t border-line pt-3 text-[10px] font-semibold uppercase tracking-wide text-paper/35">
+          Fantasy market only · no real money or cash-out
+        </p>
       </div>
     </section>
   );

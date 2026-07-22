@@ -3,6 +3,10 @@ import { createAnonServerClient, createServiceRoleClient, getSupabaseConfigStatu
 import { isAdminEmail } from "@/server/admin-auth";
 import { enforceRateLimit } from "@/server/rate-limit";
 import { requireConfirmedUser } from "@/server/user-auth";
+import {
+  recordAccountDeletionCooldown,
+  removeAccountDeletionCooldown
+} from "@/server/account-recreation";
 
 export const dynamic = "force-dynamic";
 
@@ -67,22 +71,41 @@ export async function DELETE(request: Request) {
     );
   }
 
-  if (!body.password || body.password.length < 8 || !auth.user.email) {
+  if (!auth.user.email) {
     return NextResponse.json(
-      { ok: false, error: "Enter your password to confirm account deletion." },
+      { ok: false, error: "This account does not have a verified email address." },
       { status: 400 }
     );
   }
 
-  const { data: reauthentication, error: reauthenticationError } = await createAnonServerClient().auth.signInWithPassword({
-    email: auth.user.email,
-    password: body.password,
-    options: body.captchaToken ? { captchaToken: body.captchaToken } : undefined
-  });
+  const hasPasswordIdentity = auth.user.identities?.some((identity) => identity.provider === "email") ?? false;
 
-  if (reauthenticationError || reauthentication.user?.id !== auth.user.id) {
+  if (hasPasswordIdentity) {
+    if (!body.password || body.password.length < 8) {
+      return NextResponse.json(
+        { ok: false, error: "Enter your password to confirm account deletion." },
+        { status: 400 }
+      );
+    }
+
+    const { data: reauthentication, error: reauthenticationError } = await createAnonServerClient().auth.signInWithPassword({
+      email: auth.user.email,
+      password: body.password,
+      options: body.captchaToken ? { captchaToken: body.captchaToken } : undefined
+    });
+
+    if (reauthenticationError || reauthentication.user?.id !== auth.user.id) {
+      return NextResponse.json(
+        { ok: false, error: "The password was not accepted." },
+        { status: 403 }
+      );
+    }
+  } else if (!wasRecentlyAuthenticated(auth.user.last_sign_in_at)) {
     return NextResponse.json(
-      { ok: false, error: "The password was not accepted." },
+      {
+        ok: false,
+        error: "For security, sign out and sign back in with Google before deleting this account."
+      },
       { status: 403 }
     );
   }
@@ -97,20 +120,45 @@ export async function DELETE(request: Request) {
       .remove(avatarObjects.map((object) => `${auth.user.id}/${object.name}`));
   }
 
+  let cooldown: Awaited<ReturnType<typeof recordAccountDeletionCooldown>>;
+
+  try {
+    cooldown = await recordAccountDeletionCooldown({
+      supabase: service,
+      userId: auth.user.id,
+      email: auth.user.email
+    });
+  } catch {
+    return NextResponse.json(
+      { ok: false, error: "Account deletion protection is temporarily unavailable." },
+      { status: 503 }
+    );
+  }
+
   const { error: deleteError } = await service.auth.admin.deleteUser(auth.user.id);
 
   if (deleteError) {
+    await removeAccountDeletionCooldown(service, cooldown.logId);
     return NextResponse.json({ ok: false, error: "Could not delete the account." }, { status: 500 });
   }
 
   return NextResponse.json(
-    { ok: true },
+    { ok: true, recreationAvailableAt: cooldown.cooldownUntil },
     {
       headers: {
         "Cache-Control": "no-store"
       }
     }
   );
+}
+
+function wasRecentlyAuthenticated(lastSignInAt: string | undefined) {
+  if (!lastSignInAt) {
+    return false;
+  }
+
+  const elapsed = Date.now() - new Date(lastSignInAt).getTime();
+  return Number.isFinite(elapsed) && elapsed >= 0 && elapsed <= 10 * 60 * 1000;
 }
 
 async function parseBody(request: Request): Promise<DeleteProfileBody> {

@@ -33,6 +33,7 @@ export default function SettingsPage() {
   const [deleteCaptchaToken, setDeleteCaptchaToken] = useState<string | null>(null);
   const [deleteCaptchaResetKey, setDeleteCaptchaResetKey] = useState(0);
   const displayName = state.username === "Demo Guest" ? user?.email?.split("@")[0] ?? "Guest" : state.username;
+  const hasPasswordIdentity = user?.identities?.some((identity) => identity.provider === "email") ?? false;
 
   useEffect(() => {
     setTheme(getStoredThemePreference());
@@ -336,41 +337,49 @@ export default function SettingsPage() {
               </button>
             </div>
             <p className="mt-3 text-sm leading-6 text-paper/60">
-              This permanently removes your profile, watchlist, portfolio, and trade records. Enter your password to continue.
+              This removes your RMI account, every linked sign-in method, profile, watchlist, portfolio, and trade records. To protect fair play, the same email cannot create another account for 30 days.
             </p>
-            <div className="relative mt-5">
-              <input
-                value={deletePassword}
-                onChange={(event) => setDeletePassword(event.target.value)}
-                type={showDeletePassword ? "text" : "password"}
-                autoComplete="current-password"
-                placeholder="Password"
-                className="rmi-terminal-input h-11 w-full border-ember/40 px-3 pr-11 text-sm focus:border-ember"
-                disabled={deleting}
-              />
-              <button
-                type="button"
-                onClick={() => setShowDeletePassword((visible) => !visible)}
-                className="absolute right-1 top-1 grid h-9 w-9 place-items-center rounded-md text-paper/45 hover:bg-panel"
-                aria-label={showDeletePassword ? "Hide password" : "Show password"}
-              >
-                {showDeletePassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-              </button>
-            </div>
-            <div className="mt-4">
-              <TurnstileWidget
-                siteKey={turnstileSiteKey}
-                onTokenChange={setDeleteCaptchaToken}
-                resetKey={deleteCaptchaResetKey}
-                action="rmi_account_delete"
-              />
-            </div>
+            {hasPasswordIdentity ? (
+              <>
+                <div className="relative mt-5">
+                  <input
+                    value={deletePassword}
+                    onChange={(event) => setDeletePassword(event.target.value)}
+                    type={showDeletePassword ? "text" : "password"}
+                    autoComplete="current-password"
+                    placeholder="Password"
+                    className="rmi-terminal-input h-11 w-full border-ember/40 px-3 pr-11 text-sm focus:border-ember"
+                    disabled={deleting}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowDeletePassword((visible) => !visible)}
+                    className="absolute right-1 top-1 grid h-9 w-9 place-items-center rounded-md text-paper/45 hover:bg-panel"
+                    aria-label={showDeletePassword ? "Hide password" : "Show password"}
+                  >
+                    {showDeletePassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
+                <div className="mt-4">
+                  <TurnstileWidget
+                    siteKey={turnstileSiteKey}
+                    onTokenChange={setDeleteCaptchaToken}
+                    resetKey={deleteCaptchaResetKey}
+                    action="rmi_account_delete"
+                  />
+                </div>
+              </>
+            ) : (
+              <p className="mt-4 rounded-md border border-ember/25 bg-ember/5 px-3 py-2 text-xs font-semibold leading-5 text-paper/60">
+                Google-only account: you must have signed in within the last 10 minutes. If deletion is declined, sign out, sign back in with Google, and return here.
+              </p>
+            )}
             <div className="mt-5 flex justify-end gap-2">
               <button type="button" onClick={() => setDeleteOpen(false)} className="min-h-10 rounded-md border border-line px-4 text-sm font-semibold">Cancel</button>
               <button
                 type="button"
                 onClick={deleteAccount}
-                disabled={deleting || deletePassword.length < 8 || Boolean(turnstileSiteKey && !deleteCaptchaToken)}
+                disabled={deleting || (hasPasswordIdentity && (deletePassword.length < 8 || Boolean(turnstileSiteKey && !deleteCaptchaToken)))}
                 className="min-h-10 rounded-md bg-ember px-4 text-sm font-semibold text-white disabled:opacity-40"
               >
                 {deleting ? "Deleting..." : "Delete Permanently"}
