@@ -30,6 +30,7 @@ export default function SettingsPage() {
   const [passwordCaptchaResetKey, setPasswordCaptchaResetKey] = useState(0);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deletePassword, setDeletePassword] = useState("");
+  const [deleteError, setDeleteError] = useState("");
   const [showDeletePassword, setShowDeletePassword] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [deleteCaptchaToken, setDeleteCaptchaToken] = useState<string | null>(null);
@@ -182,31 +183,49 @@ export default function SettingsPage() {
       return;
     }
 
-    setDeleting(true);
-    const response = await fetch("/api/profile/delete", {
-      method: "DELETE",
-      headers: {
-        "content-type": "application/json",
-        authorization: `Bearer ${session.access_token}`
-      },
-      body: JSON.stringify({
-        confirmation: displayName,
-        password: deletePassword,
-        captchaToken: deleteCaptchaToken ?? undefined
-      })
-    });
-    const payload = await response.json();
+    setDeleteError("");
 
-    if (!response.ok || !payload.ok) {
-      setMessage(payload.error ?? "Could not delete account.");
-      setDeleting(false);
-      setDeleteCaptchaToken(null);
-      setDeleteCaptchaResetKey((current) => current + 1);
+    if (hasPasswordIdentity && deletePassword.length === 0) {
+      setDeleteError("Enter your password to confirm account deletion.");
       return;
     }
 
-    await signOut();
-    router.replace("/");
+    if (hasPasswordIdentity && turnstileSiteKey && !deleteCaptchaToken) {
+      setDeleteError("Complete the security check before deleting your account.");
+      return;
+    }
+
+    setDeleting(true);
+
+    try {
+      const response = await fetch("/api/profile/delete", {
+        method: "DELETE",
+        headers: {
+          "content-type": "application/json",
+          authorization: `Bearer ${session.access_token}`
+        },
+        body: JSON.stringify({
+          confirmation: displayName,
+          password: deletePassword,
+          captchaToken: deleteCaptchaToken ?? undefined
+        })
+      });
+      const payload = await response.json() as { ok?: boolean; error?: string };
+
+      if (!response.ok || !payload.ok) {
+        setDeleteError(payload.error ?? "Could not delete account.");
+        setDeleting(false);
+        setDeleteCaptchaToken(null);
+        setDeleteCaptchaResetKey((current) => current + 1);
+        return;
+      }
+
+      await signOut();
+      router.replace("/");
+    } catch {
+      setDeleteError("Could not reach the server. Check your connection and try again.");
+      setDeleting(false);
+    }
   }
 
   return (
@@ -350,6 +369,8 @@ export default function SettingsPage() {
             <button
               type="button"
               onClick={() => {
+                setDeletePassword("");
+                setDeleteError("");
                 setDeleteCaptchaToken(null);
                 setDeleteCaptchaResetKey((current) => current + 1);
                 setDeleteOpen(true);
@@ -384,7 +405,10 @@ export default function SettingsPage() {
                 <div className="relative mt-5">
                   <input
                     value={deletePassword}
-                    onChange={(event) => setDeletePassword(event.target.value)}
+                    onChange={(event) => {
+                      setDeletePassword(event.target.value);
+                      setDeleteError("");
+                    }}
                     type={showDeletePassword ? "text" : "password"}
                     autoComplete="current-password"
                     placeholder="Password"
@@ -414,12 +438,17 @@ export default function SettingsPage() {
                 Google-only account: you must have signed in within the last 10 minutes. If deletion is declined, sign out, sign back in with Google, and return here.
               </p>
             )}
+            {deleteError ? (
+              <p className="mt-4 rounded-md border border-ember/40 bg-ember/10 px-3 py-2 text-sm font-semibold leading-5 text-ember" role="alert">
+                {deleteError}
+              </p>
+            ) : null}
             <div className="mt-5 flex justify-end gap-2">
               <button type="button" onClick={() => setDeleteOpen(false)} className="min-h-10 rounded-md border border-line px-4 text-sm font-semibold">Cancel</button>
               <button
                 type="button"
                 onClick={deleteAccount}
-                disabled={deleting || (hasPasswordIdentity && (deletePassword.length < 8 || Boolean(turnstileSiteKey && !deleteCaptchaToken)))}
+                disabled={deleting}
                 className="min-h-10 rounded-md bg-ember px-4 text-sm font-semibold text-white disabled:opacity-40"
               >
                 {deleting ? "Deleting..." : "Delete Permanently"}

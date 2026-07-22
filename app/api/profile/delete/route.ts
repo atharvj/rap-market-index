@@ -81,7 +81,7 @@ export async function DELETE(request: Request) {
   const hasPasswordIdentity = auth.user.identities?.some((identity) => identity.provider === "email") ?? false;
 
   if (hasPasswordIdentity) {
-    if (!body.password || body.password.length < 8) {
+    if (!body.password || body.password.length === 0) {
       return NextResponse.json(
         { ok: false, error: "Enter your password to confirm account deletion." },
         { status: 400 }

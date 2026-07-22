@@ -166,6 +166,15 @@ describe("repository security boundaries", () => {
     expect(recreationProtection).not.toContain("details: { email");
   });
 
+  it("does not lock legacy passwords out of account deletion", () => {
+    const deletionRoute = readTrackedFile("app/api/profile/delete/route.ts");
+    const settingsPage = readTrackedFile("app/settings/page.tsx");
+
+    expect(deletionRoute).not.toContain("body.password.length < 8");
+    expect(settingsPage).not.toContain("deletePassword.length < 8");
+    expect(settingsPage).toContain("setDeleteError(payload.error");
+  });
+
   it("binds watchlist and portfolio reads to the authenticated user", () => {
     const watchlist = readTrackedFile("app/api/watchlist/route.ts");
     const bootstrap = readTrackedFile("app/api/profile/bootstrap/route.ts");
