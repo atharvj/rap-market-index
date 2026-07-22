@@ -4,33 +4,14 @@ Rap Market Index uses Supabase for cloud accounts, saved portfolios, trades, mar
 
 ## Create the project
 
-1. Create a new Supabase project.
-2. Open the SQL editor.
-3. Run these files in order:
-   - `supabase/migrations/001_initial_schema.sql`
-   - `supabase/migrations/002_trading_functions.sql`
-   - `supabase/migrations/003_harden_rpc_access.sql`
-   - `supabase/migrations/004_continuous_market.sql`
-   - `supabase/migrations/005_watchlist.sql`
-   - `supabase/migrations/006_market_engine.sql`
-   - `supabase/migrations/007_market_events.sql`
-   - `supabase/migrations/008_market_model_version.sql`
-   - `supabase/migrations/009_trade_manipulation_controls.sql`
-   - `supabase/migrations/010_trade_order_guardrails.sql`
-   - `supabase/migrations/011_curated_artist_roster.sql`
-   - `supabase/migrations/012_artist_text_source_defaults.sql`
-   - `supabase/migrations/013_price_ticks.sql`
-   - `supabase/migrations/014_market_economy_guardrails.sql`
-   - `supabase/migrations/015_market_maker_quotes.sql`
-   - `supabase/migrations/016_market_integrity_guardrails.sql`
-   - `supabase/migrations/017_market_operation_controls.sql`
-   - `supabase/migrations/018_short_selling_foundation.sql`
-   - `supabase/migrations/019_profile_details.sql`
-   - `supabase/migrations/020_profile_avatar.sql`
-   - `supabase/migrations/021_profile_avatar_storage.sql`
-   - `supabase/migrations/022_account_privacy_and_onboarding.sql`
-   - `supabase/migrations/023_admin_user_support.sql`
-   - `supabase/seed.sql`
+The production project is already configured. Do not paste numbered migration
+files into the SQL Editor and do not delete them. They are system-managed schema
+and security history used by disaster recovery. See `supabase/README.md`.
+
+If a replacement Supabase project is ever required, a developer should link it
+with the Supabase CLI, compare the local and remote migration ledgers, apply all
+unapplied migrations in order, and use `supabase/seed.sql` only for an empty
+environment.
 
 ## Configure authentication URLs
 

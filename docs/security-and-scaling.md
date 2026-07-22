@@ -6,12 +6,13 @@ authentication, database, or deployment changes.
 
 ## Required Deployment Steps
 
-1. Apply every unapplied numbered file in `supabase/migrations/` through
-   `035_fix_doechii_source_ids.sql` in order. Do not rerun data migrations that
-   production already reflects. Migration 024 adds distributed
-   API rate limiting, migration 025 adds the disposable-email signup hook, and
-   migrations 028-030 add private feedback storage, case-insensitive username
-   uniqueness, and pre-email username rejection.
+1. Keep the numbered files in `supabase/migrations/` as immutable database
+   history. Production already reflects the files through `035`; the site owner
+   should not run them manually. Before applying a future migration, a developer
+   must inspect the local and remote Supabase migration ledgers. Migration 024
+   adds distributed API rate limiting, migration 025 adds the disposable-email
+   signup hook, and migrations 028-030 add private feedback storage,
+   case-insensitive username uniqueness, and pre-email username rejection.
 2. Generate a server-only rate-limit secret locally:
 
    ```bash

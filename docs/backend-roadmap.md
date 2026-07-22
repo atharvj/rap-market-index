@@ -4,56 +4,40 @@ The production app uses Supabase for confirmed cloud accounts, saved portfolios,
 
 ## Supabase setup
 
-1. Create a Supabase project.
-2. Run `supabase/migrations/001_initial_schema.sql`.
-3. Run `supabase/migrations/002_trading_functions.sql`.
-4. Run `supabase/migrations/003_harden_rpc_access.sql`.
-5. Run `supabase/migrations/004_continuous_market.sql`.
-6. Run `supabase/migrations/005_watchlist.sql`.
-7. Run `supabase/migrations/006_market_engine.sql`.
-8. Run `supabase/migrations/007_market_events.sql`.
-9. Run `supabase/migrations/008_market_model_version.sql`.
-10. Run `supabase/migrations/009_trade_manipulation_controls.sql`.
-11. Run `supabase/migrations/010_trade_order_guardrails.sql`.
-12. Run `supabase/migrations/011_curated_artist_roster.sql`.
-13. Run `supabase/migrations/012_artist_text_source_defaults.sql`.
-14. Run `supabase/migrations/013_price_ticks.sql`.
-15. Run `supabase/migrations/014_market_economy_guardrails.sql`.
-16. Run `supabase/migrations/015_market_maker_quotes.sql`.
-17. Run `supabase/migrations/016_market_integrity_guardrails.sql`.
-18. Run `supabase/migrations/017_market_operation_controls.sql`.
-19. Run `supabase/migrations/018_short_selling_foundation.sql`.
-20. Run `supabase/migrations/019_profile_details.sql`.
-21. Run `supabase/migrations/020_profile_avatar.sql`.
-22. Run `supabase/migrations/021_profile_avatar_storage.sql`.
-23. Run `supabase/migrations/022_account_privacy_and_onboarding.sql`.
-24. Run `supabase/migrations/023_admin_user_support.sql`.
-25. Run `supabase/seed.sql` for the starter artists.
-26. Create `.env.local` in the project root and fill in:
-   - `NEXT_PUBLIC_SUPABASE_URL`
-   - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-   - `SUPABASE_SERVICE_ROLE_KEY`
-   - `MARKET_UPDATE_SECRET`
-   - `CRON_SECRET`
-   - `MARKET_CRON_SOURCE=core`
-   - `MARKET_CRON_ARTIST_LIMIT=100`
-   - `MARKET_CRON_MAX_BATCHES=1`
-   - `MARKET_EVENT_SCAN_LIMIT=20`
-   - `MARKET_EVENT_SCAN_MAX_RECORDS=12`
-   - `MARKET_AUTO_HALT_DEATH_EVENTS=true`
-   - `MARKET_YOUTUBE_UPLOAD_EVENT_VIDEOS=12`
-   - `MARKET_YOUTUBE_UPLOAD_EVENT_DAYS=14`
-   - `MARKET_YOUTUBE_COMMENT_VIDEOS=0`
-   - `MARKET_YOUTUBE_COMMENT_LIMIT=25`
-   - `MARKET_BLUESKY_POST_LIMIT=20`
-   - `MARKET_BLUESKY_LOOKBACK_DAYS=7`
-   - `MARKET_BLUESKY_DELAY_MS=250`
-   - `ADMIN_EMAILS=<comma-separated admin emails>`
-   - `GROQ_API_KEY` for optional source-backed AI event extraction and verification
-   - `LASTFM_API_KEY` for optional Last.fm listener/playcount signals
-   - `SPOTIFY_CLIENT_ID` and `SPOTIFY_CLIENT_SECRET` for optional Spotify popularity/follower signals
-   - `YOUTUBE_API_KEY` for optional YouTube channel view/subscriber/video-count and comment-reaction signals
-   - `REDDIT_CLIENT_ID`, `REDDIT_CLIENT_SECRET`, and `REDDIT_USER_AGENT` for optional Reddit community-hype signals
+The production project is already configured. Numbered migrations are retained
+as database history and disaster-recovery material; they are not a manual SQL
+checklist. Follow `supabase/README.md` before changing migration history.
+
+For a brand-new replacement environment, a developer should link the Supabase
+CLI, inspect both migration ledgers, apply all unapplied migrations in order,
+then load `supabase/seed.sql` only when an empty environment needs seed data.
+
+Create `.env.local` in the project root and fill in:
+
+- `NEXT_PUBLIC_SUPABASE_URL`
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+- `SUPABASE_SERVICE_ROLE_KEY`
+- `MARKET_UPDATE_SECRET`
+- `CRON_SECRET`
+- `MARKET_CRON_SOURCE=core`
+- `MARKET_CRON_ARTIST_LIMIT=100`
+- `MARKET_CRON_MAX_BATCHES=1`
+- `MARKET_EVENT_SCAN_LIMIT=20`
+- `MARKET_EVENT_SCAN_MAX_RECORDS=12`
+- `MARKET_AUTO_HALT_DEATH_EVENTS=true`
+- `MARKET_YOUTUBE_UPLOAD_EVENT_VIDEOS=12`
+- `MARKET_YOUTUBE_UPLOAD_EVENT_DAYS=14`
+- `MARKET_YOUTUBE_COMMENT_VIDEOS=0`
+- `MARKET_YOUTUBE_COMMENT_LIMIT=25`
+- `MARKET_BLUESKY_POST_LIMIT=20`
+- `MARKET_BLUESKY_LOOKBACK_DAYS=7`
+- `MARKET_BLUESKY_DELAY_MS=250`
+- `ADMIN_EMAILS=<comma-separated admin emails>`
+- `GROQ_API_KEY` for optional source-backed AI event extraction and verification
+- `LASTFM_API_KEY` for optional Last.fm listener/playcount signals
+- `SPOTIFY_CLIENT_ID` and `SPOTIFY_CLIENT_SECRET` for optional Spotify popularity/follower signals
+- `YOUTUBE_API_KEY` for optional YouTube channel view/subscriber/video-count and comment-reaction signals
+- `REDDIT_CLIENT_ID`, `REDDIT_CLIENT_SECRET`, and `REDDIT_USER_AGENT` for optional Reddit community-hype signals
 
 The setup status endpoint is:
 
