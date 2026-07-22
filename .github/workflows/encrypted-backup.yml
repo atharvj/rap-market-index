@@ -1,0 +1,53 @@
+name: Encrypted application backup
+
+on:
+  schedule:
+    - cron: "30 10 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: encrypted-application-backup
+  cancel-in-progress: false
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.RMI_SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.RMI_SUPABASE_SERVICE_ROLE_KEY }}
+      BACKUP_ENCRYPTION_KEY: ${{ secrets.RMI_BACKUP_ENCRYPTION_KEY }}
+      BACKUP_DIR: backups
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install production dependencies
+        run: npm ci --omit=dev
+
+      - name: Export and encrypt application data
+        id: backup
+        run: npm run backup:application
+
+      - name: Verify encrypted backup
+        run: npm run backup:application:verify -- "${{ steps.backup.outputs.backup_path }}"
+
+      - name: Store encrypted backup outside Supabase
+        uses: actions/upload-artifact@v7
+        with:
+          name: rmi-encrypted-backup-${{ github.run_id }}
+          path: |
+            ${{ steps.backup.outputs.backup_path }}
+            ${{ steps.backup.outputs.checksum_path }}
+          if-no-files-found: error
+          retention-days: 30

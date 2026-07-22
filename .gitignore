@@ -11,6 +11,8 @@ backups/
 *.dump
 *.dump.enc
 *.dump.enc.sha256
+*.tar.gz.enc
+*.tar.gz.enc.sha256
 *.backup
 .env*
 *.tsbuildinfo

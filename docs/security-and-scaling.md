@@ -6,8 +6,9 @@ authentication, database, or deployment changes.
 
 ## Required Deployment Steps
 
-1. Run every numbered file in `supabase/migrations/` through
-   `031_release_window_guard.sql` in order. Migration 024 adds distributed
+1. Apply every unapplied numbered file in `supabase/migrations/` through
+   `035_fix_doechii_source_ids.sql` in order. Do not rerun data migrations that
+   production already reflects. Migration 024 adds distributed
    API rate limiting, migration 025 adds the disposable-email signup hook, and
    migrations 028-030 add private feedback storage, case-insensitive username
    uniqueness, and pre-email username rejection.
@@ -70,6 +71,8 @@ multi-instance production deployment.
   7-day profile-creation cooldown, except for explicitly configured operator test accounts.
 - Export data regularly. A free project can be paused for inactivity and does
   not provide the same backup guarantees as a paid production database.
+- Confirm the **Encrypted application backup** GitHub workflow succeeds daily
+  and download a verified artifact before major data operations.
 
 ## Vercel and GitHub Checklist
 

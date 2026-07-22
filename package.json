@@ -9,6 +9,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:e2e": "playwright test",
+    "backup:application": "./scripts/backup-application-data.sh",
+    "backup:application:verify": "./scripts/verify-application-backup.sh",
     "backup:database": "./scripts/backup-database.sh",
     "backup:verify": "./scripts/verify-database-backup.sh",
     "restore:test": "./scripts/restore-database-test.sh"

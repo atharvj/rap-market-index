@@ -39,7 +39,24 @@ Test monitoring from a Preview deployment before Production. Never add account e
 
 ## Database Backups
 
-Supabase dashboard backups and local exports serve different failure cases. Keep both when the project tier supports dashboard backups.
+The **Encrypted application backup** GitHub workflow runs every day after the
+release-window update. It exports every RMI application table, Auth user records,
+and Storage objects, encrypts the archive before uploading it, verifies the
+archive, and retains the encrypted GitHub artifact for 30 days. The encryption
+key is kept in GitHub Actions secrets and the operator's local password keychain;
+it is not stored in the repository or backup artifact.
+
+Run the workflow manually after a major data operation and confirm the run is
+green. Download both artifact files before an important launch or migration if a
+longer-lived copy is required.
+
+The application export cannot recover Supabase password hashes or active Auth
+sessions. The tracked migrations rebuild database functions, triggers, policies,
+and schema. A PostgreSQL dump remains the more complete disaster-recovery format
+when direct database credentials are available.
+
+Supabase dashboard backups and PostgreSQL dumps serve additional failure cases.
+Keep them too when the project tier and database access support them.
 
 1. Install the PostgreSQL client tools and OpenSSL.
 2. Set `SUPABASE_DB_URL` locally to the direct or session-pooler database URL. Do not commit it.
