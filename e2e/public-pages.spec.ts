@@ -205,7 +205,29 @@ async function installPublicFixtures(page: Page) {
 
     return route.fulfill({
       contentType: "text/html",
-      body: `<!doctype html><html><body style="margin:0;overflow:hidden;background:linear-gradient(120deg,#07111d,${color});color:white;font-family:Arial;display:grid;place-items:center;height:100vh"><div style="text-align:center"><b style="font-size:72px">${label}</b><div style="margin-top:14px;font-size:24px;opacity:.65">OFFICIAL MUSIC VIDEO</div></div></body></html>`
+      body: `<!doctype html><html><body style="margin:0;overflow:hidden;background:linear-gradient(120deg,#07111d,${color});color:white;font-family:Arial;display:grid;place-items:center;height:100vh"><div style="text-align:center"><b style="font-size:72px">${label}</b><div style="margin-top:14px;font-size:24px;opacity:.65">OFFICIAL MUSIC VIDEO</div></div><script>
+        let currentTime = 24;
+        const duration = ${secondVideo ? 188 : 214};
+        window.addEventListener("message", (event) => {
+          let payload;
+          try { payload = typeof event.data === "string" ? JSON.parse(event.data) : event.data; } catch { return; }
+          if (!payload || payload.event !== "command") return;
+          document.body.dataset.commands = (document.body.dataset.commands || "") + "," + payload.func;
+          if (payload.func === "seekTo") {
+            currentTime = Number(payload.args && payload.args[0]) || 0;
+            document.body.dataset.seek = String(currentTime);
+          }
+          if (payload.func === "setOption" && payload.args && payload.args[0] === "captions") {
+            document.body.dataset.captions = Object.keys(payload.args[2] || {}).length ? "on" : "off";
+          }
+          if (payload.func === "getCurrentTime" || payload.func === "getDuration") {
+            window.parent.postMessage(JSON.stringify({
+              event: "infoDelivery",
+              info: { currentTime, duration }
+            }), "*");
+          }
+        });
+      </script></body></html>`
     });
   });
   await page.route("**/api/leaderboard", (route) =>
@@ -256,6 +278,9 @@ test("homepage leads with one top story and does not repeat it below", async ({ 
   await expect(page.locator('[aria-busy="true"]')).toHaveCount(0, { timeout: 15_000 });
   await expect(page.getByText(marketNews[0].title, { exact: true })).toHaveCount(1);
   await expect(page.getByText(marketNews[1].title, { exact: true })).toBeVisible();
+  await expect(
+    page.getByRole("link", { name: `View ${marketNews[0].artistName} market` })
+  ).toHaveText("View artist market");
 });
 
 test("Watch Now starts in view and stays inside the RMI player", async ({ page }) => {
@@ -274,6 +299,19 @@ test("Watch Now starts in view and stays inside the RMI player", async ({ page }
 
   const playerFrame = page.frames().find((frame) => frame.url().includes("youtube-nocookie.com/embed/RmiVideo001"));
   expect(playerFrame).toBeDefined();
+  await page.getByRole("button", { name: "Pause current video" }).click();
+  await expect(page.getByRole("button", { name: "Play current video" })).toBeVisible();
+  await page.getByRole("button", { name: "Play current video" }).click();
+  await expect(page.getByRole("button", { name: "Pause current video" })).toBeVisible();
+
+  await page.getByRole("button", { name: "Turn captions on" }).click();
+  await expect(page.getByRole("button", { name: "Turn captions off" })).toHaveAttribute("aria-pressed", "true");
+  await expect.poll(() => playerFrame?.locator("body").getAttribute("data-captions")).toBe("on");
+
+  const progress = page.getByRole("slider", { name: "Video progress" });
+  await progress.fill("90");
+  await expect.poll(() => playerFrame?.locator("body").getAttribute("data-seek")).toBe("90");
+
   await playerFrame?.evaluate(() => {
     window.parent.postMessage(JSON.stringify({ event: "onStateChange", info: 0 }), "*");
   });

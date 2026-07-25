@@ -269,9 +269,10 @@ function HomeLeadStory({ item }: { item: MarketNewsItem }) {
               <MediaLink item={item} />
               <Link
                 href={`/artists/${item.artistId}`}
+                aria-label={`View ${item.artistName} market`}
                 className="inline-flex min-h-9 items-center gap-2 rounded-[var(--radius-control)] bg-paper px-3 text-xs font-semibold text-ink hover:bg-paper/90"
               >
-                View quote
+                View artist market
                 <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
               </Link>
               <SourceLink item={item} />

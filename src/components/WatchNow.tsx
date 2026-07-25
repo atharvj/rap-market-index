@@ -4,6 +4,7 @@ import { formatCompact, formatDate } from "@/lib/formatters";
 import type { MarketNewsItem } from "@/components/MarketNewsFeed";
 import clsx from "clsx";
 import {
+  Captions,
   ChevronRight,
   Eye,
   Pause,
@@ -34,6 +35,9 @@ export function WatchNow() {
   const [isInView, setIsInView] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const [isMuted, setIsMuted] = useState(true);
+  const [captionsEnabled, setCaptionsEnabled] = useState(false);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
   const currentVideo = videos[currentIndex] ?? null;
 
   const postPlayerCommand = useCallback((func: string, args: unknown[] = []) => {
@@ -163,6 +167,14 @@ export function WatchNow() {
             ? info.playerState
             : null;
 
+      if (typeof info.currentTime === "number" && Number.isFinite(info.currentTime)) {
+        setCurrentTime(Math.max(0, info.currentTime));
+      }
+
+      if (typeof info.duration === "number" && Number.isFinite(info.duration)) {
+        setDuration(Math.max(0, info.duration));
+      }
+
       if (playerState === 0 && endedVideoRef.current !== currentVideo.videoId) {
         endedVideoRef.current = currentVideo.videoId ?? null;
         playNext();
@@ -179,7 +191,24 @@ export function WatchNow() {
 
   useEffect(() => {
     endedVideoRef.current = null;
+    setCurrentTime(0);
+    setDuration(currentVideo?.durationSeconds ?? 0);
   }, [currentVideo?.videoId]);
+
+  useEffect(() => {
+    if (!hasStarted || !currentVideo) {
+      return;
+    }
+
+    const refreshPlaybackPosition = () => {
+      postPlayerCommand("getCurrentTime");
+      postPlayerCommand("getDuration");
+    };
+
+    refreshPlaybackPosition();
+    const interval = window.setInterval(refreshPlaybackPosition, 500);
+    return () => window.clearInterval(interval);
+  }, [currentVideo, hasStarted, postPlayerCommand]);
 
   const embedUrl = useMemo(() => {
     if (!currentVideo?.videoId || typeof window === "undefined") {
@@ -212,6 +241,12 @@ export function WatchNow() {
       );
       postPlayerCommand("addEventListener", ["onStateChange"]);
       postPlayerCommand(isMuted ? "mute" : "unMute");
+      postPlayerCommand("loadModule", ["captions"]);
+      postPlayerCommand("setOption", [
+        "captions",
+        "track",
+        captionsEnabled ? { languageCode: "en" } : {}
+      ]);
 
       if (isInView) {
         postPlayerCommand("playVideo");
@@ -238,6 +273,23 @@ export function WatchNow() {
   function toggleMute() {
     postPlayerCommand(isMuted ? "unMute" : "mute");
     setIsMuted((muted) => !muted);
+  }
+
+  function toggleCaptions() {
+    const nextEnabled = !captionsEnabled;
+    postPlayerCommand("loadModule", ["captions"]);
+    postPlayerCommand("setOption", [
+      "captions",
+      "track",
+      nextEnabled ? { languageCode: "en" } : {}
+    ]);
+    setCaptionsEnabled(nextEnabled);
+  }
+
+  function seekTo(nextTime: number) {
+    const boundedTime = Math.max(0, Math.min(nextTime, duration));
+    setCurrentTime(boundedTime);
+    postPlayerCommand("seekTo", [boundedTime, true]);
   }
 
   if (!loading && !videos.length) {
@@ -272,18 +324,26 @@ export function WatchNow() {
                 />
               ) : null}
               {hasStarted && embedUrl ? (
-                <iframe
-                  key={currentVideo.videoId}
-                  ref={iframeRef}
-                  src={embedUrl}
-                  title={`${currentVideo.title} video player`}
-                  className="pointer-events-none absolute inset-0 h-full w-full border-0"
-                  allow="autoplay; encrypted-media; picture-in-picture"
-                  referrerPolicy="strict-origin-when-cross-origin"
-                  sandbox="allow-scripts allow-same-origin allow-presentation"
-                  tabIndex={-1}
-                  onLoad={handlePlayerLoad}
-                />
+                <>
+                  <iframe
+                    key={currentVideo.videoId}
+                    ref={iframeRef}
+                    src={embedUrl}
+                    title={`${currentVideo.title} video player`}
+                    className="pointer-events-none absolute inset-0 h-full w-full border-0"
+                    allow="autoplay; encrypted-media; picture-in-picture"
+                    referrerPolicy="strict-origin-when-cross-origin"
+                    sandbox="allow-scripts allow-same-origin allow-presentation"
+                    tabIndex={-1}
+                    onLoad={handlePlayerLoad}
+                  />
+                  <button
+                    type="button"
+                    onClick={togglePlayback}
+                    className="absolute inset-0 z-10 cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-inset focus-visible:outline-cyan"
+                    aria-label={isPlaying ? "Pause current video" : "Play current video"}
+                  />
+                </>
               ) : (
                 <button
                   type="button"
@@ -300,25 +360,50 @@ export function WatchNow() {
                 </button>
               )}
 
-              <div className="pointer-events-none absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-black/90 to-transparent" />
-              <div className="absolute inset-x-0 bottom-0 flex items-center justify-between gap-3 p-3 sm:p-4">
+              <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 h-28 bg-gradient-to-t from-black/95 to-transparent" />
+              <div className="absolute inset-x-0 bottom-0 z-20 grid gap-2 p-3 sm:p-4">
                 <div className="flex items-center gap-2">
-                  <PlayerButton onClick={playPrevious} label="Previous video" disabled={videos.length < 2}>
-                    <SkipBack className="h-4 w-4 fill-current" />
-                  </PlayerButton>
-                  <PlayerButton onClick={togglePlayback} label={isPlaying ? "Pause video" : "Play video"} prominent>
-                    {isPlaying ? <Pause className="h-4 w-4 fill-current" /> : <Play className="h-4 w-4 fill-current" />}
-                  </PlayerButton>
-                  <PlayerButton onClick={playNext} label="Next video" disabled={videos.length < 2}>
-                    <SkipForward className="h-4 w-4 fill-current" />
-                  </PlayerButton>
-                  <PlayerButton onClick={toggleMute} label={isMuted ? "Unmute video" : "Mute video"}>
-                    {isMuted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
-                  </PlayerButton>
+                  <input
+                    type="range"
+                    min="0"
+                    max={Math.max(duration, 1)}
+                    step="0.1"
+                    value={Math.min(currentTime, Math.max(duration, 1))}
+                    disabled={!duration}
+                    onChange={(event) => seekTo(Number(event.currentTarget.value))}
+                    className="h-1 min-w-0 flex-1 cursor-pointer accent-cyan disabled:cursor-not-allowed disabled:opacity-40"
+                    aria-label="Video progress"
+                  />
+                  <span className="min-w-[5.5rem] text-right text-[10px] font-semibold text-white/75 number-tabular">
+                    {formatPlaybackTime(currentTime)} / {formatPlaybackTime(duration)}
+                  </span>
                 </div>
-                <span className="rounded-[var(--radius-control)] bg-black/70 px-2 py-1 text-[10px] font-semibold text-white/75">
-                  Official video
-                </span>
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2">
+                    <PlayerButton onClick={playPrevious} label="Previous video" disabled={videos.length < 2}>
+                      <SkipBack className="h-4 w-4 fill-current" />
+                    </PlayerButton>
+                    <PlayerButton onClick={togglePlayback} label={isPlaying ? "Pause video" : "Play video"} prominent>
+                      {isPlaying ? <Pause className="h-4 w-4 fill-current" /> : <Play className="h-4 w-4 fill-current" />}
+                    </PlayerButton>
+                    <PlayerButton onClick={playNext} label="Next video" disabled={videos.length < 2}>
+                      <SkipForward className="h-4 w-4 fill-current" />
+                    </PlayerButton>
+                    <PlayerButton onClick={toggleMute} label={isMuted ? "Unmute video" : "Mute video"}>
+                      {isMuted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
+                    </PlayerButton>
+                    <PlayerButton
+                      onClick={toggleCaptions}
+                      label={captionsEnabled ? "Turn captions off" : "Turn captions on"}
+                      pressed={captionsEnabled}
+                    >
+                      <Captions className="h-4 w-4" />
+                    </PlayerButton>
+                  </div>
+                  <span className="hidden rounded-[var(--radius-control)] bg-black/70 px-2 py-1 text-[10px] font-semibold text-white/75 sm:inline">
+                    Official video
+                  </span>
+                </div>
               </div>
             </div>
 
@@ -395,12 +480,14 @@ function PlayerButton({
   label,
   disabled = false,
   prominent = false,
+  pressed,
   children
 }: {
   onClick: () => void;
   label: string;
   disabled?: boolean;
   prominent?: boolean;
+  pressed?: boolean;
   children: React.ReactNode;
 }) {
   return (
@@ -412,13 +499,26 @@ function PlayerButton({
         "grid place-items-center rounded-full border text-white disabled:cursor-not-allowed disabled:opacity-35",
         prominent
           ? "h-10 w-10 border-cyan bg-cyan text-ink"
-          : "h-9 w-9 border-white/20 bg-black/65 hover:border-white/45"
+          : "h-9 w-9 border-white/20 bg-black/65 hover:border-white/45",
+        pressed && !prominent && "border-cyan bg-cyan text-ink"
       )}
       aria-label={label}
+      aria-pressed={typeof pressed === "boolean" ? pressed : undefined}
     >
       {children}
     </button>
   );
+}
+
+function formatPlaybackTime(seconds: number) {
+  if (!Number.isFinite(seconds) || seconds <= 0) {
+    return "0:00";
+  }
+
+  const roundedSeconds = Math.floor(seconds);
+  const minutes = Math.floor(roundedSeconds / 60);
+  const remainingSeconds = roundedSeconds % 60;
+  return `${minutes}:${remainingSeconds.toString().padStart(2, "0")}`;
 }
 
 function WatchNowSkeleton() {
