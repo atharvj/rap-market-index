@@ -418,7 +418,6 @@ export function WatchNow() {
                     {formatCompact(currentVideo.viewCount)} views
                   </span>
                 ) : null}
-                <span>Muted autoplay · pauses off-screen</span>
               </div>
             </div>
           </div>
