@@ -1,0 +1,447 @@
+"use client";
+
+import { formatCompact, formatDate } from "@/lib/formatters";
+import type { MarketNewsItem } from "@/components/MarketNewsFeed";
+import clsx from "clsx";
+import {
+  ChevronRight,
+  Eye,
+  Pause,
+  Play,
+  Radio,
+  SkipBack,
+  SkipForward,
+  Volume2,
+  VolumeX
+} from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+
+type WatchNowResponse = {
+  ok: boolean;
+  news?: MarketNewsItem[];
+};
+
+const PLAYER_ORIGIN = "https://www.youtube-nocookie.com";
+
+export function WatchNow() {
+  const playerViewportRef = useRef<HTMLDivElement | null>(null);
+  const iframeRef = useRef<HTMLIFrameElement | null>(null);
+  const endedVideoRef = useRef<string | null>(null);
+  const [videos, setVideos] = useState<MarketNewsItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [hasStarted, setHasStarted] = useState(false);
+  const [isInView, setIsInView] = useState(false);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [isMuted, setIsMuted] = useState(true);
+  const currentVideo = videos[currentIndex] ?? null;
+
+  const postPlayerCommand = useCallback((func: string, args: unknown[] = []) => {
+    iframeRef.current?.contentWindow?.postMessage(
+      JSON.stringify({ event: "command", func, args }),
+      PLAYER_ORIGIN
+    );
+  }, []);
+
+  const chooseVideo = useCallback((index: number) => {
+    setCurrentIndex((previousIndex) => {
+      const length = videos.length;
+
+      if (!length) {
+        return previousIndex;
+      }
+
+      return (index + length) % length;
+    });
+    endedVideoRef.current = null;
+    setHasStarted(true);
+    setIsPlaying(true);
+  }, [videos.length]);
+
+  const playNext = useCallback(() => {
+    setCurrentIndex((index) => videos.length ? (index + 1) % videos.length : index);
+    endedVideoRef.current = null;
+    setHasStarted(true);
+    setIsPlaying(true);
+  }, [videos.length]);
+
+  const playPrevious = useCallback(() => {
+    setCurrentIndex((index) => videos.length ? (index - 1 + videos.length) % videos.length : index);
+    endedVideoRef.current = null;
+    setHasStarted(true);
+    setIsPlaying(true);
+  }, [videos.length]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    const params = new URLSearchParams({
+      limit: "8",
+      lookbackDays: "60",
+      feed: "watch",
+      sort: "latest"
+    });
+
+    fetch(`/api/market/news?${params.toString()}`, { signal: controller.signal })
+      .then((response) => response.json() as Promise<WatchNowResponse>)
+      .then((payload) => {
+        if (!payload.ok) {
+          setVideos([]);
+          return;
+        }
+
+        setVideos((payload.news ?? []).filter((item) => Boolean(item.videoId)));
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) {
+          setVideos([]);
+        }
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) {
+          setLoading(false);
+        }
+      });
+
+    return () => controller.abort();
+  }, []);
+
+  useEffect(() => {
+    const playerViewport = playerViewportRef.current;
+
+    if (!playerViewport || typeof IntersectionObserver === "undefined") {
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        const nextInView = Boolean(entry?.isIntersecting && entry.intersectionRatio >= 0.42);
+        setIsInView(nextInView);
+
+        if (nextInView) {
+          setHasStarted(true);
+          setIsPlaying(true);
+          postPlayerCommand("playVideo");
+        } else {
+          setIsPlaying(false);
+          postPlayerCommand("pauseVideo");
+        }
+      },
+      { threshold: [0, 0.42, 0.7] }
+    );
+
+    observer.observe(playerViewport);
+    return () => observer.disconnect();
+  }, [currentVideo?.videoId, postPlayerCommand]);
+
+  useEffect(() => {
+    function handlePlayerMessage(event: MessageEvent) {
+      if (
+        event.origin !== PLAYER_ORIGIN ||
+        event.source !== iframeRef.current?.contentWindow ||
+        !currentVideo
+      ) {
+        return;
+      }
+
+      let payload: Record<string, unknown>;
+
+      try {
+        payload = typeof event.data === "string"
+          ? JSON.parse(event.data) as Record<string, unknown>
+          : event.data as Record<string, unknown>;
+      } catch {
+        return;
+      }
+
+      const info = payload.info && typeof payload.info === "object"
+        ? payload.info as Record<string, unknown>
+        : {};
+      const playerState =
+        payload.event === "onStateChange" && typeof payload.info === "number"
+          ? payload.info
+          : typeof info.playerState === "number"
+            ? info.playerState
+            : null;
+
+      if (playerState === 0 && endedVideoRef.current !== currentVideo.videoId) {
+        endedVideoRef.current = currentVideo.videoId ?? null;
+        playNext();
+      } else if (playerState === 1) {
+        setIsPlaying(true);
+      } else if (playerState === 2) {
+        setIsPlaying(false);
+      }
+    }
+
+    window.addEventListener("message", handlePlayerMessage);
+    return () => window.removeEventListener("message", handlePlayerMessage);
+  }, [currentVideo, playNext]);
+
+  useEffect(() => {
+    endedVideoRef.current = null;
+  }, [currentVideo?.videoId]);
+
+  const embedUrl = useMemo(() => {
+    if (!currentVideo?.videoId || typeof window === "undefined") {
+      return null;
+    }
+
+    const params = new URLSearchParams({
+      autoplay: "1",
+      controls: "0",
+      disablekb: "1",
+      enablejsapi: "1",
+      fs: "0",
+      iv_load_policy: "3",
+      loop: "0",
+      modestbranding: "1",
+      mute: "1",
+      origin: window.location.origin,
+      playsinline: "1",
+      rel: "0"
+    });
+
+    return `${PLAYER_ORIGIN}/embed/${currentVideo.videoId}?${params.toString()}`;
+  }, [currentVideo?.videoId]);
+
+  function handlePlayerLoad() {
+    const registerPlayer = () => {
+      iframeRef.current?.contentWindow?.postMessage(
+        JSON.stringify({ event: "listening", id: "rmi-watch-player" }),
+        PLAYER_ORIGIN
+      );
+      postPlayerCommand("addEventListener", ["onStateChange"]);
+      postPlayerCommand(isMuted ? "mute" : "unMute");
+
+      if (isInView) {
+        postPlayerCommand("playVideo");
+      } else {
+        postPlayerCommand("pauseVideo");
+      }
+    };
+
+    registerPlayer();
+    window.setTimeout(registerPlayer, 300);
+  }
+
+  function togglePlayback() {
+    if (isPlaying) {
+      postPlayerCommand("pauseVideo");
+      setIsPlaying(false);
+    } else {
+      setHasStarted(true);
+      postPlayerCommand("playVideo");
+      setIsPlaying(true);
+    }
+  }
+
+  function toggleMute() {
+    postPlayerCommand(isMuted ? "unMute" : "mute");
+    setIsMuted((muted) => !muted);
+  }
+
+  if (!loading && !videos.length) {
+    return null;
+  }
+
+  return (
+    <section className="rmi-card overflow-hidden" aria-labelledby="watch-now-title">
+      <div className="rmi-section-header flex items-center justify-between gap-3 px-4 py-3 sm:px-5">
+        <div>
+          <p className="rmi-kicker"><Radio className="h-4 w-4" /> Official videos</p>
+          <h2 id="watch-now-title" className="mt-1 text-lg font-bold">Watch Now</h2>
+        </div>
+        {videos.length > 1 ? (
+          <p className="text-xs font-semibold text-paper/45 number-tabular">
+            {currentIndex + 1} / {videos.length}
+          </p>
+        ) : null}
+      </div>
+
+      {loading || !currentVideo ? (
+        <WatchNowSkeleton />
+      ) : (
+        <div className="grid lg:grid-cols-[minmax(0,1.45fr)_minmax(300px,0.75fr)]">
+          <div className="min-w-0 border-b border-line lg:border-b-0 lg:border-r">
+            <div ref={playerViewportRef} className="relative aspect-video overflow-hidden bg-black">
+              {currentVideo.thumbnailUrl ? (
+                <img
+                  src={currentVideo.thumbnailUrl}
+                  alt=""
+                  className="absolute inset-0 h-full w-full object-cover"
+                />
+              ) : null}
+              {hasStarted && embedUrl ? (
+                <iframe
+                  key={currentVideo.videoId}
+                  ref={iframeRef}
+                  src={embedUrl}
+                  title={`${currentVideo.title} video player`}
+                  className="pointer-events-none absolute inset-0 h-full w-full border-0"
+                  allow="autoplay; encrypted-media; picture-in-picture"
+                  referrerPolicy="strict-origin-when-cross-origin"
+                  sandbox="allow-scripts allow-same-origin allow-presentation"
+                  tabIndex={-1}
+                  onLoad={handlePlayerLoad}
+                />
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setHasStarted(true);
+                    setIsPlaying(true);
+                  }}
+                  className="absolute inset-0 grid place-items-center bg-black/24 text-white"
+                  aria-label={`Play ${currentVideo.title}`}
+                >
+                  <span className="grid h-14 w-14 place-items-center rounded-full bg-cyan text-ink">
+                    <Play className="h-6 w-6 fill-current" aria-hidden="true" />
+                  </span>
+                </button>
+              )}
+
+              <div className="pointer-events-none absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-black/90 to-transparent" />
+              <div className="absolute inset-x-0 bottom-0 flex items-center justify-between gap-3 p-3 sm:p-4">
+                <div className="flex items-center gap-2">
+                  <PlayerButton onClick={playPrevious} label="Previous video" disabled={videos.length < 2}>
+                    <SkipBack className="h-4 w-4 fill-current" />
+                  </PlayerButton>
+                  <PlayerButton onClick={togglePlayback} label={isPlaying ? "Pause video" : "Play video"} prominent>
+                    {isPlaying ? <Pause className="h-4 w-4 fill-current" /> : <Play className="h-4 w-4 fill-current" />}
+                  </PlayerButton>
+                  <PlayerButton onClick={playNext} label="Next video" disabled={videos.length < 2}>
+                    <SkipForward className="h-4 w-4 fill-current" />
+                  </PlayerButton>
+                  <PlayerButton onClick={toggleMute} label={isMuted ? "Unmute video" : "Mute video"}>
+                    {isMuted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
+                  </PlayerButton>
+                </div>
+                <span className="rounded-[var(--radius-control)] bg-black/70 px-2 py-1 text-[10px] font-semibold text-white/75">
+                  Official video
+                </span>
+              </div>
+            </div>
+
+            <div className="p-4 sm:p-5">
+              <p className="text-xs font-semibold text-cyan">{currentVideo.artistName} · {currentVideo.ticker}</p>
+              <h3 className="mt-2 text-xl font-bold leading-tight text-paper">{currentVideo.title}</h3>
+              <div className="mt-3 flex flex-wrap items-center gap-3 text-xs font-medium text-paper/45">
+                <span>{formatDate(currentVideo.eventDate)}</span>
+                {typeof currentVideo.viewCount === "number" ? (
+                  <span className="inline-flex items-center gap-1">
+                    <Eye className="h-3.5 w-3.5" aria-hidden="true" />
+                    {formatCompact(currentVideo.viewCount)} views
+                  </span>
+                ) : null}
+                <span>Muted autoplay · pauses off-screen</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="min-w-0">
+            <div className="flex items-center justify-between border-b border-line px-4 py-3">
+              <h3 className="text-sm font-semibold">More videos</h3>
+              <span className="text-[11px] font-medium text-paper/40">Newest first</span>
+            </div>
+            <div className="max-h-[31rem] overflow-y-auto scrollbar-thin">
+              {videos.map((video, index) => (
+                <button
+                  key={video.id}
+                  type="button"
+                  onClick={() => chooseVideo(index)}
+                  aria-current={index === currentIndex ? "true" : undefined}
+                  className={clsx(
+                    "grid w-full grid-cols-[112px_minmax(0,1fr)_18px] items-center gap-3 border-b border-line/70 px-3 py-3 text-left last:border-b-0",
+                    index === currentIndex ? "bg-cyan/[0.06]" : "hover:bg-panelSoft"
+                  )}
+                >
+                  <span className="relative aspect-video overflow-hidden rounded-[var(--radius-control)] border border-line bg-panelSoft">
+                    {video.thumbnailUrl ? (
+                      <img src={video.thumbnailUrl} alt="" className="h-full w-full object-cover" loading="lazy" />
+                    ) : null}
+                    {index === currentIndex ? (
+                      <span className="absolute bottom-1 left-1 rounded-[var(--radius-control)] bg-cyan px-1.5 py-0.5 text-[9px] font-bold text-ink">
+                        Now playing
+                      </span>
+                    ) : (
+                      <span className="absolute inset-0 grid place-items-center bg-black/18 text-white">
+                        <Play className="h-4 w-4 fill-current" aria-hidden="true" />
+                      </span>
+                    )}
+                  </span>
+                  <span className="min-w-0">
+                    <span className="line-clamp-2 text-sm font-semibold leading-snug text-paper">{video.title}</span>
+                    <span className="mt-1 block truncate text-[11px] font-medium text-paper/42">
+                      {video.artistName} · {formatDate(video.eventDate)}
+                    </span>
+                  </span>
+                  {index === currentIndex ? (
+                    <Pause className="h-4 w-4 text-cyan" aria-hidden="true" />
+                  ) : (
+                    <ChevronRight className="h-4 w-4 text-paper/28" aria-hidden="true" />
+                  )}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+    </section>
+  );
+}
+
+function PlayerButton({
+  onClick,
+  label,
+  disabled = false,
+  prominent = false,
+  children
+}: {
+  onClick: () => void;
+  label: string;
+  disabled?: boolean;
+  prominent?: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className={clsx(
+        "grid place-items-center rounded-full border text-white disabled:cursor-not-allowed disabled:opacity-35",
+        prominent
+          ? "h-10 w-10 border-cyan bg-cyan text-ink"
+          : "h-9 w-9 border-white/20 bg-black/65 hover:border-white/45"
+      )}
+      aria-label={label}
+    >
+      {children}
+    </button>
+  );
+}
+
+function WatchNowSkeleton() {
+  return (
+    <div className="grid lg:grid-cols-[minmax(0,1.45fr)_minmax(300px,0.75fr)]" aria-label="Loading official videos" aria-busy="true">
+      <div className="border-b border-line p-4 lg:border-b-0 lg:border-r">
+        <div className="rmi-skeleton aspect-video rounded-[var(--radius-control)]" />
+        <div className="mt-4 space-y-2">
+          <div className="rmi-skeleton h-3 w-24 rounded-[var(--radius-control)]" />
+          <div className="rmi-skeleton h-6 w-3/4 rounded-[var(--radius-control)]" />
+        </div>
+      </div>
+      <div className="grid gap-3 p-4">
+        {Array.from({ length: 3 }, (_, index) => (
+          <div key={index} className="grid grid-cols-[96px_minmax(0,1fr)] gap-3">
+            <div className="rmi-skeleton aspect-video rounded-[var(--radius-control)]" />
+            <div className="space-y-2">
+              <div className="rmi-skeleton h-4 w-full rounded-[var(--radius-control)]" />
+              <div className="rmi-skeleton h-3 w-2/3 rounded-[var(--radius-control)]" />
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}

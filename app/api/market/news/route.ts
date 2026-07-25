@@ -22,6 +22,10 @@ import {
   sortMarketNewsEvents
 } from "@/lib/market-news-sort";
 import { reportServerError } from "@/server/observability";
+import {
+  getYoutubeVideoId,
+  isWatchNowMarketEvent
+} from "@/server/market/watch-now-videos";
 
 export const dynamic = "force-dynamic";
 
@@ -38,7 +42,7 @@ type ArtistRow = Pick<
 >;
 type MarketEventRow = Database["public"]["Tables"]["market_events"]["Row"];
 type MarketNewsType = Database["public"]["Tables"]["market_events"]["Row"]["event_type"];
-type NewsFeedMode = "home" | "news" | "artist";
+type NewsFeedMode = "home" | "news" | "artist" | "watch";
 
 type MarketNewsItem = {
   id: string;
@@ -59,9 +63,13 @@ type MarketNewsItem = {
   sourceDomain: string | null;
   sourceIconUrl: string | null;
   thumbnailUrl: string | null;
+  thumbnailSource?: "event" | "article" | "artist" | null;
   mediaUrl: string | null;
   mediaType: string | null;
   mediaLabel: string | null;
+  videoId: string | null;
+  durationSeconds: number | null;
+  viewCount: number | null;
   sentimentScore: number;
   impactScore: number;
   confidence: number;
@@ -130,7 +138,7 @@ export async function GET(request: Request) {
       }, { headers: CACHE_HEADERS });
     }
 
-    const candidateLimit = Math.min(500, limit * 6);
+    const candidateLimit = feedMode === "watch" ? 500 : Math.min(500, limit * 6);
     let query = supabase
       .from("market_events")
       .select("*")
@@ -166,14 +174,16 @@ export async function GET(request: Request) {
           eventType
         })
       : initialEvents;
+    const effectiveFeedMode = selectedArtistIds.length ? "artist" : feedMode;
     const rankedEvents = sortMarketNewsEvents(
       candidateEvents.filter(
         (event) =>
           artistById.has(event.artist_id) &&
           isPublicMarketNewsEvent(event, {
-            feedMode: selectedArtistIds.length ? "artist" : feedMode,
+            feedMode: effectiveFeedMode,
             artist: artistById.get(event.artist_id) ?? null
-          })
+          }) &&
+          (effectiveFeedMode !== "watch" || isWatchNowMarketEvent(event))
       ),
       newsSort,
       (event) => getNewsImportanceScore(event, runDate)
@@ -196,7 +206,7 @@ export async function GET(request: Request) {
     const storyByPrimaryId = new Map(storyGroups.map((group) => [group.primary.id, group]));
     const groupedEvents = storyGroups.map((group) => group.primary);
     const selectedEvents = selectMarketNewsEvents(groupedEvents, {
-      feedMode: selectedArtistIds.length ? "artist" : feedMode,
+      feedMode: effectiveFeedMode,
       limit,
       runDate,
       sort: newsSort
@@ -211,14 +221,22 @@ export async function GET(request: Request) {
     const sourcePreviewImages = await loadSourcePreviewImageUrls(
       eventNews.filter((item) => !item.thumbnailUrl).map((item) => item.sourceUrl)
     );
-    const news = eventNews.slice(0, limit).map((item) => ({
-      ...item,
-      thumbnailUrl:
-        item.thumbnailUrl ??
-        (item.sourceUrl ? sourcePreviewImages.get(item.sourceUrl) : null) ??
-        imageByArtistId.get(item.artistId) ??
-        null
-    }));
+    const news = eventNews.slice(0, limit).map((item) => {
+      const articleImageUrl = item.sourceUrl ? sourcePreviewImages.get(item.sourceUrl) ?? null : null;
+      const artistImageUrl = imageByArtistId.get(item.artistId) ?? null;
+
+      return {
+        ...item,
+        thumbnailUrl: item.thumbnailUrl ?? articleImageUrl ?? artistImageUrl,
+        thumbnailSource: item.thumbnailUrl
+          ? "event" as const
+          : articleImageUrl
+            ? "article" as const
+            : artistImageUrl
+              ? "artist" as const
+              : null
+      };
+    });
 
     return NextResponse.json({
       ok: true,
@@ -309,6 +327,24 @@ function mapMarketEventToNewsItem(
   const sourceUrl = event.source_url && isSafeHttpUrl(event.source_url) ? event.source_url : null;
   const sourceName = event.source_name ?? null;
   const sourceDomain = getSourceDomain(sourceUrl, sourceName);
+  const storyPayloads = [
+    rawPayload,
+    ...storyEvents
+      .filter((storyEvent) => storyEvent.id !== event.id)
+      .map((storyEvent) => toRawPayload(storyEvent.raw_payload))
+  ];
+  const storyVideoEvent = storyEvents.find((storyEvent) =>
+    getYoutubeVideoId(toRawPayload(storyEvent.raw_payload), storyEvent.source_url)
+  );
+  const storyVideoPayload = storyVideoEvent ? toRawPayload(storyVideoEvent.raw_payload) : null;
+  const videoId =
+    getYoutubeVideoId(rawPayload, sourceUrl) ??
+    (storyVideoEvent ? getYoutubeVideoId(storyVideoPayload ?? {}, storyVideoEvent.source_url) : null);
+  const youtubeMediaUrl = videoId ? `https://www.youtube.com/watch?v=${videoId}` : null;
+  const supportingMediaPayload = storyPayloads.find((payload) => getSupportingMediaUrl(payload)) ?? rawPayload;
+  const supportingMediaUrl = getSupportingMediaUrl(supportingMediaPayload);
+  const supportingMediaType = getSupportingMediaType(supportingMediaPayload);
+  const eventThumbnailUrl = storyPayloads.map(getEventThumbnailUrl).find(Boolean) ?? null;
 
   return {
     id: event.id,
@@ -324,10 +360,21 @@ function mapMarketEventToNewsItem(
     sourceUrl,
     sourceDomain,
     sourceIconUrl: getSourceIconUrl(sourceDomain, sourceName),
-    thumbnailUrl: getEventThumbnailUrl(rawPayload) ?? null,
-    mediaUrl: getSupportingMediaUrl(rawPayload),
-    mediaType: getSupportingMediaType(rawPayload),
-    mediaLabel: getSupportingMediaLabel(rawPayload),
+    thumbnailUrl: eventThumbnailUrl,
+    mediaUrl: supportingMediaUrl ?? youtubeMediaUrl,
+    mediaType: supportingMediaType ?? (youtubeMediaUrl ? "youtube" : null),
+    mediaLabel: supportingMediaType ? getSupportingMediaLabel(supportingMediaPayload) : youtubeMediaUrl ? "Watch" : null,
+    videoId,
+    durationSeconds:
+      getRawNumber(rawPayload.durationSeconds) ??
+      getRawNumber(storyVideoPayload?.durationSeconds),
+    viewCount:
+      getRawNumber(rawPayload.viewCount) ??
+      getRawNumber(rawPayload.representativeViewCount) ??
+      getRawNumber(rawPayload.clusterMaxViews) ??
+      getRawNumber(storyVideoPayload?.viewCount) ??
+      getRawNumber(storyVideoPayload?.representativeViewCount) ??
+      getRawNumber(storyVideoPayload?.clusterMaxViews),
     sentimentScore: Number(event.sentiment_score),
     impactScore: Number(event.impact_score),
     confidence: Number(event.confidence),
@@ -374,7 +421,7 @@ function normalizeEventType(value: string | null): MarketNewsType | null {
 }
 
 function normalizeFeedMode(value: string | null): NewsFeedMode {
-  return value === "home" || value === "artist" ? value : "news";
+  return value === "home" || value === "artist" || value === "watch" ? value : "news";
 }
 
 function normalizeArtistIds(value: string | null) {
@@ -868,6 +915,10 @@ function normalizeNewsHeadline(value: string) {
 }
 
 function getYoutubeCap(feedMode: NewsFeedMode, limit: number) {
+  if (feedMode === "watch") {
+    return limit;
+  }
+
   if (feedMode === "home") {
     return 1;
   }
@@ -922,7 +973,7 @@ function isPublicYoutubeUploadEvent(
   const isMusicVideo = title.includes("official video") || title.includes("music video");
   const isTrackAudio = title.includes("official audio") || title.includes("audio");
   const isStandaloneTrackAudio = rawPayload.standaloneTrackAudio === true;
-  const isMainFeed = feedMode === "home" || feedMode === "news";
+  const isMainFeed = feedMode === "home" || feedMode === "news" || feedMode === "watch";
   const isMajorProjectRelease = ["album", "ep", "mixtape"].includes(releaseKind) || hasNamedProject;
   const minimumViews = isMajorProjectRelease || isMusicVideo || isProjectCluster ? 25_000 : isTrackAudio ? 90_000 : 60_000;
   const engagementScore = likeCount * 8 + commentCount * 20;

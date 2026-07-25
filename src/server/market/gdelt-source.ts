@@ -985,7 +985,6 @@ function hasSpeculativeFeatureContext(title: string) {
 function hasExplicitMusicViralContext(title: string) {
   return hasAny(title, [
     "album",
-    "billboard",
     "chart",
     "concert",
     "crowd",

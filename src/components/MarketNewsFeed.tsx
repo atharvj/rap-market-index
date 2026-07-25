@@ -26,9 +26,13 @@ export type MarketNewsItem = {
   sourceDomain?: string | null;
   sourceIconUrl?: string | null;
   thumbnailUrl?: string | null;
+  thumbnailSource?: "event" | "article" | "artist" | null;
   mediaUrl?: string | null;
   mediaType?: string | null;
   mediaLabel?: string | null;
+  videoId?: string | null;
+  durationSeconds?: number | null;
+  viewCount?: number | null;
   sentimentScore: number;
   impactScore: number;
   confidence: number;

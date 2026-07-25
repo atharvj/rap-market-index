@@ -3,6 +3,16 @@ import { createInitialGameState } from "../src/lib/market";
 import type { GameState } from "../src/lib/types";
 
 const dailyMoves = [4.8, 3.4, 2.1, 1.3, 0.7, 0.2, -0.3, -0.8, 1.8, -1.4, 0.9, -0.5, 2.7, -1.1, 1.2, -0.2];
+const videoPoster = (label: string, color: string) =>
+  `data:image/svg+xml,${encodeURIComponent(`
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 720">
+      <defs><linearGradient id="g" x1="0" x2="1"><stop stop-color="#07111d"/><stop offset="1" stop-color="${color}"/></linearGradient></defs>
+      <rect width="1280" height="720" fill="url(#g)"/>
+      <circle cx="315" cy="350" r="190" fill="#ffffff" opacity=".08"/>
+      <text x="620" y="330" fill="#ffffff" font-family="Arial" font-size="82" font-weight="700">${label}</text>
+      <text x="624" y="400" fill="#ffffff" opacity=".62" font-family="Arial" font-size="30">OFFICIAL MUSIC VIDEO</text>
+    </svg>
+  `)}`;
 
 const marketState: GameState = (() => {
   const initial = createInitialGameState();
@@ -135,6 +145,39 @@ const marketNews = [
   }
 ];
 
+const marketVideos = [
+  {
+    ...marketNews[0],
+    id: "video-1",
+    title: `${marketState.artists[1].name} - First Light (Official Music Video)`,
+    sourceName: "YouTube",
+    sourceDomain: "youtube.com",
+    sourceUrl: "https://www.youtube.com/watch?v=RmiVideo001",
+    thumbnailUrl: videoPoster(marketState.artists[1].ticker, "#075a66"),
+    mediaUrl: "https://www.youtube.com/watch?v=RmiVideo001",
+    mediaType: "youtube",
+    mediaLabel: "Watch",
+    videoId: "RmiVideo001",
+    durationSeconds: 214,
+    viewCount: 842_000
+  },
+  {
+    ...marketNews[1],
+    id: "video-2",
+    title: `${marketState.artists[2].name} - Night Shift (Official Video)`,
+    sourceName: "YouTube",
+    sourceDomain: "youtube.com",
+    sourceUrl: "https://www.youtube.com/watch?v=RmiVideo002",
+    thumbnailUrl: videoPoster(marketState.artists[2].ticker, "#3f2468"),
+    mediaUrl: "https://www.youtube.com/watch?v=RmiVideo002",
+    mediaType: "youtube",
+    mediaLabel: "Watch",
+    videoId: "RmiVideo002",
+    durationSeconds: 188,
+    viewCount: 416_000
+  }
+];
+
 async function installPublicFixtures(page: Page) {
   await page.addInitScript(() => {
     window.localStorage.setItem("rmi-theme", "dark");
@@ -146,12 +189,25 @@ async function installPublicFixtures(page: Page) {
       body: JSON.stringify({ ok: true, source: "supabase", state: marketState })
     })
   );
-  await page.route("**/api/market/news**", (route) =>
-    route.fulfill({
+  await page.route("**/api/market/news**", (route) => {
+    const requestUrl = new URL(route.request().url());
+    const news = requestUrl.searchParams.get("feed") === "watch" ? marketVideos : marketNews;
+
+    return route.fulfill({
       contentType: "application/json",
-      body: JSON.stringify({ ok: true, news: marketNews })
-    })
-  );
+      body: JSON.stringify({ ok: true, news })
+    });
+  });
+  await page.route("https://www.youtube-nocookie.com/embed/**", (route) => {
+    const secondVideo = route.request().url().includes("RmiVideo002");
+    const label = secondVideo ? marketState.artists[2].ticker : marketState.artists[1].ticker;
+    const color = secondVideo ? "#3f2468" : "#075a66";
+
+    return route.fulfill({
+      contentType: "text/html",
+      body: `<!doctype html><html><body style="margin:0;overflow:hidden;background:linear-gradient(120deg,#07111d,${color});color:white;font-family:Arial;display:grid;place-items:center;height:100vh"><div style="text-align:center"><b style="font-size:72px">${label}</b><div style="margin-top:14px;font-size:24px;opacity:.65">OFFICIAL MUSIC VIDEO</div></div></body></html>`
+    });
+  });
   await page.route("**/api/leaderboard", (route) =>
     route.fulfill({
       contentType: "application/json",
@@ -200,6 +256,36 @@ test("homepage leads with one top story and does not repeat it below", async ({ 
   await expect(page.locator('[aria-busy="true"]')).toHaveCount(0, { timeout: 15_000 });
   await expect(page.getByText(marketNews[0].title, { exact: true })).toHaveCount(1);
   await expect(page.getByText(marketNews[1].title, { exact: true })).toBeVisible();
+});
+
+test("Watch Now starts in view and stays inside the RMI player", async ({ page }) => {
+  await page.goto("/");
+  await expect(page.locator('[aria-busy="true"]')).toHaveCount(0, { timeout: 15_000 });
+
+  const section = page.getByRole("heading", { name: "Watch Now" });
+  await section.scrollIntoViewIfNeeded();
+  await expect(section).toBeVisible();
+  await expect(page.locator('iframe[title*="video player"]')).toHaveAttribute(
+    "src",
+    /youtube-nocookie\.com\/embed\/RmiVideo001/
+  );
+  await expect(page.getByRole("link", { name: /youtube/i })).toHaveCount(0);
+  await expect(page.locator('section[aria-labelledby="watch-now-title"]')).toHaveScreenshot("watch-now.png");
+
+  const playerFrame = page.frames().find((frame) => frame.url().includes("youtube-nocookie.com/embed/RmiVideo001"));
+  expect(playerFrame).toBeDefined();
+  await playerFrame?.evaluate(() => {
+    window.parent.postMessage(JSON.stringify({ event: "onStateChange", info: 0 }), "*");
+  });
+  await expect(page.getByRole("heading", { name: marketVideos[1].title })).toBeVisible();
+  await expect(page.locator('iframe[title*="video player"]')).toHaveAttribute(
+    "src",
+    /youtube-nocookie\.com\/embed\/RmiVideo002/
+  );
+  await page.getByRole("button", { name: "Previous video" }).click();
+  await expect(page.getByRole("heading", { name: marketVideos[0].title })).toBeVisible();
+  await page.getByRole("button", { name: "Unmute video" }).click();
+  await expect(page.getByRole("button", { name: "Mute video" })).toBeVisible();
 });
 
 test("markets visual contract", async ({ page }) => {

@@ -43,6 +43,7 @@ describe("market news classification", () => {
 
     expect(classifyArticleEvent(title, "billboard.com")).toBeNull();
     expect(isLowValueMarketArticleTitle(title)).toBe(true);
+    expect(isLowValueMarketArticleTitle(`${title} - billboard.com`)).toBe(true);
   });
 
   it("keeps a measured song trend but gives it less impact than a release", () => {

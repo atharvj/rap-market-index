@@ -6,6 +6,7 @@ import { ArtistIdentity, ChangeText, RmiButton, RmiSection } from "@/components/
 import { MarketSideRail } from "@/components/MarketSideRail";
 import { MarketNewsFeed } from "@/components/MarketNewsFeed";
 import { MiniSparkline } from "@/components/MiniSparkline";
+import { WatchNow } from "@/components/WatchNow";
 import { formatCurrency, formatPercent } from "@/lib/formatters";
 import { getMarketBreadth } from "@/lib/market-analytics";
 import { Activity, ArrowDownRight, ArrowUpRight, Gauge } from "lucide-react";
@@ -87,6 +88,8 @@ export default function HomePage() {
           ))}
         </div>
       </RmiSection>
+
+      <WatchNow />
 
       <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1.55fr)_minmax(300px,0.65fr)]">
         <RmiSection

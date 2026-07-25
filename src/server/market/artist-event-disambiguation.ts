@@ -247,7 +247,7 @@ export function isGenericMusicListicleTitle(title: string) {
 export function isLowValueMarketArticleTitle(title: string) {
   const normalized = normalizeEventSearchText(title);
   const hasExplicitMusicDemandContext =
-    /\b(?:album|billboard|chart|concert|festival|listening|music|performance|release|single|song|spotify|stream|streaming|ticket|tour|track)\b/.test(
+    /\b(?:album|chart|concert|festival|listening|music|performance|release|single|song|spotify|stream|streaming|ticket|tour|track)\b/.test(
       normalized
     );
 
