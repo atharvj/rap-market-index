@@ -72,6 +72,7 @@ export type GdeltMarketSignals = {
 
 const SOURCE = "gdelt";
 const ARTICLE_COUNT = "article_count";
+const RELEVANT_ARTICLE_COUNT = "music_relevant_article_count";
 const AVERAGE_TONE = "average_tone";
 const SOURCE_COUNT = "source_count";
 const REQUEST_ERROR = "request_error";
@@ -142,9 +143,14 @@ export async function collectGdeltMarketSignals({
 
     consecutiveRequestFailures = 0;
 
-    const signal = buildGdeltSignal({
+    const relevantArticles = filterRelevantGdeltArticles({
       artist,
       articles: result.articles,
+      query
+    });
+    const signal = buildGdeltSignal({
+      artist,
+      articles: relevantArticles,
       query,
       runDate,
       baseline: baselines[artist.id] ?? {}
@@ -155,7 +161,7 @@ export async function collectGdeltMarketSignals({
 
     const events = buildGdeltArticleEvents({
       artist,
-      articles: result.articles,
+      articles: relevantArticles,
       runDate,
       query
     });
@@ -196,7 +202,7 @@ function buildGdeltSignal({
     .filter((value): value is number => typeof value === "number");
   const averageTone = tones.reduce((total, value) => total + value, 0) / Math.max(1, tones.length);
   const sourceCount = domains.size;
-  const coverageMomentum = calculateCoverageMomentum(articleCount, baseline[ARTICLE_COUNT]);
+  const coverageMomentum = calculateCoverageMomentum(articleCount, baseline[RELEVANT_ARTICLE_COUNT]);
   const stats: Partial<HypeStats> = {};
 
   if (typeof coverageMomentum === "number") {
@@ -215,7 +221,7 @@ function buildGdeltSignal({
     articleCount,
     sourceCount,
     averageTone,
-    baselineArticleCount: baseline[ARTICLE_COUNT] ?? null,
+    baselineArticleCount: baseline[RELEVANT_ARTICLE_COUNT] ?? null,
     coverageMomentum,
     status: Object.keys(stats).length ? "ok" : "baseline_only",
     topArticles: articles.slice(0, 5).map((article) => ({
@@ -235,6 +241,7 @@ function buildGdeltSignal({
     },
     observations: [
       createObservation(artist.id, runDate, ARTICLE_COUNT, articleCount, "articles", rawPayload),
+      createObservation(artist.id, runDate, RELEVANT_ARTICLE_COUNT, articleCount, "articles", rawPayload),
       createObservation(artist.id, runDate, AVERAGE_TONE, averageTone, "tone", rawPayload),
       createObservation(artist.id, runDate, SOURCE_COUNT, sourceCount, "domains", rawPayload)
     ]
@@ -492,6 +499,63 @@ function buildGdeltArticleEvents({
   }
 
   return events;
+}
+
+function filterRelevantGdeltArticles({
+  artist,
+  articles,
+  query
+}: {
+  artist: MarketUpdateArtist;
+  articles: GdeltArticle[];
+  query: string;
+}) {
+  return articles.filter((article) => {
+    const title = normalizeArticleTitle(article.title);
+    const domain = normalizeDomain(article.domain, article.url);
+
+    if (!title || !domain || !article.url?.trim()) {
+      return false;
+    }
+
+    const classification = classifyArticleEvent(title, domain, article.tone);
+
+    if (!classification || !mentionsArtist(title, artist.name, query)) {
+      return false;
+    }
+
+    if (
+      !hasRequiredArtistEventDisambiguation({
+        artistName: artist.name,
+        text: title,
+        query,
+        sourceTier: getSourceTier(domain)
+      })
+    ) {
+      return false;
+    }
+
+    if (
+      !hasRequiredGdeltEventSubjectContext({
+        artistName: artist.name,
+        query,
+        title,
+        classification
+      })
+    ) {
+      return false;
+    }
+
+    if (isLowValueMarketArticleTitle(title) && !classification.statusSubtype) {
+      return false;
+    }
+
+    return !(
+      classification.eventType === "release" &&
+      isGenericMusicListicleTitle(title) &&
+      !mentionsSpecificProjectTitle(title)
+    );
+  });
 }
 
 function mentionsSpecificProjectTitle(title: string) {
@@ -767,13 +831,15 @@ export function classifyArticleEvent(
     };
   }
 
-  if (hasAny(lowerTitle, VIRAL_TERMS) && hasAny(lowerTitle, VIRAL_MARKET_CONTEXT_TERMS)) {
+  if (hasAny(lowerTitle, VIRAL_TERMS) && hasExplicitMusicViralContext(lowerTitle)) {
+    const isLightweightSocialTrend = hasAny(lowerTitle, ["challenge", "dance trend", "meme", "tiktok"]);
+
     return {
       eventType: "viral" as const,
-      sentimentScore: clamp(24 + toneScore * 0.55, -45, 75),
-      impactScore: clamp(38 + Math.max(0, toneScore), -20, 85),
-      confidence: getArticleConfidence(sourceTier, 0.66),
-      reason: "viral_terms"
+      sentimentScore: clamp((isLightweightSocialTrend ? 16 : 24) + toneScore * 0.55, -45, 75),
+      impactScore: clamp((isLightweightSocialTrend ? 24 : 38) + Math.max(0, toneScore), -20, 85),
+      confidence: getArticleConfidence(sourceTier, isLightweightSocialTrend ? 0.58 : 0.66),
+      reason: isLightweightSocialTrend ? "music_social_trend_terms" : "viral_terms"
     };
   }
 
@@ -914,6 +980,29 @@ function hasMusicFeatureContext(title: string) {
 
 function hasSpeculativeFeatureContext(title: string) {
   return hasAny(title, SPECULATIVE_FEATURE_TERMS) && !hasAny(title, CONFIRMED_FEATURE_TERMS);
+}
+
+function hasExplicitMusicViralContext(title: string) {
+  return hasAny(title, [
+    "album",
+    "billboard",
+    "chart",
+    "concert",
+    "crowd",
+    "freestyle",
+    "listening",
+    "music",
+    "performance",
+    "release",
+    "single",
+    "song",
+    "spotify",
+    "stream",
+    "streaming",
+    "tour",
+    "track",
+    "verse"
+  ]);
 }
 
 function getTitleSentiment(title: string) {
@@ -1581,25 +1670,6 @@ const VIRAL_TERMS = [
   "trending",
   "viral",
   "viral clip"
-];
-const VIRAL_MARKET_CONTEXT_TERMS = [
-  "album",
-  "billboard",
-  "challenge",
-  "chart",
-  "concert",
-  "crowd",
-  "freestyle",
-  "music",
-  "performance",
-  "release",
-  "song",
-  "streaming",
-  "tiktok",
-  "tour",
-  "track",
-  "verse",
-  "video"
 ];
 const DECLINE_TERMS = [
   "booed",

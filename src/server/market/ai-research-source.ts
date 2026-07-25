@@ -1,6 +1,7 @@
 import { get as httpsGet } from "node:https";
 import { clamp } from "@/lib/pricing";
 import type { MarketUpdateArtist } from "@/server/market/daily-update";
+import { isLowValueMarketArticleTitle } from "@/server/market/artist-event-disambiguation";
 import { buildDefaultGdeltQuery } from "@/server/market/artist-text-identifiers";
 import {
   classifyArticleEvent,
@@ -505,8 +506,8 @@ function buildResearchPrompt({
     `Artist: ${artist.name} (${artist.ticker}). Run date: ${runDate}. Window: ${lookbackDays} days.`,
     `Verified identity context: ${query}. Return at most ${maxEventsPerArtist} source-backed events.`,
     "Run separate concise web searches for: (1) artist + latest release/news, (2) newest project title + review/reception, and (3) artist or project + fan reaction/community. Do not paste every topic into one search query.",
-    "Use only meaningful catalysts: album/project/single/feature, review/reception, backlash/legal/health, viral performance/snippet, chart milestone, clear decline, or a major non-music event with measurable public reach.",
-    "Major acting or casting news, film roles, fashion campaigns, brand deals, business wins, and televised appearances may be public news when verified and material. Treat them as attention_only unless they change career availability. Give them meaningful music-price impact only when separate evidence shows listening, search, chart, ticket, or fan-demand growth.",
+    "Use only music-market catalysts: album/project/single/feature, review/reception, tour or festival demand, backlash/legal/health that affects career availability, a viral performance/snippet/song trend, chart milestone, or a measured decline.",
+    "Reject fragrance, beauty, fashion, brand, product, relationship, food, shopping, acting, casting, generic celebrity, and challenge-participation stories. If a non-music event causes independently measured listening, chart, search, ticket, or fan-demand growth, report that downstream music-demand change instead of the lifestyle headline.",
     "Classify marketConnection as direct_music when the event directly concerns music demand, career_availability when it changes the artist's ability to record, release, tour, or perform, or attention_only when it only raises celebrity visibility. Set musicDemandConfirmed true only when independent listening, chart, search, ticket, or fan-demand evidence connects the event to music interest. Never assume fame automatically means music demand.",
     "If many tracks dropped together, report the project, not one random track. Social/community items need factual confirmation and public reaction.",
     "For releases and reviews, actively search for reception using the release title plus fan reaction, Reddit, review, and community discussion terms. Keep fanSentimentScore separate from criticSentimentScore. A critic score is not fan consensus, and comments on the artist's own channel are biased evidence.",
@@ -535,8 +536,8 @@ function buildCompactResearchPrompt({
   return [
     `Find one meaningful, source-backed catalyst for ${artist.name} (${artist.ticker}) in the ${lookbackDays} days through ${runDate}. Verified identity terms: ${query}.`,
     "Use separate short web searches for latest release/news and for that release's review or fan reaction; do not combine every topic into one query.",
-    "Prioritize the newest release or EP and its fan/critic reception, then major news, controversy, charts, tours, or viral performances. Classify marketConnection as direct_music, career_availability, or attention_only; set musicDemandConfirmed only with independent evidence connecting attention to music demand.",
-    "Verified acting, film, fashion, brand, business, or television news can be reported, but classify it as attention_only unless career availability changes; do not turn celebrity visibility into music demand without downstream evidence.",
+    "Prioritize the newest release or EP and its fan/critic reception, then music-related controversy, charts, tours, or viral performances. Classify marketConnection as direct_music or career_availability; use attention_only only to reject a candidate.",
+    "Reject fragrance, beauty, fashion, brand, product, relationship, food, shopping, acting, casting, generic celebrity, and challenge-participation stories. If they cause verified listening, chart, search, ticket, or fan-demand growth, report that downstream music-demand change instead.",
     "Require a real accessible source URL. Search the newest release title with fan reaction, Reddit, review, and community terms. Fan sentiment needs two independent sources returned by web search; list them in corroboratingSourceUrls, otherwise set publicReactionConfirmed false and fanReactionEvidenceCount 0. Reject rumors, sarcasm, private posts, and low-view uploads.",
     "A guest credit alone is low signal. Confirm feature-driven demand with chart, listening, search, ticket, or broad corroborated reaction evidence; repeated articles about the same credit are not demand evidence. Do not infer decline merely from silence.",
     "Score sentimentScore, fanSentimentScore, criticSentimentScore, and impactScore as integers from -100 to 100; confidence is a decimal from 0 to 1. Use a valid calendar date in YYYY-MM-DD format.",
@@ -642,6 +643,13 @@ function normalizeAiResearchEvent({
   const artistRole = normalizeArtistRole(getString(value.artistRole), title, artist.name);
 
   if (artistRole === "mentioned") {
+    return null;
+  }
+
+  if (
+    (title && isLowValueMarketArticleTitle(title)) ||
+    (marketConnection === "attention_only" && !musicDemandConfirmed)
+  ) {
     return null;
   }
 

@@ -155,7 +155,7 @@ export async function POST(request: Request) {
         supabase,
         artistIds: selectedArtistIds,
         source: "gdelt",
-        metrics: ["article_count"],
+        metrics: ["music_relevant_article_count"],
         beforeDate: runDate,
         lookbackDays: 30
       })

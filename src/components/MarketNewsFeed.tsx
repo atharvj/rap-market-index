@@ -57,6 +57,7 @@ export function MarketNewsFeed({
   artistIds,
   eventType,
   limit = 8,
+  skip = 0,
   compact = false,
   variant,
   sort = "top",
@@ -66,6 +67,7 @@ export function MarketNewsFeed({
   artistIds?: string[];
   eventType?: string;
   limit?: number;
+  skip?: number;
   compact?: boolean;
   variant?: MarketNewsVariant;
   sort?: MarketNewsSort;
@@ -75,12 +77,13 @@ export function MarketNewsFeed({
   const [loading, setLoading] = useState(true);
   const resolvedVariant: MarketNewsVariant = variant ?? (compact ? "compact" : "full");
   const artistIdsKey = (artistIds ?? []).join(",");
+  const safeSkip = Math.max(0, Math.floor(skip));
 
   useEffect(() => {
     const controller = new AbortController();
     setLoading(true);
     const params = new URLSearchParams({
-      limit: String(limit),
+      limit: String(limit + safeSkip),
       lookbackDays: "45",
       feed: artistId || artistIdsKey ? "artist" : resolvedVariant === "home" ? "home" : "news"
     });
@@ -103,7 +106,7 @@ export function MarketNewsFeed({
     })
       .then((response) => response.json() as Promise<MarketNewsResponse>)
       .then((payload) => {
-        const nextItems = payload.ok ? payload.news ?? [] : [];
+        const nextItems = payload.ok ? (payload.news ?? []).slice(safeSkip, safeSkip + limit) : [];
         setItems(nextItems);
         onItemsChange?.(nextItems);
       })
@@ -140,7 +143,7 @@ export function MarketNewsFeed({
       window.removeEventListener("focus", refreshVisibleNews);
       document.removeEventListener("visibilitychange", refreshVisibleNews);
     };
-  }, [artistId, artistIdsKey, eventType, limit, onItemsChange, resolvedVariant, sort]);
+  }, [artistId, artistIdsKey, eventType, limit, onItemsChange, resolvedVariant, safeSkip, sort]);
 
   if (loading) {
     return <MarketNewsSkeleton compact={resolvedVariant === "compact"} />;
@@ -245,9 +248,9 @@ function HomeLeadStory({ item }: { item: MarketNewsItem }) {
               <span>{formatDate(item.eventDate)}</span>
               <SourceMeta item={item} />
             </div>
-            <h2 className="mt-3 text-xl font-bold leading-tight text-paper sm:text-2xl">
+            <h1 className="mt-3 text-2xl font-bold leading-[1.08] text-paper sm:text-4xl">
               {trimTitle(item.title, 132)}
-            </h2>
+            </h1>
             <p className="mt-3 text-sm leading-6 text-paper/58">
               {source} catalyst ranked by impact, confidence, and recency for {formatNewsArtistNames(item)}.
             </p>

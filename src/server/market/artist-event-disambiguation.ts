@@ -85,6 +85,7 @@ const LOW_TIER_CLAIMS_REQUIRING_CORROBORATION = new Set([
   "public_reaction_terms",
   "review_keyword",
   "snippet_terms",
+  "music_social_trend_terms",
   "tour_terms",
   "tracklist_reaction_terms",
   "viral_terms"
@@ -245,6 +246,10 @@ export function isGenericMusicListicleTitle(title: string) {
 
 export function isLowValueMarketArticleTitle(title: string) {
   const normalized = normalizeEventSearchText(title);
+  const hasExplicitMusicDemandContext =
+    /\b(?:album|billboard|chart|concert|festival|listening|music|performance|release|single|song|spotify|stream|streaming|ticket|tour|track)\b/.test(
+      normalized
+    );
 
   if (isGenericMusicListicleTitle(title)) {
     return true;
@@ -263,6 +268,18 @@ export function isLowValueMarketArticleTitle(title: string) {
     /\b(?:best|greatest)\b.*\bof all time\b/.test(normalized) ||
     /\branked\b.*\b(?:best|greatest|verses|songs|albums|moments)\b/.test(normalized) ||
     /\b(?:best|greatest|verses|songs|albums|moments)\b.*\branked\b/.test(normalized) ||
+    /\b(?:fragrance|perfume|cologne|cosmetics?|makeup|skin ?care|hair ?care|beauty (?:brand|line|product))\b/.test(normalized) ||
+    /\b(?:ulta beauty|sephora|tiktok shop)\b/.test(normalized) ||
+    (
+      /\b(?:launches?|unveils?|debuts?|fronts?|stars? in)\b.*\b(?:apparel|brand|campaign|collection|product|store|storefront)\b/.test(
+        normalized
+      ) &&
+      !hasExplicitMusicDemandContext
+    ) ||
+    (
+      /\b(?:joins?|takes? on|does?|tries?)\b.*\b(?:tiktok|viral|dance)\s+challenge\b/.test(normalized) &&
+      !hasExplicitMusicDemandContext
+    ) ||
     /\bmoments?\s+(?:we|you)\s+(?:will\s+)?never\s+forget\b/.test(normalized) ||
     /\bdream\s+setlist\b/.test(normalized) ||
     /\bsetlist\s+for\b/.test(normalized) ||

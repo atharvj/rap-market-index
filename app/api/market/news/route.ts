@@ -604,12 +604,17 @@ function isPublicAiResearchEvent(
   const musicDemandConfirmed = getRawBoolean(rawPayload.musicDemandConfirmed);
   const factualClaimConfirmed = getRawBoolean(rawPayload.factualClaimConfirmed);
   const artistRole = getRawString(rawPayload.artistRole);
+  const marketConnection = getRawString(rawPayload.marketConnection);
 
   if (artistRole === "mentioned") {
     return false;
   }
 
   if (artistRole === "featured" && !musicDemandConfirmed && !publicReactionConfirmed) {
+    return false;
+  }
+
+  if (marketConnection === "attention_only" && !musicDemandConfirmed) {
     return false;
   }
 
@@ -680,6 +685,7 @@ function getNewsImportanceScore(event: MarketEventRow, runDate: string) {
   const rawPayload = toRawPayload(event.raw_payload);
   const source = getRawString(rawPayload.source);
   const sourceWeight = getSourceWeight(source);
+  const editorialWeight = getNewsEditorialWeight(rawPayload);
   const reachScore = source === "youtube_upload_event" ? getYoutubeNewsReachScore(rawPayload) : 0;
   const typeWeight: Record<MarketNewsType, number> = {
     release: 16,
@@ -691,7 +697,37 @@ function getNewsImportanceScore(event: MarketEventRow, runDate: string) {
     viral: 12
   };
 
-  return impactScore * 1.15 + confidence * 36 + recency + sourceWeight + reachScore + (typeWeight[event.event_type] ?? 0);
+  return (
+    impactScore * 1.15 * editorialWeight +
+    confidence * 36 +
+    recency +
+    sourceWeight +
+    reachScore +
+    (typeWeight[event.event_type] ?? 0) * editorialWeight
+  );
+}
+
+function getNewsEditorialWeight(rawPayload: Record<string, unknown>) {
+  const marketConnection = getRawString(rawPayload.marketConnection);
+  const classificationReason = getRawString(rawPayload.classificationReason);
+
+  if (marketConnection === "attention_only") {
+    return getRawBoolean(rawPayload.musicDemandConfirmed) ? 0.35 : 0;
+  }
+
+  if (classificationReason === "music_social_trend_terms") {
+    return 0.62;
+  }
+
+  if (classificationReason === "snippet_terms") {
+    return 0.76;
+  }
+
+  if (classificationReason === "feature_terms" || classificationReason === "artist_feature_credit") {
+    return getRawBoolean(rawPayload.musicDemandConfirmed) ? 0.82 : 0.48;
+  }
+
+  return 1;
 }
 
 function getSourceWeight(source: string) {

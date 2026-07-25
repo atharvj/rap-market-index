@@ -81,6 +81,30 @@ describe("feature evidence safeguards", () => {
   });
 });
 
+describe("music relevance safeguards", () => {
+  it("removes celebrity attention with no demonstrated music demand", () => {
+    const event = featureEvent({
+      marketConnection: "attention_only",
+      musicDemandConfirmed: false
+    });
+    event.eventType = "news";
+    event.title = "Young Thug launches a new fragrance collection";
+
+    expect(evidenceMultiplier(event)).toBe(0);
+  });
+
+  it("heavily discounts adjacent attention even when downstream demand is confirmed", () => {
+    const event = featureEvent({
+      marketConnection: "attention_only",
+      musicDemandConfirmed: true
+    });
+    event.eventType = "news";
+    event.title = "Young Thug challenge coincides with verified streaming demand";
+
+    expect(evidenceMultiplier(event)).toBe(0.28);
+  });
+});
+
 describe("event story deduplication", () => {
   it("counts same-day coverage of one release only once", () => {
     const shared: Omit<MarketEvent, "title" | "sourceUrl"> = {

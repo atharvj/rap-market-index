@@ -579,7 +579,7 @@ async function collectRealSignals({
               supabase,
               artistIds,
               source: "gdelt",
-              metrics: ["article_count"],
+              metrics: ["music_relevant_article_count"],
               beforeDate: runDate,
               lookbackDays: 30
             })

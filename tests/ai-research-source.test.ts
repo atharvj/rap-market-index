@@ -106,6 +106,24 @@ describe("AI research source normalization", () => {
     expect(result.eventsByArtist[artist.id]?.[0]?.eventDate).toBe("2026-07-09");
   });
 
+  it("rejects a verified lifestyle launch with no demonstrated music demand", async () => {
+    const result = await collectAiResearchMarketEvents({
+      artists: [artist],
+      runDate: "2026-07-11",
+      apiKey: "test-key",
+      delayMs: 0,
+      fetchImpl: async () => groqResponse(event({
+        title: "Ken Carson launches debut fragrance at a beauty retailer",
+        summary: "The artist launched a fragrance.",
+        eventType: "news",
+        marketConnection: "attention_only",
+        musicDemandConfirmed: false
+      }))
+    });
+
+    expect(result.eventsByArtist[artist.id]).toBeUndefined();
+  });
+
   it("opens a circuit instead of retrying every artist after a daily quota limit", async () => {
     let requestCount = 0;
     const result = await collectAiResearchMarketEvents({

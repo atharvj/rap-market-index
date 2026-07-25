@@ -4,6 +4,7 @@ import type { AdapterSignals, MarketEvent, MarketSignalModifier } from "@/server
 import { getArtistStatusSubtype } from "@/server/market/status-events";
 import type { HypeStats } from "@/lib/types";
 import { areNewsStoryEventsEquivalent } from "@/server/market/news-story-groups";
+import { isLowValueMarketArticleTitle } from "@/server/market/artist-event-disambiguation";
 
 export type ManualMarketEventInput = {
   artistId?: string;
@@ -1104,6 +1105,27 @@ function getEvidenceSafetyAdjustment(event: ScoredMarketEvent) {
   const source = getRawString(event.event.rawPayload.source) ?? "";
   const evidenceLevel = getRawString(event.event.rawPayload.evidenceLevel) ?? "";
   const isSocialOrCommunity = sourceClass === "social" || sourceClass === "community";
+  const marketConnection = getRawString(event.event.rawPayload.marketConnection) ?? "";
+  const musicDemandConfirmed = getRawBoolean(event.event.rawPayload.musicDemandConfirmed);
+
+  if (isLowValueMarketArticleTitle(event.event.title)) {
+    return {
+      label: "rejected_non_music_or_low_value_story",
+      multiplier: 0
+    };
+  }
+
+  if (marketConnection === "attention_only") {
+    return musicDemandConfirmed
+      ? {
+          label: "music_demand_confirmed_after_adjacent_attention",
+          multiplier: 0.28
+        }
+      : {
+          label: "rejected_attention_without_music_demand",
+          multiplier: 0
+        };
+  }
 
   if (hasHighRiskEvidenceFlags(event)) {
     return {

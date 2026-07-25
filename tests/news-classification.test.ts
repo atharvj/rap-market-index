@@ -31,6 +31,34 @@ describe("market news classification", () => {
     expect(isLowValueMarketArticleTitle("Lil Wayne Shares Unusual Food Rules Like Hating Mayo")).toBe(true);
   });
 
+  it("rejects beauty and fragrance launches even when the publisher covers music", () => {
+    const title = "Ice Spice Launches Debut Fragrance In Ha Mood on Ulta Beauty's TikTok Shop";
+
+    expect(classifyArticleEvent(title, "complex.com")).toBeNull();
+    expect(isLowValueMarketArticleTitle(title)).toBe(true);
+  });
+
+  it("rejects celebrity participation in a generic TikTok challenge", () => {
+    const title = "Watch Millie Bobby Brown, Ice Spice & Lil Yachty Join Drake's 'Shabang' TikTok Challenge";
+
+    expect(classifyArticleEvent(title, "billboard.com")).toBeNull();
+    expect(isLowValueMarketArticleTitle(title)).toBe(true);
+  });
+
+  it("keeps a measured song trend but gives it less impact than a release", () => {
+    const trend = classifyArticleEvent(
+      "Ice Spice song sparks TikTok challenge as streaming rises",
+      "billboard.com"
+    );
+    const release = classifyArticleEvent(
+      "Ice Spice releases new single with official video",
+      "billboard.com"
+    );
+
+    expect(trend?.reason).toBe("music_social_trend_terms");
+    expect(trend?.impactScore).toBeLessThan(release?.impactScore ?? 0);
+  });
+
   it("does not mistake legal evidence for a music release", () => {
     const result = classifyArticleEvent(
       "Pooh Shiesty Case: Prosecution Unveils New Evidence",

@@ -3,66 +3,18 @@
 import { useAuth } from "@/components/AuthProvider";
 import { useGame } from "@/components/GameProvider";
 import { ArtistIdentity, ChangeText, RmiButton, RmiSection } from "@/components/RmiPrimitives";
-import { ArtistAvatar } from "@/components/ArtistAvatar";
 import { MarketSideRail } from "@/components/MarketSideRail";
 import { MarketNewsFeed } from "@/components/MarketNewsFeed";
 import { MiniSparkline } from "@/components/MiniSparkline";
 import { formatCurrency, formatPercent } from "@/lib/formatters";
 import { getMarketBreadth } from "@/lib/market-analytics";
-import type { Artist } from "@/lib/types";
 import { Activity, ArrowDownRight, ArrowUpRight, Gauge } from "lucide-react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 
 export default function HomePage() {
-  const router = useRouter();
   const { session } = useAuth();
   const { state, portfolioValue, portfolioDayChange, watchlistArtists } = useGame();
-  const [query, setQuery] = useState("");
-  const [searchFocused, setSearchFocused] = useState(false);
-
-  const searchSuggestions = useMemo(() => {
-    const normalized = query.trim().toLowerCase();
-
-    return [...state.artists]
-      .filter(
-        (artist) =>
-          !normalized ||
-          artist.name.toLowerCase().includes(normalized) ||
-          artist.ticker.toLowerCase().includes(normalized)
-      )
-      .sort((first, second) => {
-        if (normalized) {
-          const firstExact = first.name.toLowerCase() === normalized || first.ticker.toLowerCase() === normalized;
-          const secondExact = second.name.toLowerCase() === normalized || second.ticker.toLowerCase() === normalized;
-
-          if (firstExact !== secondExact) {
-            return firstExact ? -1 : 1;
-          }
-
-          const firstStarts = first.name.toLowerCase().startsWith(normalized) || first.ticker.toLowerCase().startsWith(normalized);
-          const secondStarts = second.name.toLowerCase().startsWith(normalized) || second.ticker.toLowerCase().startsWith(normalized);
-
-          if (firstStarts !== secondStarts) {
-            return firstStarts ? -1 : 1;
-          }
-        }
-
-        return second.dailyChangePercent - first.dailyChangePercent || first.name.localeCompare(second.name);
-      })
-      .slice(0, 8);
-  }, [query, state.artists]);
-  const marketLeader = [...state.artists].sort((a, b) => b.dailyChangePercent - a.dailyChangePercent)[0];
-  const underPressure = [...state.artists].sort((a, b) => a.dailyChangePercent - b.dailyChangePercent)[0];
-  const signalRanking = [...state.artists].sort(
-    (a, b) => b.hypeScore - a.hypeScore || b.dailyChangePercent - a.dailyChangePercent
-  );
-  const strongestSignal = signalRanking[0];
-  const signalLeader = signalRanking.find((artist) => artist.id !== marketLeader?.id) ?? marketLeader;
-  const signalLeaderLabel = signalLeader?.id === strongestSignal?.id
-    ? "Strongest signal"
-    : "Next strongest signal";
   const breadth = getMarketBreadth(state.artists);
   const signalDeck = useMemo(
     () =>
@@ -84,78 +36,21 @@ export default function HomePage() {
     ? Math.min(100, Math.max(0, (investedValue / portfolioValue) * 100))
     : 0;
 
-  function submitSearch(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const normalized = query.trim().toLowerCase();
-
-    if (!normalized) {
-      return;
-    }
-
-    const match = state.artists.find(
-      (artist) =>
-        artist.name.toLowerCase().includes(normalized) ||
-        artist.ticker.toLowerCase() === normalized ||
-        artist.ticker.toLowerCase().includes(normalized)
-    );
-
-    if (match) {
-      setSearchFocused(false);
-      router.push(`/artists/${match.id}`);
-    }
-  }
-
   return (
     <div className="space-y-6">
-      <section data-testid="home-market-hero" className="rmi-card rmi-hero relative z-40 grid min-w-0 overflow-visible lg:grid-cols-[minmax(0,1.45fr)_minmax(300px,0.55fr)]">
-        <div className="grid min-w-0 content-center px-5 py-9 text-center sm:px-8 lg:min-h-[260px] lg:text-left">
-          <div className="relative z-10">
-          <p className="rmi-kicker">Rap Market Index</p>
-          <h1 className="mt-4 min-w-0 break-words text-3xl font-bold leading-[1.05] sm:text-5xl">
-            Spot the next <span className="text-cyan">rise.</span>
-          </h1>
-          <p className="mt-3 max-w-2xl text-sm font-medium text-paper/66 sm:text-base">Buy shares in rappers. Build a portfolio when they blow up.</p>
-          <p className="mt-4 text-xs font-medium text-paper/50">Live fantasy market · source-checked news and data</p>
-          <form onSubmit={submitSearch} className="relative mx-auto mt-6 flex w-full min-w-0 max-w-xl flex-col gap-2 sm:flex-row lg:mx-0">
-            <input
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              onFocus={() => setSearchFocused(true)}
-              onBlur={() => window.setTimeout(() => setSearchFocused(false), 140)}
-              className="min-h-11 min-w-0 flex-1 rounded-[var(--radius-control)] border border-line bg-ink/70 px-3 text-sm outline-none placeholder:text-paper/30 focus:border-cyan"
-              placeholder="Search an artist, e.g. Ken Carson"
-            />
-            <RmiButton type="submit">Search</RmiButton>
-            {searchFocused ? (
-              <div data-testid="home-search-results" className="rmi-popover absolute left-0 right-0 top-[calc(100%+0.5rem)] z-[100] max-h-72 overscroll-contain overflow-y-auto p-2 text-left scrollbar-thin sm:right-[5.75rem]">
-                {searchSuggestions.map((artist) => (
-                  <Link
-                    key={artist.id}
-                    href={`/artists/${artist.id}`}
-                    onClick={() => setSearchFocused(false)}
-                    className="flex items-center justify-between gap-3 rounded-[var(--radius-control)] px-3 py-2 hover:bg-cyan/5"
-                  >
-                    <span className="flex min-w-0 items-center gap-3">
-                      <ArtistAvatar artist={artist} size="sm" />
-                      <span className="min-w-0">
-                        <span className="block truncate text-sm font-semibold">{artist.name}</span>
-                        <span className="block text-xs text-paper/45">${artist.ticker} · {formatCurrency(artist.currentPrice)}</span>
-                      </span>
-                    </span>
-                    <ChangeText value={artist.dailyChangePercent} />
-                  </Link>
-                ))}
-              </div>
-            ) : null}
-          </form>
+      <section data-testid="home-market-hero" aria-label="Top market story">
+        <div className="mb-3 flex items-end justify-between gap-4">
+          <div>
+            <p className="rmi-kicker">Top Market Story</p>
+            <p className="mt-1 text-sm font-medium text-paper/52">
+              The highest-ranked verified music catalyst in the market right now.
+            </p>
           </div>
+          <Link href="/news" className="shrink-0 text-xs font-semibold text-cyan hover:text-paper">
+            All News
+          </Link>
         </div>
-
-        <div className="grid divide-y divide-line/80 border-t border-line bg-ink/45 lg:border-l lg:border-t-0">
-          {marketLeader ? <PulseArtist label="Top gainer" artist={marketLeader} accent="mint" /> : null}
-          {underPressure ? <PulseArtist label="Under pressure" artist={underPressure} accent="ember" /> : null}
-          {signalLeader ? <PulseArtist label={signalLeaderLabel} artist={signalLeader} score accent="cyan" /> : null}
-        </div>
+        <MarketNewsFeed limit={1} variant="home" />
       </section>
 
       <section className="grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -196,11 +91,11 @@ export default function HomePage() {
       <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1.55fr)_minmax(300px,0.65fr)]">
         <RmiSection
           title="Market Catalysts"
-          subtitle="Top verified stories, ranked by impact, confidence, recency, source quality, and reach."
+          subtitle="More verified music stories, ranked by impact, confidence, recency, source quality, and reach."
           action={<Link href="/news" className="text-xs font-bold text-cyan hover:text-cyan/75">All News</Link>}
         >
           <div className="px-4">
-            <MarketNewsFeed limit={10} variant="full" />
+            <MarketNewsFeed limit={9} skip={1} variant="full" />
           </div>
         </RmiSection>
 
@@ -270,18 +165,6 @@ export default function HomePage() {
         </div>
       </div>
 
-    </div>
-  );
-}
-
-function PulseArtist({ label, artist, score = false, accent }: { label: string; artist: Artist; score?: boolean; accent: "mint" | "ember" | "cyan" }) {
-  return (
-    <div className="relative grid content-center gap-3 overflow-hidden p-5">
-      <p className={accent === "mint" ? "rmi-data-label text-mint" : accent === "ember" ? "rmi-data-label text-ember" : "rmi-data-label text-cyan"}>{label}</p>
-      <div className="flex items-center justify-between gap-4">
-        <ArtistIdentity artist={artist} />
-        {score ? <span className="text-sm font-semibold text-cyan">{artist.hypeScore}/100</span> : <ChangeText value={artist.dailyChangePercent} />}
-      </div>
     </div>
   );
 }

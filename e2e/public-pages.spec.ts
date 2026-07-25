@@ -191,53 +191,15 @@ test.beforeEach(async ({ page }) => {
 });
 
 test("homepage visual contract", async ({ page }) => {
-  await assertStablePublicPage(page, "/", "Spot the next rise.", "homepage.png");
-  await expect(page.getByText("Strongest signal", { exact: true })).toBeVisible();
+  await assertStablePublicPage(page, "/", marketNews[0].title, "homepage.png");
+  await expect(page.getByText("Top Market Story", { exact: true })).toBeVisible();
 });
 
-test("homepage does not call the second-ranked RMI score the strongest signal", async ({ page }) => {
-  await page.unroute("**/api/market/snapshot");
-  const topGainerIsSignalLeader: GameState = {
-    ...marketState,
-    artists: marketState.artists.map((artist, index) => ({
-      ...artist,
-      hypeScore: index === 0 ? 99 : index === 1 ? 90 : Math.min(89, artist.hypeScore)
-    }))
-  };
-  await page.route("**/api/market/snapshot", (route) =>
-    route.fulfill({
-      contentType: "application/json",
-      body: JSON.stringify({ ok: true, source: "supabase", state: topGainerIsSignalLeader })
-    })
-  );
-
+test("homepage leads with one top story and does not repeat it below", async ({ page }) => {
   await page.goto("/");
   await expect(page.locator('[aria-busy="true"]')).toHaveCount(0, { timeout: 15_000 });
-  await expect(page.getByText("Next strongest signal", { exact: true })).toBeVisible();
-  await expect(page.getByText("Strongest signal", { exact: true })).toHaveCount(0);
-});
-
-test("homepage artist search opens as an overlay without resizing the hero", async ({ page }) => {
-  await page.goto("/");
-  await expect(page.locator('[aria-busy="true"]')).toHaveCount(0, { timeout: 15_000 });
-
-  const hero = page.getByTestId("home-market-hero");
-  const search = page.getByPlaceholder("Search an artist, e.g. Ken Carson");
-  const before = await hero.boundingBox();
-
-  await search.focus();
-  const results = page.getByTestId("home-search-results");
-  await expect(results).toBeVisible();
-  const after = await hero.boundingBox();
-
-  expect(before).not.toBeNull();
-  expect(after).not.toBeNull();
-  expect(Math.abs((after?.height ?? 0) - (before?.height ?? 0))).toBeLessThanOrEqual(2);
-  await expect(results).toHaveCSS("position", "absolute");
-  await expect(results).toHaveCSS("opacity", "1");
-  expect(await results.evaluate((element) => getComputedStyle(element).backgroundColor)).not.toBe(
-    "rgba(0, 0, 0, 0)"
-  );
+  await expect(page.getByText(marketNews[0].title, { exact: true })).toHaveCount(1);
+  await expect(page.getByText(marketNews[1].title, { exact: true })).toBeVisible();
 });
 
 test("markets visual contract", async ({ page }) => {
