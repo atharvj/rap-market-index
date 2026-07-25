@@ -26,6 +26,7 @@ import {
   getYoutubeVideoId,
   isWatchNowMarketEvent
 } from "@/server/market/watch-now-videos";
+import { getMarketNewsCandidateLimit } from "@/server/market/news-candidate-limit";
 
 export const dynamic = "force-dynamic";
 
@@ -138,7 +139,11 @@ export async function GET(request: Request) {
       }, { headers: CACHE_HEADERS });
     }
 
-    const candidateLimit = feedMode === "watch" ? 500 : Math.min(500, limit * 6);
+    const candidateLimit = getMarketNewsCandidateLimit({
+      feedMode,
+      limit,
+      sort: newsSort
+    });
     let query = supabase
       .from("market_events")
       .select("*")

@@ -89,7 +89,7 @@ export function MarketNewsFeed({
     const params = new URLSearchParams({
       limit: String(limit + safeSkip),
       lookbackDays: "45",
-      feed: artistId || artistIdsKey ? "artist" : resolvedVariant === "home" ? "home" : "news"
+      feed: artistId || artistIdsKey ? "artist" : "news"
     });
     params.set("sort", sort);
 

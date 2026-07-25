@@ -274,10 +274,27 @@ test("homepage visual contract", async ({ page }) => {
 });
 
 test("homepage leads with one top story and does not repeat it below", async ({ page }) => {
+  const newsRequests: URL[] = [];
+  page.on("request", (request) => {
+    const requestUrl = new URL(request.url());
+
+    if (requestUrl.pathname === "/api/market/news") {
+      newsRequests.push(requestUrl);
+    }
+  });
+
   await page.goto("/");
   await expect(page.locator('[aria-busy="true"]')).toHaveCount(0, { timeout: 15_000 });
   await expect(page.getByText(marketNews[0].title, { exact: true })).toHaveCount(1);
   await expect(page.getByText(marketNews[1].title, { exact: true })).toBeVisible();
+  expect(
+    newsRequests.some((requestUrl) =>
+      requestUrl.searchParams.get("feed") === "news" &&
+      requestUrl.searchParams.get("limit") === "1" &&
+      requestUrl.searchParams.get("sort") === "top"
+    )
+  ).toBeTruthy();
+  expect(newsRequests.some((requestUrl) => requestUrl.searchParams.get("feed") === "home")).toBeFalsy();
   await expect(
     page.getByRole("link", { name: `View ${marketNews[0].artistName} market` })
   ).toHaveText("View artist market");
