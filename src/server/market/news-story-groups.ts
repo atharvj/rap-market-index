@@ -2,6 +2,7 @@ export type NewsStoryEvent = {
   id: string;
   artist_id: string;
   event_date: string;
+  event_type?: string;
   title: string;
   source_url: string | null;
   raw_payload?: unknown;
@@ -22,21 +23,73 @@ export function groupNewsStoryEvents<T extends NewsStoryEvent>(
   events: T[],
   preferredArtistIds: ReadonlySet<string> = new Set()
 ): NewsStoryGroup<T>[] {
-  const grouped = new Map<string, T[]>();
+  const grouped: T[][] = [];
 
   for (const event of events) {
-    const key = getNewsStoryKey(event);
-    const current = grouped.get(key) ?? [];
-    current.push(event);
-    grouped.set(key, current);
+    const existing = grouped.find((storyEvents) =>
+      storyEvents.some((storyEvent) => areNewsStoryEventsEquivalent(event, storyEvent))
+    );
+
+    if (existing) {
+      existing.push(event);
+    } else {
+      grouped.push([event]);
+    }
   }
 
-  return [...grouped.values()].map((storyEvents) => ({
+  return grouped.map((storyEvents) => ({
     primary:
       storyEvents.find((event) => preferredArtistIds.has(event.artist_id)) ??
       storyEvents[0],
     events: storyEvents
   }));
+}
+
+export function areNewsStoryEventsEquivalent(first: NewsStoryEvent, second: NewsStoryEvent) {
+  const firstUrl = normalizeNewsSourceUrl(first.source_url);
+  const secondUrl = normalizeNewsSourceUrl(second.source_url);
+
+  if (firstUrl && secondUrl && firstUrl === secondUrl) {
+    return true;
+  }
+
+  const dayGap = getNewsStoryDayGap(first.event_date, second.event_date);
+
+  if (dayGap === null || dayGap > 4) {
+    return false;
+  }
+
+  const firstHeadline = normalizeNewsStoryHeadline(first.title);
+  const secondHeadline = normalizeNewsStoryHeadline(second.title);
+
+  if (firstHeadline && firstHeadline === secondHeadline) {
+    return true;
+  }
+
+  if (first.event_type && second.event_type && first.event_type !== second.event_type) {
+    return false;
+  }
+
+  const bothReleases = first.event_type === "release" && second.event_type === "release";
+
+  if (dayGap > 0 && bothReleases && hasReleaseLifecycleMismatch(first.title, second.title)) {
+    return false;
+  }
+
+  const firstTokens = getDistinctiveNewsStoryTokens(first.title);
+  const secondTokens = getDistinctiveNewsStoryTokens(second.title);
+  const shared = [...firstTokens].filter((token) => secondTokens.has(token)).length;
+  const smallerSize = Math.min(firstTokens.size, secondTokens.size);
+  const containment = shared / Math.max(1, smallerSize);
+  const differentArtists = first.artist_id !== second.artist_id;
+  const sameRelease = bothReleases && shared >= 2 && containment >= 0.5;
+  const sharedPhrase = hasSharedDistinctiveNewsStoryPhrase(first.title, second.title);
+
+  if (differentArtists) {
+    return shared >= 4 && containment >= 0.4;
+  }
+
+  return shared >= 4 || (shared >= 3 && (containment >= 0.5 || sharedPhrase)) || sameRelease;
 }
 
 export function getNewsStoryKey(event: NewsStoryEvent) {
@@ -144,13 +197,60 @@ export function normalizeNewsSourceUrl(value: string | null) {
 function normalizeNewsStoryHeadline(value: string) {
   return value
     .toLowerCase()
-    .replace(/\s*[-|]\s*(?:[a-z0-9]+(?:\.[a-z]{2,})?|[a-z0-9 .&]+)$/i, "")
+    .replace(/\s+(?:-|\|)\s+(?:[a-z0-9]+(?:\.[a-z]{2,})?|[a-z0-9 .&-]+)$/i, "")
     .replace(/\bhotnewhiphop\b/g, "")
     .replace(/\s+-\s+[a-z0-9 .&]+$/i, "")
+    .replace(/[’']s\b/g, "")
     .replace(/[’']/g, "")
     .replace(/[^a-z0-9]+/g, " ")
     .replace(/\s+/g, " ")
     .trim();
+}
+
+function getDistinctiveNewsStoryTokens(value: string) {
+  return new Set(getDistinctiveNewsStoryTokenList(value));
+}
+
+function hasSharedDistinctiveNewsStoryPhrase(first: string, second: string) {
+  const firstTokens = getDistinctiveNewsStoryTokenList(first);
+  const secondPhrases = new Set(getNewsStoryBigrams(getDistinctiveNewsStoryTokenList(second)));
+
+  return getNewsStoryBigrams(firstTokens).some((phrase) => secondPhrases.has(phrase));
+}
+
+function getNewsStoryBigrams(tokens: string[]) {
+  return tokens.slice(0, -1).map((token, index) => `${token} ${tokens[index + 1]}`);
+}
+
+function getDistinctiveNewsStoryTokenList(value: string) {
+  return normalizeNewsStoryHeadline(value)
+    .split(" ")
+    .filter((token) => token.length >= 2 && !NEWS_STORY_IGNORED_TOKENS.has(token) && !/^20\d{2}$/.test(token));
+}
+
+const NEWS_STORY_IGNORED_TOKENS = new Set([
+  "a", "an", "and", "at", "by", "for", "from", "in", "is", "it", "new", "of", "on", "the", "to", "with",
+  "announces", "audio", "delivers", "drops", "feat", "featuring", "ft", "hear", "listen", "music", "official",
+  "rap", "rapper", "release", "released", "releases", "reveals", "says", "shares", "single", "song", "track",
+  "unveils", "video", "watch"
+]);
+
+function getNewsStoryDayGap(firstDate: string, secondDate: string) {
+  const first = Date.parse(`${firstDate}T00:00:00Z`);
+  const second = Date.parse(`${secondDate}T00:00:00Z`);
+
+  return Number.isFinite(first) && Number.isFinite(second)
+    ? Math.abs(Math.round((first - second) / 86_400_000))
+    : null;
+}
+
+function hasReleaseLifecycleMismatch(firstTitle: string, secondTitle: string) {
+  const first = normalizeNewsStoryHeadline(firstTitle);
+  const second = normalizeNewsStoryHeadline(secondTitle);
+  const firstIsVideo = /\b(?:music video|visualizer|video)\b/.test(first);
+  const secondIsVideo = /\b(?:music video|visualizer|video)\b/.test(second);
+
+  return firstIsVideo !== secondIsVideo;
 }
 
 function normalizeArtistIdentity(value: string) {

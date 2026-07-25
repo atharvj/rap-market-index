@@ -80,3 +80,31 @@ describe("feature evidence safeguards", () => {
     }))).toBe(1);
   });
 });
+
+describe("event story deduplication", () => {
+  it("counts same-day coverage of one release only once", () => {
+    const shared: Omit<MarketEvent, "title" | "sourceUrl"> = {
+      artistId: artist.id,
+      eventDate: "2026-07-10",
+      eventType: "release",
+      sourceName: "Music publication",
+      sentimentScore: 35,
+      impactScore: 45,
+      confidence: 0.8,
+      rawPayload: { sourceTier: 2 }
+    };
+    const signal = buildEventMarketSignals({
+      artists: [artist],
+      runDate: "2026-07-11",
+      eventsByArtist: {
+        [artist.id]: [
+          { ...shared, title: "Young Thug Shares New Song 'Example'", sourceUrl: "https://one.test/example" },
+          { ...shared, title: "Young Thug - Example (Official Music Video)", sourceUrl: "https://two.test/example" }
+        ]
+      }
+    })[artist.id];
+    const events = signal.rawPayload.events as unknown[];
+
+    expect(events).toHaveLength(1);
+  });
+});

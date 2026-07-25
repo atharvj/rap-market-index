@@ -37,10 +37,208 @@ describe("news story groups", () => {
     expect(groups[0].events.map((event) => event.artist_id)).toEqual(["che", "nine-vicious"]);
   });
 
-  it("keeps the same syndicated headline separate across different dates", () => {
+  it("groups differently attributed coverage of the same event", () => {
+    const groups = groupNewsStoryEvents([
+      {
+        ...baseEvent,
+        id: "one",
+        artist_id: "jay-z",
+        event_type: "viral",
+        title: "Jay-Z brings out Rihanna and Beyoncé at Yankee Stadium",
+        source_url: "https://one.test/yankee"
+      },
+      {
+        ...baseEvent,
+        id: "two",
+        artist_id: "eminem",
+        event_type: "viral",
+        title: "Jay-Z Brings Out Eminem for Renegade at Yankee Stadium",
+        source_url: "https://two.test/yankee"
+      }
+    ]);
+
+    expect(groups).toHaveLength(1);
+  });
+
+  it("normalizes possessive artist names when matching event coverage", () => {
+    const groups = groupNewsStoryEvents([
+      {
+        ...baseEvent,
+        id: "one",
+        artist_id: "jay-z",
+        event_type: "viral",
+        title: "Jay-Z brings out Rihanna at Yankee Stadium",
+        source_url: "https://one.test/yankee"
+      },
+      {
+        ...baseEvent,
+        id: "two",
+        artist_id: "jay-z",
+        event_type: "viral",
+        title: "Every Surprise Guest At JAY-Z's Extra Innings Show At Yankee Stadium",
+        source_url: "https://two.test/yankee"
+      }
+    ]);
+
+    expect(groups).toHaveLength(1);
+  });
+
+  it("groups differently framed coverage of the same concert", () => {
+    const groups = groupNewsStoryEvents([
+      {
+        ...baseEvent,
+        id: "one",
+        artist_id: "jay-z",
+        event_type: "viral",
+        event_date: "2026-07-13",
+        title: "Jay-Z brings out Rihanna and Beyoncé after delayed start at Yankee Stadium - Los Angeles Times",
+        source_url: "https://latimes.test/yankee"
+      },
+      {
+        ...baseEvent,
+        id: "two",
+        artist_id: "jay-z",
+        event_type: "viral",
+        event_date: "2026-07-13",
+        title: "Every Surprise Guest At JAY-Z's \"Extra Innings\" Show At Yankee Stadium - REAL 103.9",
+        source_url: "https://radio.test/yankee"
+      }
+    ]);
+
+    expect(groups).toHaveLength(1);
+  });
+
+  it("keeps the same syndicated headline separate after the duplicate window", () => {
     const groups = groupNewsStoryEvents([
       { ...baseEvent, id: "one", artist_id: "che" },
-      { ...baseEvent, id: "two", artist_id: "che", event_date: "2026-07-13", source_url: "https://other.test/story" }
+      { ...baseEvent, id: "two", artist_id: "che", event_date: "2026-07-17", source_url: "https://other.test/story" }
+    ]);
+
+    expect(groups).toHaveLength(2);
+  });
+
+  it("groups the same source URL even when its title changes", () => {
+    const groups = groupNewsStoryEvents([
+      { ...baseEvent, id: "one", artist_id: "future", title: "Future - Fukk A Interview (Official Video)" },
+      { ...baseEvent, id: "two", artist_id: "future", title: "Fukk A Interview", source_url: baseEvent.source_url }
+    ]);
+
+    expect(groups).toHaveLength(1);
+  });
+
+  it("groups same-day coverage of the same named release", () => {
+    const groups = groupNewsStoryEvents([
+      {
+        ...baseEvent,
+        id: "one",
+        artist_id: "two-hollis",
+        event_type: "release",
+        title: "2hollis Shares New Song 'Hurt'",
+        source_url: "https://stereogum.com/hurt"
+      },
+      {
+        ...baseEvent,
+        id: "two",
+        artist_id: "two-hollis",
+        event_type: "release",
+        title: "2hollis - Hurt (Official Music Video)",
+        source_url: "https://youtube.com/watch?v=hurt"
+      }
+    ]);
+
+    expect(groups).toHaveLength(1);
+  });
+
+  it("keeps a later music video separate from the original song release", () => {
+    const groups = groupNewsStoryEvents([
+      {
+        ...baseEvent,
+        id: "one",
+        artist_id: "two-hollis",
+        event_type: "release",
+        title: "2hollis Shares New Song 'Hurt'",
+        source_url: "https://stereogum.com/hurt"
+      },
+      {
+        ...baseEvent,
+        id: "two",
+        artist_id: "two-hollis",
+        event_date: "2026-07-14",
+        event_type: "release",
+        title: "2hollis - Hurt (Official Music Video)",
+        source_url: "https://youtube.com/watch?v=hurt"
+      }
+    ]);
+
+    expect(groups).toHaveLength(2);
+  });
+
+  it("groups repeated video coverage published on nearby dates", () => {
+    const groups = groupNewsStoryEvents([
+      {
+        ...baseEvent,
+        id: "one",
+        artist_id: "lil-baby",
+        event_type: "release",
+        title: "Lil Baby - Dead Fresh (Official Video)",
+        source_url: "https://youtube.com/watch?v=one"
+      },
+      {
+        ...baseEvent,
+        id: "two",
+        artist_id: "lil-baby",
+        event_date: "2026-07-13",
+        event_type: "release",
+        title: "Dead Fresh Official Video Out Now",
+        source_url: "https://youtube.com/watch?v=two"
+      }
+    ]);
+
+    expect(groups).toHaveLength(1);
+  });
+
+  it("groups tour coverage even when one headline also mentions a video", () => {
+    const groups = groupNewsStoryEvents([
+      {
+        ...baseEvent,
+        id: "one",
+        artist_id: "doja-cat",
+        event_type: "tour",
+        title: "Doja Cat & Latto Team Up for Okayyy Video, Latto to Join Ma Vie World Tour",
+        source_url: "https://billboard.com/okayyy-tour"
+      },
+      {
+        ...baseEvent,
+        id: "two",
+        artist_id: "doja-cat",
+        event_date: "2026-07-13",
+        event_type: "tour",
+        title: "Doja Cat & Latto Announce Tour Ma Vie Dates",
+        source_url: "https://example.com/tour-ma-vie"
+      }
+    ]);
+
+    expect(groups).toHaveLength(1);
+  });
+
+  it("keeps different songs by the same artist separate", () => {
+    const groups = groupNewsStoryEvents([
+      {
+        ...baseEvent,
+        id: "one",
+        artist_id: "future",
+        event_type: "release",
+        title: "Future Releases 'California Girls'",
+        source_url: "https://example.com/california-girls"
+      },
+      {
+        ...baseEvent,
+        id: "two",
+        artist_id: "future",
+        event_type: "release",
+        title: "Future Releases 'Konnichiwa'",
+        source_url: "https://example.com/konnichiwa"
+      }
     ]);
 
     expect(groups).toHaveLength(2);

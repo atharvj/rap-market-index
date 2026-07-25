@@ -272,6 +272,15 @@ export function isLowValueMarketArticleTitle(title: string) {
     /\bfans?\s+sign\b/.test(normalized) ||
     /\bholds?\s+up\s+fans?\s+sign\b/.test(normalized) ||
     /\b(?:thinks?|believes?|says?)\b.*\bwon\b.*\b(?:beef|diss|feud)\b/.test(normalized) ||
+    /\balleged\s+real\s+reason\b.*\b(?:beef|diss|feud)\b/.test(normalized) ||
+    /\breal\s+reason\s+behind\b.*\b(?:beef|diss|feud)\b/.test(normalized) ||
+    /\b(?:reveals?|explains?|claims?|weighs?\s+in|reacts?|laughs?)\b.*\b(?:beef|diss|feud)\b/.test(normalized) ||
+    /\bcame\s+out\s+on\s+top\b.*\b(?:beef|diss|feud)\b/.test(normalized) ||
+    /\b(?:food|eating)\s+(?:rules?|habits?|preferences?)\b/.test(normalized) ||
+    /\b(?:hates?|hating)\s+(?:mayo|mayonnaise|milk)\b/.test(normalized) ||
+    /\b(?:mom|dad|mother|father|parent)\b.*\bviral\b.*\bcomparisons?\b/.test(normalized) ||
+    /\binspires?\b.*\bnew sound\b/.test(normalized) ||
+    /\b(?:are|is|will|could|might)\b.*\b(?:on|featured|featuring|join)\b.*\b(?:album|song|track|project)\b.*\bwhat we know\b/.test(normalized) ||
     /\b(?:sneakers?|shoes?)\s+(?:we|you)\s+want\s+to\s+see\b/.test(normalized) ||
     /\b(?:needs?|wants?|calls?\s+for)\b.*\bcollab(?:oration)?\s+album\b/.test(normalized) ||
     /\b(?:rumou?red|set to)\b.*\b(?:album|collab|song)\b.*\bwhat we know\b/.test(normalized) ||
@@ -385,9 +394,7 @@ function hasDirectReleaseSubject(normalizedText: string, normalizedAlias: string
     "(?:album|deluxe|ep|full\\s+length|mixtape|music\\s+video|project|single|song|track|tracklist|video|visualizer)";
   const releaseActions =
     "(?:announces|announced|drops|dropped|delivers|previews|previewed|releases|released|returns\\s+with|shares|shared|stream|teases|teased|unveils|unveiled|watch)";
-  const startsWithArtist = new RegExp(`^${alias}\\b`);
   const patterns = [
-    startsWithArtist,
     new RegExp(`\\b${alias}\\b(?:\\s+\\S+){0,5}\\s+${releaseActions}\\b`),
     new RegExp(`\\b${alias}\\b(?:\\s+\\S+){0,8}\\s+${releaseNouns}\\b`),
     new RegExp(`\\b${releaseNouns}\\s+(?:from|by)\\s+${alias}\\b`)

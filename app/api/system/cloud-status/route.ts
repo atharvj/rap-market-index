@@ -69,6 +69,14 @@ export async function GET(request: Request) {
         : "Optional; needed for listener/playcount market signals"
     },
     {
+      id: "listenbrainz-token",
+      label: "ListenBrainz token",
+      ok: true,
+      detail: config.listenbrainzTokenConfigured
+        ? "Configured"
+        : "Optional; adds an independent listening-data source"
+    },
+    {
       id: "spotify-credentials",
       label: "Spotify credentials",
       ok: true,

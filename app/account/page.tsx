@@ -12,7 +12,7 @@ import { formatAuthErrorMessage } from "@/lib/auth-errors";
 import { getEmailDomainWarning } from "@/lib/email-address";
 import { getUsernameValidationError, normalizeUsernameInput, USERNAME_REQUIREMENTS } from "@/lib/username";
 import { getBrowserSupabaseClient } from "@/lib/supabase/client";
-import { Camera, CalendarDays, Eye, EyeOff, ImagePlus, LogOut, Plus, Search, Star, WalletCards, X } from "lucide-react";
+import { Camera, CalendarDays, Eye, EyeOff, ImagePlus, LogOut, Plus, Search, Star, Trash2, WalletCards, X } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ChangeEvent, FormEvent, Suspense, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
@@ -52,12 +52,17 @@ function AccountPageContent() {
   const [bio, setBio] = useState("");
   const [favoriteArtistIds, setFavoriteArtistIds] = useState<string[]>([]);
   const [favoriteQuery, setFavoriteQuery] = useState("");
+  const [favoriteSaveStatus, setFavoriteSaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [message, setMessage] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [avatarSaving, setAvatarSaving] = useState(false);
   const [confirmationPending, setConfirmationPending] = useState(false);
   const [captchaToken, setCaptchaToken] = useState<string | null>(null);
   const [captchaResetKey, setCaptchaResetKey] = useState(0);
   const fileRef = useRef<HTMLInputElement | null>(null);
+  const pendingFavoriteIdsRef = useRef<string[] | null>(null);
+  const savingFavoritesRef = useRef(false);
+  const lastSavedFavoriteIdsRef = useRef<string[]>([]);
   const displayName = session && state.username !== "Demo Guest" ? state.username : user?.email?.split("@")[0] ?? "Trader";
   const emailDomainWarning = mode === "signup" ? getEmailDomainWarning(email) : null;
   const favoriteArtists = useMemo(
@@ -153,7 +158,9 @@ function AccountPageContent() {
       .then((payload) => {
         if (payload.ok && payload.profile) {
           setBio(payload.profile.bio ?? "");
-          setFavoriteArtistIds(payload.profile.favoriteArtistIds ?? []);
+          const savedFavoriteArtistIds = payload.profile.favoriteArtistIds ?? [];
+          setFavoriteArtistIds(savedFavoriteArtistIds);
+          lastSavedFavoriteIdsRef.current = savedFavoriteArtistIds;
         }
       })
       .catch(() => setMessage("Could not load profile details."));
@@ -269,7 +276,7 @@ function AccountPageContent() {
     }
   }
 
-  async function saveProfile(nextFavoriteArtistIds = favoriteArtistIds) {
+  async function saveBio() {
     if (!session) {
       return;
     }
@@ -281,13 +288,70 @@ function AccountPageContent() {
         authorization: `Bearer ${session.access_token}`
       },
       body: JSON.stringify({
-        profileBio: bio,
-        favoriteArtistIds: nextFavoriteArtistIds
+        profileBio: bio
       })
     });
     const payload = (await response.json()) as ProfileDetailsResponse;
-    setMessage(payload.ok ? "Profile saved." : payload.error ?? "Could not save profile.");
+    setMessage(payload.ok ? "Bio saved." : payload.error ?? "Could not save bio.");
     await refreshServerState();
+  }
+
+  function queueFavoriteArtistSave(nextFavoriteArtistIds: string[]) {
+    setFavoriteArtistIds(nextFavoriteArtistIds);
+    setFavoriteSaveStatus("saving");
+    pendingFavoriteIdsRef.current = nextFavoriteArtistIds;
+
+    if (!savingFavoritesRef.current) {
+      void flushFavoriteArtistSaves();
+    }
+  }
+
+  async function flushFavoriteArtistSaves() {
+    if (!session || savingFavoritesRef.current) {
+      return;
+    }
+
+    savingFavoritesRef.current = true;
+
+    try {
+      while (pendingFavoriteIdsRef.current) {
+        const nextFavoriteArtistIds = pendingFavoriteIdsRef.current;
+        pendingFavoriteIdsRef.current = null;
+        const response = await fetch("/api/profile/bootstrap", {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            authorization: `Bearer ${session.access_token}`
+          },
+          body: JSON.stringify({
+            favoriteArtistIds: nextFavoriteArtistIds
+          })
+        });
+        const payload = (await response.json()) as ProfileDetailsResponse;
+
+        if (!response.ok || !payload.ok) {
+          setFavoriteArtistIds(lastSavedFavoriteIdsRef.current);
+          setFavoriteSaveStatus("error");
+          setMessage(payload.error ?? "Could not update favorite artists.");
+          pendingFavoriteIdsRef.current = null;
+          return;
+        }
+
+        lastSavedFavoriteIdsRef.current = nextFavoriteArtistIds;
+      }
+
+      setFavoriteSaveStatus("saved");
+    } catch {
+      setFavoriteArtistIds(lastSavedFavoriteIdsRef.current);
+      setFavoriteSaveStatus("error");
+      setMessage("Could not update favorite artists. Check your connection and try again.");
+    } finally {
+      savingFavoritesRef.current = false;
+
+      if (pendingFavoriteIdsRef.current) {
+        void flushFavoriteArtistSaves();
+      }
+    }
   }
 
   async function uploadAvatar(event: ChangeEvent<HTMLInputElement>) {
@@ -311,24 +375,62 @@ function AccountPageContent() {
       return;
     }
 
-    const formData = new FormData();
-    formData.set("avatar", file, `avatar.${extension}`);
-    const response = await fetch("/api/profile/avatar", {
-      method: "POST",
-      headers: {
-        authorization: `Bearer ${session.access_token}`
-      },
-      body: formData
-    });
-    const payload = await response.json();
+    setAvatarSaving(true);
 
-    if (!response.ok || !payload.ok) {
-      setMessage(payload.error ?? "Could not upload profile picture.");
+    try {
+      const formData = new FormData();
+      formData.set("avatar", file, `avatar.${extension}`);
+      const response = await fetch("/api/profile/avatar", {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${session.access_token}`
+        },
+        body: formData
+      });
+      const payload = await response.json();
+
+      if (!response.ok || !payload.ok) {
+        setMessage(payload.error ?? "Could not upload profile picture.");
+        return;
+      }
+
+      setMessage("Profile picture updated.");
+      await refreshServerState();
+    } catch {
+      setMessage("Could not upload profile picture. Check your connection and try again.");
+    } finally {
+      setAvatarSaving(false);
+    }
+  }
+
+  async function removeAvatar() {
+    if (!session || !avatarUrl || avatarSaving) {
       return;
     }
 
-    setMessage("Profile picture updated.");
-    await refreshServerState();
+    setAvatarSaving(true);
+
+    try {
+      const response = await fetch("/api/profile/avatar", {
+        method: "DELETE",
+        headers: {
+          authorization: `Bearer ${session.access_token}`
+        }
+      });
+      const payload = await response.json() as { ok?: boolean; error?: string };
+
+      if (!response.ok || !payload.ok) {
+        setMessage(payload.error ?? "Could not remove profile picture.");
+        return;
+      }
+
+      setMessage("Profile picture removed.");
+      await refreshServerState();
+    } catch {
+      setMessage("Could not remove profile picture. Check your connection and try again.");
+    } finally {
+      setAvatarSaving(false);
+    }
   }
 
   if (configured && authLoading) {
@@ -476,9 +578,9 @@ function AccountPageContent() {
     <div className="mx-auto max-w-6xl space-y-5">
       <header className="rmi-page-head flex flex-wrap items-start justify-between gap-4">
         <div>
-          <div className="rmi-kicker">Identity Console</div>
-          <h1 className="mt-2 text-3xl font-bold">Trader Profile</h1>
-          <p className="mt-1 text-sm text-paper/60">Manage the identity and artist signals shown on your public profile.</p>
+          <div className="rmi-kicker">Account</div>
+          <h1 className="mt-2 text-3xl font-bold">Your Profile</h1>
+          <p className="mt-1 text-sm text-paper/60">Manage what appears on your public profile.</p>
         </div>
         <div className="flex flex-wrap gap-2">
           {state.userId ? <RmiButton href={`/users/${state.userId}`} variant="secondary">View Public Profile</RmiButton> : null}
@@ -489,17 +591,28 @@ function AccountPageContent() {
       <section className="rmi-card overflow-hidden p-5 sm:p-7">
         <div className="grid gap-5 sm:grid-cols-[142px_minmax(0,1fr)]">
           <div>
-            <button type="button" onClick={() => fileRef.current?.click()} className="group relative">
+            <button type="button" onClick={() => fileRef.current?.click()} className="group relative" disabled={avatarSaving}>
               <UserAvatar avatarUrl={avatarUrl} label={displayName} size="xl" />
               <span className="absolute inset-0 hidden place-items-center rounded-full bg-black/60 text-white group-hover:grid">
                 <Camera className="h-5 w-5" />
               </span>
             </button>
             <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp,image/gif" className="hidden" onChange={uploadAvatar} />
-            <button type="button" onClick={() => fileRef.current?.click()} className="mt-3 flex items-center gap-2 text-sm font-semibold text-cyan">
+            <button type="button" onClick={() => fileRef.current?.click()} disabled={avatarSaving} className="mt-3 flex items-center gap-2 text-sm font-semibold text-cyan disabled:opacity-50">
               <ImagePlus className="h-4 w-4" />
-              Add Image
+              {avatarUrl ? "Change Photo" : "Add Photo"}
             </button>
+            {avatarUrl ? (
+              <button
+                type="button"
+                onClick={removeAvatar}
+                disabled={avatarSaving}
+                className="mt-2 flex items-center gap-2 text-sm font-semibold text-ember disabled:opacity-50"
+              >
+                <Trash2 className="h-4 w-4" />
+                Remove Photo
+              </button>
+            ) : null}
           </div>
 
           <div className="min-w-0">
@@ -522,8 +635,8 @@ function AccountPageContent() {
               className="rmi-terminal-input mt-6 min-h-24 w-full p-3 text-sm font-semibold placeholder:text-paper/35"
               placeholder="A little about me..."
             />
-            <button type="button" onClick={() => saveProfile()} className="rmi-button-primary mt-3 h-10 px-4 text-sm">
-              Save profile
+            <button type="button" onClick={saveBio} className="rmi-button-primary mt-3 h-10 px-4 text-sm">
+              Save Bio
             </button>
             {message ? <p className="mt-3 text-sm font-bold text-paper/65">{message}</p> : null}
           </div>
@@ -552,7 +665,7 @@ function AccountPageContent() {
                   </Link>
                   <button
                     type="button"
-                    onClick={() => setFavoriteArtistIds((current) => current.filter((artistId) => artistId !== artist.id))}
+                    onClick={() => queueFavoriteArtistSave(favoriteArtistIds.filter((artistId) => artistId !== artist.id))}
                     className="grid h-8 w-8 shrink-0 place-items-center rounded-md text-paper/45 hover:bg-panel hover:text-ember"
                     title={`Remove ${artist.name}`}
                     aria-label={`Remove ${artist.name} from favorite artists`}
@@ -582,7 +695,7 @@ function AccountPageContent() {
                         key={artist.id}
                         type="button"
                         onClick={() => {
-                          setFavoriteArtistIds((current) => [...current, artist.id].slice(0, 12));
+                          queueFavoriteArtistSave([...favoriteArtistIds, artist.id].slice(0, 12));
                           setFavoriteQuery("");
                         }}
                         className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-left hover:bg-panelSoft"
@@ -600,13 +713,17 @@ function AccountPageContent() {
                   )}
                 </div>
               ) : null}
-              <button
-                type="button"
-                onClick={() => saveProfile(favoriteArtistIds)}
-                className="rmi-button-primary mt-3 h-10 w-full px-4 text-sm"
-              >
-                Save Favorite Artists
-              </button>
+              <p className={`mt-3 text-center text-xs font-semibold ${
+                favoriteSaveStatus === "error" ? "text-ember" : "text-paper/45"
+              }`} aria-live="polite">
+                {favoriteSaveStatus === "saving"
+                  ? "Saving..."
+                  : favoriteSaveStatus === "saved"
+                    ? "Saved"
+                    : favoriteSaveStatus === "error"
+                      ? "Could not save"
+                      : "Changes save automatically"}
+              </p>
             </div>
           </div>
         </div>
