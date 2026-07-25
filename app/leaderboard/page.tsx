@@ -78,7 +78,7 @@ export default function LeaderboardPage() {
             key={entry.id}
             className={clsx(
               "rmi-table-row grid grid-cols-[54px_minmax(0,1fr)_120px_110px_88px] items-center px-4 py-3 text-sm",
-              entry.isCurrentUser && "border-l-2 border-l-cyan bg-cyan/10"
+              entry.isCurrentUser && "bg-cyan/10"
             )}
             aria-current={entry.isCurrentUser ? "true" : undefined}
           >
@@ -177,7 +177,7 @@ export default function LeaderboardPage() {
 
 function RankingStat({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rmi-metric rmi-metric-cyan p-4">
+    <div className="rmi-metric p-4">
       <p className="text-xs font-medium text-paper/50">{label}</p>
       <p className="mt-1 text-xl font-semibold number-tabular">{value}</p>
     </div>

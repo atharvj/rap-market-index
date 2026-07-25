@@ -198,7 +198,7 @@ export default function PortfolioPage() {
 
 function PortfolioStat({ label, value, detail, good = true }: { label: string; value: string; detail?: string; good?: boolean }) {
   return (
-    <div className={`rmi-metric ${good ? "rmi-metric-mint" : "rmi-metric-ember"} p-4`}>
+    <div className="rmi-metric p-4">
       <p className="text-xs font-medium text-paper/55">{label}</p>
       <p className="mt-1 text-2xl font-bold number-tabular">{value}</p>
       {detail ? <p className={good ? "mt-1 text-xs font-semibold text-mint" : "mt-1 text-xs font-semibold text-ember"}>{detail}</p> : null}

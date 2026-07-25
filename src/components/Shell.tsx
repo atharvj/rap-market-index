@@ -158,7 +158,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
           {!authLoading && session ? (
             <Link
               href="/portfolio"
-              className="rmi-metric rmi-metric-mint hidden min-h-10 items-center gap-4 px-3 py-1.5 text-xs hover:border-cyan xl:flex"
+              className="rmi-metric hidden min-h-10 items-center gap-4 px-3 py-1.5 text-xs hover:border-cyan xl:flex"
               aria-label={`Portfolio ${formatCurrency(portfolioValue)}, today ${formatPercent(portfolioDayChangePercent)}`}
             >
               <span>

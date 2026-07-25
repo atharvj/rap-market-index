@@ -244,6 +244,32 @@ test("markets visual contract", async ({ page }) => {
   await assertStablePublicPage(page, "/markets", "Artist Markets", "markets.png");
 });
 
+test("public metrics do not use decorative colored side borders", async ({ page }) => {
+  for (const path of ["/", "/markets", "/scout"]) {
+    await page.goto(path);
+    await expect(page.locator('[aria-busy="true"]')).toHaveCount(0, { timeout: 15_000 });
+
+    const metrics = page.locator(".rmi-metric");
+    await expect(metrics.first()).toBeVisible();
+    const pseudoElements = await metrics.evaluateAll((elements) =>
+      elements.map((element) => {
+        const style = getComputedStyle(element, "::before");
+        return { content: style.content, width: style.width };
+      })
+    );
+
+    expect(
+      pseudoElements.every(({ content, width }) => content === "none" || width === "0px"),
+      `${path} rendered a metric side accent`
+    ).toBeTruthy();
+    await expect(
+      page.locator(
+        '[class*="border-l-cyan"], [class*="border-l-mint"], [class*="border-l-ember"], [class*="border-l-brass"], [class*="border-l-violet"]'
+      )
+    ).toHaveCount(0);
+  }
+});
+
 test("markets search avoids a partial input outline", async ({ page }) => {
   await page.goto("/markets");
   await expect(page.locator('[aria-busy="true"]')).toHaveCount(0, { timeout: 15_000 });

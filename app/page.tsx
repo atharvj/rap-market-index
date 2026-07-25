@@ -277,8 +277,7 @@ export default function HomePage() {
 function PulseArtist({ label, artist, score = false, accent }: { label: string; artist: Artist; score?: boolean; accent: "mint" | "ember" | "cyan" }) {
   return (
     <div className="relative grid content-center gap-3 overflow-hidden p-5">
-      <span className={accent === "mint" ? "absolute inset-y-0 left-0 w-0.5 bg-mint" : accent === "ember" ? "absolute inset-y-0 left-0 w-0.5 bg-ember" : "absolute inset-y-0 left-0 w-0.5 bg-cyan"} />
-      <p className="rmi-data-label">{label}</p>
+      <p className={accent === "mint" ? "rmi-data-label text-mint" : accent === "ember" ? "rmi-data-label text-ember" : "rmi-data-label text-cyan"}>{label}</p>
       <div className="flex items-center justify-between gap-4">
         <ArtistIdentity artist={artist} />
         {score ? <span className="text-sm font-semibold text-cyan">{artist.hypeScore}/100</span> : <ChangeText value={artist.dailyChangePercent} />}
@@ -289,7 +288,7 @@ function PulseArtist({ label, artist, score = false, accent }: { label: string; 
 
 function HeroStat({ label, value, accent, icon }: { label: string; value: string; accent: "cyan" | "mint" | "ember" | "brass"; icon: React.ReactNode }) {
   return (
-    <div className={`rmi-metric rmi-metric-${accent} p-4`}>
+    <div className="rmi-metric p-4">
       <div className="flex items-center justify-between gap-2">
         <p className="rmi-data-label">{label}</p>
         <span className={accent === "cyan" ? "text-cyan" : accent === "mint" ? "text-mint" : accent === "ember" ? "text-ember" : "text-brass"}>{icon}</span>

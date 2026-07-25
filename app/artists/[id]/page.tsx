@@ -143,10 +143,20 @@ export default function ArtistDetailPage() {
 }
 
 function QuoteStat({ label, value, tone }: { label: string; value: string; tone: "cyan" | "mint" | "ember" | "violet" | "brass" }) {
+  const valueClass = tone === "mint"
+    ? "text-mint"
+    : tone === "ember"
+      ? "text-ember"
+      : tone === "violet"
+        ? "text-violet"
+        : tone === "brass"
+          ? "text-brass"
+          : "text-cyan";
+
   return (
-    <div className={`rmi-metric rmi-metric-${tone} min-w-0 px-3 py-3`}>
+    <div className="rmi-metric min-w-0 px-3 py-3">
       <p className="rmi-data-label">{label}</p>
-      <p className="mt-1 truncate text-sm font-semibold number-tabular">{value}</p>
+      <p className={`mt-1 truncate text-sm font-semibold number-tabular ${valueClass}`}>{value}</p>
     </div>
   );
 }

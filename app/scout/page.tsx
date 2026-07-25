@@ -116,7 +116,7 @@ export default function ScoutPage() {
 
 function ScoutStat({ label, value, detail, tone = "neutral" }: { label: string; value: string; detail: string; tone?: "neutral" | "good" | "bad" }) {
   return (
-    <div className={`rmi-metric ${tone === "good" ? "rmi-metric-mint" : tone === "bad" ? "rmi-metric-ember" : "rmi-metric-cyan"} p-4`}>
+    <div className="rmi-metric p-4">
       <p className="text-xs font-medium text-paper/50">{label}</p>
       <p className={tone === "good" ? "mt-1 text-xl font-semibold text-mint number-tabular" : tone === "bad" ? "mt-1 text-xl font-semibold text-ember number-tabular" : "mt-1 text-xl font-semibold number-tabular"}>{value}</p>
       <p className="mt-1 text-xs text-paper/40">{detail}</p>
