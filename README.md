@@ -12,7 +12,7 @@ The market engine is designed to react to broad artist momentum, including audie
 
 ## Status
 
-Rap Market Index is in active development and preparing for a small public test.
+Rap Market Index is in active development.
 
 ## Stack
 
