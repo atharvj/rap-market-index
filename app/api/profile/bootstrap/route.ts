@@ -6,6 +6,7 @@ import type { Holding, ShortPosition, Transaction } from "@/lib/types";
 import { getUsernameValidationError, normalizeUsernameInput, normalizeUsernameKey } from "@/lib/username";
 import { getActiveAccountRecreationCooldown } from "@/server/account-recreation";
 import { isAdminEmail } from "@/server/admin-auth";
+import { getGoogleSignupAvatarUrl } from "@/server/google-profile";
 import { reportServerError } from "@/server/observability";
 import { enforceRateLimit } from "@/server/rate-limit";
 import { requireConfirmedUser } from "@/server/user-auth";
@@ -79,7 +80,8 @@ export async function POST(request: Request) {
         portfolioIsPublic: body.portfolioIsPublic,
         onboardingCompleted: body.onboardingCompleted,
         isAdmin: isAdminEmail(user.email),
-        usernameWasSelected: bodyHasUsername || user.user_metadata?.username_is_user_selected === true
+        usernameWasSelected: bodyHasUsername || user.user_metadata?.username_is_user_selected === true,
+        signupAvatarUrl: getGoogleSignupAvatarUrl(user)
       }),
       loadHoldings(profileSupabase, user.id),
       loadShortPositions(profileSupabase, user.id),
@@ -148,7 +150,8 @@ async function getOrCreateProfile({
   portfolioIsPublic,
   onboardingCompleted,
   isAdmin,
-  usernameWasSelected
+  usernameWasSelected,
+  signupAvatarUrl
 }: {
   supabase: ReturnType<typeof createServiceRoleClient>;
   userId: string;
@@ -163,6 +166,7 @@ async function getOrCreateProfile({
   onboardingCompleted?: boolean;
   isAdmin: boolean;
   usernameWasSelected: boolean;
+  signupAvatarUrl?: string;
 }) {
   const existing = await supabase.from("profiles").select("*").eq("id", userId).maybeSingle();
 
@@ -285,7 +289,8 @@ async function getOrCreateProfile({
         portfolio_is_public: typeof portfolioIsPublic === "boolean" ? portfolioIsPublic : true,
         onboarding_completed: typeof onboardingCompleted === "boolean" ? onboardingCompleted : false,
         market_impact_exempt: isAdmin,
-        is_admin: isAdmin
+        is_admin: isAdmin,
+        avatar_url: signupAvatarUrl
       })
       .select("*")
       .single();

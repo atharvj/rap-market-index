@@ -5,14 +5,14 @@ import { ArtistAvatar } from "@/components/ArtistAvatar";
 import { useAuth } from "@/components/AuthProvider";
 import { useGame } from "@/components/GameProvider";
 import { UserAvatar } from "@/components/UserAvatar";
-import { RmiButton } from "@/components/RmiPrimitives";
+import { RmiButton, RmiNotice, type NoticeTone } from "@/components/RmiPrimitives";
 import { TurnstileWidget } from "@/components/TurnstileWidget";
 import { formatCurrency } from "@/lib/formatters";
 import { formatAuthErrorMessage } from "@/lib/auth-errors";
 import { getEmailDomainWarning } from "@/lib/email-address";
 import { getUsernameValidationError, normalizeUsernameInput, USERNAME_REQUIREMENTS } from "@/lib/username";
 import { getBrowserSupabaseClient } from "@/lib/supabase/client";
-import { Camera, CalendarDays, Eye, EyeOff, ImagePlus, LogOut, Plus, Search, Star, WalletCards, X } from "lucide-react";
+import { Camera, CalendarDays, Eye, EyeOff, ImagePlus, LogOut, Plus, Search, Star, Trash2, WalletCards, X } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ChangeEvent, FormEvent, Suspense, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
@@ -52,12 +52,18 @@ function AccountPageContent() {
   const [bio, setBio] = useState("");
   const [favoriteArtistIds, setFavoriteArtistIds] = useState<string[]>([]);
   const [favoriteQuery, setFavoriteQuery] = useState("");
+  const [favoriteSaveStatus, setFavoriteSaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [message, setMessage] = useState("");
+  const [messageTone, setMessageTone] = useState<NoticeTone>("info");
   const [submitting, setSubmitting] = useState(false);
+  const [avatarSaving, setAvatarSaving] = useState(false);
   const [confirmationPending, setConfirmationPending] = useState(false);
   const [captchaToken, setCaptchaToken] = useState<string | null>(null);
   const [captchaResetKey, setCaptchaResetKey] = useState(0);
   const fileRef = useRef<HTMLInputElement | null>(null);
+  const pendingFavoriteIdsRef = useRef<string[] | null>(null);
+  const savingFavoritesRef = useRef(false);
+  const lastSavedFavoriteIdsRef = useRef<string[]>([]);
   const displayName = session && state.username !== "Demo Guest" ? state.username : user?.email?.split("@")[0] ?? "Trader";
   const emailDomainWarning = mode === "signup" ? getEmailDomainWarning(email) : null;
   const favoriteArtists = useMemo(
@@ -107,13 +113,15 @@ function AccountPageContent() {
 
     if (authError) {
       setMode("signin");
-      setMessage(authError.replace(/\+/g, " "));
+      setMessage(formatAuthErrorMessage(authError.replace(/\+/g, " ")));
+      setMessageTone("error");
       window.history.replaceState(null, "", `${window.location.pathname}${window.location.search}`);
       return;
     }
 
     if (searchParams.get("confirmed") === "1") {
       setMessage("Finishing email confirmation...");
+      setMessageTone("info");
     }
   }, [searchParams]);
 
@@ -124,6 +132,7 @@ function AccountPageContent() {
 
     let active = true;
     setMessage("Email confirmed. Signing you in...");
+    setMessageTone("success");
 
     void refreshServerState().then(() => {
       if (active) {
@@ -153,10 +162,15 @@ function AccountPageContent() {
       .then((payload) => {
         if (payload.ok && payload.profile) {
           setBio(payload.profile.bio ?? "");
-          setFavoriteArtistIds(payload.profile.favoriteArtistIds ?? []);
+          const savedFavoriteArtistIds = payload.profile.favoriteArtistIds ?? [];
+          setFavoriteArtistIds(savedFavoriteArtistIds);
+          lastSavedFavoriteIdsRef.current = savedFavoriteArtistIds;
         }
       })
-      .catch(() => setMessage("Could not load profile details."));
+      .catch(() => {
+        setMessage("Could not load profile details.");
+        setMessageTone("error");
+      });
   }, [configured, session]);
 
   async function submitAuth(event: FormEvent<HTMLFormElement>) {
@@ -164,6 +178,7 @@ function AccountPageContent() {
 
     if (turnstileSiteKey && !captchaToken) {
       setMessage("Complete the security check before continuing.");
+      setMessageTone("error");
       return;
     }
 
@@ -190,6 +205,7 @@ function AccountPageContent() {
       setUsernameMessage(result.message);
     }
     setMessage(result.message);
+    setMessageTone(result.ok ? "success" : "error");
     setConfirmationPending(mode === "signup" && result.ok);
     setSubmitting(false);
     setCaptchaToken(null);
@@ -206,11 +222,13 @@ function AccountPageContent() {
 
     if (!normalizedEmail) {
       setMessage("Enter your email address first.");
+      setMessageTone("error");
       return;
     }
 
     if (turnstileSiteKey && !captchaToken) {
       setMessage("Complete the security check before requesting a reset email.");
+      setMessageTone("error");
       return;
     }
 
@@ -224,6 +242,7 @@ function AccountPageContent() {
         ? formatAuthErrorMessage(error.message)
         : "If an RMI account uses this email, a password reset link has been sent."
     );
+    setMessageTone(error ? "error" : "success");
     setCaptchaToken(null);
     setCaptchaResetKey((current) => current + 1);
   }
@@ -233,11 +252,13 @@ function AccountPageContent() {
 
     if (!normalizedEmail) {
       setMessage("Enter your email address first.");
+      setMessageTone("error");
       return;
     }
 
     if (turnstileSiteKey && !captchaToken) {
       setMessage("Complete the security check before resending the confirmation email.");
+      setMessageTone("error");
       return;
     }
 
@@ -255,6 +276,7 @@ function AccountPageContent() {
         ? formatAuthErrorMessage(error.message)
         : "If this address has an unconfirmed RMI account, a new confirmation link has been sent."
     );
+    setMessageTone(error ? "error" : "success");
     setCaptchaToken(null);
     setCaptchaResetKey((current) => current + 1);
   }
@@ -263,13 +285,14 @@ function AccountPageContent() {
     setSubmitting(true);
     const result = await signInWithGoogle();
     setMessage(result.message);
+    setMessageTone(result.ok ? "info" : "error");
 
     if (!result.ok) {
       setSubmitting(false);
     }
   }
 
-  async function saveProfile(nextFavoriteArtistIds = favoriteArtistIds) {
+  async function saveBio() {
     if (!session) {
       return;
     }
@@ -281,13 +304,69 @@ function AccountPageContent() {
         authorization: `Bearer ${session.access_token}`
       },
       body: JSON.stringify({
-        profileBio: bio,
-        favoriteArtistIds: nextFavoriteArtistIds
+        profileBio: bio
       })
     });
     const payload = (await response.json()) as ProfileDetailsResponse;
-    setMessage(payload.ok ? "Profile saved." : payload.error ?? "Could not save profile.");
+    setMessage(payload.ok ? "Bio saved." : payload.error ?? "Could not save bio.");
+    setMessageTone(payload.ok ? "success" : "error");
     await refreshServerState();
+  }
+
+  function queueFavoriteArtistSave(nextFavoriteArtistIds: string[]) {
+    setFavoriteArtistIds(nextFavoriteArtistIds);
+    setFavoriteSaveStatus("saving");
+    pendingFavoriteIdsRef.current = nextFavoriteArtistIds;
+
+    if (!savingFavoritesRef.current) {
+      void flushFavoriteArtistSaves();
+    }
+  }
+
+  async function flushFavoriteArtistSaves() {
+    if (!session || savingFavoritesRef.current) {
+      return;
+    }
+
+    savingFavoritesRef.current = true;
+
+    try {
+      while (pendingFavoriteIdsRef.current) {
+        const nextFavoriteArtistIds = pendingFavoriteIdsRef.current;
+        pendingFavoriteIdsRef.current = null;
+        const response = await fetch("/api/profile/bootstrap", {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            authorization: `Bearer ${session.access_token}`
+          },
+          body: JSON.stringify({
+            favoriteArtistIds: nextFavoriteArtistIds
+          })
+        });
+        const payload = (await response.json()) as ProfileDetailsResponse;
+
+        if (!response.ok || !payload.ok) {
+          setFavoriteArtistIds(lastSavedFavoriteIdsRef.current);
+          setFavoriteSaveStatus("error");
+          pendingFavoriteIdsRef.current = null;
+          return;
+        }
+
+        lastSavedFavoriteIdsRef.current = nextFavoriteArtistIds;
+      }
+
+      setFavoriteSaveStatus("saved");
+    } catch {
+      setFavoriteArtistIds(lastSavedFavoriteIdsRef.current);
+      setFavoriteSaveStatus("error");
+    } finally {
+      savingFavoritesRef.current = false;
+
+      if (pendingFavoriteIdsRef.current) {
+        void flushFavoriteArtistSaves();
+      }
+    }
   }
 
   async function uploadAvatar(event: ChangeEvent<HTMLInputElement>) {
@@ -308,27 +387,72 @@ function AccountPageContent() {
 
     if (!extension || file.size > 3 * 1024 * 1024) {
       setMessage("Choose a JPG, PNG, WebP, or GIF image under 3 MB.");
+      setMessageTone("error");
       return;
     }
 
-    const formData = new FormData();
-    formData.set("avatar", file, `avatar.${extension}`);
-    const response = await fetch("/api/profile/avatar", {
-      method: "POST",
-      headers: {
-        authorization: `Bearer ${session.access_token}`
-      },
-      body: formData
-    });
-    const payload = await response.json();
+    setAvatarSaving(true);
 
-    if (!response.ok || !payload.ok) {
-      setMessage(payload.error ?? "Could not upload profile picture.");
+    try {
+      const formData = new FormData();
+      formData.set("avatar", file, `avatar.${extension}`);
+      const response = await fetch("/api/profile/avatar", {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${session.access_token}`
+        },
+        body: formData
+      });
+      const payload = await response.json();
+
+      if (!response.ok || !payload.ok) {
+        setMessage(payload.error ?? "Could not upload profile picture.");
+        setMessageTone("error");
+        return;
+      }
+
+      setMessage("Profile picture updated.");
+      setMessageTone("success");
+      await refreshServerState();
+    } catch {
+      setMessage("Could not upload profile picture. Check your connection and try again.");
+      setMessageTone("error");
+    } finally {
+      setAvatarSaving(false);
+    }
+  }
+
+  async function removeAvatar() {
+    if (!session || !avatarUrl || avatarSaving) {
       return;
     }
 
-    setMessage("Profile picture updated.");
-    await refreshServerState();
+    setAvatarSaving(true);
+
+    try {
+      const response = await fetch("/api/profile/avatar", {
+        method: "DELETE",
+        headers: {
+          authorization: `Bearer ${session.access_token}`
+        }
+      });
+      const payload = await response.json() as { ok?: boolean; error?: string };
+
+      if (!response.ok || !payload.ok) {
+        setMessage(payload.error ?? "Could not remove profile picture.");
+        setMessageTone("error");
+        return;
+      }
+
+      setMessage("Profile picture removed.");
+      setMessageTone("success");
+      await refreshServerState();
+    } catch {
+      setMessage("Could not remove profile picture. Check your connection and try again.");
+      setMessageTone("error");
+    } finally {
+      setAvatarSaving(false);
+    }
   }
 
   if (configured && authLoading) {
@@ -354,7 +478,7 @@ function AccountPageContent() {
           <p className="mx-auto mt-2 max-w-md text-sm text-paper/60">
             {mode === "signup"
               ? "Create a verified profile, build a watchlist, and start with fantasy cash."
-              : "Access your portfolio, watchlist, and personalized market desk."}
+              : "Access your portfolio, watchlist, and saved market activity."}
           </p>
         </header>
 
@@ -427,6 +551,7 @@ function AccountPageContent() {
               {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
             </button>
           </div>
+          {message ? <RmiNotice tone={messageTone}>{message}</RmiNotice> : null}
           <TurnstileWidget
             siteKey={turnstileSiteKey}
             onTokenChange={setCaptchaToken}
@@ -436,7 +561,7 @@ function AccountPageContent() {
           <button type="submit" disabled={submitting} className="rmi-button-primary h-11 text-sm disabled:opacity-60">
             {mode === "signup" ? "Sign up" : "Log in"}
           </button>
-          <div className="flex items-center gap-3 text-xs font-bold uppercase tracking-wide text-paper/35" aria-hidden="true">
+          <div className="flex items-center gap-3 text-xs font-semibold text-paper/35" aria-hidden="true">
             <span className="h-px flex-1 bg-line" />
             or
             <span className="h-px flex-1 bg-line" />
@@ -466,7 +591,6 @@ function AccountPageContent() {
           >
             {mode === "signup" ? "Already have an account?" : "Create account"}
           </button>
-          {message ? <p className="rounded-md border border-cyan/25 bg-cyan/5 px-3 py-2 text-sm font-semibold text-paper/75">{message}</p> : null}
         </form>
       </div>
     );
@@ -476,9 +600,9 @@ function AccountPageContent() {
     <div className="mx-auto max-w-6xl space-y-5">
       <header className="rmi-page-head flex flex-wrap items-start justify-between gap-4">
         <div>
-          <div className="rmi-kicker">Identity Console</div>
-          <h1 className="mt-2 text-3xl font-bold">Trader Profile</h1>
-          <p className="mt-1 text-sm text-paper/60">Manage the identity and artist signals shown on your public profile.</p>
+          <div className="rmi-kicker">Account</div>
+          <h1 className="mt-2 text-3xl font-bold">Your Profile</h1>
+          <p className="mt-1 text-sm text-paper/60">Manage what appears on your public profile.</p>
         </div>
         <div className="flex flex-wrap gap-2">
           {state.userId ? <RmiButton href={`/users/${state.userId}`} variant="secondary">View Public Profile</RmiButton> : null}
@@ -487,19 +611,31 @@ function AccountPageContent() {
       </header>
 
       <section className="rmi-card overflow-hidden p-5 sm:p-7">
+        {message ? <RmiNotice tone={messageTone} className="mb-5">{message}</RmiNotice> : null}
         <div className="grid gap-5 sm:grid-cols-[142px_minmax(0,1fr)]">
           <div>
-            <button type="button" onClick={() => fileRef.current?.click()} className="group relative">
+            <button type="button" onClick={() => fileRef.current?.click()} className="group relative" disabled={avatarSaving}>
               <UserAvatar avatarUrl={avatarUrl} label={displayName} size="xl" />
               <span className="absolute inset-0 hidden place-items-center rounded-full bg-black/60 text-white group-hover:grid">
                 <Camera className="h-5 w-5" />
               </span>
             </button>
             <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp,image/gif" className="hidden" onChange={uploadAvatar} />
-            <button type="button" onClick={() => fileRef.current?.click()} className="mt-3 flex items-center gap-2 text-sm font-semibold text-cyan">
+            <button type="button" onClick={() => fileRef.current?.click()} disabled={avatarSaving} className="mt-3 flex items-center gap-2 text-sm font-semibold text-cyan disabled:opacity-50">
               <ImagePlus className="h-4 w-4" />
-              Add Image
+              {avatarUrl ? "Change Photo" : "Add Photo"}
             </button>
+            {avatarUrl ? (
+              <button
+                type="button"
+                onClick={removeAvatar}
+                disabled={avatarSaving}
+                className="mt-2 flex items-center gap-2 text-sm font-semibold text-ember disabled:opacity-50"
+              >
+                <Trash2 className="h-4 w-4" />
+                Remove Photo
+              </button>
+            ) : null}
           </div>
 
           <div className="min-w-0">
@@ -522,10 +658,9 @@ function AccountPageContent() {
               className="rmi-terminal-input mt-6 min-h-24 w-full p-3 text-sm font-semibold placeholder:text-paper/35"
               placeholder="A little about me..."
             />
-            <button type="button" onClick={() => saveProfile()} className="rmi-button-primary mt-3 h-10 px-4 text-sm">
-              Save profile
+            <button type="button" onClick={saveBio} className="rmi-button-primary mt-3 h-10 px-4 text-sm">
+              Save Bio
             </button>
-            {message ? <p className="mt-3 text-sm font-bold text-paper/65">{message}</p> : null}
           </div>
         </div>
       </section>
@@ -552,7 +687,7 @@ function AccountPageContent() {
                   </Link>
                   <button
                     type="button"
-                    onClick={() => setFavoriteArtistIds((current) => current.filter((artistId) => artistId !== artist.id))}
+                    onClick={() => queueFavoriteArtistSave(favoriteArtistIds.filter((artistId) => artistId !== artist.id))}
                     className="grid h-8 w-8 shrink-0 place-items-center rounded-md text-paper/45 hover:bg-panel hover:text-ember"
                     title={`Remove ${artist.name}`}
                     aria-label={`Remove ${artist.name} from favorite artists`}
@@ -582,7 +717,7 @@ function AccountPageContent() {
                         key={artist.id}
                         type="button"
                         onClick={() => {
-                          setFavoriteArtistIds((current) => [...current, artist.id].slice(0, 12));
+                          queueFavoriteArtistSave([...favoriteArtistIds, artist.id].slice(0, 12));
                           setFavoriteQuery("");
                         }}
                         className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-left hover:bg-panelSoft"
@@ -600,13 +735,17 @@ function AccountPageContent() {
                   )}
                 </div>
               ) : null}
-              <button
-                type="button"
-                onClick={() => saveProfile(favoriteArtistIds)}
-                className="rmi-button-primary mt-3 h-10 w-full px-4 text-sm"
-              >
-                Save Favorite Artists
-              </button>
+              {favoriteSaveStatus !== "idle" ? (
+                <p className={`mt-3 text-center text-xs font-semibold ${
+                  favoriteSaveStatus === "error" ? "text-ember" : "text-paper/45"
+                }`} aria-live="polite">
+                  {favoriteSaveStatus === "saving"
+                    ? "Saving..."
+                    : favoriteSaveStatus === "saved"
+                      ? "Saved"
+                      : "Could not save. Try again."}
+                </p>
+              ) : null}
             </div>
           </div>
         </div>
@@ -614,7 +753,7 @@ function AccountPageContent() {
         <div>
           <h2 className="mb-3 text-lg font-semibold">Account Controls</h2>
           <div className="rmi-card border-t-2 border-t-cyan/70 p-4">
-            <p className="mb-4 text-sm text-paper/55">Security, privacy, and account preferences live in the settings console.</p>
+            <p className="mb-4 text-sm text-paper/55">Manage security, privacy, and account preferences in Settings.</p>
             <div className="flex flex-wrap items-center gap-3">
               <RmiButton href="/settings" variant="secondary">Open Settings</RmiButton>
               <button

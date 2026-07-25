@@ -5,6 +5,34 @@ import clsx from "clsx";
 import Link from "next/link";
 import type { ReactNode } from "react";
 
+export type NoticeTone = "error" | "success" | "info";
+
+export function RmiNotice({
+  children,
+  tone = "info",
+  className
+}: {
+  children: ReactNode;
+  tone?: NoticeTone;
+  className?: string;
+}) {
+  return (
+    <div
+      className={clsx(
+        "border px-3 py-2 text-sm font-semibold leading-5",
+        tone === "error" && "border-ember/45 bg-ember/10 text-ember",
+        tone === "success" && "border-mint/35 bg-mint/10 text-mint",
+        tone === "info" && "border-line bg-panelSoft text-paper/75",
+        className
+      )}
+      role={tone === "error" ? "alert" : "status"}
+      aria-live="polite"
+    >
+      {children}
+    </div>
+  );
+}
+
 export function RmiSection({
   title,
   subtitle,

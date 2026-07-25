@@ -877,6 +877,10 @@ function buildWarnings({
   }
 
   for (const health of observationHealth) {
+    if (health.source === "listenbrainz" && !config.listenbrainzEnabled) {
+      continue;
+    }
+
     if (health.warningThreshold !== null && health.freshCoveragePercent < health.warningThreshold) {
       warnings.push(`${health.label} fresh coverage is ${health.freshCoveragePercent.toFixed(1)}%.`);
     }

@@ -24,7 +24,7 @@ export function MetricCard({
   return (
     <section className="rmi-card p-4">
       <div className="flex items-center justify-between gap-3">
-        <p className="text-xs font-semibold uppercase tracking-wide text-paper/50">{label}</p>
+        <p className="text-xs font-semibold text-paper/50">{label}</p>
         <div className="text-paper/50">{icon}</div>
       </div>
       <p className={`mt-3 text-2xl font-semibold number-tabular ${toneClass}`}>{value}</p>

@@ -26,7 +26,7 @@ export function PolicyDocument({
       <header className="rmi-hero p-5 sm:p-7">
         <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_270px] lg:items-end">
           <div>
-            <p className="rmi-kicker"><ShieldCheck className="h-4 w-4" aria-hidden="true" /> RMI Trust Center</p>
+            <p className="rmi-kicker"><ShieldCheck className="h-4 w-4" aria-hidden="true" /> Policies</p>
             <h1 className="mt-3 text-3xl font-bold sm:text-5xl">{title}</h1>
             <p className="mt-3 max-w-3xl text-sm leading-6 text-paper/65">{summary}</p>
           </div>

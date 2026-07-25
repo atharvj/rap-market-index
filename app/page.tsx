@@ -10,7 +10,7 @@ import { MiniSparkline } from "@/components/MiniSparkline";
 import { formatCurrency, formatPercent } from "@/lib/formatters";
 import { getMarketBreadth } from "@/lib/market-analytics";
 import type { Artist } from "@/lib/types";
-import { Activity, ArrowDownRight, ArrowUpRight, Gauge, Radio } from "lucide-react";
+import { Activity, ArrowDownRight, ArrowUpRight, Gauge } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
@@ -115,10 +115,7 @@ export default function HomePage() {
             Spot the next <span className="text-cyan">rise.</span>
           </h1>
           <p className="mt-3 max-w-2xl text-sm font-medium text-paper/66 sm:text-base">Buy shares in rappers. Build a portfolio when they blow up.</p>
-          <div className="mt-4 flex flex-wrap justify-center gap-2 lg:justify-start">
-            <span className="inline-flex items-center gap-2 rounded-[var(--radius-control)] border border-mint/25 bg-mint/5 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-mint"><span className="rmi-live-dot" /> Market online</span>
-            <span className="inline-flex items-center gap-2 rounded-[var(--radius-control)] border border-cyan/25 bg-cyan/5 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-cyan"><Radio className="h-3 w-3" /> Verified catalysts</span>
-          </div>
+          <p className="mt-4 text-xs font-medium text-paper/50">Live fantasy market · source-checked news and data</p>
           <form onSubmit={submitSearch} className="relative mx-auto mt-6 flex w-full min-w-0 max-w-xl flex-col gap-2 sm:flex-row lg:mx-0">
             <input
               value={query}
@@ -169,7 +166,7 @@ export default function HomePage() {
       </section>
 
       <RmiSection
-        title="Live Signal Deck"
+        title="Market Signals"
         subtitle="Artists with the strongest combination of market movement and current RMI signal."
         action={<Link href="/markets" className="text-xs font-semibold text-cyan hover:text-paper">Open Markets</Link>}
       >

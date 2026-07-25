@@ -153,7 +153,7 @@ export function MarketNewsFeed({
           <Radio className="h-5 w-5" aria-hidden="true" />
         </span>
         <div>
-          <p className="text-sm font-semibold text-paper">Market Wire Is Clear</p>
+          <p className="text-sm font-semibold text-paper">No market news yet</p>
           <p className="mt-1 max-w-xl text-sm leading-6 text-paper/55">
             No verified, price-relevant stories are available for this view right now. Routine posts and unconfirmed chatter stay out of the feed.
           </p>
@@ -231,7 +231,7 @@ function HomeMarketNewsLayout({ items }: { items: MarketNewsItem[] }) {
 
 function HomeLeadStory({ item }: { item: MarketNewsItem }) {
   const positive = item.sentimentScore >= 0;
-  const source = item.sourceName || item.sourceDomain || "RMI Market Wire";
+  const source = item.sourceName || item.sourceDomain || "RMI";
 
   return (
     <article className="rmi-card rmi-news-card overflow-hidden">

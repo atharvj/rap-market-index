@@ -114,4 +114,4 @@ psql \
   --set ON_ERROR_STOP=on \
   --command="select 'profiles' as table_name, count(*) as restored_rows from public.profiles union all select 'artists', count(*) from public.artists union all select 'holdings', count(*) from public.holdings union all select 'transactions', count(*) from public.transactions union all select 'price_history', count(*) from public.price_history order by table_name;"
 
-echo "Test restore completed and core tables passed the RLS validation. Complete the application checks in docs/operations-runbook.md before deleting the test database."
+echo "Test restore completed and core tables passed the RLS validation. Complete the application checks before deleting the test database."

@@ -14,9 +14,9 @@
   --color-cyan: 37 213 255;
   --color-violet: 151 103 255;
   --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
-  --radius-panel: 8px;
-  --radius-control: 6px;
-  --shadow-panel: 0 10px 30px rgba(0, 0, 0, 0.14);
+  --radius-panel: 5px;
+  --radius-control: 4px;
+  --shadow-panel: none;
   --shadow-popover: 0 18px 48px rgba(0, 0, 0, 0.32);
   color-scheme: dark;
 }
@@ -163,18 +163,17 @@ button {
   display: inline-flex;
   align-items: center;
   gap: 0.5rem;
-  color: rgb(var(--color-cyan));
-  font-size: 0.68rem;
-  font-weight: 800;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
+  color: rgba(var(--color-paper), 0.62);
+  font-size: 0.75rem;
+  font-weight: 650;
+  letter-spacing: 0.02em;
 }
 
 .rmi-hero {
   position: relative;
   isolation: isolate;
   background: rgb(var(--color-panel));
-  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.18);
+  box-shadow: none;
 }
 
 .rmi-hero::before {
@@ -269,10 +268,9 @@ button {
 
 .rmi-data-label {
   color: rgba(var(--color-paper), 0.43);
-  font-size: 0.65rem;
-  font-weight: 800;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
+  font-size: 0.72rem;
+  font-weight: 650;
+  letter-spacing: 0.02em;
 }
 
 .rmi-live-dot {
@@ -309,7 +307,7 @@ button {
 
 .rmi-news-card:hover {
   border-color: rgba(var(--color-cyan), 0.55);
-  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.16);
+  box-shadow: none;
 }
 
 .rmi-tape {
@@ -344,10 +342,9 @@ button {
 .rmi-table-head {
   background: rgb(var(--color-panel-soft));
   color: rgba(var(--color-paper), 0.48);
-  font-size: 0.66rem;
-  font-weight: 800;
-  letter-spacing: 0.09em;
-  text-transform: uppercase;
+  font-size: 0.72rem;
+  font-weight: 650;
+  letter-spacing: 0.02em;
 }
 
 .rmi-table-row {
@@ -363,25 +360,21 @@ button {
   display: inline-flex;
   align-items: center;
   gap: 0.4rem;
-  min-height: 1.75rem;
-  border: 1px solid rgba(var(--color-line), 0.82);
-  border-radius: 999px;
-  background: rgba(var(--color-panel-soft), 0.8);
-  padding-inline: 0.65rem;
+  min-height: 1.5rem;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  padding-inline: 0;
   color: rgba(var(--color-paper), 0.62);
-  font-size: 0.68rem;
-  font-weight: 800;
+  font-size: 0.72rem;
+  font-weight: 650;
 }
 
 .rmi-status-chip[data-tone="mint"] {
-  border-color: rgba(var(--color-mint), 0.28);
-  background: rgba(var(--color-mint), 0.06);
   color: rgb(var(--color-mint));
 }
 
 .rmi-status-chip[data-tone="violet"] {
-  border-color: rgba(var(--color-violet), 0.28);
-  background: rgba(var(--color-violet), 0.07);
   color: rgb(var(--color-violet));
 }
 

@@ -3,6 +3,7 @@ import type { MarketUpdateArtist } from "@/server/market/daily-update";
 import type { AdapterSignals, MarketEvent, MarketSignalModifier } from "@/server/market/market-data";
 import { getArtistStatusSubtype } from "@/server/market/status-events";
 import type { HypeStats } from "@/lib/types";
+import { areNewsStoryEventsEquivalent } from "@/server/market/news-story-groups";
 
 export type ManualMarketEventInput = {
   artistId?: string;
@@ -2220,23 +2221,33 @@ function isMarketEventType(value: string): value is MarketEvent["eventType"] {
   return ["release", "review", "news", "controversy", "award", "tour", "viral"].includes(value);
 }
 
-function getEventKey(event: MarketEvent) {
-  return `${event.artistId}:${event.eventDate}:${getCanonicalEventTitle(event)}`;
-}
-
 function dedupeSemanticallyEquivalentEvents(events: MarketEvent[]) {
-  const selected = new Map<string, MarketEvent>();
+  const selected: MarketEvent[] = [];
 
   for (const event of events) {
-    const key = getEventKey(event);
-    const existing = selected.get(key);
+    const existingIndex = selected.findIndex((existing) =>
+      areNewsStoryEventsEquivalent(toNewsStoryEvent(event), toNewsStoryEvent(existing))
+    );
 
-    if (!existing || getEventEvidencePreference(event) > getEventEvidencePreference(existing)) {
-      selected.set(key, event);
+    if (existingIndex === -1) {
+      selected.push(event);
+    } else if (getEventEvidencePreference(event) > getEventEvidencePreference(selected[existingIndex])) {
+      selected[existingIndex] = event;
     }
   }
 
-  return [...selected.values()];
+  return selected;
+}
+
+function toNewsStoryEvent(event: MarketEvent) {
+  return {
+    id: event.id ?? `${event.artistId}:${event.eventDate}:${getCanonicalEventTitle(event)}`,
+    artist_id: event.artistId,
+    event_date: event.eventDate,
+    event_type: event.eventType,
+    title: event.title,
+    source_url: event.sourceUrl ?? null
+  };
 }
 
 function getEventEvidencePreference(event: MarketEvent) {

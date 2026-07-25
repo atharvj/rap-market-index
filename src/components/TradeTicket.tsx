@@ -2,6 +2,7 @@
 
 import { useAuth } from "@/components/AuthProvider";
 import { useGame } from "@/components/GameProvider";
+import { RmiNotice } from "@/components/RmiPrimitives";
 import { formatCurrency, formatShares } from "@/lib/formatters";
 import { estimateMarketMakerQuote } from "@/lib/trading";
 import type { Artist } from "@/lib/types";
@@ -20,6 +21,7 @@ export function TradeTicket({
   const [side, setSide] = useState<"buy" | "sell">(defaultSide);
   const [shares, setShares] = useState("10");
   const [message, setMessage] = useState("");
+  const [messageIsError, setMessageIsError] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const parsedShares = Number(shares);
   const holding = getHolding(artist.id);
@@ -73,9 +75,12 @@ export function TradeTicket({
 
     try {
       const result = side === "buy" ? buyShares(artist.id, parsedShares) : sellShares(artist.id, parsedShares);
-      setMessage((await result).message);
+      const completed = await result;
+      setMessage(completed.message);
+      setMessageIsError(!completed.ok);
     } catch {
       setMessage("The order could not be submitted. Please try again.");
+      setMessageIsError(true);
     } finally {
       setSubmitting(false);
     }
@@ -86,9 +91,9 @@ export function TradeTicket({
       <div className="rmi-section-header flex flex-wrap items-center justify-between gap-2 px-4 py-3">
         <span className="flex min-w-0 items-center gap-2">
           <Radio className="h-3.5 w-3.5 text-cyan" aria-hidden="true" />
-          <span className="text-xs font-semibold uppercase tracking-[0.14em]">Execution Desk</span>
+          <span className="text-xs font-semibold">Trade</span>
         </span>
-        <span className="flex shrink-0 items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-mint">
+        <span className="flex shrink-0 items-center gap-2 text-xs font-semibold text-mint">
           <span className="rmi-live-dot" aria-hidden="true" />
           Live Quote
         </span>
@@ -99,7 +104,7 @@ export function TradeTicket({
             <p className="rmi-data-label">Last Price</p>
             <h2 className="mt-1 text-3xl font-bold number-tabular">{formatCurrency(artist.currentPrice)}</h2>
           </div>
-          <span className="rounded-[var(--radius-control)] border border-cyan/25 bg-cyan/8 px-2.5 py-1 text-xs font-semibold uppercase tracking-[0.1em] text-cyan">
+          <span className="border border-cyan/25 bg-cyan/8 px-2.5 py-1 text-xs font-semibold text-cyan">
             ${artist.ticker}
           </span>
         </div>
@@ -129,7 +134,7 @@ export function TradeTicket({
           </button>
         </div>
 
-        <label className="mt-4 block text-xs font-bold uppercase tracking-wide text-paper/50" htmlFor="shares">
+        <label className="mt-4 block text-xs font-semibold text-paper/50" htmlFor="shares">
           Shares
         </label>
         <div className="mt-2 flex min-h-12 items-center overflow-hidden rounded-[var(--radius-control)] border border-line bg-ink/35 focus-within:border-cyan/65 focus-within:ring-2 focus-within:ring-cyan/10">
@@ -205,8 +210,12 @@ export function TradeTicket({
                 : "Submit sell order"}
         </button>
 
-        <p className="mt-3 min-h-5 text-sm text-paper/60" aria-live="polite">{message}</p>
-        <p className="border-t border-line pt-3 text-[10px] font-semibold uppercase tracking-wide text-paper/35">
+        {message ? (
+          <RmiNotice tone={messageIsError ? "error" : "success"} className="mt-3">
+            {message}
+          </RmiNotice>
+        ) : null}
+        <p className="border-t border-line pt-3 text-xs font-medium text-paper/35">
           Fantasy market only · no real money or cash-out
         </p>
       </div>

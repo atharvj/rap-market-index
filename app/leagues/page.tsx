@@ -53,7 +53,7 @@ export default function LeaguesPage() {
 
       <section className="flex flex-wrap items-center justify-between gap-4 border-t border-line py-6">
         <div>
-          <p className="rmi-kicker text-cyan">Prepare Your Portfolio</p>
+          <p className="rmi-kicker text-cyan">While you wait</p>
           <p className="mt-2 text-sm font-semibold">Start building your track record.</p>
           <p className="mt-1 text-xs font-normal text-paper/45">Your existing portfolio will be ready for private competition when leagues open.</p>
         </div>

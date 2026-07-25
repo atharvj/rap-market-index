@@ -133,10 +133,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
             <span className="rmi-brand-mark grid h-9 w-9 place-items-center rounded-md">
               <Activity className="h-[18px] w-[18px] text-cyan" aria-hidden="true" />
             </span>
-            <span>
-              <span className="block text-sm font-bold tracking-[0.08em]">RMI</span>
-              <span className="hidden text-[8px] font-semibold uppercase tracking-[0.2em] text-cyan/70 xl:block">Live Index</span>
-            </span>
+            <span className="block text-sm font-bold tracking-[0.08em]">RMI</span>
           </Link>
 
           <nav className="ml-2 hidden items-center gap-1 text-xs font-semibold text-paper/60 md:flex" aria-label="Primary">

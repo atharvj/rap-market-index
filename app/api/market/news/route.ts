@@ -12,7 +12,11 @@ import {
 } from "@/server/market/artist-event-disambiguation";
 import { classifyArticleEvent, normalizeDomain } from "@/server/market/gdelt-source";
 import { loadSourcePreviewImageUrls } from "@/server/market/source-preview-images";
-import { groupNewsStoryEvents, resolveNewsStoryArtists } from "@/server/market/news-story-groups";
+import {
+  areNewsStoryEventsEquivalent,
+  groupNewsStoryEvents,
+  resolveNewsStoryArtists
+} from "@/server/market/news-story-groups";
 import {
   normalizeMarketNewsSort,
   sortMarketNewsEvents
@@ -810,43 +814,7 @@ function dedupeNearDuplicateMarketNewsEvents(events: MarketEventRow[], feedMode:
 }
 
 function isNearDuplicateStory(candidate: MarketEventRow, selected: MarketEventRow[]) {
-  const candidateTokens = getDistinctiveHeadlineTokens(candidate.title);
-
-  if (candidateTokens.size < 2) {
-    return false;
-  }
-
-  return selected.some((existing) => {
-    if (existing.artist_id !== candidate.artist_id || existing.event_type !== candidate.event_type) {
-      return false;
-    }
-
-    const candidateDate = Date.parse(`${candidate.event_date}T00:00:00Z`);
-    const existingDate = Date.parse(`${existing.event_date}T00:00:00Z`);
-
-    if (!Number.isFinite(candidateDate) || !Number.isFinite(existingDate) || Math.abs(candidateDate - existingDate) > 4 * 86_400_000) {
-      return false;
-    }
-
-    const existingTokens = getDistinctiveHeadlineTokens(existing.title);
-    const shared = [...candidateTokens].filter((token) => existingTokens.has(token)).length;
-    const smallerSetSize = Math.min(candidateTokens.size, existingTokens.size);
-
-    return shared >= 4 || (shared >= 3 && shared / Math.max(1, smallerSetSize) >= 0.5);
-  });
-}
-
-function getDistinctiveHeadlineTokens(value: string) {
-  const ignored = new Set([
-    "a", "an", "and", "at", "by", "for", "from", "in", "is", "it", "new", "of", "on", "the", "to", "with",
-    "official", "audio", "video", "music", "rapper", "rap", "announces", "reveals", "says", "report", "reports"
-  ]);
-
-  return new Set(
-    normalizeNewsHeadline(value)
-      .split(" ")
-      .filter((token) => token.length >= 3 && !ignored.has(token) && !/^20\d{2}$/.test(token))
-  );
+  return selected.some((existing) => areNewsStoryEventsEquivalent(candidate, existing));
 }
 
 function getNewsHeadlineKey(event: MarketEventRow) {

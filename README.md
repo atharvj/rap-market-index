@@ -12,7 +12,7 @@ The market engine is designed to react to broad artist momentum, including audie
 
 ## Status
 
-Rap Market Index is in active development. Current work is focused on the backend market engine, account persistence, trading integrity, and reliable historical charts.
+Rap Market Index is in active development and preparing for a small public test.
 
 ## Stack
 
@@ -22,11 +22,4 @@ Rap Market Index is in active development. Current work is focused on the backen
 - Tailwind CSS
 - Server-side market update jobs
 
-## Developer Notes
-
-Implementation notes live in [`docs/`](docs/) for migration order, backend setup, and market-engine operations.
-
-Production security, deployment hardening, incident response, and capacity checks
-are documented in [`docs/security-and-scaling.md`](docs/security-and-scaling.md).
-Security issues should be reported privately as described in
-[`SECURITY.md`](SECURITY.md).
+Security issues should be reported privately as described in [`SECURITY.md`](SECURITY.md).

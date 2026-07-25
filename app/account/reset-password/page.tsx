@@ -1,8 +1,9 @@
 "use client";
 
 import { useAuth } from "@/components/AuthProvider";
-import { RmiButton } from "@/components/RmiPrimitives";
+import { RmiButton, RmiNotice, type NoticeTone } from "@/components/RmiPrimitives";
 import { getBrowserSupabaseClient } from "@/lib/supabase/client";
+import { formatAuthErrorMessage } from "@/lib/auth-errors";
 import { Eye, EyeOff, KeyRound, ShieldCheck } from "lucide-react";
 import { useState, type FormEvent } from "react";
 
@@ -11,6 +12,7 @@ export default function ResetPasswordPage() {
   const [password, setPassword] = useState("");
   const [confirmation, setConfirmation] = useState("");
   const [message, setMessage] = useState("");
+  const [messageTone, setMessageTone] = useState<NoticeTone>("info");
   const [submitting, setSubmitting] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
@@ -19,17 +21,20 @@ export default function ResetPasswordPage() {
 
     if (password.length < 8) {
       setMessage("Use at least 8 characters.");
+      setMessageTone("error");
       return;
     }
 
     if (password !== confirmation) {
       setMessage("Passwords do not match.");
+      setMessageTone("error");
       return;
     }
 
     setSubmitting(true);
     const { error } = await getBrowserSupabaseClient().auth.updateUser({ password });
-    setMessage(error ? error.message : "Password updated. You can return to RMI.");
+    setMessage(error ? formatAuthErrorMessage(error.message) : "Password updated. You can return to RMI.");
+    setMessageTone(error ? "error" : "success");
     setSubmitting(false);
   }
 
@@ -66,7 +71,7 @@ export default function ResetPasswordPage() {
   return (
     <div className="mx-auto grid max-w-5xl gap-5 lg:grid-cols-[minmax(0,0.85fr)_minmax(380px,0.65fr)]">
       <header className="rmi-hero grid content-center p-6 sm:p-8">
-        <p className="rmi-kicker"><ShieldCheck className="h-4 w-4" aria-hidden="true" /> RMI Secure Account</p>
+        <p className="rmi-kicker"><ShieldCheck className="h-4 w-4" aria-hidden="true" /> Account recovery</p>
         <h1 className="mt-4 text-3xl font-bold sm:text-5xl">Choose a New Password</h1>
         <p className="mt-3 max-w-xl text-sm leading-6 text-paper/65">
           Create a new password for your RMI identity. The update is applied through your encrypted account session.
@@ -75,8 +80,8 @@ export default function ResetPasswordPage() {
 
       <form onSubmit={submit} className="rmi-auth-surface grid content-center gap-4 p-5 sm:p-7">
         <div>
-          <p className="rmi-data-label text-cyan">Credential Reset</p>
-          <h2 className="mt-2 text-xl font-semibold">New Access Key</h2>
+          <p className="rmi-data-label text-cyan">Password reset</p>
+          <h2 className="mt-2 text-xl font-semibold">New password</h2>
         </div>
         <label className="grid gap-2 text-sm font-semibold">
           New Password
@@ -110,10 +115,10 @@ export default function ResetPasswordPage() {
             required
           />
         </label>
+        {message ? <RmiNotice tone={messageTone}>{message}</RmiNotice> : null}
         <button type="submit" disabled={submitting} className="rmi-button-primary mt-1 h-11 rounded-md text-sm font-semibold disabled:opacity-60">
           {submitting ? "Updating..." : "Update Password"}
         </button>
-        {message ? <p className="rounded-md border border-line bg-panelSoft px-3 py-2 text-sm font-medium text-paper/65">{message}</p> : null}
       </form>
     </div>
   );

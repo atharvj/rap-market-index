@@ -45,7 +45,7 @@ export default function PortfolioPage() {
     <div className="space-y-5">
       <header className="rmi-page-head flex flex-wrap items-end justify-between gap-4">
         <div>
-          <div className="rmi-kicker"><BriefcaseBusiness className="h-3.5 w-3.5" /> Portfolio Terminal</div>
+          <div className="rmi-kicker"><BriefcaseBusiness className="h-3.5 w-3.5" /> Portfolio</div>
           <h1 className="mt-2 text-3xl font-bold sm:text-4xl">Your Portfolio</h1>
           <p className="mt-1 text-sm text-paper/65">Positions, performance, allocation, and recent trading activity.</p>
         </div>

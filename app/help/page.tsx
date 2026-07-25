@@ -1,7 +1,7 @@
 "use client";
 
 import { useAuth } from "@/components/AuthProvider";
-import { RmiButton } from "@/components/RmiPrimitives";
+import { RmiButton, RmiNotice } from "@/components/RmiPrimitives";
 import {
   FEEDBACK_CATEGORIES,
   FEEDBACK_MESSAGE_MAX_LENGTH,
@@ -183,7 +183,7 @@ export default function HelpPage() {
         <div>
           <div className="flex items-center gap-2 text-cyan">
             <HelpCircle className="h-5 w-5" aria-hidden="true" />
-            <span className="text-xs font-semibold uppercase tracking-wide">RMI Support</span>
+            <span className="text-xs font-semibold">RMI Support</span>
           </div>
           <h1 className="mt-3 text-3xl font-bold sm:text-4xl">How can we help?</h1>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-paper/60">
@@ -204,7 +204,7 @@ export default function HelpPage() {
 
       <div className="grid gap-6 lg:grid-cols-[220px_minmax(0,1fr)]">
         <aside className="rmi-card h-fit border-t-2 border-t-cyan/70 p-4 lg:sticky lg:top-20">
-          <h2 className="text-xs font-semibold uppercase tracking-wide text-paper/45">Browse by Topic</h2>
+          <h2 className="text-xs font-semibold text-paper/45">Browse by topic</h2>
           <div className="mt-3 grid gap-1 sm:grid-cols-4 lg:grid-cols-1">
             {categories.map((item) => (
               <button
@@ -273,7 +273,7 @@ export default function HelpPage() {
         <div>
           <div className="flex items-center gap-2 text-cyan">
             <Send className="h-4 w-4" aria-hidden="true" />
-            <span className="text-xs font-semibold uppercase tracking-wide">Send Feedback</span>
+            <span className="text-xs font-semibold">Send feedback</span>
           </div>
           <h2 id="feedback-title" className="mt-3 text-2xl font-bold">Help improve RMI</h2>
           <p className="mt-2 max-w-md text-sm leading-6 text-paper/60">
@@ -345,13 +345,11 @@ export default function HelpPage() {
           </div>
 
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div aria-live="polite">
-              {feedbackState.message ? (
-                <p className={feedbackState.status === "error" ? "text-sm font-semibold text-ember" : "text-sm font-semibold text-mint"}>
-                  {feedbackState.message}
-                </p>
-              ) : null}
-            </div>
+            {feedbackState.message ? (
+              <RmiNotice tone={feedbackState.status === "error" ? "error" : "success"}>
+                {feedbackState.message}
+              </RmiNotice>
+            ) : <span />}
             <RmiButton type="submit" disabled={feedbackState.status === "sending"} className="sm:min-w-36">
               <Send className="h-4 w-4" aria-hidden="true" />
               {feedbackState.status === "sending" ? "Sending..." : "Send Feedback"}

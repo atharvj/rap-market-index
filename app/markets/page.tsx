@@ -67,12 +67,12 @@ export default function MarketsPage() {
     <div className="space-y-5">
       <header className="rmi-page-head flex flex-wrap items-end justify-between gap-5">
         <div>
-          <div className="rmi-kicker"><Activity className="h-4 w-4" /> Live Exchange</div>
+          <div className="rmi-kicker"><Activity className="h-4 w-4" /> Markets</div>
           <h1 className="mt-3 text-4xl font-bold">Artist Markets</h1>
           <p className="mt-2 max-w-2xl text-sm text-paper/60">Scan every active quote, compare momentum, and move from market signal to artist research in one view.</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <span className="rmi-status-chip" data-tone="mint"><span className="rmi-live-dot" /> {artists.length} Live Listings</span>
+          <span className="rmi-status-chip" data-tone="mint"><span className="rmi-live-dot" /> {artists.length} active artists</span>
           <RmiButton href="/scout" variant="secondary"><Radar className="h-4 w-4" /> Scout Artists</RmiButton>
         </div>
       </header>
@@ -111,7 +111,7 @@ export default function MarketsPage() {
             placeholder="Search artist or ticker"
             aria-label="Search artist or ticker"
           />
-          <span className="hidden text-[10px] font-semibold uppercase tracking-[0.18em] text-paper/35 sm:block">{artists.length} Results</span>
+          <span className="hidden text-xs font-medium text-paper/35 sm:block">{artists.length} results</span>
         </label>
         <div className="flex items-center gap-1 rounded-md border border-line bg-panel p-1" aria-label="Sort markets">
           <SortButton active={sortKey === "name"} onClick={() => chooseSort("name")}>Name</SortButton>

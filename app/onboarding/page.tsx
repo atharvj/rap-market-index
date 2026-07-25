@@ -3,7 +3,7 @@
 import { ArtistAvatar } from "@/components/ArtistAvatar";
 import { useAuth } from "@/components/AuthProvider";
 import { useGame } from "@/components/GameProvider";
-import { RmiButton } from "@/components/RmiPrimitives";
+import { RmiButton, RmiNotice } from "@/components/RmiPrimitives";
 import { formatCurrency } from "@/lib/formatters";
 import { MAX_FAVORITE_ARTISTS, MIN_FAVORITE_ARTISTS } from "@/lib/onboarding";
 import { Check, Search, Trophy, WalletCards } from "lucide-react";
@@ -77,7 +77,7 @@ export default function OnboardingPage() {
   if (!configured || !session) {
     return (
       <div className="rmi-auth-surface mx-auto max-w-xl space-y-4 p-6 text-center sm:p-8">
-        <div className="rmi-kicker justify-center">Market Access</div>
+        <div className="rmi-kicker justify-center">Account setup</div>
         <h1 className="text-3xl font-bold">Create your market profile</h1>
         <p className="text-sm leading-6 text-paper/60">Log in with a confirmed email address to finish setting up RMI.</p>
         <RmiButton href="/account?mode=signin">Log In</RmiButton>
@@ -161,14 +161,12 @@ export default function OnboardingPage() {
 
   return (
     <div className="rmi-auth-surface mx-auto max-w-4xl space-y-6 p-5 sm:p-8">
-      <div className="flex items-center justify-center gap-2 text-center text-sm font-semibold text-cyan">
-        <span className="rmi-live-dot" /> RMI Profile Sequence
-      </div>
       <div className="grid grid-cols-3 gap-2" aria-label={`Step ${step + 1} of 3`}>
         {Array.from({ length: 3 }).map((_, index) => (
           <span key={index} className={index <= step ? "h-1 rounded-full bg-cyan" : "h-1 rounded-full bg-panelSoft"} />
         ))}
       </div>
+      {message ? <RmiNotice tone="error">{message}</RmiNotice> : null}
 
       {step === 0 ? (
         <OnboardingStep
@@ -246,8 +244,6 @@ export default function OnboardingPage() {
           </div>
         </OnboardingStep>
       ) : null}
-
-      {message ? <p className="text-center text-sm font-medium text-ember" aria-live="polite">{message}</p> : null}
 
       <div className="grid grid-cols-2 gap-3">
         <button

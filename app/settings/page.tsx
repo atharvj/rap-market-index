@@ -4,8 +4,9 @@ import { AdminBadge } from "@/components/AdminBadge";
 import { useAuth } from "@/components/AuthProvider";
 import { useGame } from "@/components/GameProvider";
 import { UserAvatar } from "@/components/UserAvatar";
-import { RmiButton } from "@/components/RmiPrimitives";
+import { RmiButton, RmiNotice, type NoticeTone } from "@/components/RmiPrimitives";
 import { TurnstileWidget } from "@/components/TurnstileWidget";
+import { formatAuthErrorMessage } from "@/lib/auth-errors";
 import { getBrowserSupabaseClient } from "@/lib/supabase/client";
 import { applyThemePreference, getStoredThemePreference, type ThemePreference } from "@/lib/theme";
 import { getUsernameValidationError, normalizeUsernameInput, USERNAME_REQUIREMENTS } from "@/lib/username";
@@ -22,6 +23,7 @@ export default function SettingsPage() {
   const [username, setUsername] = useState(state.username);
   const [usernameMessage, setUsernameMessage] = useState("");
   const [message, setMessage] = useState("");
+  const [messageTone, setMessageTone] = useState<NoticeTone>("info");
   const [theme, setTheme] = useState<ThemePreference>("system");
   const [profileIsPublic, setProfileIsPublic] = useState(true);
   const [portfolioIsPublic, setPortfolioIsPublic] = useState(true);
@@ -66,16 +68,23 @@ export default function SettingsPage() {
         if (payload.ok && payload.profile) {
           setProfileIsPublic(payload.profile.profileIsPublic !== false);
           setPortfolioIsPublic(payload.profile.portfolioIsPublic !== false);
+          return;
         }
+
+        setMessage(payload.error ?? "Could not load privacy settings.");
+        setMessageTone("error");
       })
-      .catch(() => setMessage("Could not load privacy settings."));
+      .catch(() => {
+        setMessage("Could not load privacy settings.");
+        setMessageTone("error");
+      });
   }, [session]);
 
   if (!configured || !session) {
     return (
       <div className="mx-auto max-w-3xl space-y-4">
         <header className="rmi-page-head">
-          <div className="rmi-kicker">Control Center</div>
+          <div className="rmi-kicker">Settings</div>
           <h1 className="mt-2 text-3xl font-bold">Settings</h1>
         </header>
         <section className="rmi-auth-surface p-5">
@@ -131,11 +140,13 @@ export default function SettingsPage() {
   async function sendPasswordReset() {
     if (!user?.email) {
       setMessage("No email is attached to this account.");
+      setMessageTone("error");
       return;
     }
 
     if (turnstileSiteKey && !passwordCaptchaToken) {
       setMessage("Complete the security check before requesting a reset email.");
+      setMessageTone("error");
       return;
     }
 
@@ -144,7 +155,8 @@ export default function SettingsPage() {
       captchaToken: passwordCaptchaToken ?? undefined
     });
 
-    setMessage(error ? error.message : "Password reset email sent.");
+    setMessage(error ? formatAuthErrorMessage(error.message) : "Password reset email sent.");
+    setMessageTone(error ? "error" : "success");
     setPasswordCaptchaToken(null);
     setPasswordCaptchaResetKey((current) => current + 1);
 
@@ -163,19 +175,25 @@ export default function SettingsPage() {
       return;
     }
 
-    const response = await fetch("/api/profile/bootstrap", {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        authorization: `Bearer ${session.access_token}`
-      },
-      body: JSON.stringify({
-        profileIsPublic: nextProfileIsPublic,
-        portfolioIsPublic: nextProfileIsPublic && nextPortfolioIsPublic
-      })
-    });
-    const payload = await response.json();
-    setMessage(payload.ok ? "Visibility updated." : payload.error ?? "Could not update visibility.");
+    try {
+      const response = await fetch("/api/profile/bootstrap", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          authorization: `Bearer ${session.access_token}`
+        },
+        body: JSON.stringify({
+          profileIsPublic: nextProfileIsPublic,
+          portfolioIsPublic: nextProfileIsPublic && nextPortfolioIsPublic
+        })
+      });
+      const payload = await response.json();
+      setMessage(payload.ok ? "Visibility updated." : payload.error ?? "Could not update visibility.");
+      setMessageTone(payload.ok ? "success" : "error");
+    } catch {
+      setMessage("Could not update visibility. Check your connection and try again.");
+      setMessageTone("error");
+    }
   }
 
   async function deleteAccount() {
@@ -231,10 +249,11 @@ export default function SettingsPage() {
   return (
     <div className="mx-auto max-w-6xl space-y-5">
       <header className="rmi-page-head">
-        <div className="rmi-kicker">Trader Control Center</div>
+        <div className="rmi-kicker">Settings</div>
         <h1 className="mt-2 text-3xl font-bold sm:text-4xl">Settings</h1>
         <p className="mt-1 text-sm text-paper/55">Identity, access, appearance, and public-profile controls.</p>
       </header>
+      {message ? <RmiNotice tone={messageTone}>{message}</RmiNotice> : null}
 
       <section className="rmi-card flex items-center justify-between gap-4 p-4 sm:p-5">
         <div className="flex min-w-0 items-center gap-3">
@@ -385,8 +404,6 @@ export default function SettingsPage() {
           </div>
         </SettingsRow>
       </SettingsGroup>
-
-      {message ? <p className="rounded-md border border-cyan/25 bg-cyan/5 px-4 py-3 text-sm font-semibold text-paper/70">{message}</p> : null}
 
       {deleteOpen ? (
         <div className="fixed inset-0 z-50 grid place-items-center bg-black/75 px-4" role="dialog" aria-modal="true" aria-labelledby="delete-account-title">

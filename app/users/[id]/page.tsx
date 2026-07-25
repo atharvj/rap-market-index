@@ -121,7 +121,7 @@ export default function PublicUserProfilePage() {
             <UserAvatar avatarUrl={profile.avatarUrl} label={profile.username} size="lg" />
           </div>
           <div className="min-w-0">
-            <p className="rmi-kicker"><Radio className="h-4 w-4" aria-hidden="true" /> Public Profile</p>
+            <p className="rmi-kicker"><Radio className="h-4 w-4" aria-hidden="true" /> Profile</p>
             <div className="flex min-w-0 flex-wrap items-center gap-2">
               <h1 className="mt-2 truncate text-3xl font-bold sm:text-4xl">{profile.username}</h1>
               {profile.isAdmin ? <AdminBadge /> : null}
@@ -147,7 +147,7 @@ export default function PublicUserProfilePage() {
       <section className="rmi-card">
         <div className="rmi-section-header flex flex-col gap-3 p-5 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <p className="rmi-kicker text-cyan"><BarChart3 className="h-4 w-4" aria-hidden="true" /> Public Portfolio</p>
+            <p className="rmi-kicker text-cyan"><BarChart3 className="h-4 w-4" aria-hidden="true" /> Portfolio</p>
             <h2 className="mt-1 text-xl font-semibold">Open Positions</h2>
           </div>
           <span className="rmi-status-chip border-cyan/30 bg-cyan/10 text-cyan">
@@ -205,7 +205,7 @@ export default function PublicUserProfilePage() {
       <section className="rmi-card">
         <div className="rmi-section-header flex items-center justify-between gap-3 p-5">
           <div>
-            <p className="rmi-kicker text-cyan"><Star className="h-4 w-4" aria-hidden="true" /> Artist Favorites</p>
+            <p className="rmi-kicker text-cyan"><Star className="h-4 w-4" aria-hidden="true" /> Favorite artists</p>
             <h2 className="mt-1 text-xl font-semibold">Favorite Artists</h2>
           </div>
         </div>

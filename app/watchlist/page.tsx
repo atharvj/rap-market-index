@@ -48,7 +48,7 @@ export default function WatchlistPage() {
     <div className="space-y-5">
       <header className="rmi-page-head flex flex-wrap items-end justify-between gap-4">
         <div>
-          <div className="rmi-kicker"><Radar className="h-3.5 w-3.5" /> Personal Radar</div>
+          <div className="rmi-kicker"><Radar className="h-3.5 w-3.5" /> Watchlist</div>
           <h1 className="mt-2 text-3xl font-bold sm:text-4xl">Watchlist</h1>
           <p className="mt-1 text-sm font-medium text-paper/70">{watchlistArtists.length} artists you're tracking</p>
         </div>
@@ -162,7 +162,7 @@ export default function WatchlistPage() {
         ) : (
           <div className="grid min-h-48 place-items-center p-6 text-center">
             <div>
-              <h2 className="text-lg font-semibold">Build your market radar</h2>
+              <h2 className="text-lg font-semibold">Build your watchlist</h2>
               <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-paper/55">
                 Save artists to compare their quote movement, signal strength, and verified catalysts in one place.
               </p>
@@ -190,7 +190,7 @@ export default function WatchlistPage() {
 function WatchlistInsight({ label, artist, value }: { label: string; artist: Parameters<typeof ArtistIdentity>[0]["artist"]; value: React.ReactNode }) {
   return (
     <div className="rmi-signal-card p-4">
-      <p className="mb-3 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-paper/40"><Star className="h-3 w-3 text-brass" />{label}</p>
+      <p className="mb-3 flex items-center gap-2 text-xs font-semibold text-paper/40"><Star className="h-3 w-3 text-brass" />{label}</p>
       <div className="flex items-center justify-between gap-3">
         <ArtistIdentity artist={artist} />
         <span className="text-sm font-semibold number-tabular">{value}</span>

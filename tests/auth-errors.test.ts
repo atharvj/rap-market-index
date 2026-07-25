@@ -12,7 +12,9 @@ describe("authentication error messages", () => {
     );
   });
 
-  it("preserves unrelated provider errors", () => {
-    expect(formatAuthErrorMessage("Invalid login credentials")).toBe("Invalid login credentials");
+  it("turns invalid credentials into useful guidance without exposing membership", () => {
+    expect(formatAuthErrorMessage("Invalid login credentials")).toBe(
+      "Email or password is incorrect. Check both fields, reset your password, or create an account."
+    );
   });
 });

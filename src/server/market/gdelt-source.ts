@@ -688,26 +688,25 @@ export function classifyArticleEvent(
     };
   }
 
-  if (hasAny(lowerTitle, PUBLIC_CONFLICT_TERMS)) {
-    return {
-      eventType: "viral" as const,
-      sentimentScore: clamp(14 + toneScore * 0.55, -45, 70),
-      impactScore: clamp(34 + Math.max(0, toneScore), -20, 80),
-      confidence: getArticleConfidence(sourceTier, 0.64),
-      reason: "public_conflict_terms"
-    };
-  }
-
-  const projectRelease = buildReleaseArticleClassification(
+  const musicRelease = buildReleaseArticleClassification(
     lowerTitle,
     sourceTier,
     toneScore,
-    true,
     options.allowLowTierRelease
   );
 
-  if (projectRelease) {
-    return projectRelease;
+  if (musicRelease) {
+    return musicRelease;
+  }
+
+  if (hasAny(lowerTitle, PUBLIC_CONFLICT_TERMS)) {
+    return {
+      eventType: "news" as const,
+      sentimentScore: 0,
+      impactScore: 0,
+      confidence: getArticleConfidence(sourceTier, 0.64),
+      reason: "public_conflict_terms"
+    };
   }
 
   if (
@@ -768,7 +767,7 @@ export function classifyArticleEvent(
     };
   }
 
-  if (hasAny(lowerTitle, VIRAL_TERMS)) {
+  if (hasAny(lowerTitle, VIRAL_TERMS) && hasAny(lowerTitle, VIRAL_MARKET_CONTEXT_TERMS)) {
     return {
       eventType: "viral" as const,
       sentimentScore: clamp(24 + toneScore * 0.55, -45, 75),
@@ -776,10 +775,6 @@ export function classifyArticleEvent(
       confidence: getArticleConfidence(sourceTier, 0.66),
       reason: "viral_terms"
     };
-  }
-
-  if (hasAny(lowerTitle, RELEASE_TERMS) && (sourceTier >= 1 || options.allowLowTierRelease)) {
-    return buildReleaseArticleClassification(lowerTitle, sourceTier, toneScore, false, options.allowLowTierRelease);
   }
 
   if (sourceTier >= 2 && Math.abs(toneScore) >= 18 && hasAny(lowerTitle, NEWS_TERMS)) {
@@ -817,7 +812,6 @@ function buildReleaseArticleClassification(
   title: string,
   sourceTier: number,
   toneScore: number,
-  projectOnly: boolean,
   allowLowTierRelease = false
 ): ArticleMarketClassification | null {
   if ((sourceTier < 1 && !allowLowTierRelease) || !hasAny(title, RELEASE_TERMS)) {
@@ -828,15 +822,23 @@ function buildReleaseArticleClassification(
     return null;
   }
 
+  if (
+    /\b(?:are|is|will|could|might)\b.*\b(?:on|featured|featuring|join)\b.*\b(?:album|song|track|project)\b/.test(title) &&
+    /\b(?:what we know|rumou?r|maybe|possibly|\?)\b/.test(title)
+  ) {
+    return null;
+  }
+
   const releaseKind = getArticleReleaseKind(title);
+
+  if (!releaseKind) {
+    return null;
+  }
+
   const isProjectRelease = releaseKind === "album" || releaseKind === "ep" || releaseKind === "mixtape";
   const hasReleaseAction = hasAny(title, RELEASE_ACTION_TERMS);
 
   if (!hasReleaseAction) {
-    return null;
-  }
-
-  if (projectOnly && !isProjectRelease) {
     return null;
   }
 
@@ -846,7 +848,7 @@ function buildReleaseArticleClassification(
     impactScore: clamp((isProjectRelease ? 52 : 38) + Math.max(0, toneScore), -15, 88),
     confidence: getArticleConfidence(sourceTier, isProjectRelease ? 0.68 : 0.62),
     reason: "release_terms",
-    releaseKind: releaseKind ?? undefined
+    releaseKind
   };
 }
 
@@ -879,7 +881,7 @@ function getArticleReleaseKind(title: string): ArticleReleaseKind | null {
     return "mixtape";
   }
 
-  if (hasAny(title, ["single", "new song", "music video", "visualizer", "new track"])) {
+  if (hasAny(title, ["single", "new song", "music video", "official audio", "visualizer", "new track"])) {
     return "single";
   }
 
@@ -1579,6 +1581,25 @@ const VIRAL_TERMS = [
   "trending",
   "viral",
   "viral clip"
+];
+const VIRAL_MARKET_CONTEXT_TERMS = [
+  "album",
+  "billboard",
+  "challenge",
+  "chart",
+  "concert",
+  "crowd",
+  "freestyle",
+  "music",
+  "performance",
+  "release",
+  "song",
+  "streaming",
+  "tiktok",
+  "tour",
+  "track",
+  "verse",
+  "video"
 ];
 const DECLINE_TERMS = [
   "booed",

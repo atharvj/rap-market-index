@@ -9,6 +9,8 @@ export type SupabaseConfigStatus = {
   marketUpdateSecretConfigured: boolean;
   cronSecretConfigured: boolean;
   lastfmApiKeyConfigured: boolean;
+  listenbrainzTokenConfigured: boolean;
+  listenbrainzEnabled: boolean;
   spotifyCredentialsConfigured: boolean;
   youtubeApiKeyConfigured: boolean;
   redditCredentialsConfigured: boolean;
@@ -25,6 +27,10 @@ export function getSupabaseConfigStatus(): SupabaseConfigStatus {
   const marketUpdateSecretConfigured = Boolean(process.env.MARKET_UPDATE_SECRET);
   const cronSecretConfigured = Boolean(process.env.CRON_SECRET);
   const lastfmApiKeyConfigured = Boolean(process.env.LASTFM_API_KEY);
+  const listenbrainzTokenConfigured = Boolean(process.env.LISTENBRAINZ_USER_TOKEN);
+  const listenbrainzEnabled = ["1", "true", "yes", "on"].includes(
+    (process.env.MARKET_LISTENBRAINZ_ENABLED ?? "").trim().toLowerCase()
+  );
   const spotifyCredentialsConfigured = Boolean(process.env.SPOTIFY_CLIENT_ID && process.env.SPOTIFY_CLIENT_SECRET);
   const youtubeApiKeyConfigured = Boolean(process.env.YOUTUBE_API_KEY);
   const redditCredentialsConfigured = Boolean(process.env.REDDIT_CLIENT_ID && process.env.REDDIT_CLIENT_SECRET);
@@ -38,6 +44,8 @@ export function getSupabaseConfigStatus(): SupabaseConfigStatus {
     marketUpdateSecretConfigured,
     cronSecretConfigured,
     lastfmApiKeyConfigured,
+    listenbrainzTokenConfigured,
+    listenbrainzEnabled,
     spotifyCredentialsConfigured,
     youtubeApiKeyConfigured,
     redditCredentialsConfigured,

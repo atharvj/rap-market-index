@@ -72,7 +72,7 @@ export default function ArtistDetailPage() {
           <div className="flex min-w-0 items-start gap-4">
             <ArtistAvatar artist={artist} size="xl" />
             <div className="min-w-0">
-              <div className="rmi-kicker mb-2"><Radio className="h-3.5 w-3.5" aria-hidden="true" /> Live Artist Quote</div>
+              <div className="rmi-kicker mb-2"><Radio className="h-3.5 w-3.5" aria-hidden="true" /> Artist quote</div>
               <div className="flex flex-wrap items-center gap-2">
                 <h1 className="truncate text-3xl font-bold sm:text-4xl">{artist.name}</h1>
                 <BadgeCheck className="h-4 w-4 text-cyan" aria-hidden="true" />

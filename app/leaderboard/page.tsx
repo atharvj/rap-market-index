@@ -35,7 +35,7 @@ export default function LeaderboardPage() {
     <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
       <main className="min-w-0 space-y-5">
         <header className="rmi-page-head">
-          <div className="rmi-kicker"><Trophy className="h-3.5 w-3.5" /> Competitive Board</div>
+          <div className="rmi-kicker"><Trophy className="h-3.5 w-3.5" /> Rankings</div>
           <h1 className="mt-2 text-3xl font-bold sm:text-4xl">Leaderboard</h1>
           <p className="mt-1 text-sm text-paper/65">Global rankings by fantasy portfolio value, updated from current market quotes.</p>
         </header>

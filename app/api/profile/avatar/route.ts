@@ -144,6 +144,68 @@ export async function POST(request: Request) {
   );
 }
 
+export async function DELETE(request: Request) {
+  const config = getSupabaseConfigStatus();
+
+  if (!config.serviceRoleConfigured) {
+    return NextResponse.json({ ok: false, error: "Profile picture storage is not configured." }, { status: 503 });
+  }
+
+  const auth = await requireConfirmedUser(request);
+
+  if (!auth.ok) {
+    return auth.response;
+  }
+
+  const limited = await enforceRateLimit({
+    request,
+    identifier: auth.user.id,
+    scope: "avatar-remove",
+    limit: 12,
+    windowSeconds: 3600
+  });
+
+  if (limited) {
+    return limited;
+  }
+
+  const service = createServiceRoleClient();
+  const { data: existing, error: listError } = await service.storage
+    .from("profile-avatars")
+    .list(auth.user.id, { limit: 100 });
+
+  if (listError) {
+    return NextResponse.json({ ok: false, error: "Could not remove the profile picture." }, { status: 500 });
+  }
+
+  const { error: profileError } = await service
+    .from("profiles")
+    .update({ avatar_url: "" })
+    .eq("id", auth.user.id);
+
+  if (profileError) {
+    return NextResponse.json({ ok: false, error: "Could not remove the profile picture." }, { status: 500 });
+  }
+
+  if (existing?.length) {
+    const { error: removeError } = await service.storage
+      .from("profile-avatars")
+      .remove(existing.map((object) => `${auth.user.id}/${object.name}`));
+
+    if (removeError) {
+      return NextResponse.json(
+        { ok: true, avatarUrl: "", warning: "The old image file could not be cleaned up yet." },
+        { headers: { "Cache-Control": "private, no-store, max-age=0" } }
+      );
+    }
+  }
+
+  return NextResponse.json(
+    { ok: true, avatarUrl: "" },
+    { headers: { "Cache-Control": "private, no-store, max-age=0" } }
+  );
+}
+
 function readAscii(bytes: Uint8Array, start: number, end: number) {
   return String.fromCharCode(...bytes.slice(start, end));
 }

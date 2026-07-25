@@ -1,12 +1,12 @@
 import { execFileSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { extname } from "node:path";
 import ts from "typescript";
 import { describe, expect, it } from "vitest";
 
 const trackedFiles = execFileSync("git", ["ls-files", "-z"], { encoding: "utf8" })
   .split("\0")
-  .filter(Boolean);
+  .filter((path) => Boolean(path) && existsSync(path));
 
 const sourceExtensions = new Set([
   ".cjs",

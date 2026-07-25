@@ -1,6 +1,7 @@
 "use client";
 
 import { EMAIL_CONFIRMATION_PENDING_KEY } from "@/lib/auth-signup";
+import { formatAuthErrorMessage } from "@/lib/auth-errors";
 import { getBrowserSupabaseClient } from "@/lib/supabase/client";
 import { CheckCircle2, XCircle } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -20,7 +21,7 @@ export default function EmailConfirmedPage() {
         window.localStorage.removeItem(EMAIL_CONFIRMATION_PENDING_KEY);
         if (active) {
           setState("error");
-          setMessage(authError.replace(/\+/g, " "));
+          setMessage(formatAuthErrorMessage(authError.replace(/\+/g, " ")));
         }
         return;
       }
@@ -64,7 +65,9 @@ export default function EmailConfirmedPage() {
       <div>
         <p className="rmi-data-label text-cyan">RMI Account</p>
         <h1 className="mt-2 text-3xl font-bold">{state === "confirmed" ? "Email confirmed" : state === "error" ? "Confirmation failed" : "Confirming email"}</h1>
-        <p className="mt-3 text-sm leading-6 text-paper/60">{message}</p>
+        <p className={state === "error" ? "mt-3 border border-ember/45 bg-ember/10 px-3 py-2 text-sm font-semibold leading-6 text-ember" : "mt-3 text-sm leading-6 text-paper/60"}>
+          {message}
+        </p>
       </div>
     </div>
   );

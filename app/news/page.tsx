@@ -31,7 +31,7 @@ export default function NewsPage() {
       <main className="min-w-0">
         <div className="rmi-page-head flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <div className="rmi-kicker"><Radio className="h-4 w-4" /> RMI Market Wire</div>
+            <div className="rmi-kicker"><Radio className="h-4 w-4" /> Market news</div>
             <h1 className="mt-3 text-4xl font-bold">Market News</h1>
             <p className="mt-2 max-w-2xl text-sm text-paper/60">Price-relevant artist events ranked by impact, source confidence, and recency.</p>
           </div>
@@ -101,7 +101,7 @@ export default function NewsPage() {
 
         <section className="rmi-card rmi-news-card p-4">
           <Music className="h-5 w-5 text-cyan" aria-hidden="true" />
-          <h2 className="mt-3 text-sm font-semibold">RMI Market Wire</h2>
+          <h2 className="mt-3 text-sm font-semibold">How stories are selected</h2>
           <p className="mt-2 text-sm leading-6 text-paper/60">
             Routine uploads, reposts, and low-signal chatter are excluded. A story must clear evidence and relevance checks before it appears here.
           </p>

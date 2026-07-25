@@ -514,7 +514,9 @@ async function collectRealSignals({
   const useLastfm =
     getEnvBoolean("MARKET_LASTFM_ENABLED", true) &&
     (source === "lastfm" || source === "core" || source === "blended");
-  const useListenBrainz = source === "lastfm" || source === "core" || source === "blended";
+  const useListenBrainz =
+    getEnvBoolean("MARKET_LISTENBRAINZ_ENABLED", false) &&
+    (source === "lastfm" || source === "core" || source === "blended");
   const useSpotify =
     source === "spotify" || ((source === "core" || source === "blended") && hasSpotifyCredentials());
   const useYoutube = source === "youtube" || source === "core" || source === "blended";

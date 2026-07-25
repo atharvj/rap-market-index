@@ -19,6 +19,7 @@ export function WatchlistButton({
   const router = useRouter();
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState("");
+  const [messageIsError, setMessageIsError] = useState(false);
   const active = isWatchlisted(artistId);
   const action = active ? "Remove from watchlist" : "Add to watchlist";
   const title = session && syncMode === "supabase" ? message || action : "Sign in to save a watchlist";
@@ -41,6 +42,7 @@ export function WatchlistButton({
     setSubmitting(true);
     const result = await toggleWatchlist(artistId);
     setMessage(result.message);
+    setMessageIsError(!result.ok);
     setSubmitting(false);
   }
 
@@ -64,8 +66,13 @@ export function WatchlistButton({
       </button>
       {message ? (
         <span
-          role="status"
-          className="absolute right-0 top-11 z-40 w-max max-w-56 rounded-md border border-line bg-panel px-3 py-2 text-xs font-medium text-paper shadow-[var(--shadow-popover)]"
+          role={messageIsError ? "alert" : "status"}
+          className={clsx(
+            "absolute right-0 top-11 z-40 w-max max-w-56 border px-3 py-2 text-xs font-semibold shadow-[var(--shadow-popover)]",
+            messageIsError
+              ? "border-ember/45 bg-panel text-ember"
+              : "border-line bg-panel text-paper"
+          )}
         >
           {message}
         </span>
