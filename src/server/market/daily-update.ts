@@ -1526,6 +1526,7 @@ function getDefaultSignalConfidence(sourceName: string) {
     gdelt: 0.58,
     wikimedia: 0.62,
     market_events: 0.78,
+    polymarket: 0.44,
     trade_flow: 0.72,
     manual: 0.62,
     core: 0.68,
@@ -1585,6 +1586,9 @@ function getStatSourceWeight(key: keyof HypeStats, sourceName: string) {
       searchGrowth: 0.45,
       socialGrowth: 0.5,
       newsScore: 0.85
+    },
+    polymarket: {
+      traderDemand: 0.2
     },
     trade_flow: {
       traderDemand: 1

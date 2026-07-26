@@ -35,6 +35,7 @@ import {
 import { collectLastfmMarketSignals } from "@/server/market/lastfm-source";
 import { collectListenBrainzMarketSignals } from "@/server/market/listenbrainz-source";
 import { collectMusicbrainzReleaseEvents } from "@/server/market/musicbrainz-releases";
+import { collectPolymarketMarketSignals } from "@/server/market/polymarket-source";
 import { collectRedditMarketSignals } from "@/server/market/reddit-source";
 import { collectSpotifyMarketSignals } from "@/server/market/spotify-source";
 import { collectTradeFlowMarketSignals } from "@/server/market/trade-flow-source";
@@ -524,6 +525,9 @@ async function collectRealSignals({
   const useReddit = source === "reddit" || ((source === "core" || source === "blended") && hasRedditCredentials());
   const useBluesky =
     source === "bluesky" || ((source === "core" || source === "blended") && getEnvBoolean("MARKET_BLUESKY_ENABLED", false));
+  const usePolymarket =
+    (source === "core" || source === "blended") &&
+    getEnvBoolean("MARKET_POLYMARKET_ENABLED", true);
   const useTradeFlow = Boolean(supabase) && isRealExternalSource(source);
   const warnings: string[] = [];
 
@@ -535,7 +539,8 @@ async function collectRealSignals({
     !useYoutube &&
     !useWikimedia &&
     !useReddit &&
-    !useBluesky
+    !useBluesky &&
+    !usePolymarket
   ) {
     return {
       adapterSignalSources: [],
@@ -907,6 +912,24 @@ async function collectRealSignals({
         observations.push(...bluesky.observations);
         warnings.push(...bluesky.warnings);
         detectedEventsByArtist = mergeEvents(detectedEventsByArtist, bluesky.eventsByArtist);
+      }
+    })());
+  }
+
+  if (usePolymarket) {
+    sourceTasks.push((async () => {
+      const polymarket = await collectExternalSource("Polymarket music expectations", warnings, () =>
+        collectPolymarketMarketSignals({
+          artists,
+          runDate,
+          timeoutMs: getEnvInteger("MARKET_POLYMARKET_TIMEOUT_MS", 15000, 3000, 30000)
+        })
+      );
+
+      if (polymarket) {
+        sources.push(polymarket.signals);
+        observations.push(...polymarket.observations);
+        warnings.push(...polymarket.warnings);
       }
     })());
   }
