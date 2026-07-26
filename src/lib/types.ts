@@ -30,6 +30,37 @@ export type MarketObservationSeries = {
   latestDate: string | null;
 };
 
+export type MarketForecastKind =
+  | "release"
+  | "chart"
+  | "award"
+  | "streaming"
+  | "sales"
+  | "collaboration"
+  | "tour"
+  | "other";
+
+export type MarketForecastDirection = "bullish_yes" | "bearish_yes" | "informational";
+
+export type MarketForecast = {
+  id: string;
+  artistId: string;
+  question: string;
+  eventTitle: string;
+  probabilityPercent: number;
+  artistOutlookPercent: number;
+  dailyChangePoints: number | null;
+  artistOutlookChangePoints: number | null;
+  kind: MarketForecastKind;
+  direction: MarketForecastDirection;
+  endDate: string | null;
+  isNew: boolean;
+  pricingEligible: boolean;
+  marketQuality: "established" | "developing";
+  asOf: string;
+  insightScore: number;
+};
+
 export type Artist = {
   id: string;
   name: string;

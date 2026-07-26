@@ -59,6 +59,7 @@ import {
   loadActiveArtistsPage,
   loadArtistExternalIds,
   loadExistingPriceHistoryArtistIds,
+  loadLatestObservationPayloads,
   loadObservationBaselines,
   loadPreviousClosePrices,
   loadPreviousSignalStats,
@@ -563,6 +564,7 @@ async function collectRealSignals({
   let wikimediaBaselines: ObservationBaselines = {};
   let redditBaselines: ObservationBaselines = {};
   let blueskyBaselines: ObservationBaselines = {};
+  let polymarketPreviousPayloads: Record<string, Record<string, unknown>> = {};
 
   if (supabase) {
     try {
@@ -576,7 +578,8 @@ async function collectRealSignals({
         youtubeCommentBaselines,
         wikimediaBaselines,
         redditBaselines,
-        blueskyBaselines
+        blueskyBaselines,
+        polymarketPreviousPayloads
       ] = await Promise.all([
         loadArtistExternalIds(supabase, artistIds),
         useGdelt
@@ -678,6 +681,16 @@ async function collectRealSignals({
               beforeDate: runDate,
               lookbackDays: 30
             })
+          : Promise.resolve({}),
+        usePolymarket
+          ? loadLatestObservationPayloads({
+              supabase,
+              artistIds,
+              source: "polymarket",
+              metric: "music_market_contract_count",
+              beforeDate: runDate,
+              lookbackDays: 14
+            })
           : Promise.resolve({})
       ]);
     } catch (error) {
@@ -692,6 +705,7 @@ async function collectRealSignals({
       wikimediaBaselines = {};
       redditBaselines = {};
       blueskyBaselines = {};
+      polymarketPreviousPayloads = {};
     }
   }
 
@@ -922,6 +936,7 @@ async function collectRealSignals({
         collectPolymarketMarketSignals({
           artists,
           runDate,
+          previousPayloads: polymarketPreviousPayloads,
           timeoutMs: getEnvInteger("MARKET_POLYMARKET_TIMEOUT_MS", 15000, 3000, 30000)
         })
       );

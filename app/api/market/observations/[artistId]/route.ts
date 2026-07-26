@@ -182,6 +182,34 @@ const SERIES_DEFINITIONS: Record<string, { label: string; unit: string }> = {
   "trade_flow:signal_eligibility": {
     label: "Order-flow signal eligibility",
     unit: "boolean"
+  },
+  "polymarket:music_market_probability": {
+    label: "Crowd forecast outlook",
+    unit: "percent"
+  },
+  "polymarket:music_market_probability_1d_change": {
+    label: "Crowd forecast daily change",
+    unit: "percentage_points"
+  },
+  "polymarket:music_market_liquidity": {
+    label: "Forecast market liquidity",
+    unit: "usd"
+  },
+  "polymarket:music_market_volume": {
+    label: "Forecast market volume",
+    unit: "usd"
+  },
+  "polymarket:music_market_contract_count": {
+    label: "Tracked crowd forecasts",
+    unit: "contracts"
+  },
+  "polymarket:music_market_new_contract_count": {
+    label: "New crowd forecasts",
+    unit: "contracts"
+  },
+  "polymarket:music_market_forecast_kind_count": {
+    label: "Crowd forecast categories",
+    unit: "forecast_types"
   }
 };
 

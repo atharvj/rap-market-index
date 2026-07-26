@@ -487,6 +487,50 @@ export async function loadObservationBaselines({
   );
 }
 
+export async function loadLatestObservationPayloads({
+  supabase,
+  artistIds,
+  source,
+  metric,
+  beforeDate,
+  lookbackDays
+}: {
+  supabase: Supabase;
+  artistIds: string[];
+  source: string;
+  metric: string;
+  beforeDate: string;
+  lookbackDays: number;
+}): Promise<Record<string, Record<string, unknown>>> {
+  if (!artistIds.length) {
+    return {};
+  }
+
+  const startDate = shiftDate(beforeDate, -lookbackDays);
+  const { data, error } = await supabase
+    .from("market_observations")
+    .select("artist_id,observed_date,raw_payload")
+    .in("artist_id", artistIds)
+    .eq("source", source)
+    .eq("metric", metric)
+    .gte("observed_date", startDate)
+    .lt("observed_date", beforeDate)
+    .order("observed_date", { ascending: false });
+
+  if (error) {
+    throw new Error(`Could not load observation payloads: ${error.message}`);
+  }
+
+  return ((data ?? []) as Pick<MarketObservationRow, "artist_id" | "observed_date" | "raw_payload">[])
+    .reduce<Record<string, Record<string, unknown>>>((memo, row) => {
+      if (!memo[row.artist_id] && row.raw_payload && typeof row.raw_payload === "object" && !Array.isArray(row.raw_payload)) {
+        memo[row.artist_id] = row.raw_payload as Record<string, unknown>;
+      }
+
+      return memo;
+    }, {});
+}
+
 export async function loadLatestObservationDates({
   supabase,
   artistIds,

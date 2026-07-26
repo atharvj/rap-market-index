@@ -1,6 +1,7 @@
 "use client";
 
 import { useAuth } from "@/components/AuthProvider";
+import { CrowdForecasts } from "@/components/CrowdForecasts";
 import { useGame } from "@/components/GameProvider";
 import { ArtistIdentity, ChangeText, RmiButton, RmiSection } from "@/components/RmiPrimitives";
 import { MarketSideRail } from "@/components/MarketSideRail";
@@ -90,6 +91,8 @@ export default function HomePage() {
       </RmiSection>
 
       <WatchNow />
+
+      <CrowdForecasts limit={6} />
 
       <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1.55fr)_minmax(300px,0.65fr)]">
         <RmiSection

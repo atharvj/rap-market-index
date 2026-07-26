@@ -1901,6 +1901,7 @@ function getSourceAttributionLabel(source: string) {
     gdelt: "news coverage",
     wikimedia: "public attention",
     market_events: "release and news events",
+    polymarket: "crowd forecast outlook",
     trade_flow: "order flow",
     manual: "manual signal"
   };
@@ -2038,6 +2039,14 @@ function explainMove(
 
   if (counterCatalyst?.reasonPriority && counterCatalyst.reasonPriority >= 8) {
     return `${ticker} ${direction} by ${magnitude}% as ${signalName} shifted, though ${formatCatalystReason(counterCatalyst.reason)} offset part of the move${sourceClause}.`;
+  }
+
+  if (
+    sourceAttribution.leadingSource?.source === "polymarket" &&
+    sourceAttribution.leadingSource.alignedWithMove
+  ) {
+    const outlookDirection = dailyChangePercent > 0 ? "strengthened" : "weakened";
+    return `${ticker} ${direction} by ${magnitude}% as the crowd forecast outlook ${outlookDirection}${sourceClause}.`;
   }
 
   return `${ticker} ${direction} by ${magnitude}% at the latest market close. No verified headline or event was strong enough to attribute as the primary cause${sourceClause}.`;
