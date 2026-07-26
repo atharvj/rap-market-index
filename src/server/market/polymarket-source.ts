@@ -1,5 +1,5 @@
 import { clamp } from "@/lib/pricing";
-import type { HypeStats, MarketForecastKind } from "@/lib/types";
+import type { HypeStats } from "@/lib/types";
 import { normalizeArtistNameForMatch, scoreArtistNameMatch } from "@/server/market/artist-name-match";
 import type { MarketUpdateArtist } from "@/server/market/daily-update";
 import type { AdapterSignals, MarketObservation } from "@/server/market/market-data";
@@ -47,6 +47,15 @@ type PolymarketMarketRow = {
 };
 
 type ForecastDirection = "bullish_yes" | "bearish_yes" | "informational";
+type ForecastKind =
+  | "release"
+  | "chart"
+  | "award"
+  | "streaming"
+  | "sales"
+  | "collaboration"
+  | "tour"
+  | "other";
 
 type EligibleContract = {
   marketId: string;
@@ -64,7 +73,7 @@ type EligibleContract = {
   spread: number;
   endDate: string | null;
   createdAt: string | null;
-  forecastKind: MarketForecastKind;
+  forecastKind: ForecastKind;
   direction: ForecastDirection;
   directionMultiplier: -1 | 0 | 1;
   artistOutlookProbability: number;
@@ -502,7 +511,7 @@ function getPreviousContract(payload: Record<string, unknown> | undefined, marke
   return null;
 }
 
-function getForecastKind(value: string): MarketForecastKind {
+function getForecastKind(value: string): ForecastKind {
   if (/\b(grammy|award|aoty|album of the year|song of the year|record of the year)\b/i.test(value)) {
     return "award";
   }
@@ -546,8 +555,8 @@ function getForecastDirection(question: string): ForecastDirection {
   return "informational";
 }
 
-function getForecastImportance(kind: MarketForecastKind) {
-  const weights: Record<MarketForecastKind, number> = {
+function getForecastImportance(kind: ForecastKind) {
+  const weights: Record<ForecastKind, number> = {
     release: 0.62,
     chart: 0.92,
     award: 0.86,
@@ -779,7 +788,7 @@ function calculateInfluenceMovement(contracts: EligibleContract[]) {
     }
   }
 
-  const byKind = new Map<MarketForecastKind, EligibleContract[]>();
+  const byKind = new Map<ForecastKind, EligibleContract[]>();
 
   for (const contract of bestByEventAndKind.values()) {
     const current = byKind.get(contract.forecastKind) ?? [];

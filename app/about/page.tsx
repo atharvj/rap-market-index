@@ -27,10 +27,6 @@ const sections = [
     body: "Release, review, social, and audience signals are checked during market runs. Routine uploads and isolated fan posts are filtered out, while larger moves require stronger source confidence, independent confirmation, or measurable audience reaction. No single headline determines an artist quote by itself."
   },
   {
-    title: "What crowd forecasts mean",
-    body: "Crowd Forecasts show prediction-market estimates for artist-specific music outcomes such as releases, chart positions, streaming ranks, sales, awards, collaborations, and tours. The probability is useful context, but it is not treated as fact. Only meaningful probability movement in a sufficiently liquid, active market can provide a small confirming input to an RMI quote."
-  },
-  {
     title: "What happens outside music",
     body: "A major appearance, controversy, performance, or cultural moment can create short-term public-attention momentum and may appear in RMI news. It has a smaller and more temporary price effect unless direct music demand, audience growth, or sustained fan interest confirms that the attention is carrying back into the artist's music career."
   },

@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { createInitialGameState } from "../src/lib/market";
-import type { GameState, MarketForecast } from "../src/lib/types";
+import type { GameState } from "../src/lib/types";
 
 const dailyMoves = [4.8, 3.4, 2.1, 1.3, 0.7, 0.2, -0.3, -0.8, 1.8, -1.4, 0.9, -0.5, 2.7, -1.1, 1.2, -0.2];
 const videoPoster = (label: string, color: string) =>
@@ -178,45 +178,6 @@ const marketVideos = [
   }
 ];
 
-const marketForecasts: MarketForecast[] = [
-  {
-    id: "forecast-1",
-    artistId: marketState.artists[1].id,
-    question: `Will ${marketState.artists[1].name}'s next album go #1?`,
-    eventTitle: "Next album chart position",
-    probabilityPercent: 64,
-    artistOutlookPercent: 64,
-    dailyChangePoints: 4,
-    artistOutlookChangePoints: 4,
-    kind: "chart",
-    direction: "bullish_yes",
-    endDate: "2026-09-01T00:00:00Z",
-    isNew: true,
-    pricingEligible: false,
-    marketQuality: "established",
-    asOf: "2026-07-17",
-    insightScore: 0.91
-  },
-  {
-    id: "forecast-2",
-    artistId: marketState.artists[2].id,
-    question: `Will ${marketState.artists[2].name} release a new album this year?`,
-    eventTitle: "Album release timing",
-    probabilityPercent: 58,
-    artistOutlookPercent: 58,
-    dailyChangePoints: null,
-    artistOutlookChangePoints: null,
-    kind: "release",
-    direction: "bullish_yes",
-    endDate: "2026-12-31T00:00:00Z",
-    isNew: false,
-    pricingEligible: false,
-    marketQuality: "developing",
-    asOf: "2026-07-17",
-    insightScore: 0.64
-  }
-];
-
 async function installPublicFixtures(page: Page) {
   await page.addInitScript(() => {
     window.localStorage.setItem("rmi-theme", "dark");
@@ -235,18 +196,6 @@ async function installPublicFixtures(page: Page) {
     return route.fulfill({
       contentType: "application/json",
       body: JSON.stringify({ ok: true, news })
-    });
-  });
-  await page.route("**/api/market/forecasts**", (route) => {
-    const requestUrl = new URL(route.request().url());
-    const artistId = requestUrl.searchParams.get("artistId");
-    const forecasts = artistId
-      ? marketForecasts.filter((forecast) => forecast.artistId === artistId)
-      : marketForecasts;
-
-    return route.fulfill({
-      contentType: "application/json",
-      body: JSON.stringify({ ok: true, source: "polymarket", forecasts, asOf: "2026-07-17" })
     });
   });
   await page.route("https://www.youtube-nocookie.com/embed/**", (route) => {
@@ -392,17 +341,6 @@ test("Watch Now starts in view and stays inside the RMI player", async ({ page }
   await expect(page.getByRole("heading", { name: marketVideos[0].title })).toBeVisible();
   await page.getByRole("button", { name: "Unmute video" }).click();
   await expect(page.getByRole("button", { name: "Mute video" })).toBeVisible();
-});
-
-test("Crowd Forecasts shows public expectations without linking users to a prediction platform", async ({ page }) => {
-  await page.goto("/");
-  const heading = page.getByRole("heading", { name: "Crowd Forecasts" });
-  await heading.scrollIntoViewIfNeeded();
-
-  await expect(heading).toBeVisible();
-  await expect(page.getByText(marketForecasts[0].question, { exact: true })).toBeVisible();
-  await expect(page.getByText("64%")).toBeVisible();
-  await expect(page.getByRole("link", { name: /polymarket|prediction market/i })).toHaveCount(0);
 });
 
 test("markets visual contract", async ({ page }) => {

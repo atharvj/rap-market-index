@@ -1,9 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  calculateDailyMarketUpdates,
-  mergeAdapterSignals,
-  type MarketUpdateArtist
-} from "@/server/market/daily-update";
+import { calculateDailyMarketUpdates, type MarketUpdateArtist } from "@/server/market/daily-update";
 
 const neutralStats = {
   streamingGrowth: 0,
@@ -164,36 +160,6 @@ describe("daily market valuation pressure", () => {
     expect(update.rawPayload.measuredMinimumTick).toMatchObject({
       applied: false,
       sourceCount: 1
-    });
-  });
-
-  it("names crowd forecast movement when it is the leading measured source", () => {
-    const forecastArtist = artist();
-    forecastArtist.currentPrice = 100;
-    forecastArtist.previousClose = 100;
-    const adapterSignals = mergeAdapterSignals({
-      artist: {
-        stats: { traderDemand: 18 },
-        confidence: 0.44,
-        rawPayload: {
-          source: "polymarket",
-          status: "momentum"
-        }
-      }
-    });
-    const result = calculateDailyMarketUpdates({
-      artists: [forecastArtist],
-      runDate: "2026-07-26",
-      source: "core",
-      adapterSignals
-    });
-
-    expect(result.updates[0].explanation).toContain("crowd forecast outlook");
-    expect(result.updates[0].rawPayload.sourceAttribution).toMatchObject({
-      leadingSource: {
-        source: "polymarket",
-        label: "crowd forecast outlook"
-      }
     });
   });
 });

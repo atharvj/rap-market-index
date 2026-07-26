@@ -56,7 +56,6 @@ const topics = [
     answers: [
       "A quote is a fantasy index value, not an artist's income, net worth, or literal market capitalization.",
       "Audience momentum, durable reach, verified catalysts, reception, and eligible market demand can affect a quote.",
-      "Crowd Forecasts show prediction-market expectations. Their probability levels are informational; only qualified changes in liquid music markets can weakly confirm a daily quote signal.",
       "Source-backed quotes refresh each morning; eligible orders can also record price movement during the day.",
       "Top Gainer means the largest current-session increase. Strongest Signal means the highest combined RMI signal score, so they can be different artists."
     ]

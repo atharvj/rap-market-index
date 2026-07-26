@@ -3,7 +3,6 @@
 import { ArtistAvatar } from "@/components/ArtistAvatar";
 import { ArtistAudienceSnapshot } from "@/components/ArtistAudienceSnapshot";
 import { ArtistPriceHistoryPanel } from "@/components/ArtistPriceHistoryPanel";
-import { CrowdForecasts } from "@/components/CrowdForecasts";
 import { useGame } from "@/components/GameProvider";
 import { MarketSideRail } from "@/components/MarketSideRail";
 import { MarketNewsFeed } from "@/components/MarketNewsFeed";
@@ -112,8 +111,6 @@ export default function ArtistDetailPage() {
         </section>
 
         <ArtistAudienceSnapshot artistId={artist.id} />
-
-        <CrowdForecasts artistId={artist.id} limit={4} variant="artist" />
 
         <RmiSection title={<span className="flex items-center gap-2"><Activity className="h-4 w-4 text-mint" /> Why the Quote Moved</span>}>
           <div className="px-4">
