@@ -7,6 +7,8 @@ import {
   Captions,
   ChevronRight,
   Eye,
+  Maximize2,
+  Minimize2,
   Pause,
   Play,
   Radio,
@@ -23,11 +25,14 @@ type WatchNowResponse = {
 };
 
 const PLAYER_ORIGIN = "https://www.youtube-nocookie.com";
+const CONTROL_HIDE_DELAY_MS = 1800;
 
 export function WatchNow() {
   const playerViewportRef = useRef<HTMLDivElement | null>(null);
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
   const endedVideoRef = useRef<string | null>(null);
+  const controlHideTimerRef = useRef<number | null>(null);
+  const pointerOverPlayerRef = useRef(false);
   const [videos, setVideos] = useState<MarketNewsItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -36,6 +41,8 @@ export function WatchNow() {
   const [isPlaying, setIsPlaying] = useState(false);
   const [isMuted, setIsMuted] = useState(true);
   const [captionsEnabled, setCaptionsEnabled] = useState(false);
+  const [controlsVisible, setControlsVisible] = useState(true);
+  const [isFullscreen, setIsFullscreen] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const currentVideo = videos[currentIndex] ?? null;
@@ -46,6 +53,39 @@ export function WatchNow() {
       PLAYER_ORIGIN
     );
   }, []);
+
+  const clearControlHideTimer = useCallback(() => {
+    if (controlHideTimerRef.current !== null) {
+      window.clearTimeout(controlHideTimerRef.current);
+      controlHideTimerRef.current = null;
+    }
+  }, []);
+
+  const revealControls = useCallback(() => {
+    clearControlHideTimer();
+    setControlsVisible(true);
+  }, [clearControlHideTimer]);
+
+  const scheduleControlsHide = useCallback(() => {
+    clearControlHideTimer();
+
+    if (!isPlaying) {
+      return;
+    }
+
+    controlHideTimerRef.current = window.setTimeout(() => {
+      const playerViewport = playerViewportRef.current;
+      const controlsHaveKeyboardFocus =
+        playerViewport !== null &&
+        document.activeElement instanceof HTMLElement &&
+        playerViewport.contains(document.activeElement) &&
+        document.activeElement.matches(":focus-visible");
+
+      if (!pointerOverPlayerRef.current && !controlsHaveKeyboardFocus) {
+        setControlsVisible(false);
+      }
+    }, CONTROL_HIDE_DELAY_MS);
+  }, [clearControlHideTimer, isPlaying]);
 
   const chooseVideo = useCallback((index: number) => {
     setCurrentIndex((previousIndex) => {
@@ -108,6 +148,25 @@ export function WatchNow() {
 
     return () => controller.abort();
   }, []);
+
+  useEffect(() => {
+    function handleFullscreenChange() {
+      const nextFullscreen = document.fullscreenElement === playerViewportRef.current;
+      setIsFullscreen(nextFullscreen);
+      revealControls();
+    }
+
+    document.addEventListener("fullscreenchange", handleFullscreenChange);
+    return () => document.removeEventListener("fullscreenchange", handleFullscreenChange);
+  }, [revealControls]);
+
+  useEffect(() => {
+    if (!isPlaying) {
+      revealControls();
+    }
+  }, [isPlaying, revealControls]);
+
+  useEffect(() => () => clearControlHideTimer(), [clearControlHideTimer]);
 
   useEffect(() => {
     const playerViewport = playerViewportRef.current;
@@ -292,6 +351,24 @@ export function WatchNow() {
     postPlayerCommand("seekTo", [boundedTime, true]);
   }
 
+  async function toggleFullscreen() {
+    const playerViewport = playerViewportRef.current;
+
+    if (!playerViewport) {
+      return;
+    }
+
+    try {
+      if (document.fullscreenElement === playerViewport) {
+        await document.exitFullscreen();
+      } else {
+        await playerViewport.requestFullscreen();
+      }
+    } catch {
+      setIsFullscreen(document.fullscreenElement === playerViewport);
+    }
+  }
+
   if (!loading && !videos.length) {
     return null;
   }
@@ -315,7 +392,23 @@ export function WatchNow() {
       ) : (
         <div className="grid lg:grid-cols-[minmax(0,1.45fr)_minmax(300px,0.75fr)]">
           <div className="min-w-0 border-b border-line lg:border-b-0 lg:border-r">
-            <div ref={playerViewportRef} className="relative aspect-video overflow-hidden bg-black">
+            <div
+              ref={playerViewportRef}
+              data-watch-player
+              className="relative aspect-video overflow-hidden bg-black fullscreen:h-screen fullscreen:w-screen fullscreen:aspect-auto"
+              onMouseEnter={() => {
+                pointerOverPlayerRef.current = true;
+                revealControls();
+              }}
+              onMouseMove={revealControls}
+              onMouseLeave={() => {
+                pointerOverPlayerRef.current = false;
+                scheduleControlsHide();
+              }}
+              onFocusCapture={revealControls}
+              onBlurCapture={scheduleControlsHide}
+              onKeyDown={revealControls}
+            >
               {currentVideo.thumbnailUrl ? (
                 <img
                   src={currentVideo.thumbnailUrl}
@@ -331,7 +424,8 @@ export function WatchNow() {
                     src={embedUrl}
                     title={`${currentVideo.title} video player`}
                     className="pointer-events-none absolute inset-0 h-full w-full border-0"
-                    allow="autoplay; encrypted-media; picture-in-picture"
+                    allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
+                    allowFullScreen
                     referrerPolicy="strict-origin-when-cross-origin"
                     sandbox="allow-scripts allow-same-origin allow-presentation"
                     tabIndex={-1}
@@ -360,8 +454,19 @@ export function WatchNow() {
                 </button>
               )}
 
-              <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 h-28 bg-gradient-to-t from-black/95 to-transparent" />
-              <div className="absolute inset-x-0 bottom-0 z-20 grid gap-2 p-3 sm:p-4">
+              <div
+                className={clsx(
+                  "pointer-events-none absolute inset-x-0 bottom-0 z-10 h-28 bg-gradient-to-t from-black/95 to-transparent transition-opacity duration-300",
+                  controlsVisible ? "opacity-100" : "opacity-0"
+                )}
+              />
+              <div
+                data-watch-controls
+                className={clsx(
+                  "absolute inset-x-0 bottom-0 z-20 grid gap-2 p-3 transition-opacity duration-300 sm:p-4",
+                  controlsVisible ? "opacity-100" : "pointer-events-none opacity-0"
+                )}
+              >
                 <div className="flex items-center gap-2">
                   <input
                     type="range"
@@ -400,9 +505,18 @@ export function WatchNow() {
                       <Captions className="h-4 w-4" />
                     </PlayerButton>
                   </div>
-                  <span className="hidden rounded-[var(--radius-control)] bg-black/70 px-2 py-1 text-[10px] font-semibold text-white/75 sm:inline">
-                    Official video
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <span className="hidden rounded-[var(--radius-control)] bg-black/70 px-2 py-1 text-[10px] font-semibold text-white/75 sm:inline">
+                      Official video
+                    </span>
+                    <PlayerButton
+                      onClick={toggleFullscreen}
+                      label={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
+                      pressed={isFullscreen}
+                    >
+                      {isFullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+                    </PlayerButton>
+                  </div>
                 </div>
               </div>
             </div>

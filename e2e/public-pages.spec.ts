@@ -314,6 +314,42 @@ test("Watch Now starts in view and stays inside the RMI player", async ({ page }
   await expect(page.getByRole("link", { name: /youtube/i })).toHaveCount(0);
   await expect(page.locator('section[aria-labelledby="watch-now-title"]')).toHaveScreenshot("watch-now.png");
 
+  const player = page.locator("[data-watch-player]");
+  const controls = page.locator("[data-watch-controls]");
+  await player.hover();
+  await expect(controls).toHaveClass(/opacity-100/);
+  await page.mouse.move(1, 1);
+  await expect(controls).toHaveClass(/opacity-0/, { timeout: 3_000 });
+  await player.hover();
+  await expect(controls).toHaveClass(/opacity-100/);
+
+  await page.evaluate(() => {
+    let fullscreenElement: Element | null = null;
+
+    Object.defineProperty(document, "fullscreenElement", {
+      configurable: true,
+      get: () => fullscreenElement
+    });
+    Object.defineProperty(HTMLElement.prototype, "requestFullscreen", {
+      configurable: true,
+      value: async function requestFullscreen() {
+        fullscreenElement = this;
+        document.dispatchEvent(new Event("fullscreenchange"));
+      }
+    });
+    Object.defineProperty(document, "exitFullscreen", {
+      configurable: true,
+      value: async () => {
+        fullscreenElement = null;
+        document.dispatchEvent(new Event("fullscreenchange"));
+      }
+    });
+  });
+  await page.getByRole("button", { name: "Enter fullscreen" }).click();
+  await expect(page.getByRole("button", { name: "Exit fullscreen" })).toBeVisible();
+  await page.getByRole("button", { name: "Exit fullscreen" }).click();
+  await expect(page.getByRole("button", { name: "Enter fullscreen" })).toBeVisible();
+
   const playerFrame = page.frames().find((frame) => frame.url().includes("youtube-nocookie.com/embed/RmiVideo001"));
   expect(playerFrame).toBeDefined();
   await page.getByRole("button", { name: "Pause current video" }).click();
