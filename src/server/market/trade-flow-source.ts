@@ -91,7 +91,20 @@ export async function collectTradeFlowMarketSignals({
     throw new Error(`Could not load trade flow: ${error.message}`);
   }
 
-  const buckets = groupTrades((data ?? []) as TradeRow[]);
+  const { data: excludedProfiles, error: excludedProfilesError } = await supabase
+    .from("profiles")
+    .select("id,is_admin,market_impact_exempt")
+    .or("is_admin.eq.true,market_impact_exempt.eq.true");
+
+  if (excludedProfilesError) {
+    throw new Error(`Could not verify excluded trade accounts: ${excludedProfilesError.message}`);
+  }
+
+  const excludedUserIds = new Set((excludedProfiles ?? []).map((profile) => profile.id));
+  const eligibleRows = (data ?? []) as TradeRow[];
+  const trades = eligibleRows.filter((trade) => !excludedUserIds.has(trade.user_id));
+  const defensivelyExcludedTradeCount = eligibleRows.length - trades.length;
+  const buckets = groupTrades(trades);
   const artistsById = new Map(artists.map((artist) => [artist.id, artist]));
   const signals: AdapterSignals = {};
   const observations: MarketObservation[] = [];
@@ -126,6 +139,12 @@ export async function collectTradeFlowMarketSignals({
   if (suppressedSignalCount > 0) {
     warnings.push(
       `Suppressed ${suppressedSignalCount} thin or concentrated trade-flow signal${suppressedSignalCount === 1 ? "" : "s"} from the pricing model.`
+    );
+  }
+
+  if (defensivelyExcludedTradeCount > 0) {
+    warnings.push(
+      `Defensively excluded ${defensivelyExcludedTradeCount} admin or market-exempt trade${defensivelyExcludedTradeCount === 1 ? "" : "s"} that had been marked market-eligible.`
     );
   }
 

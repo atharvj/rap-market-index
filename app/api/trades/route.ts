@@ -92,7 +92,23 @@ export async function POST(request: Request) {
   const { supabase, user: authUser } = auth;
   const serviceSupabase = createServiceRoleClient();
   const email = (authUser.email ?? "").toLowerCase();
-  const impactExempt = isMarketImpactExemptEmail(email);
+  const { data: impactProfile, error: impactProfileError } = await serviceSupabase
+    .from("profiles")
+    .select("is_admin,market_impact_exempt")
+    .eq("id", authUser.id)
+    .maybeSingle();
+
+  if (impactProfileError) {
+    return NextResponse.json(
+      { ok: false, error: "Could not verify this account's market eligibility." },
+      { status: 500 }
+    );
+  }
+
+  const impactExempt =
+    isMarketImpactExemptEmail(email) ||
+    impactProfile?.is_admin === true ||
+    impactProfile?.market_impact_exempt === true;
   const marketEligible = !impactExempt && isAccountOldEnoughForMarketImpact(authUser.created_at);
 
   if (impactExempt) {
@@ -194,7 +210,7 @@ export async function POST(request: Request) {
     marketEligibility: {
       eligible: marketEligible,
       reason: getMarketEligibilityReason({
-        email,
+        impactExempt,
         createdAt: authUser.created_at
       })
     }
@@ -329,8 +345,14 @@ function isAccountOldEnoughForMarketImpact(createdAt: string | undefined) {
   return Date.now() - createdAtMs >= MARKET_IMPACT_MIN_ACCOUNT_AGE_HOURS * 60 * 60 * 1000;
 }
 
-function getMarketEligibilityReason({ email, createdAt }: { email: string; createdAt: string | undefined }) {
-  if (isMarketImpactExemptEmail(email)) {
+function getMarketEligibilityReason({
+  impactExempt,
+  createdAt
+}: {
+  impactExempt: boolean;
+  createdAt: string | undefined;
+}) {
+  if (impactExempt) {
     return "market_impact_exempt_account";
   }
 
