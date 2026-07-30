@@ -34,5 +34,5 @@ jobs:
             --request POST \
             --header "content-type: application/json" \
             --header "x-market-update-secret: $MARKET_UPDATE_SECRET" \
-            --data '{"dryRun":false,"artistLimit":100,"includeGdelt":false,"includeMediaRss":true,"includeAiResearch":true,"aiResearchArtistLimit":12}' \
+            --data '{"dryRun":false,"artistLimit":100,"includeGdelt":false,"includeMediaRss":true,"includeAiResearch":true,"aiResearchArtistLimit":6}' \
             https://rap-market-index.vercel.app/api/admin/market-event-scan
