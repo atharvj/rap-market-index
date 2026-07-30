@@ -21,6 +21,7 @@ import {
   normalizeMarketNewsSort,
   sortMarketNewsEvents
 } from "@/lib/market-news-sort";
+import { selectPreferredNewsSourceEvent } from "@/lib/market-news-links";
 import { reportServerError } from "@/server/observability";
 import {
   getYoutubeVideoId,
@@ -329,8 +330,12 @@ function mapMarketEventToNewsItem(
 ): MarketNewsItem {
   const artist = artistById.get(event.artist_id) ?? null;
   const rawPayload = toRawPayload(event.raw_payload);
-  const sourceUrl = event.source_url && isSafeHttpUrl(event.source_url) ? event.source_url : null;
-  const sourceName = event.source_name ?? null;
+  const sourceEvent = selectPreferredNewsSourceEvent(event, storyEvents);
+  const sourceUrl =
+    sourceEvent.source_url && isSafeHttpUrl(sourceEvent.source_url)
+      ? sourceEvent.source_url
+      : null;
+  const sourceName = sourceEvent.source_name ?? null;
   const sourceDomain = getSourceDomain(sourceUrl, sourceName);
   const storyPayloads = [
     rawPayload,

@@ -2,6 +2,10 @@
 
 import { formatDate } from "@/lib/formatters";
 import type { MarketNewsSort } from "@/lib/market-news-sort";
+import {
+  shouldShowNewsMediaAction,
+  shouldShowNewsSourceAction
+} from "@/lib/market-news-links";
 import clsx from "clsx";
 import { ArrowRight, ExternalLink, Headphones, Newspaper, PlayCircle, Radio } from "lucide-react";
 import Link from "next/link";
@@ -606,29 +610,33 @@ function SourceMeta({ item }: { item: MarketNewsItem }) {
 }
 
 function SourceLink({ item }: { item: MarketNewsItem }) {
-  if (!item.sourceUrl) {
+  if (!shouldShowNewsSourceAction(item)) {
     return <span />;
   }
 
+  const label = item.sourceDomain === "youtube.com" ? "Open video source" : "Read source article";
+
   return (
     <a
-      href={item.sourceUrl}
+      href={item.sourceUrl ?? undefined}
       target="_blank"
       rel="noreferrer"
       className="mt-1 text-paper/40 hover:text-cyan"
-      aria-label="Open source"
+      aria-label={label}
+      title={label}
     >
-      <ExternalLink className="h-4 w-4" />
+      <ExternalLink className="h-4 w-4" aria-hidden="true" />
     </a>
   );
 }
 
 function MediaLink({ item, compact = false }: { item: MarketNewsItem; compact?: boolean }) {
-  if (!item.mediaUrl || !item.mediaLabel) {
+  if (!shouldShowNewsMediaAction(item) || !item.mediaUrl || !item.mediaLabel) {
     return null;
   }
 
   const Icon = item.mediaType === "youtube" ? PlayCircle : Headphones;
+  const label = item.mediaType === "youtube" ? "Play release" : item.mediaLabel;
 
   return (
     <a
@@ -639,6 +647,8 @@ function MediaLink({ item, compact = false }: { item: MarketNewsItem; compact?: 
         "inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-line bg-panelSoft text-xs font-semibold text-paper/65 hover:border-cyan/45 hover:text-cyan",
         compact ? "px-1.5 py-1" : "min-h-9 px-3"
       )}
+      aria-label={label}
+      title={label}
     >
       <Icon className="h-3.5 w-3.5" aria-hidden="true" />
       {compact ? null : <span>{item.mediaLabel}</span>}

@@ -44,6 +44,8 @@ const topics = [
     answers: [
       "Open an artist quote, choose Buy or Sell, enter the number of shares, and review the estimated total.",
       "The final execution price can differ slightly from the displayed quote because of spread and slippage.",
+      "A positive daily move describes what already happened since the previous close; buying a current gainer does not automatically earn that past return.",
+      "Buying and immediately selling normally loses fantasy cash because buys execute above the midpoint, sells execute below it, and each side pays commission.",
       "RMI uses fantasy cash only. Shares cannot be converted into real money."
     ]
   },

@@ -525,7 +525,7 @@ async function collectRealSignals({
   const useWikimedia = source === "wikimedia" || source === "core" || source === "blended";
   const useReddit = source === "reddit" || ((source === "core" || source === "blended") && hasRedditCredentials());
   const useBluesky =
-    source === "bluesky" || ((source === "core" || source === "blended") && getEnvBoolean("MARKET_BLUESKY_ENABLED", false));
+    source === "bluesky" || ((source === "core" || source === "blended") && getEnvBoolean("MARKET_BLUESKY_ENABLED", true));
   const usePolymarket =
     (source === "core" || source === "blended") &&
     getEnvBoolean("MARKET_POLYMARKET_ENABLED", true);

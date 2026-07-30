@@ -3046,21 +3046,21 @@ function buildLaunchReadinessChecks(data: MarketHealth): LaunchReadinessCheck[] 
     },
     {
       id: "community",
-      label: "Underground event discovery is connected",
+      label: "Community discovery has fresh coverage",
       ok: redditCoverage > 0 || aiResearchCoverage > 0,
-      severity: "blocker",
+      severity: "warning",
       detail:
         redditCoverage > 0 || aiResearchCoverage > 0
           ? `Reddit ${formatPercent(redditCoverage)}, AI source-backed ${formatPercent(aiResearchCoverage)}.`
-          : "Connect Reddit or the AI research provider before launching underground-heavy coverage."
+          : "Reddit is not connected, and the scheduled source-backed research scan has no fresh observations yet."
     },
     {
       id: "ai-research",
-      label: "AI source-backed research is producing usable catalysts",
+      label: "AI source-backed research is running",
       ok: data.config.aiResearchConfigured === true && (aiResearchCoverage > 0 || aiHighConfidenceCoverage > 0),
-      severity: "blocker",
+      severity: "warning",
       detail: data.config.aiResearchConfigured
-        ? `AI event coverage ${formatPercent(aiResearchCoverage)}, high-confidence ${formatPercent(aiHighConfidenceCoverage)}.`
+        ? `Fresh scan coverage ${formatPercent(aiResearchCoverage)}; high-confidence scan coverage ${formatPercent(aiHighConfidenceCoverage)}.`
         : "The AI research provider is not configured, so that research layer is disabled."
     },
     {
