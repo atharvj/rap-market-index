@@ -570,8 +570,9 @@ function AccountPageContent() {
             type="button"
             onClick={continueWithGoogle}
             disabled={submitting}
-            className="rmi-button-secondary h-11 text-sm disabled:opacity-60"
+            className="inline-flex h-11 items-center justify-center gap-3 rounded-md border border-[#747775] bg-white px-4 text-sm font-semibold text-[#1f1f1f] shadow-sm transition-colors hover:border-[#5f6368] hover:bg-[#f8faff] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan focus-visible:ring-offset-2 focus-visible:ring-offset-ink disabled:cursor-not-allowed disabled:opacity-60"
           >
+            <GoogleLogo />
             Continue with Google
           </button>
           {mode === "signin" ? (
@@ -779,6 +780,29 @@ function ProfileStat({ icon, label, value }: { icon: ReactNode; label: string; v
       <span className="text-paper/55">{label}:</span>
       <span className="ml-auto font-semibold">{value}</span>
     </div>
+  );
+}
+
+function GoogleLogo() {
+  return (
+    <svg className="h-[18px] w-[18px] shrink-0" viewBox="0 0 18 18" aria-hidden="true">
+      <path
+        fill="#4285F4"
+        d="M17.64 9.205c0-.638-.057-1.252-.164-1.841H9v3.481h4.844a4.14 4.14 0 0 1-1.797 2.715v2.259h2.909c1.702-1.567 2.684-3.875 2.684-6.614Z"
+      />
+      <path
+        fill="#34A853"
+        d="M9 18c2.43 0 4.468-.806 5.956-2.181l-2.909-2.259c-.806.54-1.835.859-3.047.859-2.344 0-4.328-1.585-5.037-3.715H.957v2.332A9 9 0 0 0 9 18Z"
+      />
+      <path
+        fill="#FBBC05"
+        d="M3.963 10.704A5.417 5.417 0 0 1 3.681 9c0-.592.102-1.168.282-1.704V4.964H.957A9 9 0 0 0 0 9c0 1.45.347 2.822.957 4.036l3.006-2.332Z"
+      />
+      <path
+        fill="#EA4335"
+        d="M9 3.581c1.321 0 2.507.454 3.441 1.346l2.581-2.581C13.464.895 11.426 0 9 0A9 9 0 0 0 .957 4.964l3.006 2.332C4.672 5.166 6.656 3.581 9 3.581Z"
+      />
+    </svg>
   );
 }
 
