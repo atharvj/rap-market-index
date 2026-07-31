@@ -4,7 +4,6 @@ export const MIN_COMMISSION_PER_SHARE = 0.02;
 export const MIN_TRADE_COMMISSION = 0.01;
 export const MIN_TRADE_VALUE = 1;
 export const MAX_TRADE_SHARES = 1_000_000;
-const SHARE_QUANTITY_PRECISION = 1_000_000;
 
 export type MarketMakerSide = "buy" | "sell";
 
@@ -136,7 +135,7 @@ export function roundShareQuantityDown(value: number) {
     return 0;
   }
 
-  return Math.floor((value + Number.EPSILON) * SHARE_QUANTITY_PRECISION) / SHARE_QUANTITY_PRECISION;
+  return Math.floor(value + Number.EPSILON);
 }
 
 export function clampTradeShareInput(value: string, maxShares: number) {
@@ -150,7 +149,7 @@ export function clampTradeShareInput(value: string, maxShares: number) {
     return value;
   }
 
-  return parsedValue > maxShares ? formatTradeShareInput(maxShares) : value;
+  return formatTradeShareInput(Math.min(parsedValue, maxShares));
 }
 
 export function formatTradeShareInput(value: number) {

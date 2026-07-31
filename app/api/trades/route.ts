@@ -224,6 +224,7 @@ const SAFE_TRADE_ERRORS = [
   "trading is halted for this artist",
   "newly detected catalyst",
   "shares must be greater than zero",
+  "shares must be whole numbers",
   "share amount is too large",
   "artist not found or inactive",
   "order value must be at least",
@@ -384,9 +385,10 @@ function validateTradeBody(body: TradeBody): { ok: true } | { ok: false; error: 
     typeof body.shares !== "number"
     || !Number.isFinite(body.shares)
     || body.shares <= 0
+    || !Number.isInteger(body.shares)
     || body.shares > 1_000_000
   ) {
-    return { ok: false, error: "shares must be a positive number." };
+    return { ok: false, error: "Shares must be a positive whole number." };
   }
 
   return { ok: true };

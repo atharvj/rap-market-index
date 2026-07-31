@@ -43,7 +43,7 @@ const topics = [
     summary: "Order estimates, execution prices, commissions, available cash, and position limits.",
     icon: CandlestickChart,
     answers: [
-      "Open an artist quote, choose Buy or Sell, enter the number of shares, and review the estimated total.",
+      "Open an artist quote, choose Buy or Sell, enter a whole number of shares, and review the estimated total.",
       "The ticket shows the maximum available quantity. Buy limits use the lower of your available fantasy cash and the 25% per-artist portfolio limit; Sell limits use the shares you currently own.",
       "Orders must be worth at least $1. The quantity field and plus button stop at your current maximum so an order cannot exceed your cash, position room, or owned shares.",
       "Trading requires a confirmed account with completed setup and a fully synced profile. The ticket explains which requirement is still loading or missing.",

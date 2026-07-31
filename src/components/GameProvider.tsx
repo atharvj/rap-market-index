@@ -405,8 +405,8 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
         return { ok: false, message: "Artist not found." };
       }
 
-      if (!Number.isFinite(shares) || shares <= 0) {
-        return { ok: false, message: "Enter a positive share amount." };
+      if (!Number.isFinite(shares) || shares <= 0 || !Number.isInteger(shares)) {
+        return { ok: false, message: "Enter a positive whole-share amount." };
       }
 
       const quoteEstimate = estimateMarketMakerQuote({
@@ -461,8 +461,8 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
         return { ok: false, message: "No shares available to sell." };
       }
 
-      if (!Number.isFinite(shares) || shares <= 0) {
-        return { ok: false, message: "Enter a positive share amount." };
+      if (!Number.isFinite(shares) || shares <= 0 || !Number.isInteger(shares)) {
+        return { ok: false, message: "Enter a positive whole-share amount." };
       }
 
       if (shares > holding.shares) {

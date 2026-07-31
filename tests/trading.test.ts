@@ -52,7 +52,7 @@ describe("market-maker trading economics", () => {
     const oversizedQuote = estimateMarketMakerQuote({
       side: "buy",
       midPrice: 25,
-      shares: maxShares + 0.01,
+      shares: maxShares + 1,
       volatility: 1.2
     });
 
@@ -79,20 +79,20 @@ describe("market-maker trading economics", () => {
       estimateMarketMakerQuote({
         side: "buy",
         midPrice: 20,
-        shares: maxShares + 0.01,
+        shares: maxShares + 1,
         volatility: 1
       }).orderValue
     ).toBeGreaterThan(250);
   });
 
-  it("rounds share caps down without exceeding the available quantity", () => {
-    expect(roundShareQuantityDown(10.1234569)).toBe(10.123456);
+  it("rounds share caps down to whole shares without exceeding the available quantity", () => {
+    expect(roundShareQuantityDown(10.1234569)).toBe(10);
     expect(roundShareQuantityDown(-1)).toBe(0);
   });
 
   it("clamps typed share quantities to the available maximum", () => {
     expect(clampTradeShareInput("11", 10)).toBe("10");
-    expect(clampTradeShareInput("7.5", 10)).toBe("7.5");
+    expect(clampTradeShareInput("7.5", 10)).toBe("7");
     expect(clampTradeShareInput("", 10)).toBe("");
   });
 });

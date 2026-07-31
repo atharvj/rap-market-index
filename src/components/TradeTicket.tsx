@@ -103,7 +103,7 @@ export function TradeTicket({
   }, [artist.currentPrice, maxBuy, maxSell, side, state.cashBalance, tradeUnavailableReason]);
 
   function changeShares(nextValue: string) {
-    if (nextValue && !/^\d*\.?\d*$/.test(nextValue)) {
+    if (nextValue && !/^\d*$/.test(nextValue)) {
       return;
     }
 
@@ -205,9 +205,22 @@ export function TradeTicket({
           </button>
         </div>
 
-        <label className="mt-4 block text-xs font-semibold text-paper/50" htmlFor="shares">
-          Shares
-        </label>
+        <div className="mt-4 flex items-center justify-between gap-3">
+          <label className="text-xs font-semibold text-paper/50" htmlFor="shares">
+            Shares
+          </label>
+          <button
+            type="button"
+            className="text-xs font-semibold text-cyan transition hover:text-cyan/80 disabled:cursor-not-allowed disabled:text-paper/25"
+            onClick={() => {
+              setMessage("");
+              setShares(formatTradeShareInput(maxShares));
+            }}
+            disabled={maxShares <= 0 || Boolean(tradeUnavailableReason)}
+          >
+            Use max
+          </button>
+        </div>
         <div className="mt-2 flex min-h-12 items-center overflow-hidden rounded-[var(--radius-control)] border border-line bg-ink/35 focus-within:border-cyan/65 focus-within:ring-2 focus-within:ring-cyan/10">
           <button
             type="button"
@@ -221,7 +234,8 @@ export function TradeTicket({
           <input
             id="shares"
             className="h-12 min-w-0 flex-1 bg-transparent px-3 text-center text-lg font-semibold outline-none number-tabular"
-            inputMode="decimal"
+            inputMode="numeric"
+            pattern="[0-9]*"
             value={shares}
             onChange={(event) => changeShares(event.target.value)}
             aria-describedby="trade-share-limit"
@@ -299,7 +313,7 @@ export function TradeTicket({
 
 function formatTradeLimit(value: number) {
   return value.toLocaleString("en-US", {
-    maximumFractionDigits: 2
+    maximumFractionDigits: 0
   });
 }
 
@@ -362,7 +376,7 @@ function isOrderBlocked({
     return true;
   }
 
-  if (!Number.isFinite(parsedShares) || parsedShares <= 0) {
+  if (!Number.isFinite(parsedShares) || parsedShares <= 0 || !Number.isInteger(parsedShares)) {
     return true;
   }
 

@@ -1,7 +1,7 @@
 "use client";
 
 import { UserAvatar } from "@/components/UserAvatar";
-import { formatCurrency, formatPercent } from "@/lib/formatters";
+import { formatCurrency, formatPercent, formatShares } from "@/lib/formatters";
 import clsx from "clsx";
 import { Activity, BarChart3, CalendarDays, LoaderCircle, LockKeyhole, Radio, Star, Trophy, WalletCards } from "lucide-react";
 import Link from "next/link";
@@ -175,7 +175,7 @@ export default function PublicUserProfilePage() {
                   <span className="min-w-0">
                     <span className="block truncate text-sm font-semibold">{holding.name}</span>
                     <span className="text-xs font-medium text-paper/50">
-                      {holding.ticker} · {holding.shares.toLocaleString("en-US", { maximumFractionDigits: 2 })} shares
+                      {holding.ticker} · {formatShares(holding.shares)} shares
                     </span>
                   </span>
                 </span>

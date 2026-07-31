@@ -20,7 +20,7 @@ export function formatCompact(value: number) {
 
 export function formatShares(value: number) {
   return new Intl.NumberFormat("en-US", {
-    maximumFractionDigits: value >= 10 ? 0 : 2
+    maximumFractionDigits: 0
   }).format(value);
 }
 
