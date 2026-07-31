@@ -10,6 +10,7 @@ import type {
 } from "@/server/market/market-data";
 import {
   buildMomentumQualityPayload,
+  calculateAnnualPointMomentum,
   calculatePointDeltaMomentum,
   calculateSnapshotMomentum,
   getBaselineAgeDays,
@@ -213,16 +214,25 @@ function buildSpotifySignal({
     max: 75,
     monotonic: true
   });
+  const annualPopularityMomentum = calculateAnnualPointMomentum({
+    current: info.popularity,
+    baseline: baseline[`${POPULARITY}__year_ago_value`],
+    multiplier: 1.6,
+    min: -22,
+    max: 28
+  });
   const stats: Partial<HypeStats> = {};
 
   if (typeof popularityMomentum.value === "number" || typeof followerMomentum.value === "number") {
     const streamingGrowth = weightedAverage([
-      { value: popularityMomentum.value, weight: 0.75 },
-      { value: followerMomentum.value, weight: 0.25 }
+      { value: popularityMomentum.value, weight: 0.6 },
+      { value: followerMomentum.value, weight: 0.22 },
+      { value: annualPopularityMomentum.value, weight: 0.18 }
     ]);
     const searchGrowth = weightedAverage([
-      { value: popularityMomentum.value, weight: 0.45 },
-      { value: followerMomentum.value, weight: 0.35 }
+      { value: popularityMomentum.value, weight: 0.42 },
+      { value: followerMomentum.value, weight: 0.32 },
+      { value: annualPopularityMomentum.value, weight: 0.18 }
     ]);
 
     if (typeof streamingGrowth === "number") {
@@ -245,12 +255,15 @@ function buildSpotifySignal({
     popularity: info.popularity ?? null,
     baselineFollowers: baseline[FOLLOWERS] ?? null,
     baselinePopularity: baseline[POPULARITY] ?? null,
+    yearAgoPopularity: baseline[`${POPULARITY}__year_ago_value`] ?? null,
     followerBaselineAgeDays,
     popularityBaselineAgeDays,
     followerMomentum: followerMomentum.value,
     popularityMomentum: popularityMomentum.value,
+    annualPopularityMomentum: annualPopularityMomentum.value,
     followerMomentumQuality: buildMomentumQualityPayload(followerMomentum),
     popularityMomentumQuality: buildMomentumQualityPayload(popularityMomentum),
+    annualPopularityMomentumQuality: buildMomentumQualityPayload(annualPopularityMomentum),
     matchedBy: info.matchedBy,
     matchConfidence: info.matchConfidence,
     matchStatus: info.matchStatus,
@@ -270,7 +283,9 @@ function buildSpotifySignal({
     signal: {
       stats,
       confidence: clamp(
-        0.7 * getCombinedConfidenceMultiplier([popularityMomentum, followerMomentum]) * info.matchConfidence,
+        0.7 *
+          getCombinedConfidenceMultiplier([popularityMomentum, followerMomentum, annualPopularityMomentum]) *
+          info.matchConfidence,
         0.16,
         0.7
       ),

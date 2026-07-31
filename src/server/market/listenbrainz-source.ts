@@ -9,6 +9,8 @@ import type {
 } from "@/server/market/market-data";
 import {
   buildMomentumQualityPayload,
+  buildRateMomentumQualityPayload,
+  calculateRateMomentum,
   calculateSnapshotMomentum,
   getBaselineAgeDays,
   getCombinedConfidenceMultiplier
@@ -132,10 +134,24 @@ export async function collectListenBrainzMarketSignals({
       max: 55,
       monotonic: true
     });
+    const listenRateMomentum = calculateRateMomentum({
+      current: listenCount,
+      baseline: baseline[LISTEN_COUNT],
+      baselineAgeDays: getBaselineAgeDays(baseline, LISTEN_COUNT),
+      recentDailyRate: baseline[`${LISTEN_COUNT}__recent_daily_rate`],
+      recentRateSamples: baseline[`${LISTEN_COUNT}__recent_rate_samples`],
+      yearAgoDailyRate: baseline[`${LISTEN_COUNT}__year_ago_daily_rate`],
+      yearAgoRateSamples: baseline[`${LISTEN_COUNT}__year_ago_rate_samples`],
+      multiplier: 0.18,
+      min: -28,
+      max: 55,
+      monotonic: true
+    });
     const stats: Partial<HypeStats> = {};
     const streamingGrowth = weightedAverage([
-      { value: listenMomentum.value, weight: 0.65 },
-      { value: listenerMomentum.value, weight: 0.35 }
+      { value: listenRateMomentum.value, weight: 0.55 },
+      { value: listenMomentum.value, weight: 0.25 },
+      { value: listenerMomentum.value, weight: 0.2 }
     ]);
 
     if (typeof streamingGrowth === "number") {
@@ -152,15 +168,23 @@ export async function collectListenBrainzMarketSignals({
       baselineListenerCount: baseline[LISTENER_COUNT] ?? null,
       listenMomentum: listenMomentum.value,
       listenerMomentum: listenerMomentum.value,
+      listenRateMomentum: listenRateMomentum.value,
       listenMomentumQuality: buildMomentumQualityPayload(listenMomentum),
       listenerMomentumQuality: buildMomentumQualityPayload(listenerMomentum),
+      listenRateMomentumQuality: buildRateMomentumQualityPayload(listenRateMomentum),
+      velocityMinimumTickEligible:
+        typeof listenRateMomentum.value === "number" &&
+        Math.abs(listenRateMomentum.value) >= 1 &&
+        listenRateMomentum.recentRateSamples >= 2 &&
+        listenRateMomentum.confidenceMultiplier >= 0.75 &&
+        listenRateMomentum.anomalyFlags.length === 0,
       status: Object.keys(stats).length ? "momentum" : "baseline_only"
     };
 
     signals[artist.id] = {
       stats,
       confidence: clamp(
-        0.62 * getCombinedConfidenceMultiplier([listenMomentum, listenerMomentum]),
+        0.62 * getCombinedConfidenceMultiplier([listenMomentum, listenerMomentum, listenRateMomentum]),
         0.15,
         0.62
       ),

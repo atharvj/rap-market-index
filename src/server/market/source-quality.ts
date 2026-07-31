@@ -10,6 +10,16 @@ export type SnapshotMomentumResult = {
   anomalyFlags: string[];
 };
 
+export type RateMomentumResult = SnapshotMomentumResult & {
+  currentDailyRate: number | undefined;
+  recentDailyRate: number | undefined;
+  yearAgoDailyRate: number | undefined;
+  recentRateSamples: number;
+  yearAgoRateSamples: number;
+  recentRateChangePercent: number | undefined;
+  annualRateChangePercent: number | undefined;
+};
+
 export function calculateSnapshotMomentum({
   current,
   baseline,
@@ -122,6 +132,148 @@ export function calculatePointDeltaMomentum({
   };
 }
 
+export function calculateRateMomentum({
+  current,
+  baseline,
+  baselineAgeDays,
+  recentDailyRate,
+  recentRateSamples = 0,
+  yearAgoDailyRate,
+  yearAgoRateSamples = 0,
+  multiplier,
+  min,
+  max,
+  monotonic = true
+}: {
+  current: number | undefined;
+  baseline: number | undefined;
+  baselineAgeDays: number | undefined;
+  recentDailyRate: number | undefined;
+  recentRateSamples?: number;
+  yearAgoDailyRate?: number;
+  yearAgoRateSamples?: number;
+  multiplier: number;
+  min: number;
+  max: number;
+  monotonic?: boolean;
+}): RateMomentumResult {
+  const baselineAgeFactor = getBaselineAgeFactor(baselineAgeDays);
+  const hasInputs =
+    typeof current === "number" &&
+    typeof baseline === "number" &&
+    typeof recentDailyRate === "number" &&
+    Number.isFinite(recentDailyRate) &&
+    recentDailyRate > 0;
+
+  if (!hasInputs) {
+    return {
+      value: undefined,
+      baselineAgeDays,
+      baselineAgeFactor,
+      rawChangePercent: undefined,
+      normalizedChangePercent: undefined,
+      confidenceMultiplier: 0.42,
+      anomalyFlags: ["missing_rate_baseline"],
+      currentDailyRate: undefined,
+      recentDailyRate,
+      yearAgoDailyRate,
+      recentRateSamples,
+      yearAgoRateSamples,
+      recentRateChangePercent: undefined,
+      annualRateChangePercent: undefined
+    };
+  }
+
+  const currentDailyRate = (current - baseline) / baselineAgeFactor;
+  const recentRateChangePercent = ((currentDailyRate - recentDailyRate) / recentDailyRate) * 100;
+  const hasAnnualRate =
+    typeof yearAgoDailyRate === "number" &&
+    Number.isFinite(yearAgoDailyRate) &&
+    yearAgoDailyRate > 0 &&
+    yearAgoRateSamples > 0;
+  const annualRateChangePercent = hasAnnualRate
+    ? ((currentDailyRate - yearAgoDailyRate) / yearAgoDailyRate) * 100
+    : undefined;
+  const anomalyFlags: string[] = [];
+  let adjustedRecentChange = clamp(recentRateChangePercent, -100, 250);
+  let adjustedAnnualChange =
+    typeof annualRateChangePercent === "number" ? clamp(annualRateChangePercent, -100, 250) : undefined;
+  let anomalyMultiplier = 1;
+
+  if (monotonic && currentDailyRate < 0) {
+    anomalyFlags.push("counter_drop");
+    adjustedRecentChange = clamp(adjustedRecentChange * 0.08, -4, 0);
+    adjustedAnnualChange =
+      typeof adjustedAnnualChange === "number" ? clamp(adjustedAnnualChange * 0.08, -4, 0) : undefined;
+    anomalyMultiplier *= 0.42;
+  }
+
+  const combinedRateChange =
+    typeof adjustedAnnualChange === "number"
+      ? adjustedRecentChange * 0.75 + adjustedAnnualChange * 0.25
+      : adjustedRecentChange;
+  const sampleMultiplier = recentRateSamples >= 5 ? 1 : recentRateSamples >= 2 ? 0.9 : 0.72;
+
+  return {
+    value: clamp(combinedRateChange * multiplier, min, max),
+    baselineAgeDays,
+    baselineAgeFactor,
+    rawChangePercent: currentDailyRate,
+    normalizedChangePercent: combinedRateChange,
+    confidenceMultiplier: clamp(
+      getBaselineFreshnessMultiplier(baselineAgeDays) * sampleMultiplier * anomalyMultiplier,
+      0.22,
+      1
+    ),
+    anomalyFlags,
+    currentDailyRate,
+    recentDailyRate,
+    yearAgoDailyRate,
+    recentRateSamples,
+    yearAgoRateSamples,
+    recentRateChangePercent,
+    annualRateChangePercent
+  };
+}
+
+export function calculateAnnualPointMomentum({
+  current,
+  baseline,
+  multiplier,
+  min,
+  max
+}: {
+  current: number | undefined;
+  baseline: number | undefined;
+  multiplier: number;
+  min: number;
+  max: number;
+}): SnapshotMomentumResult {
+  if (typeof current !== "number" || typeof baseline !== "number") {
+    return {
+      value: undefined,
+      baselineAgeDays: undefined,
+      baselineAgeFactor: 1,
+      rawChangePercent: undefined,
+      normalizedChangePercent: undefined,
+      confidenceMultiplier: 0.42,
+      anomalyFlags: ["missing_annual_baseline"]
+    };
+  }
+
+  const pointChange = current - baseline;
+
+  return {
+    value: clamp(pointChange * multiplier, min, max),
+    baselineAgeDays: 365,
+    baselineAgeFactor: 1,
+    rawChangePercent: pointChange,
+    normalizedChangePercent: pointChange,
+    confidenceMultiplier: 0.78,
+    anomalyFlags: []
+  };
+}
+
 export function getBaselineAgeDays(baseline: Record<string, number>, metric: string) {
   const value = baseline[`${metric}__age_days`];
 
@@ -154,6 +306,19 @@ export function buildMomentumQualityPayload(result: SnapshotMomentumResult) {
     baselineAgeFactor: result.baselineAgeFactor,
     confidenceMultiplier: round(result.confidenceMultiplier),
     anomalyFlags: result.anomalyFlags
+  };
+}
+
+export function buildRateMomentumQualityPayload(result: RateMomentumResult) {
+  return {
+    ...buildMomentumQualityPayload(result),
+    currentDailyRate: round(result.currentDailyRate),
+    recentDailyRate: round(result.recentDailyRate),
+    yearAgoDailyRate: round(result.yearAgoDailyRate),
+    recentRateSamples: result.recentRateSamples,
+    yearAgoRateSamples: result.yearAgoRateSamples,
+    recentRateChangePercent: round(result.recentRateChangePercent),
+    annualRateChangePercent: round(result.annualRateChangePercent)
   };
 }
 

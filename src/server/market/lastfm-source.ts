@@ -10,6 +10,8 @@ import type {
 } from "@/server/market/market-data";
 import {
   buildMomentumQualityPayload,
+  buildRateMomentumQualityPayload,
+  calculateRateMomentum,
   calculateSnapshotMomentum,
   getBaselineAgeDays,
   getCombinedConfidenceMultiplier
@@ -176,16 +178,31 @@ function buildLastfmSignal({
     max: 75,
     monotonic: true
   });
+  const playcountRateMomentum = calculateRateMomentum({
+    current: playcount,
+    baseline: baseline[PLAYCOUNT],
+    baselineAgeDays: playcountBaselineAgeDays,
+    recentDailyRate: baseline[`${PLAYCOUNT}__recent_daily_rate`],
+    recentRateSamples: baseline[`${PLAYCOUNT}__recent_rate_samples`],
+    yearAgoDailyRate: baseline[`${PLAYCOUNT}__year_ago_daily_rate`],
+    yearAgoRateSamples: baseline[`${PLAYCOUNT}__year_ago_rate_samples`],
+    multiplier: 0.18,
+    min: -28,
+    max: 55,
+    monotonic: true
+  });
   const stats: Partial<HypeStats> = {};
 
   if (typeof playcountMomentum.value === "number" || typeof listenerMomentum.value === "number") {
     const streamingGrowth = weightedAverage([
-      { value: playcountMomentum.value, weight: 0.7 },
-      { value: listenerMomentum.value, weight: 0.3 }
+      { value: playcountRateMomentum.value, weight: 0.55 },
+      { value: playcountMomentum.value, weight: 0.25 },
+      { value: listenerMomentum.value, weight: 0.2 }
     ]);
     const socialGrowth = weightedAverage([
-      { value: listenerMomentum.value, weight: 0.65 },
-      { value: playcountMomentum.value, weight: 0.15 }
+      { value: listenerMomentum.value, weight: 0.55 },
+      { value: playcountRateMomentum.value, weight: 0.25 },
+      { value: playcountMomentum.value, weight: 0.1 }
     ]);
 
     if (typeof streamingGrowth === "number") {
@@ -214,8 +231,16 @@ function buildLastfmSignal({
     playcountBaselineAgeDays,
     listenerMomentum: listenerMomentum.value,
     playcountMomentum: playcountMomentum.value,
+    playcountRateMomentum: playcountRateMomentum.value,
     listenerMomentumQuality: buildMomentumQualityPayload(listenerMomentum),
     playcountMomentumQuality: buildMomentumQualityPayload(playcountMomentum),
+    playcountRateMomentumQuality: buildRateMomentumQualityPayload(playcountRateMomentum),
+    velocityMinimumTickEligible:
+      typeof playcountRateMomentum.value === "number" &&
+      Math.abs(playcountRateMomentum.value) >= 1 &&
+      playcountRateMomentum.recentRateSamples >= 2 &&
+      playcountRateMomentum.confidenceMultiplier >= 0.75 &&
+      playcountRateMomentum.anomalyFlags.length === 0,
     status: trustedIdentity ? (Object.keys(stats).length ? "ok" : "baseline_only") : "name_mismatch"
   };
   const observations: MarketObservation[] = [];
@@ -232,7 +257,13 @@ function buildLastfmSignal({
     signal: {
       stats,
       confidence: trustedIdentity
-        ? clamp(0.86 * getCombinedConfidenceMultiplier([listenerMomentum, playcountMomentum]) * nameMatch.confidence, 0.18, 0.86)
+        ? clamp(
+            0.86 *
+              getCombinedConfidenceMultiplier([listenerMomentum, playcountMomentum, playcountRateMomentum]) *
+              nameMatch.confidence,
+            0.18,
+            0.86
+          )
         : 0.05,
       rawPayload
     },

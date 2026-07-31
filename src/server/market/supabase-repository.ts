@@ -423,7 +423,8 @@ export async function loadObservationBaselines({
   metrics,
   beforeDate,
   lookbackDays,
-  strategy = "average"
+  strategy = "average",
+  annualComparison = false
 }: {
   supabase: Supabase;
   artistIds: string[];
@@ -432,30 +433,57 @@ export async function loadObservationBaselines({
   beforeDate: string;
   lookbackDays: number;
   strategy?: "average" | "latest";
+  annualComparison?: boolean;
 }): Promise<ObservationBaselines> {
   if (!artistIds.length || !metrics.length) {
     return {};
   }
 
   const startDate = shiftDate(beforeDate, -lookbackDays);
-  const { data, error } = await supabase
-    .from("market_observations")
-    .select("artist_id,metric,value,observed_date")
-    .in("artist_id", artistIds)
-    .eq("source", source)
-    .in("metric", metrics)
-    .gte("observed_date", startDate)
-    .lt("observed_date", beforeDate)
-    .order("observed_date", { ascending: false });
+  const annualStartDate = shiftDate(beforeDate, -372);
+  const annualEndDate = shiftDate(beforeDate, -358);
+  const [recentResult, annualResult] = await Promise.all([
+    supabase
+      .from("market_observations")
+      .select("artist_id,metric,value,observed_date")
+      .in("artist_id", artistIds)
+      .eq("source", source)
+      .in("metric", metrics)
+      .gte("observed_date", startDate)
+      .lt("observed_date", beforeDate)
+      .order("observed_date", { ascending: false })
+      .limit(10000),
+    annualComparison
+      ? supabase
+          .from("market_observations")
+          .select("artist_id,metric,value,observed_date")
+          .in("artist_id", artistIds)
+          .eq("source", source)
+          .in("metric", metrics)
+          .gte("observed_date", annualStartDate)
+          .lte("observed_date", annualEndDate)
+          .order("observed_date", { ascending: false })
+          .limit(10000)
+      : Promise.resolve({ data: [], error: null })
+  ]);
+  const { data, error } = recentResult;
 
   if (error) {
     throw new Error(`Could not load observation baselines: ${error.message}`);
   }
 
+  if (annualResult.error) {
+    throw new Error(`Could not load annual observation baselines: ${annualResult.error.message}`);
+  }
+
   const rows = (data ?? []) as Pick<MarketObservationRow, "artist_id" | "metric" | "value" | "observed_date">[];
+  const annualRows = (annualResult.data ?? []) as Pick<
+    MarketObservationRow,
+    "artist_id" | "metric" | "value" | "observed_date"
+  >[];
 
   if (strategy === "latest") {
-    return rows.reduce<ObservationBaselines>((memo, row) => {
+    const baselines = rows.reduce<ObservationBaselines>((memo, row) => {
       memo[row.artist_id] ??= {};
 
       if (typeof memo[row.artist_id][row.metric] !== "number") {
@@ -465,6 +493,12 @@ export async function loadObservationBaselines({
 
       return memo;
     }, {});
+
+    addRateBaselines(baselines, rows, "recent");
+    addRateBaselines(baselines, annualRows, "year_ago");
+    addAnnualLevelBaselines(baselines, annualRows, beforeDate);
+
+    return baselines;
   }
 
   const grouped = rows.reduce<
@@ -485,6 +519,97 @@ export async function loadObservationBaselines({
       )
     ])
   );
+}
+
+function addRateBaselines(
+  baselines: ObservationBaselines,
+  rows: Array<Pick<MarketObservationRow, "artist_id" | "metric" | "value" | "observed_date">>,
+  period: "recent" | "year_ago"
+) {
+  const grouped = groupObservationRows(rows);
+
+  for (const [artistId, metrics] of Object.entries(grouped)) {
+    baselines[artistId] ??= {};
+
+    for (const [metric, metricRows] of Object.entries(metrics)) {
+      const rates = metricRows
+        .slice(1)
+        .map((row, index) => {
+          const previous = metricRows[index];
+          const days = previous ? getDateDistanceDays(row.observed_date, previous.observed_date) : 0;
+
+          return days > 0 && previous ? (Number(row.value) - Number(previous.value)) / days : null;
+        })
+        .filter((value): value is number => typeof value === "number" && Number.isFinite(value));
+
+      if (!rates.length) {
+        continue;
+      }
+
+      baselines[artistId][`${metric}__${period}_daily_rate`] = median(rates);
+      baselines[artistId][`${metric}__${period}_rate_samples`] = rates.length;
+    }
+  }
+}
+
+function addAnnualLevelBaselines(
+  baselines: ObservationBaselines,
+  rows: Array<Pick<MarketObservationRow, "artist_id" | "metric" | "value" | "observed_date">>,
+  beforeDate: string
+) {
+  const targetDate = shiftDate(beforeDate, -365);
+  const grouped = groupObservationRows(rows);
+
+  for (const [artistId, metrics] of Object.entries(grouped)) {
+    baselines[artistId] ??= {};
+
+    for (const [metric, metricRows] of Object.entries(metrics)) {
+      const closest = [...metricRows].sort(
+        (first, second) =>
+          getAbsoluteDateDistanceDays(first.observed_date, targetDate) -
+          getAbsoluteDateDistanceDays(second.observed_date, targetDate)
+      )[0];
+
+      if (closest) {
+        baselines[artistId][`${metric}__year_ago_value`] = Number(closest.value);
+      }
+    }
+  }
+}
+
+function groupObservationRows(
+  rows: Array<Pick<MarketObservationRow, "artist_id" | "metric" | "value" | "observed_date">>
+) {
+  const grouped: Record<
+    string,
+    Record<string, Array<Pick<MarketObservationRow, "value" | "observed_date">>>
+  > = {};
+
+  for (const row of rows) {
+    grouped[row.artist_id] ??= {};
+    grouped[row.artist_id][row.metric] ??= [];
+    grouped[row.artist_id][row.metric].push({
+      value: row.value,
+      observed_date: row.observed_date
+    });
+  }
+
+  for (const metrics of Object.values(grouped)) {
+    for (const metricRows of Object.values(metrics)) {
+      metricRows.sort((first, second) => first.observed_date.localeCompare(second.observed_date));
+    }
+  }
+
+  return grouped;
+}
+
+function median(values: number[]) {
+  const sorted = [...values].sort((first, second) => first - second);
+  const middle = Math.floor(sorted.length / 2);
+
+  return sorted.length % 2
+    ? sorted[middle]
+    : ((sorted[middle - 1] ?? 0) + (sorted[middle] ?? 0)) / 2;
 }
 
 export async function loadLatestObservationPayloads({
@@ -631,6 +756,17 @@ function getDateDistanceDays(laterDate: string, earlierDate: string) {
   }
 
   return Math.max(1, Math.round((later - earlier) / 86_400_000));
+}
+
+function getAbsoluteDateDistanceDays(firstDate: string, secondDate: string) {
+  const first = new Date(`${firstDate}T00:00:00.000Z`).getTime();
+  const second = new Date(`${secondDate}T00:00:00.000Z`).getTime();
+
+  if (!Number.isFinite(first) || !Number.isFinite(second)) {
+    return Number.MAX_SAFE_INTEGER;
+  }
+
+  return Math.abs(Math.round((first - second) / 86_400_000));
 }
 
 export async function persistMarketObservations(supabase: Supabase, observations: MarketObservation[]) {

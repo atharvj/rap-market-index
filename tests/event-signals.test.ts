@@ -105,6 +105,35 @@ describe("music relevance safeguards", () => {
   });
 });
 
+describe("release demand safeguards", () => {
+  function releaseEvent(rawPayload: Record<string, unknown> = {}): MarketEvent {
+    return {
+      artistId: artist.id,
+      eventDate: "2026-07-10",
+      eventType: "release",
+      title: "Young Thug releases a new album, out now",
+      sourceName: "Music publication",
+      sourceUrl: "https://example.com/release",
+      sentimentScore: 65,
+      impactScore: 75,
+      confidence: 0.9,
+      rawPayload: {
+        source: "manual_event",
+        releaseKind: "album",
+        ...rawPayload
+      }
+    };
+  }
+
+  it("treats a release as a baseline catalyst until demand is demonstrated", () => {
+    expect(evidenceMultiplier(releaseEvent())).toBeLessThan(1);
+  });
+
+  it("restores release authority when independent music demand is confirmed", () => {
+    expect(evidenceMultiplier(releaseEvent({ musicDemandConfirmed: true }))).toBe(1);
+  });
+});
+
 describe("event story deduplication", () => {
   it("counts same-day coverage of one release only once", () => {
     const shared: Omit<MarketEvent, "title" | "sourceUrl"> = {

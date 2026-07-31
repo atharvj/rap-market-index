@@ -938,7 +938,14 @@ function applyMeasuredMinimumTick(update: ArtistMarketUpdate): ArtistMarketUpdat
   const roundedPrice = roundPrice(update.currentPrice);
   const direction = Math.sign(measuredSignalDelta);
   const signalDirection = Math.sign(update.signalDelta);
-  const eligible =
+  const youtubePayload = getObjectRecord(update.rawPayload.youtube);
+  const lastfmPayload = getObjectRecord(update.rawPayload.lastfm);
+  const listenbrainzPayload = getObjectRecord(update.rawPayload.listenbrainz);
+  const qualifiedAudienceVelocity =
+    youtubePayload.velocityMinimumTickEligible === true ||
+    lastfmPayload.velocityMinimumTickEligible === true ||
+    listenbrainzPayload.velocityMinimumTickEligible === true;
+  const corroboratedEvidence =
     update.rawPayload.hasMomentumSignal === true &&
     sourceCount >= 2 &&
     statCount >= 2 &&
@@ -946,7 +953,24 @@ function applyMeasuredMinimumTick(update: ArtistMarketUpdate): ArtistMarketUpdat
     sourceQualityMultiplier >= 0.65 &&
     anomalyCount === 0 &&
     staleCount === 0 &&
-    Math.abs(measuredSignalDelta) >= 0.00075 &&
+    Math.abs(measuredSignalDelta) >= 0.00075;
+  const qualifiedVelocityEvidence =
+    update.rawPayload.hasMomentumSignal === true &&
+    qualifiedAudienceVelocity &&
+    sourceCount >= 1 &&
+    statCount >= 2 &&
+    reliability >= 0.44 &&
+    sourceQualityMultiplier >= 0.7 &&
+    anomalyCount === 0 &&
+    staleCount === 0 &&
+    Math.abs(measuredSignalDelta) >= 0.0005;
+  const evidenceMode = corroboratedEvidence
+    ? "corroborated_sources"
+    : qualifiedVelocityEvidence
+      ? "measured_audience_velocity"
+      : "none";
+  const eligible =
+    (corroboratedEvidence || qualifiedVelocityEvidence) &&
     direction !== 0 &&
     direction === signalDirection &&
     roundedPrice === oldPrice &&
@@ -959,6 +983,7 @@ function applyMeasuredMinimumTick(update: ArtistMarketUpdate): ArtistMarketUpdat
     statCount,
     reliability,
     sourceQualityMultiplier,
+    evidenceMode,
     reason: eligible ? "price_tick_check" : "criteria_not_met"
   };
 
@@ -996,7 +1021,12 @@ function applyMeasuredMinimumTick(update: ArtistMarketUpdate): ArtistMarketUpdat
     ...update,
     currentPrice: candidatePrice,
     dailyChangePercent,
-    explanation: `${update.ticker} edged ${direction > 0 ? "higher" : "lower"} on fresh, corroborated measured signals.`,
+    explanation:
+      evidenceMode === "measured_audience_velocity"
+        ? `${update.ticker} edged ${direction > 0 ? "higher" : "lower"} as fresh audience growth ran ${
+            direction > 0 ? "above" : "below"
+          } its recent pace.`
+        : `${update.ticker} edged ${direction > 0 ? "higher" : "lower"} on fresh, corroborated measured signals.`,
     rawPayload: {
       ...update.rawPayload,
       measuredMinimumTick: {

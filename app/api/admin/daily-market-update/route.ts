@@ -600,7 +600,8 @@ async function collectRealSignals({
               metrics: ["listeners", "playcount"],
               beforeDate: runDate,
               lookbackDays: 30,
-              strategy: "latest"
+              strategy: "latest",
+              annualComparison: true
             })
           : Promise.resolve({}),
         useListenBrainz
@@ -611,7 +612,8 @@ async function collectRealSignals({
               metrics: ["listen_count", "listener_count"],
               beforeDate: runDate,
               lookbackDays: 30,
-              strategy: "latest"
+              strategy: "latest",
+              annualComparison: true
             })
           : Promise.resolve({}),
         useSpotify
@@ -622,7 +624,8 @@ async function collectRealSignals({
               metrics: ["popularity", "followers_total"],
               beforeDate: runDate,
               lookbackDays: 30,
-              strategy: "latest"
+              strategy: "latest",
+              annualComparison: true
             })
           : Promise.resolve({}),
         useYoutube
@@ -633,7 +636,8 @@ async function collectRealSignals({
               metrics: ["channel_views", "subscriber_count", "video_count"],
               beforeDate: runDate,
               lookbackDays: 30,
-              strategy: "latest"
+              strategy: "latest",
+              annualComparison: true
             })
           : Promise.resolve({}),
         useYoutube

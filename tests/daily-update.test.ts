@@ -122,7 +122,6 @@ describe("daily market valuation pressure", () => {
       }
     });
     const update = result.updates[0];
-
     expect(update.currentPrice).toBe(4.99);
     expect(update.dailyChangePercent).toBeLessThan(0);
     expect(update.rawPayload.measuredMinimumTick).toMatchObject({ applied: true });
@@ -161,5 +160,44 @@ describe("daily market valuation pressure", () => {
       applied: false,
       sourceCount: 1
     });
+  });
+
+  it("can preserve a one-cent move from one high-confidence measured audience velocity signal", () => {
+    const result = calculateDailyMarketUpdates({
+      artists: [artist()],
+      runDate: "2026-07-13",
+      source: "blended",
+      adapterSignals: {
+        artist: {
+          stats: {
+            youtubeGrowth: -0.2,
+            socialGrowth: -0.2
+          },
+          rawPayload: {
+            youtube: {
+              velocityMinimumTickEligible: true
+            },
+            sourceWeights: {
+              youtube: { youtubeGrowth: 0.8, socialGrowth: 0.4 }
+            },
+            sourceValues: {
+              youtube: { youtubeGrowth: -0.2, socialGrowth: -0.2 }
+            },
+            sourceDirectionalScores: {
+              youtube: -0.2
+            }
+          }
+        }
+      }
+    });
+    const update = result.updates[0];
+
+    expect(update.currentPrice).toBe(4.99);
+    expect(update.rawPayload.measuredMinimumTick).toMatchObject({
+      applied: true,
+      sourceCount: 1,
+      evidenceMode: "measured_audience_velocity"
+    });
+    expect(update.explanation).toContain("below its recent pace");
   });
 });

@@ -1149,6 +1149,12 @@ function getEvidenceSafetyAdjustment(event: ScoredMarketEvent) {
     return featureAdjustment;
   }
 
+  const releaseAdjustment = getReleaseDemandAdjustment(event);
+
+  if (releaseAdjustment.multiplier < 1) {
+    return releaseAdjustment;
+  }
+
   if (!isSocialOrCommunity) {
     return {
       label: "not_social_evidence",
@@ -1193,6 +1199,49 @@ function getEvidenceSafetyAdjustment(event: ScoredMarketEvent) {
     label: "social_evidence_confirmed",
     multiplier: 1
   };
+}
+
+function getReleaseDemandAdjustment(event: ScoredMarketEvent) {
+  const releaseMultipliers: Record<string, number> = {
+    project_release: 0.72,
+    single_video_release: 0.52,
+    track_audio_release: 0.3,
+    release: 0.52
+  };
+  const baselineMultiplier = releaseMultipliers[event.eventSubtype];
+
+  if (typeof baselineMultiplier !== "number" || event.weightedImpact <= 0) {
+    return {
+      label: "not_release_baseline",
+      multiplier: 1
+    };
+  }
+
+  const rawPayload = event.event.rawPayload;
+  const musicDemandConfirmed = getRawBoolean(rawPayload.musicDemandConfirmed);
+  const publicReactionConfirmed = getRawBoolean(rawPayload.publicReactionConfirmed);
+  const fanReactionEvidenceCount = getRawOptionalNumber(rawPayload.fanReactionEvidenceCount) ?? 0;
+  const viewCount =
+    getRawOptionalNumber(rawPayload.viewCount) ??
+    getRawOptionalNumber(rawPayload.videoViewCount) ??
+    getRawOptionalNumber(rawPayload.clusterTotalViews) ??
+    0;
+  const demandConfirmed =
+    musicDemandConfirmed ||
+    publicReactionConfirmed ||
+    fanReactionEvidenceCount > 0 ||
+    event.reactionConfirmingSourceCount > 0 ||
+    viewCount >= 100_000;
+
+  return demandConfirmed
+    ? {
+        label: "release_with_demonstrated_demand",
+        multiplier: 1
+      }
+    : {
+        label: "release_baseline_pending_demand",
+        multiplier: baselineMultiplier
+      };
 }
 
 function getFeatureEvidenceAdjustment(event: ScoredMarketEvent) {
