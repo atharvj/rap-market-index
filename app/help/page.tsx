@@ -43,6 +43,11 @@ const topics = [
     icon: CandlestickChart,
     answers: [
       "Open an artist quote, choose Buy or Sell, enter the number of shares, and review the estimated total.",
+      "The ticket shows the maximum available quantity. Buy limits use the lower of your available fantasy cash and the 25% per-artist portfolio limit; Sell limits use the shares you currently own.",
+      "Orders must be worth at least $1. The quantity field and plus button stop at your current maximum so an order cannot exceed your cash, position room, or owned shares.",
+      "Trading requires a confirmed account with completed setup and a fully synced profile. The ticket explains which requirement is still loading or missing.",
+      "Trading may pause briefly while the daily market update is verified, while a newly detected artist catalyst is incorporated into the quote, or when market integrity controls are active.",
+      "Rapid duplicate orders and daily activity can be limited to protect the fantasy market. Wait for the message shown on the ticket before trying again.",
       "The final execution price can differ slightly from the displayed quote because of spread and slippage.",
       "A positive daily move describes what already happened since the previous close; buying a current gainer does not automatically earn that past return.",
       "Buying and immediately selling normally loses fantasy cash because buys execute above the midpoint, sells execute below it, and each side pays commission.",
@@ -107,7 +112,7 @@ const topics = [
     answers: [
       "Request a new confirmation or password-reset email when an older link has expired.",
       "Refresh once after a deployment if the browser still holds an older application bundle.",
-      "An order can be rejected for insufficient cash, insufficient shares, market controls, or an invalid quantity."
+      "When an order is unavailable, read the explanation above its submit button. Common causes are insufficient cash or shares, the 25% artist limit, the $1 minimum order, profile syncing, a brief rate limit, or a temporary market pause."
     ]
   }
 ];
@@ -236,7 +241,7 @@ export default function HelpPage() {
                 const Icon = topic.icon;
 
                 return (
-                  <article key={topic.id} id={topic.id} className="rmi-signal-card p-5">
+                  <article key={topic.id} id={topic.id} className="rmi-signal-card scroll-mt-24 p-5">
                     <div className="flex items-start gap-3">
                       <span className="grid h-10 w-10 shrink-0 place-items-center rounded-md bg-cyan/10 text-cyan">
                         <Icon className="h-5 w-5" aria-hidden="true" />

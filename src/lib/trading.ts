@@ -2,6 +2,9 @@ export const STARTING_CASH = 100000;
 export const TRADE_COMMISSION_RATE = 0.01;
 export const MIN_COMMISSION_PER_SHARE = 0.02;
 export const MIN_TRADE_COMMISSION = 0.01;
+export const MIN_TRADE_VALUE = 1;
+export const MAX_TRADE_SHARES = 1_000_000;
+const SHARE_QUANTITY_PRECISION = 1_000_000;
 
 export type MarketMakerSide = "buy" | "sell";
 
@@ -83,6 +86,75 @@ export function estimateMarketMakerQuote({
     totalCost: roundMoney(orderValue + commission),
     netProceeds: roundMoney(Math.max(0, orderValue - commission))
   };
+}
+
+export function getMaximumBuyShares({
+  cashBalance,
+  remainingPositionValue,
+  midPrice,
+  volatility = 1
+}: {
+  cashBalance: number;
+  remainingPositionValue: number;
+  midPrice: number;
+  volatility?: number;
+}) {
+  const availableCash = Math.max(0, Number.isFinite(cashBalance) ? cashBalance : 0);
+  const availablePositionValue = Math.max(
+    0,
+    Number.isFinite(remainingPositionValue) ? remainingPositionValue : 0
+  );
+  const cleanMidPrice = Math.max(1, Number.isFinite(midPrice) ? midPrice : 1);
+  let lowerBound = 0;
+  let upperBound = Math.min(
+    MAX_TRADE_SHARES,
+    availableCash / cleanMidPrice,
+    availablePositionValue / cleanMidPrice
+  );
+
+  for (let iteration = 0; iteration < 48; iteration += 1) {
+    const candidate = (lowerBound + upperBound) / 2;
+    const quote = estimateMarketMakerQuote({
+      side: "buy",
+      midPrice: cleanMidPrice,
+      shares: candidate,
+      volatility
+    });
+
+    if (quote.totalCost <= availableCash && quote.orderValue <= availablePositionValue) {
+      lowerBound = candidate;
+    } else {
+      upperBound = candidate;
+    }
+  }
+
+  return roundShareQuantityDown(lowerBound);
+}
+
+export function roundShareQuantityDown(value: number) {
+  if (!Number.isFinite(value) || value <= 0) {
+    return 0;
+  }
+
+  return Math.floor((value + Number.EPSILON) * SHARE_QUANTITY_PRECISION) / SHARE_QUANTITY_PRECISION;
+}
+
+export function clampTradeShareInput(value: string, maxShares: number) {
+  if (!value.trim()) {
+    return value;
+  }
+
+  const parsedValue = Number(value);
+
+  if (!Number.isFinite(parsedValue)) {
+    return value;
+  }
+
+  return parsedValue > maxShares ? formatTradeShareInput(maxShares) : value;
+}
+
+export function formatTradeShareInput(value: number) {
+  return String(roundShareQuantityDown(value));
 }
 
 function roundMoney(value: number) {
