@@ -137,7 +137,10 @@ export type MarketUpdateSummary = {
   lowReliabilityCount: number;
   mediumReliabilityCount: number;
   highReliabilityCount: number;
+  sourceQualityDiagnosticsVersion: number;
   sourceQualityAnomalyCount: number;
+  sourceQualityAnomalousArtistCount: number;
+  sourceQualityMissingBaselineCount: number;
   sourceQualityStaleCount: number;
   averageSourceQualityMultiplier: number;
   technicalAdjustmentCount: number;
@@ -230,7 +233,10 @@ export function calculateDailyMarketUpdates(input: MarketUpdateInput) {
       lowReliabilityCount: reliabilityCounts.low,
       mediumReliabilityCount: reliabilityCounts.medium,
       highReliabilityCount: reliabilityCounts.high,
+      sourceQualityDiagnosticsVersion: 2,
       sourceQualityAnomalyCount: sourceQuality.anomalyCount,
+      sourceQualityAnomalousArtistCount: sourceQuality.anomalousArtistCount,
+      sourceQualityMissingBaselineCount: sourceQuality.missingBaselineCount,
       sourceQualityStaleCount: sourceQuality.staleCount,
       averageSourceQualityMultiplier: sourceQuality.averageMultiplier,
       technicalAdjustmentCount: technicals.adjustmentCount,
@@ -459,6 +465,8 @@ function summarizeSourceQuality(updates: ArtistMarketUpdate[]) {
   if (!updates.length) {
     return {
       anomalyCount: 0,
+      anomalousArtistCount: 0,
+      missingBaselineCount: 0,
       staleCount: 0,
       averageMultiplier: 1
     };
@@ -469,12 +477,16 @@ function summarizeSourceQuality(updates: ArtistMarketUpdate[]) {
       const details = getObjectRecord(update.rawPayload.reliabilityDetails);
 
       memo.anomalyCount += getNumber(details.sourceQualityAnomalyCount, 0);
+      memo.anomalousArtistCount += getNumber(details.sourceQualityAnomalyCount, 0) > 0 ? 1 : 0;
+      memo.missingBaselineCount += getNumber(details.sourceQualityMissingBaselineCount, 0);
       memo.staleCount += getNumber(details.sourceQualityStaleCount, 0);
       memo.multiplierTotal += getNumber(details.sourceQualityMultiplier, 1);
       return memo;
     },
     {
       anomalyCount: 0,
+      anomalousArtistCount: 0,
+      missingBaselineCount: 0,
       staleCount: 0,
       multiplierTotal: 0
     }
@@ -482,6 +494,8 @@ function summarizeSourceQuality(updates: ArtistMarketUpdate[]) {
 
   return {
     anomalyCount: summary.anomalyCount,
+    anomalousArtistCount: summary.anomalousArtistCount,
+    missingBaselineCount: summary.missingBaselineCount,
     staleCount: summary.staleCount,
     averageMultiplier: summary.multiplierTotal / Math.max(1, updates.length)
   };
@@ -1761,7 +1775,7 @@ function getDataQualityDiagnostics(rawPayload: Record<string, unknown>) {
     for (const flag of anomalyFlags) {
       flags.add(flag);
 
-      if (flag === "missing_baseline") {
+      if (isMissingBaselineFlag(flag)) {
         missingBaselineCount += 1;
       } else {
         anomalyCount += 1;
@@ -1779,6 +1793,10 @@ function getDataQualityDiagnostics(rawPayload: Record<string, unknown>) {
     missingBaselineCount,
     flags: Array.from(flags).sort()
   };
+}
+
+function isMissingBaselineFlag(flag: string) {
+  return flag === "missing_baseline" || flag === "missing_rate_baseline" || flag === "missing_annual_baseline";
 }
 
 function collectMomentumQualityObjects(value: unknown): Record<string, unknown>[] {

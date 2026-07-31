@@ -25,6 +25,70 @@ function artist(): MarketUpdateArtist {
 }
 
 describe("daily market valuation pressure", () => {
+  it("tracks missing history separately from genuine source anomalies", () => {
+    const result = calculateDailyMarketUpdates({
+      artists: [artist()],
+      runDate: "2026-07-13",
+      source: "blended",
+      adapterSignals: {
+        artist: {
+          stats: { youtubeGrowth: 0.2 },
+          rawPayload: {
+            sourceWeights: { youtube: { youtubeGrowth: 0.8 } },
+            sourceValues: { youtube: { youtubeGrowth: 0.2 } },
+            youtube: {
+              viewRateMomentum: {
+                confidenceMultiplier: 0.42,
+                anomalyFlags: ["missing_rate_baseline"]
+              },
+              annualPopularityMomentum: {
+                confidenceMultiplier: 0.42,
+                anomalyFlags: ["missing_annual_baseline"]
+              }
+            }
+          }
+        }
+      }
+    });
+
+    expect(result.summary).toMatchObject({
+      sourceQualityDiagnosticsVersion: 2,
+      sourceQualityAnomalyCount: 0,
+      sourceQualityAnomalousArtistCount: 0,
+      sourceQualityMissingBaselineCount: 2
+    });
+  });
+
+  it("still reports genuine counter anomalies and affected artists", () => {
+    const result = calculateDailyMarketUpdates({
+      artists: [artist()],
+      runDate: "2026-07-13",
+      source: "blended",
+      adapterSignals: {
+        artist: {
+          stats: { youtubeGrowth: -0.2 },
+          rawPayload: {
+            sourceWeights: { youtube: { youtubeGrowth: 0.8 } },
+            sourceValues: { youtube: { youtubeGrowth: -0.2 } },
+            youtube: {
+              viewRateMomentum: {
+                confidenceMultiplier: 0.42,
+                anomalyFlags: ["counter_drop"]
+              }
+            }
+          }
+        }
+      }
+    });
+
+    expect(result.summary).toMatchObject({
+      sourceQualityDiagnosticsVersion: 2,
+      sourceQualityAnomalyCount: 1,
+      sourceQualityAnomalousArtistCount: 1,
+      sourceQualityMissingBaselineCount: 0
+    });
+  });
+
   it("never treats a legacy rebase flag as an uncapped daily move", () => {
     const result = calculateDailyMarketUpdates({
       artists: [artist()],

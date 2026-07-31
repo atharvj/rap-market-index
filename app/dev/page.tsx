@@ -453,7 +453,10 @@ type MarketHealth = {
       lowReliabilityCount?: number;
       mediumReliabilityCount?: number;
       highReliabilityCount?: number;
+      sourceQualityDiagnosticsVersion?: number;
       sourceQualityAnomalyCount?: number;
+      sourceQualityAnomalousArtistCount?: number;
+      sourceQualityMissingBaselineCount?: number;
       sourceQualityStaleCount?: number;
       averageSourceQualityMultiplier?: number;
       technicalAdjustmentCount?: number;
@@ -2812,7 +2815,9 @@ function MarketHealthPanel({ data }: { data: MarketHealth }) {
             key: "latest-run:source-quality",
             label: "Source quality",
             value: `${Math.round((data.latestRun.summary.averageSourceQualityMultiplier ?? 1) * 100)}/100`,
-            detail: `${data.latestRun.summary.sourceQualityAnomalyCount ?? 0} anomalies, ${data.latestRun.summary.sourceQualityStaleCount ?? 0} stale inputs`
+            detail: (data.latestRun.summary.sourceQualityDiagnosticsVersion ?? 0) >= 2
+              ? `${data.latestRun.summary.sourceQualityAnomalyCount ?? 0} anomalies across ${data.latestRun.summary.sourceQualityAnomalousArtistCount ?? 0} artists · ${data.latestRun.summary.sourceQualityMissingBaselineCount ?? 0} missing baselines · ${data.latestRun.summary.sourceQualityStaleCount ?? 0} stale inputs`
+              : `${data.latestRun.summary.sourceQualityStaleCount ?? 0} stale inputs · anomaly detail unavailable for this legacy run`
           },
           {
             key: "latest-run:technicals",

@@ -824,9 +824,14 @@ function buildWarnings({
       warnings.push("Latest market run quality score is low; review source confirmation, direction balance, and move size.");
     }
 
-    if (movementSummary.sourceQualityAnomalyCount > 0) {
+    const anomalyWarningThreshold = Math.max(3, Math.ceil(movementSummary.artistCount * 0.08));
+
+    if (
+      movementSummary.sourceQualityDiagnosticsVersion >= 2 &&
+      movementSummary.sourceQualityAnomalousArtistCount >= anomalyWarningThreshold
+    ) {
       warnings.push(
-        `Latest market run saw ${movementSummary.sourceQualityAnomalyCount} source data anomal${movementSummary.sourceQualityAnomalyCount === 1 ? "y" : "ies"}; review raw source quality before trusting sharp moves.`
+        `Latest market run found ${movementSummary.sourceQualityAnomalyCount} genuine source anomal${movementSummary.sourceQualityAnomalyCount === 1 ? "y" : "ies"} across ${movementSummary.sourceQualityAnomalousArtistCount} artists; affected inputs were dampened automatically.`
       );
     }
 
@@ -938,7 +943,10 @@ function getMovementSummary(summary: MarketRunRow["summary"]) {
       mediumReliabilityCount: 0,
       highReliabilityCount: 0,
       marketQualityScore: 0,
+      sourceQualityDiagnosticsVersion: 0,
       sourceQualityAnomalyCount: 0,
+      sourceQualityAnomalousArtistCount: 0,
+      sourceQualityMissingBaselineCount: 0,
       sourceQualityStaleCount: 0,
       averageSourceQualityMultiplier: 1,
       technicalAdjustmentCount: 0,
@@ -956,7 +964,10 @@ function getMovementSummary(summary: MarketRunRow["summary"]) {
     mediumReliabilityCount: getSummaryNumber(value.mediumReliabilityCount),
     highReliabilityCount: getSummaryNumber(value.highReliabilityCount),
     marketQualityScore: getSummaryNumber(value.marketQualityScore),
+    sourceQualityDiagnosticsVersion: getSummaryNumber(value.sourceQualityDiagnosticsVersion),
     sourceQualityAnomalyCount: getSummaryNumber(value.sourceQualityAnomalyCount),
+    sourceQualityAnomalousArtistCount: getSummaryNumber(value.sourceQualityAnomalousArtistCount),
+    sourceQualityMissingBaselineCount: getSummaryNumber(value.sourceQualityMissingBaselineCount),
     sourceQualityStaleCount: getSummaryNumber(value.sourceQualityStaleCount),
     averageSourceQualityMultiplier: getSummaryNumber(value.averageSourceQualityMultiplier, 1),
     technicalAdjustmentCount: getSummaryNumber(value.technicalAdjustmentCount),
