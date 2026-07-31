@@ -154,7 +154,7 @@ export default function MarketsPage() {
             How pricing works
           </Link>
         </div>
-        <div className="rmi-table-head grid grid-cols-[minmax(0,1fr)_104px_84px_44px] gap-x-4 px-4 py-3 lg:grid-cols-[minmax(220px,1fr)_140px_124px_104px_84px_44px]">
+        <div className="rmi-table-head grid grid-cols-[minmax(0,1fr)_72px_60px_32px] gap-x-1 px-2 py-3 sm:grid-cols-[minmax(0,1fr)_104px_84px_36px] sm:gap-x-3 sm:px-4 lg:grid-cols-[minmax(220px,1fr)_140px_124px_104px_84px_44px] lg:gap-x-4">
           <span>Artist</span>
           <span className="hidden text-right lg:block">Recent sessions</span>
           <span className="hidden text-right lg:block">Signal Score</span>
@@ -165,16 +165,17 @@ export default function MarketsPage() {
         {artists.map((artist) => (
           <div
             key={artist.id}
-            className="rmi-table-row grid grid-cols-[minmax(0,1fr)_104px_84px_44px] items-center gap-x-4 px-4 py-3 last:border-b-0 lg:grid-cols-[minmax(220px,1fr)_140px_124px_104px_84px_44px]"
+            className="rmi-table-row grid grid-cols-[minmax(0,1fr)_72px_60px_32px] items-center gap-x-1 px-2 py-3 last:border-b-0 sm:grid-cols-[minmax(0,1fr)_104px_84px_36px] sm:gap-x-3 sm:px-4 lg:grid-cols-[minmax(220px,1fr)_140px_124px_104px_84px_44px] lg:gap-x-4"
+            data-market-row
           >
             <Link
               href={`/artists/${artist.id}`}
-              className="flex min-w-0 items-center gap-3"
+              className="flex min-w-0 items-center gap-2 sm:gap-3"
               title={artist.lastMoveExplanation}
             >
               <ArtistAvatar artist={artist} />
-              <span className="min-w-0">
-                <span className="block truncate text-sm font-semibold">{artist.name}</span>
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-sm font-semibold" data-market-artist-name>{artist.name}</span>
                 <span className="block truncate text-xs font-medium text-paper/45">${artist.ticker}</span>
               </span>
             </Link>
@@ -192,7 +193,7 @@ export default function MarketsPage() {
             <span className="text-right text-xs">
               <ChangeText value={artist.dailyChangePercent} />
             </span>
-            <WatchlistButton artistId={artist.id} />
+            <WatchlistButton artistId={artist.id} compact />
           </div>
         ))}
       </section>

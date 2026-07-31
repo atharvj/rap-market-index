@@ -9,10 +9,12 @@ import { useEffect, useState } from "react";
 
 export function WatchlistButton({
   artistId,
-  label = false
+  label = false,
+  compact = false
 }: {
   artistId: string;
   label?: boolean;
+  compact?: boolean;
 }) {
   const { isWatchlisted, toggleWatchlist, syncMode } = useGame();
   const { session } = useAuth();
@@ -55,7 +57,8 @@ export function WatchlistButton({
         title={title}
         aria-label={action}
         className={clsx(
-          "inline-flex min-h-9 shrink-0 items-center justify-center gap-2 rounded-md border px-2.5 text-sm font-semibold transition-colors disabled:cursor-wait disabled:opacity-60",
+          "inline-flex shrink-0 items-center justify-center gap-2 rounded-md border text-sm font-semibold transition-colors disabled:cursor-wait disabled:opacity-60",
+          compact ? "h-8 w-8 px-0" : "min-h-9 px-2.5",
           active
             ? "border-brass/45 bg-brass/[0.15] text-brass"
             : "border-line bg-panel text-paper/50 hover:border-brass/40 hover:text-brass"

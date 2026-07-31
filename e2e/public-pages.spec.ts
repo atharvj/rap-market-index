@@ -386,6 +386,32 @@ test("markets visual contract", async ({ page }) => {
   await assertStablePublicPage(page, "/markets", "Artist Markets", "markets.png");
 });
 
+test("market artist names retain readable space on mobile", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/markets");
+  await expect(page.locator('[aria-busy="true"]')).toHaveCount(0, { timeout: 15_000 });
+
+  const names = page.locator("[data-market-artist-name]");
+  await expect(names).toHaveCount(marketState.artists.length);
+
+  const widths = await names.evaluateAll((nodes) =>
+    nodes.slice(0, 8).map((node) => Math.round(node.getBoundingClientRect().width))
+  );
+  expect(widths.every((width) => width >= 80), `mobile artist-name widths: ${widths.join(", ")}`).toBeTruthy();
+});
+
+test("artist pages include related markets without repeating the current artist", async ({ page }) => {
+  const currentArtist = marketState.artists[0];
+  await page.goto(`/artists/${currentArtist.id}`);
+  await expect(page.locator('[aria-busy="true"]')).toHaveCount(0, { timeout: 15_000 });
+
+  const heading = page.getByRole("heading", { name: "Related Artists" });
+  await expect(heading).toBeVisible();
+  const section = page.locator("section").filter({ has: heading }).first();
+  await expect(section.locator('a[href^="/artists/"]')).toHaveCount(4);
+  await expect(section.locator(`a[href="/artists/${currentArtist.id}"]`)).toHaveCount(0);
+});
+
 test("public metrics do not use decorative colored side borders", async ({ page }) => {
   for (const path of ["/", "/markets", "/scout"]) {
     await page.goto(path);

@@ -6,12 +6,13 @@ import { ArtistPriceHistoryPanel } from "@/components/ArtistPriceHistoryPanel";
 import { useGame } from "@/components/GameProvider";
 import { MarketSideRail } from "@/components/MarketSideRail";
 import { MarketNewsFeed } from "@/components/MarketNewsFeed";
-import { ChangeText, RmiButton, RmiSection } from "@/components/RmiPrimitives";
+import { ArtistMiniCard, ChangeText, RmiButton, RmiSection } from "@/components/RmiPrimitives";
 import { ScoreInfo } from "@/components/ScoreInfo";
 import { TradeTicket } from "@/components/TradeTicket";
 import { WatchlistButton } from "@/components/WatchlistButton";
 import { getArtistSignalDrivers } from "@/lib/artist-signal-drivers";
 import { formatCurrency, formatShares } from "@/lib/formatters";
+import { getRelatedArtists } from "@/lib/related-artists";
 import { estimateMarketMakerQuote } from "@/lib/trading";
 import { Activity, BadgeCheck, Radio, Zap } from "lucide-react";
 import { useParams, useSearchParams } from "next/navigation";
@@ -59,6 +60,7 @@ export default function ArtistDetailPage() {
   const signalRank = [...state.artists]
     .sort((first, second) => second.hypeScore - first.hypeScore)
     .findIndex((candidate) => candidate.id === activeArtist.id) + 1;
+  const relatedArtists = getRelatedArtists(activeArtist, state.artists, 4);
 
   return (
     <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_300px] xl:grid-cols-[minmax(0,1fr)_340px]">
@@ -115,6 +117,16 @@ export default function ArtistDetailPage() {
         <RmiSection title={<span className="flex items-center gap-2"><Activity className="h-4 w-4 text-mint" /> Signal Breakdown</span>}>
           <SignalBreakdown drivers={signalDrivers} />
         </RmiSection>
+
+        {relatedArtists.length ? (
+          <RmiSection title="Related Artists" subtitle="Similar market tier and current signal profile.">
+            <div className="grid gap-3 p-4 sm:grid-cols-2 xl:grid-cols-4">
+              {relatedArtists.map((relatedArtist) => (
+                <ArtistMiniCard key={relatedArtist.id} artist={relatedArtist} />
+              ))}
+            </div>
+          </RmiSection>
+        ) : null}
 
         <RmiSection title="Market News">
           <div className="px-4">
