@@ -89,60 +89,83 @@ export default function PortfolioPage() {
 
       <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_300px] xl:grid-cols-[minmax(0,1fr)_340px]">
         <RmiSection title="Holdings" subtitle={`${holdings.length} long position${holdings.length === 1 ? "" : "s"}`}>
-          <div className="overflow-x-auto">
-            <div className="min-w-[650px]">
-              <div className="rmi-table-head grid grid-cols-[minmax(230px,1fr)_76px_100px_112px_96px] px-4 py-3 text-xs font-medium text-paper/45">
-                <span>Artist</span>
-                <span>Shares</span>
-                <span>Average Cost</span>
-                <span className="text-right">Market Value</span>
-                <span className="text-right">Return</span>
-              </div>
-              {holdings.length ? (
-                holdings.map((holding) => (
-                  <div
-                    key={holding.artistId}
-                    className="rmi-table-row grid grid-cols-[minmax(230px,1fr)_76px_100px_112px_96px] items-center px-4 py-3"
-                  >
-                    <div className="flex min-w-0 items-center gap-2 pr-3">
-                      <Link href={`/artists/${holding.artistId}`} className="flex min-w-0 flex-1 items-center gap-3 hover:text-cyan">
+          {holdings.length ? (
+            <>
+              <div className="divide-y divide-line xl:hidden">
+                {holdings.map((holding) => (
+                  <article key={holding.artistId} className="p-4">
+                    <div className="flex items-center justify-between gap-4">
+                      <Link href={`/artists/${holding.artistId}`} className="flex min-w-0 items-center gap-3 hover:text-cyan">
                         <ArtistAvatar artist={holding.artist} size="sm" />
                         <span className="min-w-0">
                           <span className="block truncate text-sm font-semibold">{holding.artist.name}</span>
                           <span className="block text-xs text-paper/40">${holding.artist.ticker}</span>
                         </span>
                       </Link>
-                      <span className="flex shrink-0 overflow-hidden rounded-md border border-line bg-ink/30 text-xs font-semibold">
-                        <Link
-                          href={`/artists/${holding.artistId}?side=buy#trade`}
-                          className="px-2 py-1.5 text-mint hover:bg-mint/12"
-                          aria-label={`Buy ${holding.artist.name}`}
-                        >
-                          Buy
-                        </Link>
-                        <Link
-                          href={`/artists/${holding.artistId}?side=sell#trade`}
-                          className="border-l border-line px-2 py-1.5 text-ember hover:bg-ember/12"
-                          aria-label={`Sell ${holding.artist.name}`}
-                        >
-                          Sell
-                        </Link>
+                      <span className="shrink-0 text-right">
+                        <span className="block text-xs font-medium text-paper/45">Market value</span>
+                        <span className="block text-sm font-semibold number-tabular">{formatCurrency(holding.currentValue)}</span>
                       </span>
                     </div>
-                    <span className="text-sm font-semibold number-tabular">{formatShares(holding.shares)}</span>
-                    <span className="text-sm font-semibold number-tabular">{formatCurrency(holding.averageBuyPrice)}</span>
-                    <span className="text-right text-sm font-semibold number-tabular">{formatCurrency(holding.currentValue)}</span>
-                    <span className="text-right text-xs"><ChangeText value={holding.profitLossPercent} /></span>
+
+                    <div className="mt-4 grid grid-cols-3 gap-3 border-y border-line/70 py-3">
+                      <HoldingDetail label="Shares" value={formatShares(holding.shares)} />
+                      <HoldingDetail label="Avg. cost" value={formatCurrency(holding.averageBuyPrice)} />
+                      <div className="text-right">
+                        <span className="block text-xs font-medium text-paper/45">Return</span>
+                        <span className="mt-1 block text-xs"><ChangeText value={holding.profitLossPercent} /></span>
+                      </div>
+                    </div>
+
+                    <div className="mt-3 grid grid-cols-2 gap-2">
+                      <HoldingTradeLink artistId={holding.artistId} artistName={holding.artist.name} side="buy" />
+                      <HoldingTradeLink artistId={holding.artistId} artistName={holding.artist.name} side="sell" />
+                    </div>
+                  </article>
+                ))}
+              </div>
+
+              <div className="hidden overflow-x-auto xl:block">
+                <div className="min-w-[740px]">
+                  <div className="rmi-table-head grid grid-cols-[minmax(170px,1fr)_70px_96px_108px_84px_104px] items-center px-4 py-3 text-xs font-medium text-paper/45">
+                    <span>Artist</span>
+                    <span>Shares</span>
+                    <span>Average Cost</span>
+                    <span className="text-right">Market Value</span>
+                    <span className="text-right">Return</span>
+                    <span className="text-right">Trade</span>
                   </div>
-                ))
-              ) : (
-                <div className="flex items-center justify-between gap-4 p-6">
-                  <p className="text-sm text-paper/55">No holdings yet. Compare quotes and start a fantasy position.</p>
-                  <RmiButton href="/markets" className="shrink-0">Trade Markets</RmiButton>
+                  {holdings.map((holding) => (
+                    <div
+                      key={holding.artistId}
+                      className="rmi-table-row grid grid-cols-[minmax(170px,1fr)_70px_96px_108px_84px_104px] items-center px-4 py-3"
+                    >
+                      <Link href={`/artists/${holding.artistId}`} className="flex min-w-0 items-center gap-3 pr-3 hover:text-cyan">
+                        <ArtistAvatar artist={holding.artist} size="sm" />
+                        <span className="min-w-0">
+                          <span className="block truncate text-sm font-semibold">{holding.artist.name}</span>
+                          <span className="block text-xs text-paper/40">${holding.artist.ticker}</span>
+                        </span>
+                      </Link>
+                      <span className="text-sm font-semibold number-tabular">{formatShares(holding.shares)}</span>
+                      <span className="text-sm font-semibold number-tabular">{formatCurrency(holding.averageBuyPrice)}</span>
+                      <span className="text-right text-sm font-semibold number-tabular">{formatCurrency(holding.currentValue)}</span>
+                      <span className="text-right text-xs"><ChangeText value={holding.profitLossPercent} /></span>
+                      <span className="ml-auto flex overflow-hidden rounded-md border border-line bg-ink/30 text-xs font-semibold">
+                        <HoldingTradeLink artistId={holding.artistId} artistName={holding.artist.name} side="buy" compact />
+                        <HoldingTradeLink artistId={holding.artistId} artistName={holding.artist.name} side="sell" compact />
+                      </span>
+                    </div>
+                  ))}
                 </div>
-              )}
+              </div>
+            </>
+          ) : (
+            <div className="flex flex-wrap items-center justify-between gap-4 p-6">
+              <p className="text-sm text-paper/55">No holdings yet. Compare quotes and start a fantasy position.</p>
+              <RmiButton href="/markets" className="shrink-0">Trade Markets</RmiButton>
             </div>
-          </div>
+          )}
         </RmiSection>
 
         <div className="space-y-4">
@@ -232,6 +255,47 @@ function AnalyticsRow({ label, value, tone = "neutral" }: { label: string; value
         {value}
       </span>
     </div>
+  );
+}
+
+function HoldingDetail({ label, value }: { label: string; value: string }) {
+  return (
+    <span>
+      <span className="block text-xs font-medium text-paper/45">{label}</span>
+      <span className="mt-1 block text-sm font-semibold number-tabular">{value}</span>
+    </span>
+  );
+}
+
+function HoldingTradeLink({
+  artistId,
+  artistName,
+  side,
+  compact = false
+}: {
+  artistId: string;
+  artistName: string;
+  side: "buy" | "sell";
+  compact?: boolean;
+}) {
+  const label = side === "buy" ? "Buy" : "Sell";
+  const colorClass = side === "buy"
+    ? "text-mint hover:bg-mint/10"
+    : "text-ember hover:bg-ember/10";
+  const layoutClass = compact
+    ? `px-2 py-1.5 ${side === "sell" ? "border-l border-line" : ""}`
+    : `inline-flex min-h-9 items-center justify-center rounded-md border font-semibold ${
+        side === "buy" ? "border-mint/35" : "border-ember/35"
+      }`;
+
+  return (
+    <Link
+      href={`/artists/${artistId}?side=${side}#trade`}
+      className={`text-xs transition-colors ${colorClass} ${layoutClass}`}
+      aria-label={`${label} ${artistName}`}
+    >
+      {label}
+    </Link>
   );
 }
 
