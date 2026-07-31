@@ -16,7 +16,7 @@ const sections = [
   },
   {
     title: "What the RMI Signal Score means",
-    body: "RMI Signal Score is a 1-99 reading of current directional evidence across audience momentum, public attention, verified catalysts, reception, and eligible trading demand. It does not measure fame, audience size, or career stature. Limited or mixed evidence stays near 50, so a smaller artist with stronger current momentum can score above an established artist while still carrying a much lower quote."
+    body: "RMI Signal Score is a 1–100 reading of current directional evidence across audience momentum, public attention, verified catalysts, reception, and eligible trading demand. It does not measure fame, audience size, or career stature. Limited or mixed evidence stays near 50, so a smaller artist with stronger current momentum can score above an established artist while still carrying a much lower quote."
   },
   {
     title: "Why audience size is not the whole price",

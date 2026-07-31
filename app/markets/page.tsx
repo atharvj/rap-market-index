@@ -6,7 +6,6 @@ import { MiniSparkline } from "@/components/MiniSparkline";
 import { ChangeText, RmiButton, RmiSection } from "@/components/RmiPrimitives";
 import { PriceChart } from "@/components/PriceChart";
 import { WatchlistButton } from "@/components/WatchlistButton";
-import { getMarketSignalLabel } from "@/lib/artist-explanations";
 import { formatCurrency, formatDate, formatPercent } from "@/lib/formatters";
 import { buildMarketIndexSeries, getMarketBreadth, getSeriesChangePercent } from "@/lib/market-analytics";
 import { Activity, ArrowDown, ArrowDownAZ, ArrowUp, ArrowUpAZ, Radar, Search, Signal } from "lucide-react";
@@ -148,7 +147,7 @@ export default function MarketsPage() {
           <div>
             <h2 className="text-sm font-semibold">Market board</h2>
             <p className="mt-1 max-w-3xl text-xs leading-5 text-paper/50">
-              Signal Score measures current evidence, not fame or price. Sparklines show up to 18 recorded sessions; 24h compares the latest quote with the previous close.
+              Sparklines show up to 18 sessions. 24h uses the previous close.
             </p>
           </div>
           <Link href="/about" className="text-xs font-semibold text-cyan hover:text-cyan/75">
@@ -202,19 +201,16 @@ export default function MarketsPage() {
 }
 
 function ScoreCell({ value }: { value: number }) {
-  const label = getMarketSignalLabel(value);
   const tone = value >= 53 ? "bg-mint" : value <= 47 ? "bg-ember" : "bg-cyan";
-  const textTone = value >= 53 ? "text-mint" : value <= 47 ? "text-ember" : "text-paper/48";
 
   return (
-    <div className="hidden flex-col items-end lg:flex" aria-label={`RMI Signal Score ${value} out of 99, ${label}`}>
+    <div className="hidden items-center justify-end lg:flex" aria-label={`RMI Signal Score ${value} out of 100`}>
       <span className="flex items-center justify-end gap-2">
         <span className="h-1.5 w-12 overflow-hidden rounded-full bg-paper/10" aria-hidden="true">
           <span className={`block h-full rounded-full ${tone}`} style={{ width: `${Math.max(0, Math.min(100, value))}%` }} />
         </span>
         <span className="w-6 text-right text-xs font-semibold text-paper/70 number-tabular">{value}</span>
       </span>
-      <span className={`mt-1 text-[10px] font-medium ${textTone}`}>{label}</span>
     </div>
   );
 }

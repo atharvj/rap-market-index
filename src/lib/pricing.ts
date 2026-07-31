@@ -20,7 +20,7 @@ export function calculateHypeScore(stats: HypeStats) {
     (stats.newsScore - 50) * 0.15 +
     stats.traderDemand * 0.1;
 
-  return Math.round(clamp(50 + momentum * 1.4, 1, 99));
+  return Math.round(clamp(50 + momentum * 1.4, 1, 100));
 }
 
 export function calculateSignalDelta(stats: HypeStats) {

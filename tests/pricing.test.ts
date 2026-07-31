@@ -21,7 +21,7 @@ describe("RMI Signal Score range", () => {
       socialGrowth: 120,
       newsScore: 100,
       traderDemand: 40
-    })).toBe(99);
+    })).toBe(100);
   });
 
   it("can approach the bottom of the range when measured signals are exceptionally weak", () => {

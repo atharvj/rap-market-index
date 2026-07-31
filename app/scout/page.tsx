@@ -72,7 +72,7 @@ export default function ScoutPage() {
                 <ChangeText value={breakoutLeader.dailyChangePercent} />
               </div>
               <div className="mt-4 grid grid-cols-2 gap-2 text-xs">
-                <SignalTile label="RMI Signal" value={`${breakoutLeader.hypeScore}/99`} />
+                <SignalTile label="RMI Signal" value={`${breakoutLeader.hypeScore}/100`} />
                 <SignalTile label="Volatility" value={`${breakoutLeader.volatility.toFixed(2)}x`} />
               </div>
             </div>

@@ -88,7 +88,7 @@ export default function HomePage() {
               </div>
               <div className="mt-3 flex items-center justify-between border-t border-line/60 pt-2">
                 <span className="rmi-data-label">RMI signal</span>
-                <span className="text-xs font-semibold text-cyan number-tabular">{artist.hypeScore}/99</span>
+                <span className="text-xs font-semibold text-cyan number-tabular">{artist.hypeScore}/100</span>
               </div>
             </Link>
           ))}

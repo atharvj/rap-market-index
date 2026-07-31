@@ -1,7 +1,7 @@
 import type { HypeStats } from "@/lib/types";
 
 export const MARKET_SCORE_EXPLANATION =
-  "RMI Signal Score runs from 1-99 and summarizes current directional evidence. It does not measure fame, audience size, current price, or predict the next move. Around 50 means neutral, mixed, or limited evidence; a smaller artist can score above an established artist when its current signals are stronger.";
+  "A 1–100 snapshot of an artist’s current momentum. Around 50 means signals are mixed.";
 
 export function getMarketSignalLabel(score: number) {
   if (score >= 60) {

@@ -14,7 +14,6 @@ import {
 } from "@/lib/trading";
 import type { Artist } from "@/lib/types";
 import { ArrowDownRight, ArrowUpRight, LoaderCircle, Minus, Plus, Radio } from "lucide-react";
-import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 
 export function TradeTicket({
@@ -70,15 +69,14 @@ export function TradeTicket({
     serverRefreshing,
     syncMode
   });
-  const orderBlockReason = getOrderBlockReason({
+  const orderBlocked = isOrderBlocked({
     estimatedOrderValue: estimatedValue,
     maxShares,
     parsedShares,
-    remainingPositionValue,
     side,
     tradeUnavailableReason
   });
-  const disabled = Boolean(orderBlockReason) || submitting;
+  const disabled = orderBlocked || submitting;
 
   useEffect(() => {
     setSide(defaultSide);
@@ -98,10 +96,10 @@ export function TradeTicket({
     }
 
     if (side === "buy") {
-      return `Fantasy cash ${formatCurrency(state.cashBalance)} · Max ${formatTradeShareInput(maxBuy)}`;
+      return `Fantasy cash ${formatCurrency(state.cashBalance)} · Max ${formatTradeLimit(maxBuy)}`;
     }
 
-    return `Your shares ${formatTradeShareInput(maxSell)} · Value ${formatCurrency(maxSell * artist.currentPrice)}`;
+    return `Your shares ${formatTradeLimit(maxSell)} · Value ${formatCurrency(maxSell * artist.currentPrice)}`;
   }, [artist.currentPrice, maxBuy, maxSell, side, state.cashBalance, tradeUnavailableReason]);
 
   function changeShares(nextValue: string) {
@@ -266,15 +264,6 @@ export function TradeTicket({
           </div>
         </div>
 
-        {orderBlockReason && !submitting ? (
-          <div className="mt-3 border border-brass/35 bg-brass/10 px-3 py-2 text-xs leading-5 text-paper/70" role="status">
-            <p>{orderBlockReason}</p>
-            <Link href="/help#trading" className="font-semibold text-cyan hover:text-cyan/75">
-              See trading limits and pauses
-            </Link>
-          </div>
-        ) : null}
-
         <button
           type="button"
           disabled={disabled}
@@ -288,7 +277,7 @@ export function TradeTicket({
           {submitting ? <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden="true" /> : null}
           {submitting
             ? "Submitting order"
-            : orderBlockReason
+            : orderBlocked
               ? tradeUnavailableReason || `${side === "buy" ? "Buy" : "Sell"} unavailable`
               : side === "buy"
                 ? "Submit buy order"
@@ -306,6 +295,12 @@ export function TradeTicket({
       </div>
     </section>
   );
+}
+
+function formatTradeLimit(value: number) {
+  return value.toLocaleString("en-US", {
+    maximumFractionDigits: 2
+  });
 }
 
 function getTradeUnavailableReason({
@@ -342,46 +337,42 @@ function getTradeUnavailableReason({
   return "";
 }
 
-function getOrderBlockReason({
+function isOrderBlocked({
   estimatedOrderValue,
   maxShares,
   parsedShares,
-  remainingPositionValue,
   side,
   tradeUnavailableReason
 }: {
   estimatedOrderValue: number;
   maxShares: number;
   parsedShares: number;
-  remainingPositionValue: number;
   side: "buy" | "sell";
   tradeUnavailableReason: string;
 }) {
   if (tradeUnavailableReason) {
-    return tradeUnavailableReason;
+    return true;
   }
 
   if (side === "sell" && maxShares <= 0) {
-    return "You do not own any shares of this artist to sell.";
+    return true;
   }
 
   if (side === "buy" && maxShares <= 0) {
-    return remainingPositionValue <= 0
-      ? "This artist is already at the 25% portfolio position limit."
-      : "You do not have enough fantasy cash available for another share.";
+    return true;
   }
 
   if (!Number.isFinite(parsedShares) || parsedShares <= 0) {
-    return "Enter a share amount greater than zero.";
+    return true;
   }
 
   if (parsedShares > maxShares) {
-    return `The most you can ${side} right now is ${formatTradeShareInput(maxShares)} shares.`;
+    return true;
   }
 
   if (estimatedOrderValue < MIN_TRADE_VALUE) {
-    return `The minimum order value is ${formatCurrency(MIN_TRADE_VALUE)}.`;
+    return true;
   }
 
-  return "";
+  return false;
 }

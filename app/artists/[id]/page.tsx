@@ -81,7 +81,7 @@ export default function ArtistDetailPage() {
                 <WatchlistButton artistId={artist.id} />
               </div>
               <p className="mt-1 flex flex-wrap items-center gap-1.5 text-sm font-medium text-paper/60">
-                <span>${artist.ticker} · RMI Signal {artist.hypeScore}/99 · {getMarketSignalLabel(artist.hypeScore)}</span>
+                <span>${artist.ticker} · RMI Signal {artist.hypeScore}/100 · {getMarketSignalLabel(artist.hypeScore)}</span>
                 <ScoreInfo />
               </p>
               <div className="mt-3 flex flex-wrap gap-2">
