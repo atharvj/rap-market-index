@@ -434,6 +434,39 @@ test("help visual contract", async ({ page }) => {
   await assertStablePublicPage(page, "/help", "How can we help?", "help.png");
 });
 
+test("help topics stay in one compact expandable column", async ({ page }) => {
+  await page.goto("/help");
+  await expect(page.locator('[aria-busy="true"]')).toHaveCount(0, { timeout: 15_000 });
+
+  const topics = page.locator("main details");
+  await expect(topics).toHaveCount(7);
+  await expect(page.locator("main details[open]")).toHaveCount(0);
+
+  const topicPositions = await topics.evaluateAll((nodes) =>
+    nodes.map((node) => {
+      const bounds = node.getBoundingClientRect();
+      return { x: Math.round(bounds.x), width: Math.round(bounds.width) };
+    })
+  );
+  expect(new Set(topicPositions.map(({ x }) => x)).size).toBe(1);
+  expect(new Set(topicPositions.map(({ width }) => width)).size).toBe(1);
+
+  await page.getByText("Buy and sell artist shares", { exact: true }).click();
+  await expect(page.locator("details#trading")).toHaveAttribute("open", "");
+  await expect(page.locator("details#account")).not.toHaveAttribute("open", "");
+
+  await page.goto("/help#trading");
+  await expect(page.locator("details#trading")).toHaveAttribute("open", "");
+});
+
+test("privacy visual contract", async ({ page }) => {
+  await assertStablePublicPage(page, "/privacy", "Privacy Policy", "privacy.png");
+});
+
+test("terms visual contract", async ({ page }) => {
+  await assertStablePublicPage(page, "/terms", "Terms of Use", "terms.png");
+});
+
 test("help feedback can be submitted without signing in", async ({ page }) => {
   let submittedBody: Record<string, unknown> | null = null;
   await page.route("**/api/feedback", async (route) => {

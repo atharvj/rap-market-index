@@ -3,136 +3,140 @@ import { Activity, ArrowUpRight, BookOpenCheck, CircleGauge, DatabaseZap, Shield
 
 const sections = [
   {
+    id: "overview",
     title: "What is RMI?",
     body: "Rap Market Index is a fantasy rap trading game. Users receive virtual cash, buy and sell artist shares, build a portfolio, and compete on a leaderboard. There is no real-money deposit, cash-out, gambling, or artist affiliation."
   },
   {
+    id: "price-movement",
     title: "How prices move",
     body: "Artist prices are updated by a market engine that looks for meaningful changes in audience momentum, video activity, public attention, releases, reviews, major events, and eligible trading demand. Durable listener, play, subscriber, and view scale also keeps long-term quote levels comparable. The exact weights are kept internal so the game is harder to manipulate."
   },
   {
+    id: "quote-meaning",
     title: "What a quote means",
     body: "An RMI quote is a fantasy index value, not an artist's net worth, revenue, or literal market capitalization. A larger established audience generally supports a higher long-term range, while verified momentum and catalysts determine how the quote moves from one market session to the next."
   },
   {
+    id: "signal-score",
     title: "What the RMI Signal Score means",
     body: "RMI Signal Score is a 1–100 reading of current directional evidence across audience momentum, public attention, verified catalysts, reception, and eligible trading demand. It does not measure fame, audience size, or career stature. Limited or mixed evidence stays near 50, so a smaller artist with stronger current momentum can score above an established artist while still carrying a much lower quote."
   },
   {
+    id: "audience-size",
     title: "Why audience size is not the whole price",
     body: "Monthly reach can jump temporarily after a feature or playlist placement. RMI treats that as momentum first and waits for durable listening, direct-channel growth, and broader attention before allowing it to become a permanent valuation change."
   },
   {
+    id: "catalysts",
     title: "How catalysts are checked",
     body: "Release, review, social, and audience signals are checked during market runs. Routine uploads and isolated fan posts are filtered out, while larger moves require stronger source confidence, independent confirmation, or measurable audience reaction. No single headline determines an artist quote by itself."
   },
   {
+    id: "daily-moves",
     title: "Why many daily moves are small",
     body: "RMI does not add volatility just to make the board look active. Weak, conflicting, stale, or single-source evidence receives little or no weight. A major verified release, chart result, reception shift, or measurable demand event can move a quote more sharply, but an old success does not generate the same return again every day."
   },
   {
+    id: "outside-music",
     title: "What happens outside music",
     body: "A major appearance, controversy, performance, or cultural moment can create short-term public-attention momentum and may appear in RMI news. It has a smaller and more temporary price effect unless direct music demand, audience growth, or sustained fan interest confirms that the attention is carrying back into the artist's music career."
   },
   {
+    id: "purpose",
     title: "Why it exists",
     body: "Rap fans already debate who is rising, falling, overhyped, underrated, or about to break out. RMI turns those debates into a structured fantasy market with prices, charts, watchlists, portfolios, and standings."
   }
 ];
 
+const facts = [
+  { icon: DatabaseZap, label: "Inputs", value: "Multiple independent sources" },
+  { icon: CircleGauge, label: "Output", value: "Comparable fantasy quotes" },
+  { icon: BookOpenCheck, label: "Evidence", value: "Verified before weighting" },
+  { icon: ShieldCheck, label: "Economy", value: "Fantasy cash only" }
+];
+
 export default function AboutPage() {
   return (
-    <div className="mx-auto max-w-6xl space-y-5">
-      <header className="rmi-page-head relative overflow-hidden p-5 sm:p-8">
-        <div className="relative z-10 grid gap-7 lg:grid-cols-[minmax(0,1fr)_360px] lg:items-end">
-          <div>
-            <div className="rmi-kicker"><Activity className="h-3.5 w-3.5" aria-hidden="true" /> About RMI</div>
-            <h1 className="mt-4 max-w-3xl text-3xl font-bold leading-tight sm:text-5xl">A fantasy market for following rapper momentum.</h1>
-            <p className="mt-4 max-w-2xl text-sm leading-6 text-paper/60">
-              RMI combines audience movement, public attention, music events, and eligible fantasy-market activity into comparable artist quotes.
-            </p>
-          </div>
-          <div className="grid grid-cols-2 gap-2">
-            <TrustMetric icon={DatabaseZap} label="Inputs" value="Multi-source" tone="cyan" />
-            <TrustMetric icon={CircleGauge} label="Output" value="Market quotes" tone="cyan" />
-            <TrustMetric icon={BookOpenCheck} label="Evidence" value="Verified" tone="mint" />
-            <TrustMetric icon={ShieldCheck} label="Economy" value="Fantasy only" tone="brass" />
-          </div>
+    <div className="mx-auto max-w-5xl space-y-10">
+      <header className="border-b border-line pb-8 pt-2 sm:pb-10 sm:pt-5">
+        <div className="max-w-3xl">
+          <div className="rmi-kicker"><Activity className="h-3.5 w-3.5" aria-hidden="true" /> About RMI</div>
+          <h1 className="mt-4 text-3xl font-bold leading-tight sm:text-5xl">A fantasy market for following rapper momentum.</h1>
+          <p className="mt-4 max-w-2xl text-base leading-7 text-paper/60">
+            RMI combines audience movement, public attention, music events, and eligible fantasy-market activity into comparable artist quotes.
+          </p>
         </div>
+
+        <dl className="mt-8 grid gap-px overflow-hidden rounded-md border border-line bg-line sm:grid-cols-2 lg:grid-cols-4">
+          {facts.map(({ icon: Icon, label, value }) => (
+            <div key={label} className="bg-panel p-4">
+              <div className="flex items-center gap-2 text-cyan">
+                <Icon className="h-4 w-4" aria-hidden="true" />
+                <dt className="text-xs font-semibold">{label}</dt>
+              </div>
+              <dd className="mt-2 text-sm font-medium text-paper/70">{value}</dd>
+            </div>
+          ))}
+        </dl>
       </header>
 
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_320px]">
-        <main className="rmi-card overflow-hidden">
-          <section className="rmi-section-header flex flex-col gap-3 p-5 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <p className="rmi-data-label text-cyan">Market Guide</p>
-              <h2 className="mt-1 text-xl font-semibold">How RMI Works</h2>
-            </div>
-            <span className="rmi-status-chip border-mint/30 bg-mint/8 text-mint"><span className="rmi-live-dot" /> Market Active</span>
-          </section>
+      <div className="grid gap-8 lg:grid-cols-[190px_minmax(0,1fr)]">
+        <aside className="h-fit border-b border-line pb-6 lg:sticky lg:top-20 lg:border-b-0 lg:border-r lg:pb-0 lg:pr-6">
+          <p className="text-xs font-semibold text-paper/45">On this page</p>
+          <nav className="mt-3 grid gap-1" aria-label="About RMI sections">
+            {sections.map((section) => (
+              <a
+                key={section.id}
+                href={`#${section.id}`}
+                className="rounded-md px-3 py-2 text-sm font-medium text-paper/60 transition-colors hover:bg-panelSoft hover:text-cyan"
+              >
+                {section.title}
+              </a>
+            ))}
+          </nav>
+          <div className="mt-5 border-t border-line pt-5">
+            <Link href="/help" className="flex items-center justify-between rounded-md px-3 py-2 text-sm font-medium text-paper/60 hover:bg-panelSoft hover:text-cyan">
+              Help Center <ArrowUpRight className="h-3.5 w-3.5" aria-hidden="true" />
+            </Link>
+          </div>
+        </aside>
 
-          <div className="grid md:grid-cols-2">
+        <main className="rmi-card min-w-0 overflow-hidden px-5 sm:px-7">
+          <div className="border-b border-line py-6">
+            <p className="text-xs font-semibold text-cyan">Market guide</p>
+            <h2 className="mt-1 text-2xl font-semibold">How RMI works</h2>
+          </div>
+          <div>
             {sections.map((section, index) => (
-              <section key={section.title} className="border-b border-line p-5 md:odd:border-r">
-                <div className="flex items-start gap-4">
-                  <span className="number-tabular text-xs font-semibold text-cyan/70">{String(index + 1).padStart(2, "0")}</span>
-                  <div>
-                    <h3 className="text-base font-semibold">{section.title}</h3>
-                    <p className="mt-2 text-sm leading-6 text-paper/56">{section.body}</p>
+              <section
+                key={section.id}
+                id={section.id}
+                className={`scroll-mt-24 py-6 ${index < sections.length - 1 ? "border-b border-line" : ""}`}
+              >
+                <div className="grid grid-cols-[28px_minmax(0,1fr)] gap-3 sm:gap-4">
+                  <span className="number-tabular pt-1 text-xs font-semibold text-paper/30">{String(index + 1).padStart(2, "0")}</span>
+                  <div className="max-w-3xl">
+                    <h3 className="text-lg font-semibold">{section.title}</h3>
+                    <p className="mt-2 text-sm leading-7 text-paper/65">{section.body}</p>
                   </div>
                 </div>
               </section>
             ))}
           </div>
+          <div className="flex flex-wrap gap-3 border-t border-line py-6">
+            {[
+              ["Browse Markets", "/markets"],
+              ["Read Market News", "/news"],
+              ["View Rankings", "/leaderboard"]
+            ].map(([label, href]) => (
+              <Link key={href} href={href} className="rmi-button-secondary inline-flex min-h-10 items-center gap-2 rounded-md border border-line px-4 text-sm font-semibold">
+                {label}<ArrowUpRight className="h-3.5 w-3.5" aria-hidden="true" />
+              </Link>
+            ))}
+          </div>
         </main>
-
-        <aside className="space-y-5 lg:sticky lg:top-24 lg:self-start">
-          <section className="rmi-card overflow-hidden">
-            <div className="rmi-section-header flex items-center justify-between gap-3 px-4 py-3">
-              <h2 className="text-sm font-semibold">Explore RMI</h2>
-              <Activity className="h-4 w-4 text-cyan" aria-hidden="true" />
-            </div>
-            <div className="divide-y divide-line">
-              {[
-                ["Now Trading", "/markets"],
-                ["Market News", "/news"],
-                ["Global Rankings", "/leaderboard"],
-                ["My Portfolio", "/portfolio"],
-                ["Help Center", "/help"]
-              ].map(([label, href]) => (
-                <Link key={href} href={href} className="flex items-center justify-between px-4 py-3 text-sm font-medium text-paper/65 transition-colors hover:bg-cyan/5 hover:text-cyan">
-                  {label}<ArrowUpRight className="h-3.5 w-3.5" aria-hidden="true" />
-                </Link>
-              ))}
-            </div>
-          </section>
-
-          <section className="rmi-signal-card border-t-2 border-t-cyan/70 p-5">
-            <p className="rmi-data-label text-cyan">Support</p>
-            <h2 className="mt-2 text-lg font-semibold">Need help?</h2>
-            <p className="mt-2 text-sm leading-6 text-paper/55">
-              Find answers about accounts, trading, artist quotes, portfolios, privacy, and common problems.
-            </p>
-            <Link href="/help" className="rmi-button-secondary mt-5 flex h-10 items-center justify-center text-sm">Open Help Center</Link>
-          </section>
-        </aside>
       </div>
-    </div>
-  );
-}
-
-function TrustMetric({ icon: Icon, label, value, tone }: { icon: typeof Activity; label: string; value: string; tone: "cyan" | "mint" | "brass" }) {
-  const tones = {
-    cyan: "border-cyan/25 bg-cyan/7 text-cyan",
-    mint: "border-mint/25 bg-mint/7 text-mint",
-    brass: "border-brass/25 bg-brass/7 text-brass"
-  };
-
-  return (
-    <div className={`rounded-md border p-3 ${tones[tone]}`}>
-      <Icon className="h-4 w-4" aria-hidden="true" />
-      <p className="mt-3 text-[10px] font-semibold uppercase text-paper/40">{label}</p>
-      <p className="mt-0.5 text-sm font-semibold text-paper">{value}</p>
     </div>
   );
 }

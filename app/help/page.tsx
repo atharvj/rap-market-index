@@ -10,6 +10,7 @@ import {
 } from "@/lib/feedback";
 import {
   CandlestickChart,
+  ChevronDown,
   CircleUserRound,
   HelpCircle,
   Newspaper,
@@ -20,7 +21,7 @@ import {
   Wrench
 } from "lucide-react";
 import Link from "next/link";
-import { type FormEvent, useMemo, useState } from "react";
+import { type FormEvent, useEffect, useMemo, useState } from "react";
 
 const topics = [
   {
@@ -137,6 +138,7 @@ export default function HelpPage() {
   const [feedbackState, setFeedbackState] = useState<
     { status: "idle" | "sending" | "success" | "error"; message: string }
   >({ status: "idle", message: "" });
+  const [openTopicIds, setOpenTopicIds] = useState<Set<string>>(new Set());
   const filteredTopics = useMemo(() => {
     const normalized = query.trim().toLowerCase();
 
@@ -147,6 +149,54 @@ export default function HelpPage() {
       return matchesCategory && (!normalized || searchable.includes(normalized));
     });
   }, [category, query]);
+
+  useEffect(() => {
+    const topicId = window.location.hash.slice(1);
+
+    if (!topics.some((topic) => topic.id === topicId)) {
+      return;
+    }
+
+    setOpenTopicIds(new Set([topicId]));
+    window.requestAnimationFrame(() => {
+      document.getElementById(topicId)?.scrollIntoView({ block: "start" });
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!query.trim()) {
+      return;
+    }
+
+    setOpenTopicIds(new Set(filteredTopics.map((topic) => topic.id)));
+  }, [filteredTopics, query]);
+
+  function chooseCategory(nextCategory: string) {
+    setCategory(nextCategory);
+    setOpenTopicIds(new Set(
+      nextCategory === "All"
+        ? []
+        : topics.filter((topic) => topic.category === nextCategory).map((topic) => topic.id)
+    ));
+  }
+
+  function syncTopicState(topicId: string, open: boolean) {
+    setOpenTopicIds((current) => {
+      if (current.has(topicId) === open) {
+        return current;
+      }
+
+      const next = new Set(current);
+
+      if (open) {
+        next.add(topicId);
+      } else {
+        next.delete(topicId);
+      }
+
+      return next;
+    });
+  }
 
   async function submitFeedback(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -185,9 +235,9 @@ export default function HelpPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <header className="rmi-page-head grid gap-5 p-5 sm:p-7 lg:grid-cols-[minmax(0,1fr)_minmax(320px,0.7fr)] lg:items-end">
-        <div>
+    <div className="mx-auto max-w-5xl space-y-10">
+      <header className="border-b border-line pb-8 pt-2 sm:pb-10 sm:pt-5">
+        <div className="max-w-3xl">
           <div className="flex items-center gap-2 text-cyan">
             <HelpCircle className="h-5 w-5" aria-hidden="true" />
             <span className="text-xs font-semibold">RMI Support</span>
@@ -196,28 +246,28 @@ export default function HelpPage() {
           <p className="mt-2 max-w-2xl text-sm leading-6 text-paper/60">
             Find clear answers about accounts, artist shares, market quotes, portfolios, news, and privacy.
           </p>
+          <label className="relative mt-6 block max-w-2xl">
+            <Search className="pointer-events-none absolute left-4 top-3.5 h-4 w-4 text-paper/35" aria-hidden="true" />
+            <span className="sr-only">Search help</span>
+            <input
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              className="rmi-terminal-input h-12 w-full rounded-md pl-11 pr-4 text-sm"
+              placeholder="Search accounts, trading, quotes, and more"
+            />
+          </label>
         </div>
-        <label className="relative block">
-          <Search className="pointer-events-none absolute left-3 top-3.5 h-4 w-4 text-paper/35" aria-hidden="true" />
-          <span className="sr-only">Search help</span>
-          <input
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            className="rmi-terminal-input h-11 w-full pl-10 pr-3 text-sm"
-            placeholder="Search Help"
-          />
-        </label>
       </header>
 
-      <div className="grid gap-6 lg:grid-cols-[220px_minmax(0,1fr)]">
-        <aside className="rmi-card h-fit border-t-2 border-t-cyan/70 p-4 lg:sticky lg:top-20">
+      <div className="grid gap-8 lg:grid-cols-[190px_minmax(0,1fr)]">
+        <aside className="h-fit border-b border-line pb-6 lg:sticky lg:top-20 lg:border-b-0 lg:border-r lg:pb-0 lg:pr-6">
           <h2 className="text-xs font-semibold text-paper/45">Browse by topic</h2>
-          <div className="mt-3 grid gap-1 sm:grid-cols-4 lg:grid-cols-1">
+          <div className="mt-3 flex flex-wrap gap-1 lg:grid">
             {categories.map((item) => (
               <button
                 key={item}
                 type="button"
-                onClick={() => setCategory(item)}
+                onClick={() => chooseCategory(item)}
                 className={category === item
                   ? "rounded-md bg-cyan/10 px-3 py-2 text-left text-sm font-semibold text-cyan"
                   : "rounded-md px-3 py-2 text-left text-sm font-medium text-paper/60 transition-colors hover:bg-panelSoft hover:text-paper"
@@ -234,33 +284,44 @@ export default function HelpPage() {
           </div>
         </aside>
 
-        <main>
+        <main className="min-w-0">
           {filteredTopics.length ? (
-            <div className="grid gap-4 xl:grid-cols-2">
+            <div className="space-y-3">
               {filteredTopics.map((topic) => {
                 const Icon = topic.icon;
 
                 return (
-                  <article key={topic.id} id={topic.id} className="rmi-signal-card scroll-mt-24 p-5">
-                    <div className="flex items-start gap-3">
+                  <details
+                    key={topic.id}
+                    id={topic.id}
+                    open={openTopicIds.has(topic.id)}
+                    onToggle={(event) => syncTopicState(topic.id, event.currentTarget.open)}
+                    className="group rmi-card scroll-mt-24 overflow-hidden"
+                  >
+                    <summary className="flex cursor-pointer list-none items-center gap-4 p-4 marker:hidden sm:p-5 [&::-webkit-details-marker]:hidden">
                       <span className="grid h-10 w-10 shrink-0 place-items-center rounded-md bg-cyan/10 text-cyan">
                         <Icon className="h-5 w-5" aria-hidden="true" />
                       </span>
-                      <div>
-                        <p className="text-xs font-semibold text-cyan">{topic.category}</p>
-                        <h2 className="mt-1 text-lg font-semibold">{topic.title}</h2>
-                        <p className="mt-2 text-sm leading-6 text-paper/55">{topic.summary}</p>
+                      <span className="min-w-0 flex-1">
+                        <span className="text-xs font-semibold text-cyan">{topic.category}</span>
+                        <span className="mt-0.5 block text-base font-semibold sm:text-lg">{topic.title}</span>
+                        <span className="mt-1 block text-sm leading-6 text-paper/55">{topic.summary}</span>
+                      </span>
+                      <ChevronDown className="h-5 w-5 shrink-0 text-paper/35 transition-transform group-open:rotate-180" aria-hidden="true" />
+                    </summary>
+                    <div className="border-t border-line bg-panelSoft/35 px-4 sm:px-5">
+                      <div className="divide-y divide-line/70">
+                        {topic.answers.map((answer, index) => (
+                          <div key={answer} className="grid grid-cols-[24px_minmax(0,1fr)] gap-3 py-4 text-sm leading-6 text-paper/65">
+                            <span className="number-tabular pt-0.5 text-xs font-semibold text-paper/30" aria-hidden="true">
+                              {String(index + 1).padStart(2, "0")}
+                            </span>
+                            <p>{answer}</p>
+                          </div>
+                        ))}
                       </div>
                     </div>
-                    <ul className="mt-5 space-y-3 border-t border-line pt-4 text-sm leading-6 text-paper/65">
-                      {topic.answers.map((answer) => (
-                        <li key={answer} className="flex gap-3">
-                          <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-cyan" aria-hidden="true" />
-                          <span>{answer}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </article>
+                  </details>
                 );
               })}
             </div>
@@ -268,7 +329,7 @@ export default function HelpPage() {
             <div className="rmi-card p-8 text-center">
               <h2 className="text-lg font-semibold">No matching help topics</h2>
               <p className="mt-2 text-sm text-paper/55">Try a shorter search or browse all topics.</p>
-              <button type="button" onClick={() => { setQuery(""); setCategory("All"); }} className="rmi-button-secondary mt-4 px-4 py-2 text-sm">
+              <button type="button" onClick={() => { setQuery(""); chooseCategory("All"); }} className="rmi-button-secondary mt-4 px-4 py-2 text-sm">
                 Show All Topics
               </button>
             </div>
@@ -276,8 +337,8 @@ export default function HelpPage() {
         </main>
       </div>
 
-      <section className="rmi-card grid gap-6 p-5 sm:p-7 lg:grid-cols-[minmax(0,0.7fr)_minmax(360px,1fr)]" aria-labelledby="feedback-title">
-        <div>
+      <section className="rmi-card mx-auto max-w-3xl overflow-hidden" aria-labelledby="feedback-title">
+        <div className="border-b border-line p-5 sm:p-7">
           <div className="flex items-center gap-2 text-cyan">
             <Send className="h-4 w-4" aria-hidden="true" />
             <span className="text-xs font-semibold">Send feedback</span>
@@ -288,7 +349,7 @@ export default function HelpPage() {
           </p>
         </div>
 
-        <form onSubmit={submitFeedback} className="relative grid gap-4">
+        <form onSubmit={submitFeedback} className="relative grid gap-4 p-5 sm:p-7">
           <div className="grid gap-4 sm:grid-cols-2">
             <label className="grid gap-2 text-xs font-semibold text-paper/60">
               Category
