@@ -1083,12 +1083,12 @@ function applyEventClusterCaps(
     };
   });
 
-  return applyReleaseCycleContext(applyEvidenceSafetyContext(applyReactionConsensusContext(clusteredEvents)));
+  return applyReleaseCycleContext(applyEvidenceSafetyContext(applyReactionConsensusContext(clusteredEvents), artist));
 }
 
-function applyEvidenceSafetyContext(scoredEvents: ScoredMarketEvent[]): ScoredMarketEvent[] {
+function applyEvidenceSafetyContext(scoredEvents: ScoredMarketEvent[], artist: MarketUpdateArtist): ScoredMarketEvent[] {
   return scoredEvents.map((event) => {
-    const safety = getEvidenceSafetyAdjustment(event);
+    const safety = getEvidenceSafetyAdjustment(event, artist);
     const weightedImpact = clamp(event.weightedImpact * safety.multiplier, -100, 100);
     const shockWeightedImpact = clamp(event.shockWeightedImpact * safety.multiplier, -100, 100);
 
@@ -1102,7 +1102,7 @@ function applyEvidenceSafetyContext(scoredEvents: ScoredMarketEvent[]): ScoredMa
   });
 }
 
-function getEvidenceSafetyAdjustment(event: ScoredMarketEvent) {
+function getEvidenceSafetyAdjustment(event: ScoredMarketEvent, artist: MarketUpdateArtist) {
   const sourceClass = getReactionSourceClass(event);
   const source = getRawString(event.event.rawPayload.source) ?? "";
   const evidenceLevel = getRawString(event.event.rawPayload.evidenceLevel) ?? "";
@@ -1149,9 +1149,9 @@ function getEvidenceSafetyAdjustment(event: ScoredMarketEvent) {
     return featureAdjustment;
   }
 
-  const releaseAdjustment = getReleaseDemandAdjustment(event);
+  const releaseAdjustment = getReleaseDemandAdjustment(event, artist);
 
-  if (releaseAdjustment.multiplier < 1) {
+  if (releaseAdjustment.label !== "not_release_baseline") {
     return releaseAdjustment;
   }
 
@@ -1201,7 +1201,7 @@ function getEvidenceSafetyAdjustment(event: ScoredMarketEvent) {
   };
 }
 
-function getReleaseDemandAdjustment(event: ScoredMarketEvent) {
+function getReleaseDemandAdjustment(event: ScoredMarketEvent, artist: MarketUpdateArtist) {
   const releaseMultipliers: Record<string, number> = {
     project_release: 0.72,
     single_video_release: 0.52,
@@ -1221,27 +1221,141 @@ function getReleaseDemandAdjustment(event: ScoredMarketEvent) {
   const musicDemandConfirmed = getRawBoolean(rawPayload.musicDemandConfirmed);
   const publicReactionConfirmed = getRawBoolean(rawPayload.publicReactionConfirmed);
   const fanReactionEvidenceCount = getRawOptionalNumber(rawPayload.fanReactionEvidenceCount) ?? 0;
-  const viewCount =
+  const reach = getReleaseReachAdjustment(event, artist, baselineMultiplier);
+  const reactionMultiplier = publicReactionConfirmed && fanReactionEvidenceCount >= 2
+    ? 0.94
+    : fanReactionEvidenceCount >= 2 || event.reactionConfirmingSourceCount > 0
+      ? 0.82
+      : baselineMultiplier;
+
+  if (musicDemandConfirmed) {
+    return {
+      label: reach.hasMeasuredReach ? `${reach.label}_with_confirmed_demand` : "release_with_demonstrated_demand",
+      multiplier: reach.hasMeasuredReach ? Math.max(0.9, reach.multiplier) : 1
+    };
+  }
+
+  if (reach.hasMeasuredReach) {
+    return {
+      label: reach.label,
+      multiplier: clamp(Math.max(reach.multiplier, reactionMultiplier), 0.12, 1.12)
+    };
+  }
+
+  if (reactionMultiplier > baselineMultiplier) {
+    return {
+      label: "release_with_corroborated_reaction",
+      multiplier: reactionMultiplier
+    };
+  }
+
+  return {
+    label: "release_baseline_pending_demand",
+    multiplier: baselineMultiplier
+  };
+}
+
+function getReleaseReachAdjustment(
+  event: ScoredMarketEvent,
+  artist: MarketUpdateArtist,
+  baselineMultiplier: number
+) {
+  const rawPayload = event.event.rawPayload;
+  const explicitReachRatio = getRawOptionalNumber(rawPayload.clusterReachRatio);
+  const singleViews =
     getRawOptionalNumber(rawPayload.viewCount) ??
     getRawOptionalNumber(rawPayload.videoViewCount) ??
-    getRawOptionalNumber(rawPayload.clusterTotalViews) ??
-    0;
-  const demandConfirmed =
-    musicDemandConfirmed ||
-    publicReactionConfirmed ||
-    fanReactionEvidenceCount > 0 ||
-    event.reactionConfirmingSourceCount > 0 ||
-    viewCount >= 100_000;
+    getRawOptionalNumber(rawPayload.representativeViewCount) ??
+    getRawOptionalNumber(rawPayload.clusterMaxViews);
+  const clusterTotalViews = getRawOptionalNumber(rawPayload.clusterTotalViews);
+  const hasMeasuredReach =
+    typeof explicitReachRatio === "number" ||
+    typeof singleViews === "number" ||
+    typeof clusterTotalViews === "number";
 
-  return demandConfirmed
-    ? {
-        label: "release_with_demonstrated_demand",
-        multiplier: 1
-      }
-    : {
-        label: "release_baseline_pending_demand",
-        multiplier: baselineMultiplier
-      };
+  if (!hasMeasuredReach) {
+    return {
+      hasMeasuredReach: false,
+      label: "release_without_measured_reach",
+      multiplier: baselineMultiplier
+    };
+  }
+
+  const expectedViews = getExpectedReleaseViews(artist, rawPayload);
+  const recentBaseline = getRawOptionalNumber(rawPayload.clusterBaselineViews) ?? 0;
+  const releaseAgeDays = getRawOptionalNumber(rawPayload.clusterReleaseAgeDays) ?? event.ageDays;
+  const ageFactor = clamp(releaseAgeDays / 7, 0.35, 1);
+  const effectiveBaseline = Math.max(expectedViews, recentBaseline) * ageFactor;
+  const calculatedReachRatio = Math.max(
+    typeof singleViews === "number" && effectiveBaseline > 0 ? singleViews / effectiveBaseline : 0,
+    typeof clusterTotalViews === "number" && effectiveBaseline > 0
+      ? clusterTotalViews / (effectiveBaseline * 2.45)
+      : 0
+  );
+  const reachRatio = Math.max(0, explicitReachRatio ?? calculatedReachRatio);
+  const matureRelease = releaseAgeDays >= 2;
+  let multiplier: number;
+  let label: string;
+
+  if (reachRatio >= 2.5) {
+    multiplier = 1.12;
+    label = "release_breakout_relative_reach";
+  } else if (reachRatio >= 1.5) {
+    multiplier = 1.06;
+    label = "release_above_artist_baseline";
+  } else if (reachRatio >= 0.85) {
+    multiplier = 1;
+    label = "release_at_artist_baseline";
+  } else if (reachRatio >= 0.55) {
+    multiplier = 0.88;
+    label = "release_near_artist_baseline";
+  } else if (reachRatio >= 0.3) {
+    multiplier = matureRelease ? 0.68 : Math.max(baselineMultiplier, 0.68);
+    label = "release_below_artist_baseline";
+  } else {
+    multiplier = matureRelease ? baselineMultiplier * 0.62 : baselineMultiplier;
+    label = matureRelease ? "release_well_below_artist_baseline" : "release_reach_still_developing";
+  }
+
+  const viewCount = singleViews ?? clusterTotalViews ?? 0;
+  const likeCount =
+    getRawOptionalNumber(rawPayload.likeCount) ?? getRawOptionalNumber(rawPayload.representativeLikeCount);
+  const commentCount =
+    getRawOptionalNumber(rawPayload.commentCount) ?? getRawOptionalNumber(rawPayload.representativeCommentCount);
+
+  if (viewCount >= 1_000 && (typeof likeCount === "number" || typeof commentCount === "number")) {
+    const engagementRate = ((likeCount ?? 0) + (commentCount ?? 0) * 3) / viewCount;
+
+    if (engagementRate >= 0.08) {
+      multiplier += 0.05;
+      label = `${label}_with_strong_engagement`;
+    } else if (engagementRate >= 0.04) {
+      multiplier += 0.025;
+      label = `${label}_with_healthy_engagement`;
+    }
+  }
+
+  return {
+    hasMeasuredReach: true,
+    label,
+    multiplier: clamp(multiplier, 0.12, 1.12)
+  };
+}
+
+function getExpectedReleaseViews(artist: MarketUpdateArtist, rawPayload: Record<string, unknown>) {
+  const category = getRawString(rawPayload.artistCategory) ?? artist.category;
+  const categoryBase: Record<string, number> = {
+    underground: 25_000,
+    rising: 65_000,
+    mainstream: 150_000,
+    superstar: 350_000
+  };
+  const rawPrice = getRawOptionalNumber(rawPayload.artistCurrentPrice);
+  const price = rawPrice ?? (Number.isFinite(artist.currentPrice) ? artist.currentPrice : 0);
+  const priceBase =
+    price >= 100 ? 350_000 : price >= 70 ? 180_000 : price >= 35 ? 85_000 : price >= 15 ? 45_000 : 22_000;
+
+  return Math.max(categoryBase[category] ?? 35_000, priceBase);
 }
 
 function getFeatureEvidenceAdjustment(event: ScoredMarketEvent) {

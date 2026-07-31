@@ -106,10 +106,10 @@ describe("music relevance safeguards", () => {
 });
 
 describe("release demand safeguards", () => {
-  function releaseEvent(rawPayload: Record<string, unknown> = {}): MarketEvent {
+  function releaseEvent(rawPayload: Record<string, unknown> = {}, eventDate = "2026-07-10"): MarketEvent {
     return {
       artistId: artist.id,
-      eventDate: "2026-07-10",
+      eventDate,
       eventType: "release",
       title: "Young Thug releases a new album, out now",
       sourceName: "Music publication",
@@ -131,6 +131,105 @@ describe("release demand safeguards", () => {
 
   it("restores release authority when independent music demand is confirmed", () => {
     expect(evidenceMultiplier(releaseEvent({ musicDemandConfirmed: true }))).toBe(1);
+  });
+
+  it("scales release demand by views relative to the artist's expected audience", () => {
+    const weakRelease = evidenceMultiplier(releaseEvent({ viewCount: 100_000 }, "2026-07-04"));
+    const breakoutRelease = evidenceMultiplier(releaseEvent({
+      viewCount: 3_000_000,
+      likeCount: 270_000,
+      commentCount: 12_000
+    }, "2026-07-04"));
+
+    expect(breakoutRelease).toBeGreaterThan(weakRelease);
+    expect(breakoutRelease).toBeGreaterThan(1);
+  });
+
+  it("judges the same view total against each artist's own audience baseline", () => {
+    const undergroundArtist: MarketUpdateArtist = {
+      ...artist,
+      id: "new-artist",
+      name: "New Artist",
+      ticker: "NEW",
+      category: "underground",
+      currentPrice: 12,
+      previousClose: 12
+    };
+    const event = releaseEvent({ viewCount: 100_000 }, "2026-07-04");
+    event.artistId = undergroundArtist.id;
+    const signal = buildEventMarketSignals({
+      artists: [undergroundArtist],
+      runDate: "2026-07-11",
+      eventsByArtist: { [undergroundArtist.id]: [event] }
+    })[undergroundArtist.id];
+    const events = signal.rawPayload.events as Array<{ evidenceSafetyMultiplier: number }>;
+
+    expect(events[0].evidenceSafetyMultiplier).toBeGreaterThan(
+      evidenceMultiplier(releaseEvent({ viewCount: 100_000 }, "2026-07-04"))
+    );
+  });
+});
+
+describe("release performance and reception", () => {
+  function releaseWithViews(viewCount: number): MarketEvent {
+    return {
+      artistId: artist.id,
+      eventDate: "2026-07-04",
+      eventType: "release",
+      title: "Young Thug releases Example, a new album",
+      sourceName: "YouTube",
+      sourceUrl: "https://youtube.com/watch?v=example",
+      sentimentScore: 55,
+      impactScore: 70,
+      confidence: 0.9,
+      rawPayload: {
+        source: "youtube_upload_event",
+        releaseKind: "album",
+        artistCategory: artist.category,
+        artistCurrentPrice: artist.currentPrice,
+        viewCount
+      }
+    };
+  }
+
+  function receptionEvent(sentiment: number): MarketEvent {
+    return {
+      artistId: artist.id,
+      eventDate: "2026-07-05",
+      eventType: "review",
+      title: sentiment < 0 ? "Example receives poor reviews" : "Example receives strong reviews",
+      sourceName: "Music reviewer",
+      sourceUrl: `https://review.test/example-${sentiment}`,
+      sentimentScore: sentiment,
+      impactScore: sentiment,
+      confidence: 0.9,
+      rawPayload: {
+        source: "manual_event",
+        sourceType: "review",
+        publicReactionConfirmed: true,
+        fanReactionEvidenceCount: 2
+      }
+    };
+  }
+
+  function totalPriceShock(events: MarketEvent[]) {
+    const signal = buildEventMarketSignals({
+      artists: [artist],
+      runDate: "2026-07-11",
+      eventsByArtist: { [artist.id]: events }
+    })[artist.id];
+
+    return (signal.modifiers ?? []).reduce((total, modifier) => total + (modifier.priceShock ?? 0), 0);
+  }
+
+  it("keeps viral reach separate from poor reception", () => {
+    const poorReception = receptionEvent(-75);
+    const viralButPoor = totalPriceShock([releaseWithViews(3_000_000), poorReception]);
+    const weakAndPoor = totalPriceShock([releaseWithViews(50_000), poorReception]);
+    const viralAndPositive = totalPriceShock([releaseWithViews(3_000_000), receptionEvent(75)]);
+
+    expect(viralButPoor).toBeGreaterThan(weakAndPoor);
+    expect(viralButPoor).toBeLessThan(viralAndPositive);
   });
 });
 
