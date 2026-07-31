@@ -49,7 +49,7 @@ export default function PortfolioPage() {
           <h1 className="mt-2 text-3xl font-bold sm:text-4xl">Your Portfolio</h1>
           <p className="mt-1 text-sm text-paper/65">Positions, performance, allocation, and recent trading activity.</p>
         </div>
-        <div className="flex items-center gap-2"><span className="rmi-status-chip"><span className="rmi-live-dot" /> Live valuation</span><RmiButton href="/markets" variant="secondary">Find an Artist</RmiButton></div>
+        <div className="flex items-center gap-2"><span className="rmi-status-chip"><span className="rmi-live-dot" /> Live valuation</span><RmiButton href="/markets" variant="secondary">Trade Markets</RmiButton></div>
       </header>
 
       <section className="grid grid-cols-2 gap-3 lg:grid-cols-4">
@@ -90,8 +90,8 @@ export default function PortfolioPage() {
       <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_300px] xl:grid-cols-[minmax(0,1fr)_340px]">
         <RmiSection title="Holdings" subtitle={`${holdings.length} long position${holdings.length === 1 ? "" : "s"}`}>
           <div className="overflow-x-auto">
-            <div className="min-w-[610px]">
-              <div className="rmi-table-head grid grid-cols-[minmax(180px,1fr)_76px_100px_112px_96px] px-4 py-3 text-xs font-medium text-paper/45">
+            <div className="min-w-[650px]">
+              <div className="rmi-table-head grid grid-cols-[minmax(230px,1fr)_76px_100px_112px_96px] px-4 py-3 text-xs font-medium text-paper/45">
                 <span>Artist</span>
                 <span>Shares</span>
                 <span>Average Cost</span>
@@ -100,27 +100,45 @@ export default function PortfolioPage() {
               </div>
               {holdings.length ? (
                 holdings.map((holding) => (
-                  <Link
+                  <div
                     key={holding.artistId}
-                    href={`/artists/${holding.artistId}`}
-                    className="rmi-table-row grid grid-cols-[minmax(180px,1fr)_76px_100px_112px_96px] items-center px-4 py-3"
+                    className="rmi-table-row grid grid-cols-[minmax(230px,1fr)_76px_100px_112px_96px] items-center px-4 py-3"
                   >
-                    <span className="flex min-w-0 items-center gap-3">
-                      <ArtistAvatar artist={holding.artist} size="sm" />
-                      <span className="min-w-0">
-                        <span className="block truncate text-sm font-semibold">{holding.artist.name}</span>
-                        <span className="block text-xs text-paper/40">${holding.artist.ticker}</span>
+                    <div className="flex min-w-0 items-center gap-2 pr-3">
+                      <Link href={`/artists/${holding.artistId}`} className="flex min-w-0 flex-1 items-center gap-3 hover:text-cyan">
+                        <ArtistAvatar artist={holding.artist} size="sm" />
+                        <span className="min-w-0">
+                          <span className="block truncate text-sm font-semibold">{holding.artist.name}</span>
+                          <span className="block text-xs text-paper/40">${holding.artist.ticker}</span>
+                        </span>
+                      </Link>
+                      <span className="flex shrink-0 overflow-hidden rounded-md border border-line bg-ink/30 text-xs font-semibold">
+                        <Link
+                          href={`/artists/${holding.artistId}?side=buy#trade`}
+                          className="px-2 py-1.5 text-mint hover:bg-mint/12"
+                          aria-label={`Buy ${holding.artist.name}`}
+                        >
+                          Buy
+                        </Link>
+                        <Link
+                          href={`/artists/${holding.artistId}?side=sell#trade`}
+                          className="border-l border-line px-2 py-1.5 text-ember hover:bg-ember/12"
+                          aria-label={`Sell ${holding.artist.name}`}
+                        >
+                          Sell
+                        </Link>
                       </span>
-                    </span>
+                    </div>
                     <span className="text-sm font-semibold number-tabular">{formatShares(holding.shares)}</span>
                     <span className="text-sm font-semibold number-tabular">{formatCurrency(holding.averageBuyPrice)}</span>
                     <span className="text-right text-sm font-semibold number-tabular">{formatCurrency(holding.currentValue)}</span>
                     <span className="text-right text-xs"><ChangeText value={holding.profitLossPercent} /></span>
-                  </Link>
+                  </div>
                 ))
               ) : (
-                <div className="p-6 text-sm text-paper/55">
-                  No holdings yet. Open Markets to compare quotes and start a fantasy position.
+                <div className="flex items-center justify-between gap-4 p-6">
+                  <p className="text-sm text-paper/55">No holdings yet. Compare quotes and start a fantasy position.</p>
+                  <RmiButton href="/markets" className="shrink-0">Trade Markets</RmiButton>
                 </div>
               )}
             </div>

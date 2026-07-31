@@ -14,13 +14,15 @@ import { sanitizeMoveExplanation } from "@/lib/artist-explanations";
 import { formatCurrency, formatShares } from "@/lib/formatters";
 import { estimateMarketMakerQuote } from "@/lib/trading";
 import { Activity, BadgeCheck, KeyRound, Radio, Zap } from "lucide-react";
-import { useParams } from "next/navigation";
+import { useParams, useSearchParams } from "next/navigation";
 import type { ReactNode } from "react";
 
 export default function ArtistDetailPage() {
   const params = useParams<{ id: string }>();
+  const searchParams = useSearchParams();
   const { getArtist, getHolding, state } = useGame();
   const artist = getArtist(params.id);
+  const defaultTradeSide = searchParams.get("side") === "sell" ? "sell" : "buy";
 
   if (!artist) {
     return (
@@ -126,7 +128,7 @@ export default function ArtistDetailPage() {
       </main>
 
       <aside className="space-y-4 lg:sticky lg:top-4 lg:max-h-[calc(100vh-2rem)] lg:self-start lg:overflow-y-auto lg:pr-1 scrollbar-thin">
-        <TradeTicket artist={activeArtist} />
+        <TradeTicket artist={activeArtist} defaultSide={defaultTradeSide} />
         {holding ? (
           <RmiSection title="Your Position">
             <div className="space-y-2 p-4 text-sm">

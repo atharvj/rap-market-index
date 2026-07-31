@@ -87,7 +87,7 @@ export function TradeTicket({
   }
 
   return (
-    <section className="rmi-card overflow-hidden">
+    <section id="trade" className="rmi-card scroll-mt-24 overflow-hidden">
       <div className="rmi-section-header flex flex-wrap items-center justify-between gap-2 px-4 py-3">
         <span className="flex min-w-0 items-center gap-2">
           <Radio className="h-3.5 w-3.5 text-cyan" aria-hidden="true" />
