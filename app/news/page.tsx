@@ -46,14 +46,9 @@ export default function NewsPage() {
                 aria-label="Filter market news"
               >
                 <option value="">All Stories</option>
-                <option value="emerging">Emerging Articles</option>
                 <option value="release">Releases</option>
-                <option value="review">Reviews</option>
-                <option value="controversy">Controversy</option>
                 <option value="viral">Viral</option>
                 <option value="tour">Tours</option>
-                <option value="award">Awards</option>
-                <option value="news">Other News</option>
               </select>
             </label>
             <label className="rmi-terminal-input flex items-center gap-2 px-3 text-xs font-medium text-paper/55">
@@ -76,8 +71,7 @@ export default function NewsPage() {
             limit={40}
             variant="full"
             sort={newsSort}
-            coverage={eventType === "emerging" ? "emerging" : undefined}
-            eventType={eventType && eventType !== "emerging" ? eventType : undefined}
+            eventType={eventType || undefined}
             onItemsChange={handleNewsItems}
           />
         </div>

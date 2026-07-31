@@ -63,7 +63,6 @@ const eventLabels: Record<string, string> = {
 export function MarketNewsFeed({
   artistId,
   artistIds,
-  coverage,
   eventType,
   limit = 8,
   skip = 0,
@@ -74,7 +73,6 @@ export function MarketNewsFeed({
 }: {
   artistId?: string;
   artistIds?: string[];
-  coverage?: "emerging";
   eventType?: string;
   limit?: number;
   skip?: number;
@@ -109,10 +107,6 @@ export function MarketNewsFeed({
 
     if (eventType) {
       params.set("eventType", eventType);
-    }
-
-    if (coverage) {
-      params.set("coverage", coverage);
     }
 
     const loadNews = () => fetch(`/api/market/news?${params.toString()}`, {
@@ -157,7 +151,7 @@ export function MarketNewsFeed({
       window.removeEventListener("focus", refreshVisibleNews);
       document.removeEventListener("visibilitychange", refreshVisibleNews);
     };
-  }, [artistId, artistIdsKey, coverage, eventType, limit, onItemsChange, resolvedVariant, safeSkip, sort]);
+  }, [artistId, artistIdsKey, eventType, limit, onItemsChange, resolvedVariant, safeSkip, sort]);
 
   if (loading) {
     return <MarketNewsSkeleton compact={resolvedVariant === "compact"} />;

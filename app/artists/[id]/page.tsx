@@ -96,14 +96,18 @@ export default function ArtistDetailPage() {
         <ArtistPriceHistoryPanel artistId={artist.id} fallbackData={artist.priceHistory} />
 
         <section className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-          <QuoteStat label="Previous Close" value={formatCurrency(activeArtist.previousClose)} tone="cyan" />
-          <QuoteStat label="Today's Change" value={`${priceChange >= 0 ? "+" : ""}${formatCurrency(priceChange)}`} tone={priceChange >= 0 ? "mint" : "ember"} />
-          <QuoteStat label="Bid" value={formatCurrency(sellQuote.executionPrice)} tone="ember" />
-          <QuoteStat label="Ask" value={formatCurrency(buyQuote.executionPrice)} tone="mint" />
-          <QuoteStat label="Recorded Low" value={formatCurrency(recordedLow)} tone="violet" />
-          <QuoteStat label="Recorded High" value={formatCurrency(recordedHigh)} tone="brass" />
-          <QuoteStat label="24h Rank" value={`#${moveRank}`} tone="cyan" />
-          <QuoteStat label="Signal Rank" value={`#${signalRank}`} tone="violet" />
+          <QuoteStat label="Previous Close" value={formatCurrency(activeArtist.previousClose)} />
+          <QuoteStat
+            label="Today's Change"
+            value={`${priceChange >= 0 ? "+" : ""}${formatCurrency(priceChange)}`}
+            tone={priceChange >= 0 ? "positive" : "negative"}
+          />
+          <QuoteStat label="Bid" value={formatCurrency(sellQuote.executionPrice)} />
+          <QuoteStat label="Ask" value={formatCurrency(buyQuote.executionPrice)} />
+          <QuoteStat label="Recorded Low" value={formatCurrency(recordedLow)} />
+          <QuoteStat label="Recorded High" value={formatCurrency(recordedHigh)} />
+          <QuoteStat label="24h Rank" value={`#${moveRank}`} />
+          <QuoteStat label="Signal Rank" value={`#${signalRank}`} />
         </section>
 
         <ArtistAudienceSnapshot artistId={artist.id} />
@@ -140,16 +144,20 @@ function formatArtistCategory(category: string) {
   return category.charAt(0).toUpperCase() + category.slice(1);
 }
 
-function QuoteStat({ label, value, tone }: { label: string; value: string; tone: "cyan" | "mint" | "ember" | "violet" | "brass" }) {
-  const valueClass = tone === "mint"
+function QuoteStat({
+  label,
+  value,
+  tone = "neutral"
+}: {
+  label: string;
+  value: string;
+  tone?: "neutral" | "positive" | "negative";
+}) {
+  const valueClass = tone === "positive"
     ? "text-mint"
-    : tone === "ember"
+    : tone === "negative"
       ? "text-ember"
-      : tone === "violet"
-        ? "text-violet"
-        : tone === "brass"
-          ? "text-brass"
-          : "text-cyan";
+      : "text-paper/80";
 
   return (
     <div className="rmi-metric min-w-0 px-3 py-3">

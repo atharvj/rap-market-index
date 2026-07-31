@@ -50,7 +50,6 @@ type ArtistRow = Pick<
 type MarketEventRow = Database["public"]["Tables"]["market_events"]["Row"];
 type MarketNewsType = Database["public"]["Tables"]["market_events"]["Row"]["event_type"];
 type NewsFeedMode = "home" | "news" | "artist" | "watch";
-type NewsCoverageMode = "emerging" | null;
 
 type MarketNewsItem = {
   id: string;
@@ -122,7 +121,6 @@ export async function GET(request: Request) {
     const eventType = normalizeEventType(url.searchParams.get("eventType"));
     const feedMode = normalizeFeedMode(url.searchParams.get("feed"));
     const newsSort = normalizeMarketNewsSort(url.searchParams.get("sort"));
-    const coverage = normalizeCoverageMode(url.searchParams.get("coverage"));
     const supabase = createServiceRoleClient();
     const artists = await loadArtists(supabase);
     const artistById = new Map(artists.map((artist) => [artist.id, artist]));
@@ -196,7 +194,6 @@ export async function GET(request: Request) {
             feedMode: effectiveFeedMode,
             artist: artistById.get(event.artist_id) ?? null
           }) &&
-          (!coverage || isTrustedEmergingEditorialEvent(event, artistById)) &&
           (effectiveFeedMode !== "watch" || isWatchNowMarketEvent(event))
       ),
       newsSort,
@@ -258,7 +255,6 @@ export async function GET(request: Request) {
       runDate,
       lookbackDays,
       sort: newsSort,
-      coverage,
       eventCount: news.length,
       news
     }, { headers: CACHE_HEADERS });
@@ -441,10 +437,6 @@ function normalizeEventType(value: string | null): MarketNewsType | null {
 
 function normalizeFeedMode(value: string | null): NewsFeedMode {
   return value === "home" || value === "artist" || value === "watch" ? value : "news";
-}
-
-function normalizeCoverageMode(value: string | null): NewsCoverageMode {
-  return value === "emerging" ? value : null;
 }
 
 function normalizeArtistIds(value: string | null) {

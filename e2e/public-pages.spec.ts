@@ -312,6 +312,9 @@ test("Watch Now starts in view and stays inside the RMI player", async ({ page }
     /youtube-nocookie\.com\/embed\/RmiVideo001/
   );
   await expect(page.getByRole("link", { name: /youtube/i })).toHaveCount(0);
+  await expect(
+    page.getByRole("link", { name: `${marketVideos[0].artistName} artist page` })
+  ).toHaveAttribute("href", `/artists/${marketVideos[0].artistId}`);
   await expect(page.locator('section[aria-labelledby="watch-now-title"]')).toHaveScreenshot("watch-now.png");
 
   const player = page.locator("[data-watch-player]");

@@ -17,6 +17,7 @@ import {
   Volume2,
   VolumeX
 } from "lucide-react";
+import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 type WatchNowResponse = {
@@ -522,7 +523,13 @@ export function WatchNow() {
             </div>
 
             <div className="p-4 sm:p-5">
-              <p className="text-xs font-semibold text-cyan">{currentVideo.artistName} · {currentVideo.ticker}</p>
+              <Link
+                href={`/artists/${currentVideo.artistId}`}
+                className="block w-fit text-xs font-semibold text-cyan hover:text-cyan/75"
+                aria-label={`${currentVideo.artistName} artist page`}
+              >
+                {currentVideo.artistName} · {currentVideo.ticker}
+              </Link>
               <h3 className="mt-2 text-xl font-bold leading-tight text-paper">{currentVideo.title}</h3>
               <div className="mt-3 flex flex-wrap items-center gap-3 text-xs font-medium text-paper/45">
                 <span>{formatDate(currentVideo.eventDate)}</span>
