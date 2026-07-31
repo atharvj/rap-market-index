@@ -1,6 +1,5 @@
 "use client";
 
-import { AdminBadge } from "@/components/AdminBadge";
 import { ArtistIdentity, ChangeText, RmiButton } from "@/components/RmiPrimitives";
 import { useGame } from "@/components/GameProvider";
 import { UserAvatar } from "@/components/UserAvatar";
@@ -88,7 +87,6 @@ export default function LeaderboardPage() {
               <Link href={`/users/${entry.id}`} className="truncate font-semibold hover:text-cyan">
                 {entry.isCurrentUser ? `${entry.username} (You)` : entry.username}
               </Link>
-              {entry.isAdmin ? <AdminBadge compact /> : null}
             </span>
             <span className="text-right font-semibold number-tabular">{formatCurrency(entry.portfolioValue)}</span>
             <span className="text-right font-semibold number-tabular">

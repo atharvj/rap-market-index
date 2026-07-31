@@ -1,6 +1,5 @@
 "use client";
 
-import { AdminBadge } from "@/components/AdminBadge";
 import { UserAvatar } from "@/components/UserAvatar";
 import { formatCurrency, formatPercent } from "@/lib/formatters";
 import clsx from "clsx";
@@ -28,7 +27,6 @@ type PublicProfile = {
   createdAt: string;
   favoriteArtists: PublicFavoriteArtist[];
   holdings: PublicHolding[];
-  isAdmin: boolean;
   isPrivate: boolean;
   portfolioIsPublic: boolean;
   portfolioValue: number | null;
@@ -124,7 +122,6 @@ export default function PublicUserProfilePage() {
             <p className="rmi-kicker"><Radio className="h-4 w-4" aria-hidden="true" /> Profile</p>
             <div className="flex min-w-0 flex-wrap items-center gap-2">
               <h1 className="mt-2 truncate text-3xl font-bold sm:text-4xl">{profile.username}</h1>
-              {profile.isAdmin ? <AdminBadge /> : null}
             </div>
             <p className="mt-3 max-w-3xl text-sm font-medium leading-6 text-paper/58">
               {profile.isPrivate ? "This trader keeps their profile private." : profile.bio || "This trader has not added a bio yet."}

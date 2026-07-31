@@ -49,7 +49,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
       await Promise.all([
         supabase
           .from("profiles")
-          .select("id,username,bio,avatar_url,created_at,favorite_artist_ids,cash_balance,profile_is_public,portfolio_is_public,is_admin")
+          .select("id,username,bio,avatar_url,created_at,favorite_artist_ids,cash_balance,profile_is_public,portfolio_is_public")
           .eq("id", id)
           .maybeSingle(),
         supabase.from("market_leaderboard").select("*").eq("user_id", id).maybeSingle()
@@ -85,7 +85,6 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
           username: profileRow.username,
           avatarUrl: profileRow.avatar_url ?? "",
           createdAt: profileRow.created_at,
-          isAdmin: profileRow.is_admin,
           isPrivate: true,
           portfolioIsPublic: false,
           bio: "",
@@ -132,7 +131,6 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
           ...holding,
           imageUrl: imageByArtistId.get(holding.artistId) ?? null
         })),
-        isAdmin: profileRow.is_admin,
         isPrivate: false,
         portfolioIsPublic: profileRow.portfolio_is_public,
         portfolioValue: profileRow.portfolio_is_public

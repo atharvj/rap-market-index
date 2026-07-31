@@ -52,7 +52,7 @@ export async function GET(request: Request) {
     const { data: profiles, error: profilesError } = leaderboardRows.length
       ? await supabase
           .from("profiles")
-          .select("id,avatar_url,profile_is_public,portfolio_is_public,is_admin")
+          .select("id,avatar_url,profile_is_public,portfolio_is_public")
           .in("id", leaderboardRows.map((row) => row.user_id))
           .eq("profile_is_public", true)
       : { data: [], error: null };
@@ -64,15 +64,11 @@ export async function GET(request: Request) {
     const profileMetadata = new Map(
       (profiles ?? []).map((profile) => [profile.id, {
         avatarUrl: profile.avatar_url,
-        isAdmin: profile.is_admin,
         portfolioIsPublic: profile.portfolio_is_public
       }])
     );
     const visibleRows = leaderboardRows
-      .filter((row) => {
-        const metadata = profileMetadata.get(row.user_id);
-        return Boolean(metadata && !metadata.isAdmin);
-      })
+      .filter((row) => profileMetadata.has(row.user_id))
       .slice(0, 100);
     const visibleLeaderboard = visibleRows.map((row, index) => ({
       ...mapLeaderboardEntry(row, profileMetadata.get(row.user_id)!),
@@ -82,10 +78,10 @@ export async function GET(request: Request) {
     if (requesterId && !visibleLeaderboard.some((entry) => entry.id === requesterId)) {
       const [{ data: requesterRow }, { data: requesterProfile }] = await Promise.all([
         supabase.from("market_leaderboard").select("*").eq("user_id", requesterId).maybeSingle(),
-        supabase.from("profiles").select("id,avatar_url,portfolio_is_public,is_admin").eq("id", requesterId).maybeSingle()
+        supabase.from("profiles").select("id,avatar_url,portfolio_is_public").eq("id", requesterId).maybeSingle()
       ]);
 
-      if (requesterRow && requesterProfile && !requesterProfile.is_admin) {
+      if (requesterRow && requesterProfile) {
         const { count } = await supabase
           .from("market_leaderboard")
           .select("user_id", { count: "exact", head: true })
@@ -94,7 +90,6 @@ export async function GET(request: Request) {
         visibleLeaderboard.push({
           ...mapLeaderboardEntry(requesterRow as LeaderboardRow, {
             avatarUrl: requesterProfile.avatar_url,
-            isAdmin: requesterProfile.is_admin,
             portfolioIsPublic: requesterProfile.portfolio_is_public
           }),
           rank: (count ?? 0) + 1
@@ -133,7 +128,7 @@ async function getRequesterId(request: Request) {
 
 function mapLeaderboardEntry(
   row: LeaderboardRow,
-  metadata: { avatarUrl: string | null; isAdmin: boolean; portfolioIsPublic: boolean }
+  metadata: { avatarUrl: string | null; portfolioIsPublic: boolean }
 ): LeaderboardEntry {
   const portfolioValue = Number(row.portfolio_value);
 
@@ -144,7 +139,7 @@ function mapLeaderboardEntry(
     portfolioValue,
     cashBalance: metadata.portfolioIsPublic ? Number(row.cash_balance) : 0,
     gainPercent: ((portfolioValue - STARTING_CASH) / STARTING_CASH) * 100,
-    isAdmin: metadata.isAdmin,
+    isAdmin: false,
     portfolioIsPublic: metadata.portfolioIsPublic
   };
 }
