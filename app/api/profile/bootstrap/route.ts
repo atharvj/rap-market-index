@@ -8,6 +8,7 @@ import { getActiveAccountRecreationCooldown } from "@/server/account-recreation"
 import { isAdminEmail } from "@/server/admin-auth";
 import { getGoogleSignupAvatarUrl } from "@/server/google-profile";
 import { reportServerError } from "@/server/observability";
+import { STARTING_CASH } from "@/lib/trading";
 import { enforceRateLimit } from "@/server/rate-limit";
 import { requireConfirmedUser } from "@/server/user-auth";
 
@@ -231,6 +232,10 @@ async function getOrCreateProfile({
       update.is_admin = isAdmin;
     }
 
+    if (!isAdmin && !profile.onboarding_completed && Number(profile.cash_balance) === 100_000) {
+      update.cash_balance = STARTING_CASH;
+    }
+
     if (Object.keys(update).length) {
       const updated = await supabase.from("profiles").update(update).eq("id", userId).select("*").single();
 
@@ -288,6 +293,7 @@ async function getOrCreateProfile({
         profile_is_public: typeof profileIsPublic === "boolean" ? profileIsPublic : true,
         portfolio_is_public: typeof portfolioIsPublic === "boolean" ? portfolioIsPublic : true,
         onboarding_completed: typeof onboardingCompleted === "boolean" ? onboardingCompleted : false,
+        cash_balance: STARTING_CASH,
         market_impact_exempt: isAdmin,
         is_admin: isAdmin,
         avatar_url: signupAvatarUrl

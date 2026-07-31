@@ -556,7 +556,7 @@ test("onboarding watchlist selections stay visibly selected", async ({ page }) =
         profile: {
           id: userId,
           username: "OnboardingTester",
-          cashBalance: 100_000,
+          cashBalance: 25_000,
           favoriteArtistIds: [],
           onboardingCompleted: false,
           isAdmin: false
@@ -583,6 +583,9 @@ test("onboarding watchlist selections stay visibly selected", async ({ page }) =
   await expect(page.getByLabel("Selected")).toHaveCount(3);
   await expect(page.getByText("3 of 5 selected")).toBeVisible();
   await expect(page.getByRole("button", { name: "Continue" })).toBeEnabled();
+  await page.getByRole("button", { name: "Continue" }).click();
+  await expect(page.getByRole("heading", { name: "Your opening balance" })).toBeVisible();
+  await expect(page.getByRole("paragraph").filter({ hasText: "$25,000" })).toBeVisible();
 });
 
 test("primary public pages do not overflow a mobile viewport", async ({ page }) => {

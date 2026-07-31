@@ -7,6 +7,7 @@ import {
 import type { Database } from "@/lib/supabase/database.types";
 import type { LeaderboardEntry } from "@/lib/types";
 import { reportServerError } from "@/server/observability";
+import { STARTING_CASH } from "@/lib/trading";
 
 export const dynamic = "force-dynamic";
 
@@ -131,13 +132,15 @@ function mapLeaderboardEntry(
   row: LeaderboardRow,
   metadata: { avatarUrl: string | null; isAdmin: boolean; portfolioIsPublic: boolean }
 ): LeaderboardEntry {
+  const portfolioValue = Number(row.portfolio_value);
+
   return {
     id: row.user_id,
     username: row.username,
     avatarUrl: metadata.avatarUrl ?? "",
-    portfolioValue: Number(row.portfolio_value),
+    portfolioValue,
     cashBalance: metadata.portfolioIsPublic ? Number(row.cash_balance) : 0,
-    gainPercent: Number(row.gain_percent),
+    gainPercent: ((portfolioValue - STARTING_CASH) / STARTING_CASH) * 100,
     isAdmin: metadata.isAdmin,
     portfolioIsPublic: metadata.portfolioIsPublic
   };

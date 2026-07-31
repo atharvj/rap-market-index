@@ -1,4 +1,4 @@
-export const STARTING_CASH = 100000;
+export const STARTING_CASH = 25_000;
 export const TRADE_COMMISSION_RATE = 0.01;
 export const MIN_COMMISSION_PER_SHARE = 0.02;
 export const MIN_TRADE_COMMISSION = 0.01;

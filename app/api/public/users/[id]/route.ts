@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { STARTING_CASH } from "@/lib/trading";
 import { createServiceRoleClient, getSupabaseConfigStatus } from "@/lib/supabase/server";
 import type { Database } from "@/lib/supabase/database.types";
 import { loadArtistImageUrls } from "@/server/market/artist-images";
@@ -140,7 +141,11 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
         cashBalance: profileRow.portfolio_is_public
           ? leaderboardRow ? Number(leaderboardRow.cash_balance) : Number(profileRow.cash_balance)
           : null,
-        gainPercent: profileRow.portfolio_is_public ? leaderboardRow ? Number(leaderboardRow.gain_percent) : 0 : null
+        gainPercent: profileRow.portfolio_is_public
+          ? leaderboardRow
+            ? ((Number(leaderboardRow.portfolio_value) - STARTING_CASH) / STARTING_CASH) * 100
+            : ((Number(profileRow.cash_balance) - STARTING_CASH) / STARTING_CASH) * 100
+          : null
         }
       },
       { headers: PRIVATE_RESPONSE_HEADERS }

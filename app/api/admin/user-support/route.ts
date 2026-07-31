@@ -5,6 +5,7 @@ import { createServiceRoleClient } from "@/lib/supabase/server";
 import { isAdminEmail, requireAdminRequest } from "@/server/admin-auth";
 import { reportServerError } from "@/server/observability";
 import type { User } from "@supabase/supabase-js";
+import { STARTING_CASH } from "@/lib/trading";
 
 export const dynamic = "force-dynamic";
 
@@ -71,6 +72,7 @@ export async function GET(request: Request) {
     const users = authUsers.map((user) => {
       const profile = profiles.get(user.id);
       const standing = leaderboard.get(user.id);
+      const portfolioValue = Number(standing?.portfolio_value ?? profile?.cash_balance ?? 0);
 
       return {
         id: user.id,
@@ -85,8 +87,8 @@ export async function GET(request: Request) {
         isAdmin: Boolean(profile?.is_admin || isAdminEmail(user.email)),
         onboardingCompleted: Boolean(profile?.onboarding_completed),
         cashBalance: Number(profile?.cash_balance ?? 0),
-        portfolioValue: Number(standing?.portfolio_value ?? profile?.cash_balance ?? 0),
-        gainPercent: Number(standing?.gain_percent ?? 0),
+        portfolioValue,
+        gainPercent: profile ? ((portfolioValue - STARTING_CASH) / STARTING_CASH) * 100 : 0,
         positionCount: positionCounts.get(user.id) ?? 0,
         tradeCount: tradeCounts.get(user.id) ?? 0
       };
@@ -327,7 +329,7 @@ export async function PATCH(request: Request) {
       );
     }
 
-    const startingCash = Number(body.startingCash ?? 100_000);
+    const startingCash = Number(body.startingCash ?? STARTING_CASH);
 
     if (!Number.isFinite(startingCash) || startingCash < 0 || startingCash > 100_000_000) {
       return NextResponse.json(

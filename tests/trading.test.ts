@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  STARTING_CASH,
   clampTradeShareInput,
   estimateMarketMakerQuote,
   getMaximumBuyShares,
@@ -7,6 +8,10 @@ import {
 } from "@/lib/trading";
 
 describe("market-maker trading economics", () => {
+  it("uses a focused opening bankroll", () => {
+    expect(STARTING_CASH).toBe(25_000);
+  });
+
   it("does not let the maximum one-order quote lift overcome round-trip costs", () => {
     const scenarios = [
       { midPrice: 5, shares: 100, volatility: 0.7 },

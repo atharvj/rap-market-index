@@ -2,6 +2,7 @@
 
 import { useAuth } from "@/components/AuthProvider";
 import { formatCurrency, formatDate, formatPercent } from "@/lib/formatters";
+import { STARTING_CASH } from "@/lib/trading";
 import {
   AlertTriangle,
   BarChart3,
@@ -787,14 +788,14 @@ export default function DevPage() {
   const [manualSourceForm, setManualSourceForm] = useState<ManualSourceIdForm>(emptyManualSourceIdForm);
   const [manualSourceSave, setManualSourceSave] = useState<ManualSourceIdSaveState>({ status: "idle" });
   const [resetConfirm, setResetConfirm] = useState("");
-  const [resetStartingCash, setResetStartingCash] = useState("100000");
+  const [resetStartingCash, setResetStartingCash] = useState(String(STARTING_CASH));
   const [prelaunchReset, setPrelaunchReset] = useState<AdminActionState>({ status: "idle" });
-  const [adminCashValue, setAdminCashValue] = useState("100000");
+  const [adminCashValue, setAdminCashValue] = useState(String(STARTING_CASH));
   const [adminCashAction, setAdminCashAction] = useState<AdminActionState>({ status: "idle" });
   const [userSupport, setUserSupport] = useState<AsyncState<UserSupportDirectory>>({ status: "loading" });
   const [userSupportAction, setUserSupportAction] = useState<AdminActionState>({ status: "idle" });
   const [userSupportReason, setUserSupportReason] = useState("");
-  const [userResetCash, setUserResetCash] = useState("100000");
+  const [userResetCash, setUserResetCash] = useState(String(STARTING_CASH));
   const adminHeaders = useMemo<Record<string, string>>(() => {
     if (!session) {
       return {} as Record<string, string>;

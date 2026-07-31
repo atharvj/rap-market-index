@@ -6,6 +6,7 @@ import { useGame } from "@/components/GameProvider";
 import { RmiButton, RmiNotice } from "@/components/RmiPrimitives";
 import { formatCurrency } from "@/lib/formatters";
 import { MAX_FAVORITE_ARTISTS, MIN_FAVORITE_ARTISTS } from "@/lib/onboarding";
+import { STARTING_CASH } from "@/lib/trading";
 import { Check, Search, Trophy, WalletCards } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
@@ -229,7 +230,7 @@ export default function OnboardingPage() {
         <OnboardingStep eyebrow="Step 2 of 3" title="Your opening balance" description="Every trader starts on equal footing. Starter cash cannot be purchased or withdrawn.">
           <div className="rmi-soft-card grid place-items-center gap-3 border-t-2 border-t-mint p-8 text-center sm:p-10">
             <WalletCards className="h-8 w-8 text-mint" />
-            <p className="text-4xl font-semibold number-tabular">{formatCurrency(100_000)}</p>
+            <p className="text-4xl font-semibold number-tabular">{formatCurrency(STARTING_CASH)}</p>
             <p className="max-w-md text-sm leading-6 text-paper/60">Use fantasy cash to build positions. The global ranking compares portfolio performance from the same starting balance.</p>
           </div>
         </OnboardingStep>

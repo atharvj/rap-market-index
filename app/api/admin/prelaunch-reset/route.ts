@@ -7,6 +7,7 @@ import { getMarketDate, shiftMarketDate } from "@/server/market/market-date";
 import { getMarketModelVersion } from "@/server/market/model-version";
 import { loadObservationBaselines } from "@/server/market/supabase-repository";
 import type { HypeStats } from "@/lib/types";
+import { STARTING_CASH } from "@/lib/trading";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 120;
@@ -37,7 +38,7 @@ type ResetCalibration = {
 };
 
 const CONFIRM_TEXT = "RESET RMI";
-const DEFAULT_STARTING_CASH = 100_000;
+const DEFAULT_STARTING_CASH = STARTING_CASH;
 const MAX_STARTING_CASH = 1_000_000_000;
 const NEUTRAL_STATS: HypeStats = {
   streamingGrowth: 0,
