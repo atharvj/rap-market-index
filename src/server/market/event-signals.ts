@@ -363,6 +363,7 @@ function getEventModifierReason(event: ScoredMarketEvent) {
   const title = event.event.title;
   const labels: Record<string, string> = {
     project_release: "project release",
+    project_announcement: "project announcement",
     single_video_release: "single/video release",
     track_audio_release: "track upload",
     tracklist_reaction: "tracklist reaction",
@@ -399,6 +400,7 @@ function getEventModifierReason(event: ScoredMarketEvent) {
 function getEventReasonPriority(subtype: string) {
   const priorities: Record<string, number> = {
     project_release: 12,
+    project_announcement: 6,
     status_death: 13,
     status_legal_sentencing: 12,
     status_legal_conviction: 12,
@@ -1802,6 +1804,39 @@ function getEventSubtype(event: MarketEvent, artist?: MarketUpdateArtist) {
 
   if (event.eventType === "release") {
     const releaseKind = getRawString(event.rawPayload.releaseKind);
+    const hasProjectLanguage =
+      Boolean(releaseKind && hasAnyTerm(releaseKind, ["album", "ep", "mixtape", "project"])) ||
+      hasAnyTerm(text, ["album", "project", "mixtape", "ep", "deluxe", "tracklist"]);
+    const hasFutureProjectLanguage = hasAnyTerm(text, [
+      "announce",
+      "announced",
+      "announcement",
+      "announces",
+      "coming soon",
+      "next album",
+      "plans to release",
+      "preview",
+      "tease",
+      "teased",
+      "teaser",
+      "teases",
+      "upcoming",
+      "working on"
+    ]);
+    const hasConfirmedReleaseLanguage = hasAnyTerm(text, [
+      "available now",
+      "dropped",
+      "drops today",
+      "has arrived",
+      "out now",
+      "released",
+      "releases",
+      "stream now"
+    ]);
+
+    if (hasProjectLanguage && hasFutureProjectLanguage && !hasConfirmedReleaseLanguage) {
+      return "project_announcement";
+    }
 
     if (releaseKind && hasAnyTerm(releaseKind, ["album", "ep", "mixtape"])) {
       return "project_release";
@@ -1989,6 +2024,7 @@ function getEventSubtype(event: MarketEvent, artist?: MarketUpdateArtist) {
 function getEventSubtypePriceProfile(subtype: string) {
   const profiles: Record<string, { divisor: number; minShock: number; maxShock: number }> = {
     project_release: { divisor: 1550, minShock: -0.02, maxShock: 0.052 },
+    project_announcement: { divisor: 2900, minShock: -0.01, maxShock: 0.018 },
     single_video_release: { divisor: 1900, minShock: -0.018, maxShock: 0.035 },
     track_audio_release: { divisor: 3500, minShock: -0.008, maxShock: 0.012 },
     tracklist_reaction: { divisor: 2100, minShock: -0.028, maxShock: 0.024 },
@@ -2158,6 +2194,7 @@ function getEventShockDecayMultiplier({
 }) {
   const subtypeHalfLives: Record<string, number> = {
     project_release: 4.5,
+    project_announcement: 2.5,
     single_video_release: 3,
     track_audio_release: 1.5,
     tracklist_reaction: 2.5,

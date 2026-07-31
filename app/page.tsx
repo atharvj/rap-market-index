@@ -8,7 +8,7 @@ import { MarketNewsFeed } from "@/components/MarketNewsFeed";
 import { MiniSparkline } from "@/components/MiniSparkline";
 import { WatchNow } from "@/components/WatchNow";
 import { formatCurrency, formatPercent } from "@/lib/formatters";
-import { getMarketBreadth } from "@/lib/market-analytics";
+import { getMarketBreadth, getSeriesChangePercent } from "@/lib/market-analytics";
 import { Activity, ArrowDownRight, ArrowUpRight, Gauge } from "lucide-react";
 import Link from "next/link";
 import { useMemo } from "react";
@@ -78,11 +78,17 @@ export default function HomePage() {
                   <p className="text-lg font-bold number-tabular">{formatCurrency(artist.currentPrice)}</p>
                   <ChangeText value={artist.dailyChangePercent} />
                 </div>
-                <MiniSparkline data={artist.priceHistory} positive={artist.dailyChangePercent >= 0} width={118} height={38} />
+                <MiniSparkline
+                  data={artist.priceHistory}
+                  positive={getSeriesChangePercent(artist.priceHistory.slice(-18)) >= 0}
+                  width={118}
+                  height={38}
+                  label={`Price trend over ${Math.min(18, artist.priceHistory.length)} recorded sessions`}
+                />
               </div>
               <div className="mt-3 flex items-center justify-between border-t border-line/60 pt-2">
                 <span className="rmi-data-label">RMI signal</span>
-                <span className="text-xs font-semibold text-cyan number-tabular">{artist.hypeScore}/100</span>
+                <span className="text-xs font-semibold text-cyan number-tabular">{artist.hypeScore}/99</span>
               </div>
             </Link>
           ))}

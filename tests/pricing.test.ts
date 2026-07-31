@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { calculateHypeScore } from "@/lib/pricing";
 
-describe("RMI Score range", () => {
+describe("RMI Signal Score range", () => {
   it("keeps neutral evidence at the midpoint", () => {
     expect(calculateHypeScore({
       streamingGrowth: 0,

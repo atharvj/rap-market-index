@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { sanitizeMoveExplanation } from "@/lib/artist-explanations";
+import { getMarketSignalLabel, sanitizeMoveExplanation } from "@/lib/artist-explanations";
+
+describe("market signal labels", () => {
+  it("describes neutral and directional scores without implying artist stature", () => {
+    expect(getMarketSignalLabel(50)).toBe("Neutral / mixed");
+    expect(getMarketSignalLabel(58)).toBe("Positive");
+    expect(getMarketSignalLabel(35)).toBe("Strong negative");
+  });
+});
 
 describe("artist move explanations", () => {
   it("does not describe an unchanged quote as a rise", () => {
@@ -17,6 +25,16 @@ describe("artist move explanations", () => {
     expect(sanitizeMoveExplanation("TEST", "TEST moved higher after a verified release.", 1.2)).toBe(
       "TEST moved higher after a verified release."
     );
+  });
+
+  it("does not present an album teaser as a completed project release", () => {
+    expect(
+      sanitizeMoveExplanation(
+        "TEST",
+        "TEST moved higher after project release (Artist teases an upcoming new album) led the move.",
+        0.2
+      )
+    ).toContain("project announcement");
   });
 
   it("summarizes the strongest supportive recorded input", () => {

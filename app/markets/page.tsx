@@ -6,7 +6,8 @@ import { MiniSparkline } from "@/components/MiniSparkline";
 import { ChangeText, RmiButton, RmiSection } from "@/components/RmiPrimitives";
 import { PriceChart } from "@/components/PriceChart";
 import { WatchlistButton } from "@/components/WatchlistButton";
-import { formatCurrency, formatPercent } from "@/lib/formatters";
+import { getMarketSignalLabel } from "@/lib/artist-explanations";
+import { formatCurrency, formatDate, formatPercent } from "@/lib/formatters";
 import { buildMarketIndexSeries, getMarketBreadth, getSeriesChangePercent } from "@/lib/market-analytics";
 import { Activity, ArrowDown, ArrowDownAZ, ArrowUp, ArrowUpAZ, Radar, Search, Signal } from "lucide-react";
 import Link from "next/link";
@@ -20,6 +21,13 @@ export default function MarketsPage() {
   const [sortKey, setSortKey] = useState<SortKey>("change");
   const [sortDescending, setSortDescending] = useState(true);
   const marketIndex = useMemo(() => buildMarketIndexSeries(state.artists), [state.artists]);
+  const latestRecordedClose = useMemo(
+    () =>
+      state.artists
+        .flatMap((artist) => artist.priceHistory.map((point) => point.date))
+        .sort((first, second) => second.localeCompare(first))[0] ?? null,
+    [state.artists]
+  );
   const marketIndexChange = getSeriesChangePercent(marketIndex);
   const breadth = getMarketBreadth(state.artists);
   const artists = useMemo(() => {
@@ -73,6 +81,7 @@ export default function MarketsPage() {
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <span className="rmi-status-chip" data-tone="mint"><span className="rmi-live-dot" /> {artists.length} active artists</span>
+          {latestRecordedClose ? <span className="rmi-status-chip">Latest close {formatDate(latestRecordedClose)}</span> : null}
           <RmiButton href="/scout" variant="secondary"><Radar className="h-4 w-4" /> Scout Artists</RmiButton>
         </div>
       </header>
@@ -135,10 +144,21 @@ export default function MarketsPage() {
       </div>
 
       <section className="rmi-card overflow-hidden">
-        <div className="rmi-table-head grid grid-cols-[minmax(0,1fr)_104px_84px_44px] gap-x-4 px-4 py-3 lg:grid-cols-[minmax(220px,1fr)_140px_108px_104px_84px_44px]">
+        <div className="flex flex-wrap items-start justify-between gap-3 border-b border-line px-4 py-3">
+          <div>
+            <h2 className="text-sm font-semibold">Market board</h2>
+            <p className="mt-1 max-w-3xl text-xs leading-5 text-paper/50">
+              Signal Score measures current evidence, not fame or price. Sparklines show up to 18 recorded sessions; 24h compares the latest quote with the previous close.
+            </p>
+          </div>
+          <Link href="/about" className="text-xs font-semibold text-cyan hover:text-cyan/75">
+            How pricing works
+          </Link>
+        </div>
+        <div className="rmi-table-head grid grid-cols-[minmax(0,1fr)_104px_84px_44px] gap-x-4 px-4 py-3 lg:grid-cols-[minmax(220px,1fr)_140px_124px_104px_84px_44px]">
           <span>Artist</span>
-          <span className="hidden text-right lg:block">Recorded trend</span>
-          <span className="hidden text-right lg:block">RMI Score</span>
+          <span className="hidden text-right lg:block">Recent sessions</span>
+          <span className="hidden text-right lg:block">Signal Score</span>
           <span className="text-right">Price</span>
           <span className="text-right">24h</span>
           <span className="sr-only">watchlist</span>
@@ -146,9 +166,13 @@ export default function MarketsPage() {
         {artists.map((artist) => (
           <div
             key={artist.id}
-            className="rmi-table-row grid grid-cols-[minmax(0,1fr)_104px_84px_44px] items-center gap-x-4 px-4 py-3 last:border-b-0 lg:grid-cols-[minmax(220px,1fr)_140px_108px_104px_84px_44px]"
+            className="rmi-table-row grid grid-cols-[minmax(0,1fr)_104px_84px_44px] items-center gap-x-4 px-4 py-3 last:border-b-0 lg:grid-cols-[minmax(220px,1fr)_140px_124px_104px_84px_44px]"
           >
-            <Link href={`/artists/${artist.id}`} className="flex min-w-0 items-center gap-3">
+            <Link
+              href={`/artists/${artist.id}`}
+              className="flex min-w-0 items-center gap-3"
+              title={artist.lastMoveExplanation}
+            >
               <ArtistAvatar artist={artist} />
               <span className="min-w-0">
                 <span className="block truncate text-sm font-semibold">{artist.name}</span>
@@ -161,6 +185,7 @@ export default function MarketsPage() {
                 positive={getSeriesChangePercent(artist.priceHistory.slice(-18)) >= 0}
                 width={116}
                 height={30}
+                label={`Price trend over ${Math.min(18, artist.priceHistory.length)} recorded sessions`}
               />
             </div>
             <ScoreCell value={artist.hypeScore} />
@@ -177,14 +202,19 @@ export default function MarketsPage() {
 }
 
 function ScoreCell({ value }: { value: number }) {
-  const tone = value >= 70 ? "bg-mint" : value >= 45 ? "bg-cyan" : "bg-ember";
+  const label = getMarketSignalLabel(value);
+  const tone = value >= 53 ? "bg-mint" : value <= 47 ? "bg-ember" : "bg-cyan";
+  const textTone = value >= 53 ? "text-mint" : value <= 47 ? "text-ember" : "text-paper/48";
 
   return (
-    <div className="hidden items-center justify-end gap-2 lg:flex" aria-label={`RMI Score ${value} out of 100`}>
-      <span className="h-1.5 w-12 overflow-hidden rounded-full bg-paper/10" aria-hidden="true">
-        <span className={`block h-full rounded-full ${tone}`} style={{ width: `${Math.max(0, Math.min(100, value))}%` }} />
+    <div className="hidden flex-col items-end lg:flex" aria-label={`RMI Signal Score ${value} out of 99, ${label}`}>
+      <span className="flex items-center justify-end gap-2">
+        <span className="h-1.5 w-12 overflow-hidden rounded-full bg-paper/10" aria-hidden="true">
+          <span className={`block h-full rounded-full ${tone}`} style={{ width: `${Math.max(0, Math.min(100, value))}%` }} />
+        </span>
+        <span className="w-6 text-right text-xs font-semibold text-paper/70 number-tabular">{value}</span>
       </span>
-      <span className="w-6 text-right text-xs font-semibold text-paper/70 number-tabular">{value}</span>
+      <span className={`mt-1 text-[10px] font-medium ${textTone}`}>{label}</span>
     </div>
   );
 }

@@ -132,3 +132,46 @@ describe("event story deduplication", () => {
     expect(events).toHaveLength(1);
   });
 });
+
+describe("project announcement classification", () => {
+  function projectSignal(title: string) {
+    const event: MarketEvent = {
+      artistId: artist.id,
+      eventDate: "2026-07-10",
+      eventType: "release",
+      title,
+      sourceName: "Music publication",
+      sourceUrl: "https://example.com/project",
+      sentimentScore: 65,
+      impactScore: 75,
+      confidence: 0.9,
+      rawPayload: {
+        source: "manual_event",
+        releaseKind: "album"
+      }
+    };
+
+    return buildEventMarketSignals({
+      artists: [artist],
+      runDate: "2026-07-10",
+      eventsByArtist: { [artist.id]: [event] }
+    })[artist.id];
+  }
+
+  it("does not describe an album teaser as a completed project release", () => {
+    const signal = projectSignal("Young Thug teases an upcoming new album");
+    const events = signal.rawPayload.events as Array<{ eventSubtype: string }>;
+
+    expect(events[0].eventSubtype).toBe("project_announcement");
+    expect(signal.modifiers?.[0]?.reason).toContain("project announcement");
+  });
+
+  it("gives a confirmed project release more authority than an announcement", () => {
+    const announcement = projectSignal("Young Thug announces an upcoming new album");
+    const release = projectSignal("Young Thug releases a new album, out now");
+    const announcementShock = Math.abs(announcement.modifiers?.[0]?.priceShock ?? 0);
+    const releaseShock = Math.abs(release.modifiers?.[0]?.priceShock ?? 0);
+
+    expect(releaseShock).toBeGreaterThan(announcementShock);
+  });
+});

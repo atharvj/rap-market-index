@@ -120,7 +120,7 @@ export default function WatchlistPage() {
           </div>
           <div className="grid gap-3 md:grid-cols-3">
               {biggestMover ? <WatchlistInsight label="Biggest Move" artist={biggestMover} value={<ChangeText value={biggestMover.dailyChangePercent} />} /> : null}
-              {signalLeader ? <WatchlistInsight label="Signal Leader" artist={signalLeader} value={`${signalLeader.hypeScore}/100`} /> : null}
+              {signalLeader ? <WatchlistInsight label="Signal Leader" artist={signalLeader} value={`${signalLeader.hypeScore}/99`} /> : null}
               <div className="rmi-card grid grid-cols-3 gap-2 p-4 text-center text-xs">
                 <BriefingCount label="Up" value={breadth.advancers} tone="good" />
                 <BriefingCount label="Down" value={breadth.decliners} tone="bad" />

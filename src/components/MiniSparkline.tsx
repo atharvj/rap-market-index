@@ -4,12 +4,14 @@ export function MiniSparkline({
   data,
   positive,
   width = 116,
-  height = 34
+  height = 34,
+  label = "Recent recorded price trend"
 }: {
   data: PricePoint[];
   positive: boolean;
   width?: number;
   height?: number;
+  label?: string;
 }) {
   const points = data.slice(-18);
 
@@ -18,7 +20,7 @@ export function MiniSparkline({
       <div
         className="relative overflow-hidden rounded-sm border border-line/60 bg-panelSoft/70"
         style={{ width, height }}
-        aria-label="Price history is still building"
+        aria-label={`${label}; price history is still building`}
       >
         <span className="absolute inset-x-2 top-1/2 h-px bg-paper/12" />
       </div>
@@ -48,8 +50,9 @@ export function MiniSparkline({
       viewBox={`0 0 ${width} ${height}`}
       className={positive ? "overflow-visible text-mint" : "overflow-visible text-ember"}
       role="img"
-      aria-label="Recent price trend"
+      aria-label={label}
     >
+      <title>{label}</title>
       <path d={path} fill="none" stroke="currentColor" strokeOpacity="0.16" strokeWidth="6" />
       <path d={path} fill="none" stroke="currentColor" strokeWidth="2.1" />
       <circle cx={last.x} cy={last.y} r="2.6" fill="currentColor" />

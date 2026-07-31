@@ -10,7 +10,7 @@ export function ScoreInfo({ className }: { className?: string }) {
       <button
         type="button"
         className="inline-flex h-4 w-4 items-center justify-center rounded-full border border-line bg-panel text-paper/45 hover:border-cyan hover:text-cyan focus:outline-none focus:ring-2 focus:ring-cyan/30"
-        aria-label="Explain RMI Score"
+        aria-label="Explain RMI Signal Score"
       >
         <Info className="h-3 w-3" aria-hidden="true" />
       </button>

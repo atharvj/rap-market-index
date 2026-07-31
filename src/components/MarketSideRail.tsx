@@ -4,6 +4,7 @@ import { ArtistAvatar } from "@/components/ArtistAvatar";
 import { useGame } from "@/components/GameProvider";
 import { MiniSparkline } from "@/components/MiniSparkline";
 import { formatCurrency, formatPercent } from "@/lib/formatters";
+import { getSeriesChangePercent } from "@/lib/market-analytics";
 import type { Artist } from "@/lib/types";
 import { Activity, Star, TrendingDown, TrendingUp } from "lucide-react";
 import Link from "next/link";
@@ -82,33 +83,38 @@ function MarketList({
         {href ? <Link href={href} className="text-[11px] font-bold text-cyan hover:text-paper">View All</Link> : null}
       </div>
       <div className="divide-y divide-line/75">
-        {artists.map((artist) => (
-          <Link
-            key={artist.id}
-            href={`/artists/${artist.id}`}
-            className="group grid grid-cols-[minmax(0,1fr)_64px_68px] items-center gap-2 px-3 py-2.5 transition hover:bg-cyan/[0.045]"
-          >
-            <span className="flex min-w-0 items-center gap-2.5">
-              <ArtistAvatar artist={artist} size="sm" />
-              <span className="min-w-0">
-                <span className="block truncate text-xs font-semibold transition group-hover:text-cyan">{artist.name}</span>
-                <span className="block truncate text-[10px] font-medium text-paper/42">${artist.ticker}</span>
+        {artists.map((artist) => {
+          const recentHistory = artist.priceHistory.slice(-18);
+
+          return (
+            <Link
+              key={artist.id}
+              href={`/artists/${artist.id}`}
+              className="group grid grid-cols-[minmax(0,1fr)_64px_68px] items-center gap-2 px-3 py-2.5 transition hover:bg-cyan/[0.045]"
+            >
+              <span className="flex min-w-0 items-center gap-2.5">
+                <ArtistAvatar artist={artist} size="sm" />
+                <span className="min-w-0">
+                  <span className="block truncate text-xs font-semibold transition group-hover:text-cyan">{artist.name}</span>
+                  <span className="block truncate text-[10px] font-medium text-paper/42">${artist.ticker}</span>
+                </span>
               </span>
-            </span>
-            <MiniSparkline
-              data={artist.priceHistory}
-              positive={artist.dailyChangePercent >= 0}
-              width={64}
-              height={24}
-            />
-            <span className="text-right number-tabular">
-              <span className="block text-xs font-semibold">{formatCurrency(artist.currentPrice)}</span>
-              <span className={artist.dailyChangePercent >= 0 ? "block text-[10px] font-semibold text-mint" : "block text-[10px] font-semibold text-ember"}>
-                {formatPercent(artist.dailyChangePercent)}
+              <MiniSparkline
+                data={recentHistory}
+                positive={getSeriesChangePercent(recentHistory) >= 0}
+                width={64}
+                height={24}
+                label={`Price trend over ${Math.min(18, recentHistory.length)} recorded sessions`}
+              />
+              <span className="text-right number-tabular">
+                <span className="block text-xs font-semibold">{formatCurrency(artist.currentPrice)}</span>
+                <span className={artist.dailyChangePercent >= 0 ? "block text-[10px] font-semibold text-mint" : "block text-[10px] font-semibold text-ember"}>
+                  {formatPercent(artist.dailyChangePercent)}
+                </span>
               </span>
-            </span>
-          </Link>
-        ))}
+            </Link>
+          );
+        })}
       </div>
     </section>
   );

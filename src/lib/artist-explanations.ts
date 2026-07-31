@@ -1,7 +1,27 @@
 import type { HypeStats } from "@/lib/types";
 
 export const MARKET_SCORE_EXPLANATION =
-  "RMI Score runs from 1-99. Around 50 means neutral or limited evidence; unusually strong or weak signals can move it toward either extreme. It is not a price forecast.";
+  "RMI Signal Score runs from 1-99 and summarizes current directional evidence. It does not measure fame, audience size, current price, or predict the next move. Around 50 means neutral, mixed, or limited evidence; a smaller artist can score above an established artist when its current signals are stronger.";
+
+export function getMarketSignalLabel(score: number) {
+  if (score >= 60) {
+    return "Strong positive";
+  }
+
+  if (score >= 53) {
+    return "Positive";
+  }
+
+  if (score <= 40) {
+    return "Strong negative";
+  }
+
+  if (score <= 47) {
+    return "Negative";
+  }
+
+  return "Neutral / mixed";
+}
 
 const LOW_SIGNAL_EXPLANATION_TERMS = [
   "#explorepage",
@@ -40,7 +60,7 @@ export function sanitizeMoveExplanation(
   dailyChangePercent?: number,
   stats?: HypeStats
 ) {
-  const trimmed = explanation?.trim();
+  const trimmed = normalizeProjectAnnouncementLabel(explanation?.trim());
   const hasChange = typeof dailyChangePercent === "number" && Number.isFinite(dailyChangePercent);
 
   if (trimmed?.toLowerCase().includes(EVIDENCE_MARKER)) {
@@ -76,6 +96,21 @@ export function sanitizeMoveExplanation(
     hasVerifiedCatalyst,
     !shouldUseFallback && !hasCurrentNoCatalystClaim
   );
+}
+
+function normalizeProjectAnnouncementLabel(explanation: string | undefined) {
+  if (!explanation || !/project release/i.test(explanation)) {
+    return explanation;
+  }
+
+  const title = explanation.match(/project release\s*\(([^)]*)\)/i)?.[1]?.toLowerCase() ?? "";
+  const hasFutureLanguage = /\b(announc\w*|coming soon|next album|preview\w*|teas\w*|upcoming|working on)\b/i.test(title);
+  const hasConfirmedReleaseLanguage =
+    /\b(available now|dropped|drops today|has arrived|out now|released|releases|stream now)\b/i.test(title);
+
+  return hasFutureLanguage && !hasConfirmedReleaseLanguage
+    ? explanation.replace(/project release/i, "project announcement")
+    : explanation;
 }
 
 function hasVerifiedCatalystEvidence(explanation: string) {

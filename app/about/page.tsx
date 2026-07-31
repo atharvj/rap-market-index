@@ -15,8 +15,8 @@ const sections = [
     body: "An RMI quote is a fantasy index value, not an artist's net worth, revenue, or literal market capitalization. A larger established audience generally supports a higher long-term range, while verified momentum and catalysts determine how the quote moves from one market session to the next."
   },
   {
-    title: "What the RMI Score means",
-    body: "RMI Score is a 1-99 reading of current signal strength across audience momentum, public attention, verified catalysts, reception, and eligible trading demand. Limited or mixed evidence stays near 50; sustained unusually weak or strong evidence can push the score toward either extreme. It is not a price target, forecast, or daily percentage change."
+    title: "What the RMI Signal Score means",
+    body: "RMI Signal Score is a 1-99 reading of current directional evidence across audience momentum, public attention, verified catalysts, reception, and eligible trading demand. It does not measure fame, audience size, or career stature. Limited or mixed evidence stays near 50, so a smaller artist with stronger current momentum can score above an established artist while still carrying a much lower quote."
   },
   {
     title: "Why audience size is not the whole price",
@@ -25,6 +25,10 @@ const sections = [
   {
     title: "How catalysts are checked",
     body: "Release, review, social, and audience signals are checked during market runs. Routine uploads and isolated fan posts are filtered out, while larger moves require stronger source confidence, independent confirmation, or measurable audience reaction. No single headline determines an artist quote by itself."
+  },
+  {
+    title: "Why many daily moves are small",
+    body: "RMI does not add volatility just to make the board look active. Weak, conflicting, stale, or single-source evidence receives little or no weight. A major verified release, chart result, reception shift, or measurable demand event can move a quote more sharply, but an old success does not generate the same return again every day."
   },
   {
     title: "What happens outside music",
