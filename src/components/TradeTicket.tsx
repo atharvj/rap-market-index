@@ -205,22 +205,9 @@ export function TradeTicket({
           </button>
         </div>
 
-        <div className="mt-4 flex items-center justify-between gap-3">
-          <label className="text-xs font-semibold text-paper/50" htmlFor="shares">
-            Shares
-          </label>
-          <button
-            type="button"
-            className="text-xs font-semibold text-cyan transition hover:text-cyan/80 disabled:cursor-not-allowed disabled:text-paper/25"
-            onClick={() => {
-              setMessage("");
-              setShares(formatTradeShareInput(maxShares));
-            }}
-            disabled={maxShares <= 0 || Boolean(tradeUnavailableReason)}
-          >
-            Use max
-          </button>
-        </div>
+        <label className="mt-4 block text-xs font-semibold text-paper/50" htmlFor="shares">
+          Shares
+        </label>
         <div className="mt-2 flex min-h-12 items-center overflow-hidden rounded-[var(--radius-control)] border border-line bg-ink/35 focus-within:border-cyan/65 focus-within:ring-2 focus-within:ring-cyan/10">
           <button
             type="button"
