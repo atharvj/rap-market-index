@@ -69,7 +69,10 @@ export async function GET(request: Request) {
       }])
     );
     const visibleRows = leaderboardRows
-      .filter((row) => profileMetadata.has(row.user_id))
+      .filter((row) => {
+        const metadata = profileMetadata.get(row.user_id);
+        return Boolean(metadata && !metadata.isAdmin);
+      })
       .slice(0, 100);
     const visibleLeaderboard = visibleRows.map((row, index) => ({
       ...mapLeaderboardEntry(row, profileMetadata.get(row.user_id)!),
@@ -82,7 +85,7 @@ export async function GET(request: Request) {
         supabase.from("profiles").select("id,avatar_url,portfolio_is_public,is_admin").eq("id", requesterId).maybeSingle()
       ]);
 
-      if (requesterRow && requesterProfile) {
+      if (requesterRow && requesterProfile && !requesterProfile.is_admin) {
         const { count } = await supabase
           .from("market_leaderboard")
           .select("user_id", { count: "exact", head: true })
