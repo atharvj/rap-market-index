@@ -10,7 +10,7 @@ import {
   isLowValueMarketArticleTitle,
   isUncorroboratedLowTierMarketClaim
 } from "@/server/market/artist-event-disambiguation";
-import { classifyArticleEvent, normalizeDomain } from "@/server/market/gdelt-source";
+import { classifyArticleEvent, getSourceTier, normalizeDomain } from "@/server/market/gdelt-source";
 import { loadSourcePreviewImageUrls } from "@/server/market/source-preview-images";
 import {
   areNewsStoryEventsEquivalent,
@@ -28,6 +28,10 @@ import {
   isWatchNowMarketEvent
 } from "@/server/market/watch-now-videos";
 import { getMarketNewsCandidateLimit } from "@/server/market/news-candidate-limit";
+import {
+  isTrustedEmergingEditorialCoverage,
+  promoteEmergingEditorialCoverage
+} from "@/server/market/emerging-news";
 
 export const dynamic = "force-dynamic";
 
@@ -39,12 +43,14 @@ type ArtistRow = Pick<
   | "current_price"
   | "daily_change_percent"
   | "hype_score"
+  | "category"
   | "last_move_explanation"
   | "updated_at"
 >;
 type MarketEventRow = Database["public"]["Tables"]["market_events"]["Row"];
 type MarketNewsType = Database["public"]["Tables"]["market_events"]["Row"]["event_type"];
 type NewsFeedMode = "home" | "news" | "artist" | "watch";
+type NewsCoverageMode = "emerging" | null;
 
 type MarketNewsItem = {
   id: string;
@@ -116,6 +122,7 @@ export async function GET(request: Request) {
     const eventType = normalizeEventType(url.searchParams.get("eventType"));
     const feedMode = normalizeFeedMode(url.searchParams.get("feed"));
     const newsSort = normalizeMarketNewsSort(url.searchParams.get("sort"));
+    const coverage = normalizeCoverageMode(url.searchParams.get("coverage"));
     const supabase = createServiceRoleClient();
     const artists = await loadArtists(supabase);
     const artistById = new Map(artists.map((artist) => [artist.id, artist]));
@@ -189,6 +196,7 @@ export async function GET(request: Request) {
             feedMode: effectiveFeedMode,
             artist: artistById.get(event.artist_id) ?? null
           }) &&
+          (!coverage || isTrustedEmergingEditorialEvent(event, artistById)) &&
           (effectiveFeedMode !== "watch" || isWatchNowMarketEvent(event))
       ),
       newsSort,
@@ -216,7 +224,7 @@ export async function GET(request: Request) {
       limit,
       runDate,
       sort: newsSort
-    });
+    }, artistById);
     const eventNews = selectedEvents.map((event) =>
       mapMarketEventToNewsItem(
         event,
@@ -250,6 +258,7 @@ export async function GET(request: Request) {
       runDate,
       lookbackDays,
       sort: newsSort,
+      coverage,
       eventCount: news.length,
       news
     }, { headers: CACHE_HEADERS });
@@ -269,7 +278,7 @@ export async function GET(request: Request) {
 async function loadArtists(supabase: ReturnType<typeof createServiceRoleClient>) {
   const { data, error } = await supabase
     .from("artists")
-    .select("id,name,ticker,current_price,daily_change_percent,hype_score,last_move_explanation,updated_at")
+    .select("id,name,ticker,current_price,daily_change_percent,hype_score,category,last_move_explanation,updated_at")
     .eq("is_active", true);
 
   if (error) {
@@ -432,6 +441,10 @@ function normalizeEventType(value: string | null): MarketNewsType | null {
 
 function normalizeFeedMode(value: string | null): NewsFeedMode {
   return value === "home" || value === "artist" || value === "watch" ? value : "news";
+}
+
+function normalizeCoverageMode(value: string | null): NewsCoverageMode {
+  return value === "emerging" ? value : null;
 }
 
 function normalizeArtistIds(value: string | null) {
@@ -821,10 +834,11 @@ function getSourceWeight(source: string) {
 
 function selectMarketNewsEvents(
   events: MarketEventRow[],
-  options: { feedMode: NewsFeedMode; limit: number; runDate: string; sort: ReturnType<typeof normalizeMarketNewsSort> }
+  options: { feedMode: NewsFeedMode; limit: number; runDate: string; sort: ReturnType<typeof normalizeMarketNewsSort> },
+  artistById: Map<string, ArtistRow>
 ) {
   if (options.sort === "top") {
-    return diversifyMarketNewsEvents(events, options);
+    return diversifyMarketNewsEvents(events, options, artistById);
   }
 
   return dedupeNearDuplicateMarketNewsEvents(
@@ -833,7 +847,11 @@ function selectMarketNewsEvents(
   ).slice(0, options.limit);
 }
 
-function diversifyMarketNewsEvents(events: MarketEventRow[], options: { feedMode: NewsFeedMode; limit: number }) {
+function diversifyMarketNewsEvents(
+  events: MarketEventRow[],
+  options: { feedMode: NewsFeedMode; limit: number },
+  artistById: Map<string, ArtistRow>
+) {
   const selected: MarketEventRow[] = [];
   const sourceCounts = new Map<string, number>();
   const artistCounts = new Map<string, number>();
@@ -873,7 +891,40 @@ function diversifyMarketNewsEvents(events: MarketEventRow[], options: { feedMode
     artistCounts.set(event.artist_id, artistCount + 1);
   }
 
-  return selected;
+  return options.feedMode === "news" && options.limit >= 8
+    ? promoteEmergingEditorialCoverage({
+        ranked: events,
+        selected,
+        isEligible: (event) => isTrustedEmergingEditorialEvent(event, artistById, "underground"),
+        limit: options.limit
+      })
+    : selected;
+}
+
+function isTrustedEmergingEditorialEvent(
+  event: MarketEventRow,
+  artistById: Map<string, ArtistRow>,
+  requiredCategory?: "underground"
+) {
+  const artist = artistById.get(event.artist_id);
+
+  if (!artist || (requiredCategory && artist.category !== requiredCategory)) {
+    return false;
+  }
+
+  const rawPayload = toRawPayload(event.raw_payload);
+  const source = getRawString(rawPayload.source);
+  const domain =
+    getRawString(rawPayload.domain) ||
+    normalizeDomain(undefined, event.source_url ?? undefined) ||
+    "";
+  const sourceTier = getRawNumber(rawPayload.sourceTier) ?? getSourceTier(domain);
+
+  return isTrustedEmergingEditorialCoverage({
+    category: artist.category,
+    source,
+    sourceTier
+  });
 }
 
 function dedupeNearDuplicateMarketNewsEvents(events: MarketEventRow[], feedMode: NewsFeedMode) {

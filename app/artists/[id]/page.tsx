@@ -10,12 +10,11 @@ import { ChangeText, RmiButton, RmiSection } from "@/components/RmiPrimitives";
 import { ScoreInfo } from "@/components/ScoreInfo";
 import { TradeTicket } from "@/components/TradeTicket";
 import { WatchlistButton } from "@/components/WatchlistButton";
-import { getMarketSignalLabel, sanitizeMoveExplanation } from "@/lib/artist-explanations";
+import { getArtistSignalDrivers } from "@/lib/artist-signal-drivers";
 import { formatCurrency, formatShares } from "@/lib/formatters";
 import { estimateMarketMakerQuote } from "@/lib/trading";
-import { Activity, BadgeCheck, KeyRound, Radio, Zap } from "lucide-react";
+import { Activity, BadgeCheck, Radio, Zap } from "lucide-react";
 import { useParams, useSearchParams } from "next/navigation";
-import type { ReactNode } from "react";
 
 export default function ArtistDetailPage() {
   const params = useParams<{ id: string }>();
@@ -37,12 +36,7 @@ export default function ArtistDetailPage() {
 
   const activeArtist = artist;
   const holding = getHolding(activeArtist.id);
-  const explanation = sanitizeMoveExplanation(
-    activeArtist.ticker,
-    activeArtist.lastMoveExplanation,
-    activeArtist.dailyChangePercent,
-    activeArtist.stats
-  );
+  const signalDrivers = getArtistSignalDrivers(activeArtist.stats);
   const recordedPrices = [...activeArtist.priceHistory.map((point) => point.price), activeArtist.currentPrice];
   const recordedHigh = Math.max(...recordedPrices);
   const recordedLow = Math.min(...recordedPrices);
@@ -81,11 +75,11 @@ export default function ArtistDetailPage() {
                 <WatchlistButton artistId={artist.id} />
               </div>
               <p className="mt-1 flex flex-wrap items-center gap-1.5 text-sm font-medium text-paper/60">
-                <span>${artist.ticker} · RMI Signal {artist.hypeScore}/100 · {getMarketSignalLabel(artist.hypeScore)}</span>
+                <span>${artist.ticker} · RMI Signal {artist.hypeScore}/100</span>
                 <ScoreInfo />
               </p>
               <div className="mt-3 flex flex-wrap gap-2">
-                <span className="rmi-status-chip"><span className="rmi-live-dot" /> Market active</span>
+                <span className="rmi-status-chip">{formatArtistCategory(artist.category)}</span>
                 <span className="rmi-status-chip text-cyan"><Zap className="h-3 w-3" /> Signal rank #{signalRank}</span>
               </div>
             </div>
@@ -114,10 +108,8 @@ export default function ArtistDetailPage() {
 
         <ArtistAudienceSnapshot artistId={artist.id} />
 
-        <RmiSection title={<span className="flex items-center gap-2"><Activity className="h-4 w-4 text-mint" /> Why the Quote Moved</span>}>
-          <div className="px-4">
-            <CatalystRow icon={<KeyRound className="h-4 w-4" />} text={explanation} />
-          </div>
+        <RmiSection title={<span className="flex items-center gap-2"><Activity className="h-4 w-4 text-mint" /> Signal Breakdown</span>}>
+          <SignalBreakdown drivers={signalDrivers} />
         </RmiSection>
 
         <RmiSection title="Market News">
@@ -144,6 +136,10 @@ export default function ArtistDetailPage() {
   );
 }
 
+function formatArtistCategory(category: string) {
+  return category.charAt(0).toUpperCase() + category.slice(1);
+}
+
 function QuoteStat({ label, value, tone }: { label: string; value: string; tone: "cyan" | "mint" | "ember" | "violet" | "brass" }) {
   const valueClass = tone === "mint"
     ? "text-mint"
@@ -163,11 +159,42 @@ function QuoteStat({ label, value, tone }: { label: string; value: string; tone:
   );
 }
 
-function CatalystRow({ icon, text }: { icon: ReactNode; text: string }) {
+function SignalBreakdown({
+  drivers
+}: {
+  drivers: ReturnType<typeof getArtistSignalDrivers>;
+}) {
+  const visibleDrivers = drivers.slice(0, 4);
+  const largestMagnitude = Math.max(0.01, ...visibleDrivers.map((driver) => Math.abs(driver.contribution)));
+
   return (
-    <div className="flex gap-3 py-3 text-sm">
-      <span className="mt-0.5 text-paper/45">{icon}</span>
-      <p className="font-medium leading-5 text-paper/85">{text}</p>
+    <div className="p-4">
+      <p className="mb-3 text-xs text-paper/45">Largest weighted inputs in the current model.</p>
+      <div className="grid gap-2 sm:grid-cols-2">
+        {visibleDrivers.map((driver) => {
+          const positive = driver.contribution > 0;
+          const negative = driver.contribution < 0;
+          const tone = positive ? "bg-mint" : negative ? "bg-ember" : "bg-paper/20";
+          const textTone = positive ? "text-mint" : negative ? "text-ember" : "text-paper/45";
+
+          return (
+            <div key={driver.key} className="rmi-metric px-3 py-3">
+              <div className="flex items-center justify-between gap-3 text-xs">
+                <span className="font-semibold text-paper/60">{driver.label}</span>
+                <span className={`font-semibold number-tabular ${textTone}`}>
+                  {driver.contribution > 0 ? "+" : ""}{driver.contribution.toFixed(2)}
+                </span>
+              </div>
+              <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-paper/10" aria-hidden="true">
+                <span
+                  className={`block h-full rounded-full ${tone}`}
+                  style={{ width: `${Math.max(3, Math.abs(driver.contribution) / largestMagnitude * 100)}%` }}
+                />
+              </div>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }

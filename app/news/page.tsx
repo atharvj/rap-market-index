@@ -46,6 +46,7 @@ export default function NewsPage() {
                 aria-label="Filter market news"
               >
                 <option value="">All Stories</option>
+                <option value="emerging">Emerging Articles</option>
                 <option value="release">Releases</option>
                 <option value="review">Reviews</option>
                 <option value="controversy">Controversy</option>
@@ -75,7 +76,8 @@ export default function NewsPage() {
             limit={40}
             variant="full"
             sort={newsSort}
-            eventType={eventType || undefined}
+            coverage={eventType === "emerging" ? "emerging" : undefined}
+            eventType={eventType && eventType !== "emerging" ? eventType : undefined}
             onItemsChange={handleNewsItems}
           />
         </div>
