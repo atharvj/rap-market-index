@@ -44,8 +44,8 @@ const topics = [
     icon: CandlestickChart,
     answers: [
       "Open an artist quote, choose Buy or Sell, enter a whole number of shares, and review the estimated total.",
-      "The ticket shows the maximum available quantity. Buy limits use the lower of your available fantasy cash and the 25% per-artist portfolio limit; Sell limits use the shares you currently own.",
-      "Orders must be worth at least $1. The quantity field and plus button stop at your current maximum so an order cannot exceed your cash, position room, or owned shares.",
+      "The ticket's Max uses the lowest active limit: available fantasy cash, 25% artist position room, the rolling 24-hour artist allowance, or shares owned.",
+      "An artist's 24-hour buy allowance is 40% of portfolio value, with a $1,000 minimum and $5,000 maximum. Wait 30 seconds between orders for the same artist.",
       "Trading requires a confirmed account with completed setup and a fully synced profile. The ticket explains which requirement is still loading or missing.",
       "Trading may pause briefly while the daily market update is verified, while a newly detected artist catalyst is incorporated into the quote, or when market integrity controls are active.",
       "Rapid duplicate orders and daily activity can be limited to protect the fantasy market. Wait for the message shown on the ticket before trying again.",

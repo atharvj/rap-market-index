@@ -3,7 +3,9 @@ import {
   STARTING_CASH,
   clampTradeShareInput,
   estimateMarketMakerQuote,
+  getDailyArtistBuyLimit,
   getMaximumBuyShares,
+  getRemainingDailyArtistBuyValue,
   roundShareQuantityDown
 } from "@/lib/trading";
 
@@ -83,6 +85,57 @@ describe("market-maker trading economics", () => {
         volatility: 1
       }).orderValue
     ).toBeGreaterThan(250);
+  });
+
+  it("caps a buy at the remaining rolling 24-hour artist allowance", () => {
+    const maxShares = getMaximumBuyShares({
+      cashBalance: 25_000,
+      remainingPositionValue: 6_250,
+      remainingDailyBuyValue: 2_000,
+      midPrice: 47.54,
+      volatility: 1.6
+    });
+    const quote = estimateMarketMakerQuote({
+      side: "buy",
+      midPrice: 47.54,
+      shares: maxShares,
+      volatility: 1.6
+    });
+    const oversizedQuote = estimateMarketMakerQuote({
+      side: "buy",
+      midPrice: 47.54,
+      shares: maxShares + 1,
+      volatility: 1.6
+    });
+
+    expect(quote.orderValue).toBeLessThanOrEqual(2_000);
+    expect(oversizedQuote.orderValue).toBeGreaterThan(2_000);
+    expect(getMaximumBuyShares({
+      cashBalance: 25_000,
+      remainingPositionValue: 6_250,
+      remainingDailyBuyValue: 5_000,
+      midPrice: 47.54,
+      volatility: 1.6
+    })).toBe(104);
+  });
+
+  it("matches the database daily allowance and subtracts only recent buys for that artist", () => {
+    const now = Date.parse("2026-07-31T18:00:00Z");
+
+    expect(getDailyArtistBuyLimit(1_000)).toBe(1_000);
+    expect(getDailyArtistBuyLimit(5_000)).toBe(2_000);
+    expect(getDailyArtistBuyLimit(25_000)).toBe(5_000);
+    expect(getRemainingDailyArtistBuyValue({
+      artistId: "nemzzz",
+      portfolioValue: 25_000,
+      now,
+      transactions: [
+        { artistId: "nemzzz", type: "buy", shares: 20, price: 50, grossValue: 1_000, createdAt: "2026-07-31T12:00:00Z" },
+        { artistId: "nemzzz", type: "sell", shares: 10, price: 50, grossValue: 500, createdAt: "2026-07-31T13:00:00Z" },
+        { artistId: "cardi-b", type: "buy", shares: 10, price: 100, grossValue: 1_000, createdAt: "2026-07-31T14:00:00Z" },
+        { artistId: "nemzzz", type: "buy", shares: 10, price: 50, grossValue: 500, createdAt: "2026-07-30T12:00:00Z" }
+      ]
+    })).toBe(4_000);
   });
 
   it("rounds share caps down to whole shares without exceeding the available quantity", () => {

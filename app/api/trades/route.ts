@@ -177,7 +177,7 @@ export async function POST(request: Request) {
     return NextResponse.json(
       {
         ok: false,
-        error: "Trading is temporarily paused for this artist while a newly detected catalyst is incorporated into the quote.",
+        error: "Repricing this artist after new activity. Try again shortly.",
         pendingCatalyst
       },
       { status: 423 }
@@ -242,6 +242,27 @@ const SAFE_TRADE_ERRORS = [
 
 function getPublicTradeError(message: string) {
   const normalized = message.toLowerCase();
+
+  if (normalized.includes("daily buy limit reached")) {
+    return "24h artist limit reached.";
+  }
+
+  if (normalized.includes("please wait before placing another order")) {
+    return "Wait 30 seconds between artist orders.";
+  }
+
+  if (normalized.includes("position limit is")) {
+    return "25% artist limit reached.";
+  }
+
+  if (normalized.includes("not enough cash")) {
+    return "Not enough fantasy cash.";
+  }
+
+  if (normalized.includes("you cannot sell more shares than you own")) {
+    return "Not enough shares to sell.";
+  }
+
   const safeMessage = SAFE_TRADE_ERRORS.find((candidate) => normalized.includes(candidate));
 
   if (!safeMessage) {

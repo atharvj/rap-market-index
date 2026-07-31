@@ -12,7 +12,7 @@ import {
   resetGame,
   simulateDailyUpdate
 } from "@/lib/market";
-import { estimateMarketMakerQuote } from "@/lib/trading";
+import { estimateMarketMakerQuote, getRemainingDailyArtistBuyValue } from "@/lib/trading";
 import type { Artist, GameState, HoldingView, LeaderboardEntry, ShortPositionView, TradeResult } from "@/lib/types";
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
@@ -418,14 +418,23 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       const cost = quoteEstimate.orderValue;
       const totalCost = quoteEstimate.totalCost;
       const holding = getHolding(artistId);
-      const remainingPositionValue = Math.max(0, portfolioValue * 0.25 - (holding?.currentValue ?? 0));
+      const remainingPositionValue = Math.max(0, Math.max(100, portfolioValue * 0.25) - (holding?.currentValue ?? 0));
+      const remainingDailyBuyValue = getRemainingDailyArtistBuyValue({
+        artistId,
+        portfolioValue,
+        transactions: state.transactions
+      });
 
       if (totalCost > state.cashBalance) {
         return { ok: false, message: "Not enough cash for that order." };
       }
 
       if (cost > remainingPositionValue) {
-        return { ok: false, message: "Artist position limit is 25% of portfolio value." };
+        return { ok: false, message: "25% artist limit reached." };
+      }
+
+      if (cost > remainingDailyBuyValue) {
+        return { ok: false, message: "24h artist limit reached." };
       }
 
       if (!session) {
@@ -449,7 +458,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
 
       return result;
     },
-    [getArtist, getHolding, portfolioValue, refreshServerState, session, state.cashBalance, syncMode]
+    [getArtist, getHolding, portfolioValue, refreshServerState, session, state.cashBalance, state.transactions, syncMode]
   );
 
   const sellShares = useCallback(

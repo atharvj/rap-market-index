@@ -8,6 +8,7 @@ import {
   clampTradeShareInput,
   estimateMarketMakerQuote,
   formatTradeShareInput,
+  getRemainingDailyArtistBuyValue,
   getMaximumBuyShares,
   MIN_TRADE_VALUE,
   roundShareQuantityDown
@@ -52,11 +53,17 @@ export function TradeTicket({
   const estimatedCommission = quoteEstimate.commission;
   const estimatedCashImpact = quoteEstimate.totalCost;
   const maxSell = roundShareQuantityDown(holding?.shares ?? 0);
-  const maxPositionValue = portfolioValue * 0.25;
+  const maxPositionValue = Math.max(100, portfolioValue * 0.25);
   const remainingPositionValue = Math.max(0, maxPositionValue - (holding?.currentValue ?? 0));
+  const remainingDailyBuyValue = getRemainingDailyArtistBuyValue({
+    artistId: artist.id,
+    portfolioValue,
+    transactions: state.transactions
+  });
   const maxBuy = getMaximumBuyShares({
     cashBalance: state.cashBalance,
     remainingPositionValue,
+    remainingDailyBuyValue,
     midPrice: artist.currentPrice,
     volatility: artist.volatility
   });
@@ -69,12 +76,22 @@ export function TradeTicket({
     serverRefreshing,
     syncMode
   });
+  const limitReason = getLimitReason({
+    artist,
+    cashBalance: state.cashBalance,
+    maxBuy,
+    maxSell,
+    remainingDailyBuyValue,
+    remainingPositionValue,
+    side
+  });
+  const blockedReason = tradeUnavailableReason || limitReason;
   const orderBlocked = isOrderBlocked({
     estimatedOrderValue: estimatedValue,
     maxShares,
     parsedShares,
     side,
-    tradeUnavailableReason
+    blockedReason
   });
   const disabled = orderBlocked || submitting;
 
@@ -83,12 +100,12 @@ export function TradeTicket({
   }, [artist.id, defaultSide]);
 
   useEffect(() => {
-    if (tradeUnavailableReason) {
+    if (blockedReason) {
       return;
     }
 
     setShares((current) => clampTradeShareInput(current, maxShares));
-  }, [artist.id, maxShares, side, tradeUnavailableReason]);
+  }, [artist.id, blockedReason, maxShares, side]);
 
   const helper = useMemo(() => {
     if (tradeUnavailableReason) {
@@ -96,11 +113,19 @@ export function TradeTicket({
     }
 
     if (side === "buy") {
-      return `Fantasy cash ${formatCurrency(state.cashBalance)} · Max ${formatTradeLimit(maxBuy)}`;
+      if (limitReason) {
+        return limitReason;
+      }
+
+      return `Max ${formatTradeLimit(maxBuy)} · ${getBuyLimitLabel({
+        cashBalance: state.cashBalance,
+        remainingDailyBuyValue,
+        remainingPositionValue
+      })}`;
     }
 
-    return `Your shares ${formatTradeLimit(maxSell)} · Value ${formatCurrency(maxSell * artist.currentPrice)}`;
-  }, [artist.currentPrice, maxBuy, maxSell, side, state.cashBalance, tradeUnavailableReason]);
+    return limitReason || `Owned ${formatTradeLimit(maxSell)} · Max ${formatTradeLimit(maxSell)}`;
+  }, [limitReason, maxBuy, maxSell, remainingDailyBuyValue, remainingPositionValue, side, state.cashBalance, tradeUnavailableReason]);
 
   function changeShares(nextValue: string) {
     if (nextValue && !/^\d*$/.test(nextValue)) {
@@ -279,7 +304,7 @@ export function TradeTicket({
           {submitting
             ? "Submitting order"
             : orderBlocked
-              ? tradeUnavailableReason || `${side === "buy" ? "Buy" : "Sell"} unavailable`
+              ? blockedReason || `${side === "buy" ? "Buy" : "Sell"} unavailable`
               : side === "buy"
                 ? "Submit buy order"
                 : "Submit sell order"}
@@ -343,15 +368,15 @@ function isOrderBlocked({
   maxShares,
   parsedShares,
   side,
-  tradeUnavailableReason
+  blockedReason
 }: {
   estimatedOrderValue: number;
   maxShares: number;
   parsedShares: number;
   side: "buy" | "sell";
-  tradeUnavailableReason: string;
+  blockedReason: string;
 }) {
-  if (tradeUnavailableReason) {
+  if (blockedReason) {
     return true;
   }
 
@@ -376,4 +401,71 @@ function isOrderBlocked({
   }
 
   return false;
+}
+
+function getLimitReason({
+  artist,
+  cashBalance,
+  maxBuy,
+  maxSell,
+  remainingDailyBuyValue,
+  remainingPositionValue,
+  side
+}: {
+  artist: Artist;
+  cashBalance: number;
+  maxBuy: number;
+  maxSell: number;
+  remainingDailyBuyValue: number;
+  remainingPositionValue: number;
+  side: "buy" | "sell";
+}) {
+  if (side === "sell") {
+    return maxSell <= 0 ? "No shares to sell" : "";
+  }
+
+  if (maxBuy > 0) {
+    return "";
+  }
+
+  const oneShareQuote = estimateMarketMakerQuote({
+    side: "buy",
+    midPrice: artist.currentPrice,
+    shares: 1,
+    volatility: artist.volatility
+  });
+
+  if (remainingDailyBuyValue < oneShareQuote.orderValue) {
+    return "24h artist limit reached";
+  }
+
+  if (remainingPositionValue < oneShareQuote.orderValue) {
+    return "25% artist limit reached";
+  }
+
+  if (cashBalance < oneShareQuote.totalCost) {
+    return "Not enough fantasy cash";
+  }
+
+  return "Buy unavailable";
+}
+
+function getBuyLimitLabel({
+  cashBalance,
+  remainingDailyBuyValue,
+  remainingPositionValue
+}: {
+  cashBalance: number;
+  remainingDailyBuyValue: number;
+  remainingPositionValue: number;
+}) {
+  if (remainingDailyBuyValue <= Math.min(cashBalance, remainingPositionValue)) {
+    return "24h artist limit";
+  }
+
+  if (remainingPositionValue <= cashBalance) {
+    return "25% artist limit";
+  }
+
+  return "cash available";
 }

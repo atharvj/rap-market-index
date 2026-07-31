@@ -387,18 +387,36 @@ async function loadTransactions(
   supabase: ReturnType<typeof createServiceRoleClient>,
   userId: string
 ): Promise<Transaction[]> {
-  const { data, error } = await supabase
-    .from("market_trade_events")
-    .select("*")
-    .eq("user_id", userId)
-    .order("created_at", { ascending: false })
-    .limit(50);
+  const recentBuyCutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+  const [historyResult, recentBuyResult] = await Promise.all([
+    supabase
+      .from("market_trade_events")
+      .select("*")
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false })
+      .limit(50),
+    supabase
+      .from("market_trade_events")
+      .select("*")
+      .eq("user_id", userId)
+      .eq("type", "buy")
+      .gte("created_at", recentBuyCutoff)
+      .order("created_at", { ascending: false })
+      .limit(1000)
+  ]);
 
-  if (error) {
-    throw new Error(`Could not load transactions: ${error.message}`);
+  if (historyResult.error || recentBuyResult.error) {
+    throw new Error(`Could not load transactions: ${historyResult.error?.message ?? recentBuyResult.error?.message}`);
   }
 
-  return ((data ?? []) as TransactionRow[]).map((transaction) => ({
+  const transactions = Array.from(
+    new Map(
+      ([...(historyResult.data ?? []), ...(recentBuyResult.data ?? [])] as TransactionRow[])
+        .map((transaction) => [transaction.id, transaction])
+    ).values()
+  ).sort((first, second) => Date.parse(second.created_at) - Date.parse(first.created_at));
+
+  return transactions.map((transaction) => ({
     id: transaction.id,
     artistId: transaction.artist_id,
     type: transaction.type,
