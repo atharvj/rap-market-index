@@ -143,16 +143,13 @@ export default function MarketsPage() {
       </div>
 
       <section className="rmi-card overflow-hidden">
-        <div className="flex flex-wrap items-start justify-between gap-3 border-b border-line px-4 py-3">
+        <div className="border-b border-line px-4 py-3">
           <div>
             <h2 className="text-sm font-semibold">Market board</h2>
             <p className="mt-1 max-w-3xl text-xs leading-5 text-paper/50">
               Sparklines show up to 18 sessions. 24h uses the previous close.
             </p>
           </div>
-          <Link href="/about" className="text-xs font-semibold text-cyan hover:text-cyan/75">
-            How pricing works
-          </Link>
         </div>
         <div className="rmi-table-head grid grid-cols-[minmax(0,1fr)_72px_60px_32px] gap-x-1 px-2 py-3 sm:grid-cols-[minmax(0,1fr)_104px_84px_36px] sm:gap-x-3 sm:px-4 lg:grid-cols-[minmax(220px,1fr)_140px_124px_104px_84px_44px] lg:gap-x-4">
           <span>Artist</span>
