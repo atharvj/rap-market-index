@@ -128,7 +128,11 @@ export default function PortfolioPage() {
                     <div className="mt-4 grid grid-cols-2 gap-x-6 gap-y-4 border-y border-line/70 py-3">
                       <HoldingDetail label="Shares" value={formatShares(holding.shares)} />
                       <HoldingDetail label="Current price" value={formatCurrency(holding.artist.currentPrice)} align="right" />
-                      <HoldingDetail label="Avg. buy price" value={formatCurrency(holding.averageBuyPrice)} />
+                      <HoldingDetail
+                        label="Avg. fill"
+                        value={formatCurrency(holding.averageBuyPrice)}
+                        title="Your average execution price per share."
+                      />
                       <HoldingDetail label="Position cost" value={formatCurrency(holding.costBasis)} align="right" />
                     </div>
 
@@ -151,7 +155,7 @@ export default function PortfolioPage() {
                     <span>Artist</span>
                     <span>Shares</span>
                     <span className="text-right">Price</span>
-                    <span className="text-right">Avg. Buy</span>
+                    <span className="text-right" title="Your average execution price per share.">Avg. Fill</span>
                     <span className="text-right">Position Cost</span>
                     <span className="text-right">Market Value</span>
                     <span className="text-right">Unrealized P/L</span>
@@ -312,15 +316,17 @@ function PositionReturn({ amount, percent }: { amount: number; percent: number }
 function HoldingDetail({
   label,
   value,
-  align = "left"
+  align = "left",
+  title
 }: {
   label: string;
   value: string;
   align?: "left" | "right";
+  title?: string;
 }) {
   return (
     <span className={align === "right" ? "text-right" : undefined}>
-      <span className="block text-xs font-medium text-paper/45">{label}</span>
+      <span className="block text-xs font-medium text-paper/45" title={title}>{label}</span>
       <span className="mt-1 block text-sm font-semibold number-tabular">{value}</span>
     </span>
   );

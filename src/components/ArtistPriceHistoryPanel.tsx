@@ -125,11 +125,11 @@ export function ArtistPriceHistoryPanel({
         <p className="mt-3 text-xs text-paper/42">
           {status === "ready" && !hasMovement
             ? range === "1D"
-              ? "No intraday movement yet. A new quote is recorded when the market runs or an eligible order changes the price."
+              ? "No intraday market-quote movement yet. Individual order fills are not charted."
               : "No additional recorded close or eligible trade quote in this range."
             : range === "1D"
-              ? "The 1D view uses recorded market refreshes and eligible trade quotes. Hover, tap, or click to inspect one."
-              : `${recordedCloseCount} recorded daily close${recordedCloseCount === 1 ? "" : "s"} in this range. Lines connect recorded closes and eligible public trades; RMI does not invent intraday movement.`}
+              ? "The 1D view shows recorded market quotes, not individual order fills. Hover, tap, or click to inspect one."
+              : `${recordedCloseCount} recorded daily close${recordedCloseCount === 1 ? "" : "s"} in this range. The chart shows market quotes, not individual order fills.`}
         </p>
         {status === "error" ? (
           <p className="mt-3 text-xs font-bold text-ember">Price history unavailable.</p>

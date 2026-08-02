@@ -475,6 +475,7 @@ test("artist pages include related markets without repeating the current artist"
   const section = page.locator("section").filter({ has: heading }).first();
   await expect(section.locator('a[href^="/artists/"]')).toHaveCount(4);
   await expect(section.locator(`a[href="/artists/${currentArtist.id}"]`)).toHaveCount(0);
+  await expect(page.getByText(/The chart shows market quotes, not individual order fills\./)).toBeVisible();
 });
 
 test("public metrics do not use decorative colored side borders", async ({ page }) => {
@@ -657,7 +658,7 @@ test("portfolio shows purchase basis and unrealized position performance", async
   await installPortfolioFixture(page);
   await page.goto("/portfolio");
   await expect(page.getByRole("heading", { level: 1, name: "Your Portfolio" })).toBeVisible();
-  await expect(page.getByText("Avg. Buy", { exact: true })).toBeVisible();
+  await expect(page.getByText("Avg. Fill", { exact: true })).toBeVisible();
   await expect(page.getByText("Position Cost", { exact: true }).first()).toBeVisible();
   await expect(page.getByText("Market Value", { exact: true }).first()).toBeVisible();
   await expect(
@@ -666,7 +667,7 @@ test("portfolio shows purchase basis and unrealized position performance", async
   await expect(page.getByText("Holdings Cost", { exact: true })).toBeVisible();
 
   await page.setViewportSize({ width: 390, height: 844 });
-  await expect(page.getByText("Avg. buy price", { exact: true }).first()).toBeVisible();
+  await expect(page.getByText("Avg. fill", { exact: true }).first()).toBeVisible();
   await expect(page.getByText("Current price", { exact: true }).first()).toBeVisible();
   const dimensions = await page.evaluate(() => ({
     clientWidth: document.documentElement.clientWidth,

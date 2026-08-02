@@ -142,7 +142,11 @@ export default function ArtistDetailPage() {
             <div className="space-y-2 p-4 text-sm">
               <PositionRow label="Shares" value={formatShares(holding.shares)} />
               <PositionRow label="Value" value={formatCurrency(holding.currentValue)} />
-              <PositionRow label="Average Cost" value={formatCurrency(holding.averageBuyPrice)} />
+              <PositionRow
+                label="Average Fill"
+                value={formatCurrency(holding.averageBuyPrice)}
+                title="Your average execution price per share."
+              />
             </div>
           </RmiSection>
         ) : null}
@@ -219,10 +223,10 @@ function SignalBreakdown({
   );
 }
 
-function PositionRow({ label, value }: { label: string; value: string }) {
+function PositionRow({ label, value, title }: { label: string; value: string; title?: string }) {
   return (
     <div className="flex items-center justify-between gap-4">
-      <span className="font-medium text-paper/55">{label}</span>
+      <span className="font-medium text-paper/55" title={title}>{label}</span>
       <span className="font-semibold number-tabular">{value}</span>
     </div>
   );
