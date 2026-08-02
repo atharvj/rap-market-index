@@ -658,16 +658,22 @@ test("portfolio shows purchase basis and unrealized position performance", async
   await installPortfolioFixture(page);
   await page.goto("/portfolio");
   await expect(page.getByRole("heading", { level: 1, name: "Your Portfolio" })).toBeVisible();
-  await expect(page.getByText("Avg. Fill", { exact: true })).toBeVisible();
+  await expect(page.locator(".rmi-table-head")).toContainText("Avg. Fill");
   await expect(page.getByText("Position Cost", { exact: true }).first()).toBeVisible();
   await expect(page.getByText("Market Value", { exact: true }).first()).toBeVisible();
   await expect(
     page.locator(".hidden.overflow-x-auto.xl\\:block").getByText("Unrealized P/L", { exact: true })
   ).toBeVisible();
   await expect(page.getByText("Holdings Cost", { exact: true })).toBeVisible();
+  const desktopHoldings = page.locator(".hidden.overflow-x-auto.xl\\:block");
+  const averageFillInfo = desktopHoldings.getByRole("button", { name: "Explain average fill price" });
+  await averageFillInfo.hover();
+  await expect(desktopHoldings.getByRole("tooltip")).toHaveText(
+    "Your average price paid per share. Buys can fill slightly above the chart price."
+  );
 
   await page.setViewportSize({ width: 390, height: 844 });
-  await expect(page.getByText("Avg. fill", { exact: true }).first()).toBeVisible();
+  await expect(page.locator(".xl\\:hidden").first()).toContainText("Avg. fill");
   await expect(page.getByText("Current price", { exact: true }).first()).toBeVisible();
   const dimensions = await page.evaluate(() => ({
     clientWidth: document.documentElement.clientWidth,

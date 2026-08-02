@@ -1,6 +1,7 @@
 "use client";
 
 import { ArtistAvatar } from "@/components/ArtistAvatar";
+import { AverageFillInfo } from "@/components/AverageFillInfo";
 import { useAuth } from "@/components/AuthProvider";
 import { useGame } from "@/components/GameProvider";
 import { PriceChart } from "@/components/PriceChart";
@@ -11,7 +12,7 @@ import { buildPortfolioQuoteSeries, getSeriesChangePercent } from "@/lib/market-
 import { STARTING_CASH } from "@/lib/market";
 import Link from "next/link";
 import { Activity, BriefcaseBusiness, Radar, WalletCards } from "lucide-react";
-import { useMemo } from "react";
+import { type ReactNode, useMemo } from "react";
 
 export default function PortfolioPage() {
   const { session } = useAuth();
@@ -129,9 +130,8 @@ export default function PortfolioPage() {
                       <HoldingDetail label="Shares" value={formatShares(holding.shares)} />
                       <HoldingDetail label="Current price" value={formatCurrency(holding.artist.currentPrice)} align="right" />
                       <HoldingDetail
-                        label="Avg. fill"
+                        label={<span className="inline-flex items-center gap-1">Avg. fill <AverageFillInfo /></span>}
                         value={formatCurrency(holding.averageBuyPrice)}
-                        title="Your average execution price per share."
                       />
                       <HoldingDetail label="Position cost" value={formatCurrency(holding.costBasis)} align="right" />
                     </div>
@@ -155,7 +155,7 @@ export default function PortfolioPage() {
                     <span>Artist</span>
                     <span>Shares</span>
                     <span className="text-right">Price</span>
-                    <span className="text-right" title="Your average execution price per share.">Avg. Fill</span>
+                    <span className="inline-flex items-center justify-end gap-1">Avg. Fill <AverageFillInfo align="right" /></span>
                     <span className="text-right">Position Cost</span>
                     <span className="text-right">Market Value</span>
                     <span className="text-right">Unrealized P/L</span>
@@ -316,17 +316,15 @@ function PositionReturn({ amount, percent }: { amount: number; percent: number }
 function HoldingDetail({
   label,
   value,
-  align = "left",
-  title
+  align = "left"
 }: {
-  label: string;
+  label: ReactNode;
   value: string;
   align?: "left" | "right";
-  title?: string;
 }) {
   return (
     <span className={align === "right" ? "text-right" : undefined}>
-      <span className="block text-xs font-medium text-paper/45" title={title}>{label}</span>
+      <span className="block text-xs font-medium text-paper/45">{label}</span>
       <span className="mt-1 block text-sm font-semibold number-tabular">{value}</span>
     </span>
   );

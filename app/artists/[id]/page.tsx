@@ -1,6 +1,7 @@
 "use client";
 
 import { ArtistAvatar } from "@/components/ArtistAvatar";
+import { AverageFillInfo } from "@/components/AverageFillInfo";
 import { ArtistAudienceSnapshot } from "@/components/ArtistAudienceSnapshot";
 import { ArtistPriceHistoryPanel } from "@/components/ArtistPriceHistoryPanel";
 import { useGame } from "@/components/GameProvider";
@@ -16,6 +17,7 @@ import { getRelatedArtists } from "@/lib/related-artists";
 import { estimateMarketMakerQuote } from "@/lib/trading";
 import { Activity, BadgeCheck, Radio, Zap } from "lucide-react";
 import { useParams, useSearchParams } from "next/navigation";
+import type { ReactNode } from "react";
 
 export default function ArtistDetailPage() {
   const params = useParams<{ id: string }>();
@@ -143,9 +145,8 @@ export default function ArtistDetailPage() {
               <PositionRow label="Shares" value={formatShares(holding.shares)} />
               <PositionRow label="Value" value={formatCurrency(holding.currentValue)} />
               <PositionRow
-                label="Average Fill"
+                label={<span className="inline-flex items-center gap-1">Average Fill <AverageFillInfo align="right" /></span>}
                 value={formatCurrency(holding.averageBuyPrice)}
-                title="Your average execution price per share."
               />
             </div>
           </RmiSection>
@@ -223,10 +224,10 @@ function SignalBreakdown({
   );
 }
 
-function PositionRow({ label, value, title }: { label: string; value: string; title?: string }) {
+function PositionRow({ label, value }: { label: ReactNode; value: string }) {
   return (
     <div className="flex items-center justify-between gap-4">
-      <span className="font-medium text-paper/55" title={title}>{label}</span>
+      <span className="font-medium text-paper/55">{label}</span>
       <span className="font-semibold number-tabular">{value}</span>
     </div>
   );
