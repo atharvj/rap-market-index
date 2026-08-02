@@ -120,6 +120,7 @@ export async function collectBlueskyMarketSignals({
   const observations: MarketObservation[] = [];
   const eventsByArtist: Record<string, MarketEvent[]> = {};
   const warnings: string[] = [];
+  let requestFailureCount = 0;
 
   for (const [index, artist] of artists.entries()) {
     if (index > 0 && delayMs > 0) {
@@ -137,6 +138,7 @@ export async function collectBlueskyMarketSignals({
     });
 
     if (!result.ok) {
+      requestFailureCount += 1;
       signals[artist.id] = {
         stats: {},
         rawPayload: {
@@ -176,6 +178,19 @@ export async function collectBlueskyMarketSignals({
       eventsByArtist[event.artistId] ??= [];
       eventsByArtist[event.artistId].push(event);
     }
+  }
+
+  const requestFailureRatio = requestFailureCount / Math.max(1, artists.length);
+
+  if (artists.length >= 12 && requestFailureRatio >= 0.5) {
+    return {
+      signals: {},
+      observations: observations.filter((observation) => observation.metric === REQUEST_ERROR),
+      eventsByArtist: {},
+      warnings: [
+        `Bluesky was excluded from pricing because ${requestFailureCount} of ${artists.length} artist searches failed.`
+      ]
+    };
   }
 
   return {

@@ -58,4 +58,34 @@ describe("Bluesky market source", () => {
       sourceName: "Bluesky"
     });
   });
+
+  it("drops a partial prefix when most roster searches fail", async () => {
+    const artists = Array.from({ length: 12 }, (_, index) => ({
+      ...artist,
+      id: `artist-${index}`,
+      name: `Artist ${index}`,
+      ticker: `ART${index}`
+    }));
+    let requestCount = 0;
+    const result = await collectBlueskyMarketSignals({
+      artists,
+      runDate: "2026-08-02",
+      delayMs: 0,
+      fetchImpl: async () => {
+        requestCount += 1;
+
+        return requestCount <= 3
+          ? new Response(JSON.stringify({ posts: [] }), { status: 200 })
+          : new Response(JSON.stringify({ error: "Forbidden" }), { status: 403 });
+      }
+    });
+
+    expect(result.signals).toEqual({});
+    expect(result.eventsByArtist).toEqual({});
+    expect(result.observations).toHaveLength(9);
+    expect(result.observations.every((observation) => observation.metric === "request_error")).toBe(true);
+    expect(result.warnings).toEqual([
+      "Bluesky was excluded from pricing because 9 of 12 artist searches failed."
+    ]);
+  });
 });
