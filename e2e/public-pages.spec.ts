@@ -251,6 +251,71 @@ async function installPublicFixtures(page: Page) {
   );
 }
 
+async function installPortfolioFixture(page: Page) {
+  const userId = "22222222-2222-4222-8222-222222222222";
+  const timestamp = "2026-07-21T12:00:00.000Z";
+  const user = {
+    id: userId,
+    aud: "authenticated",
+    role: "authenticated",
+    email: "portfolio@example.com",
+    email_confirmed_at: timestamp,
+    app_metadata: { provider: "email", providers: ["email"] },
+    user_metadata: { username: "PortfolioTester" },
+    identities: [],
+    created_at: timestamp,
+    updated_at: timestamp
+  };
+  const session = {
+    access_token: createTestAccessToken(userId),
+    refresh_token: "portfolio-refresh-token",
+    token_type: "bearer",
+    expires_in: 3600,
+    expires_at: Math.floor(Date.now() / 1000) + 3600,
+    user
+  };
+
+  await page.addInitScript((value) => {
+    window.localStorage.setItem("sb-example-auth-token", JSON.stringify(value));
+  }, session);
+  await page.route("https://example.supabase.co/auth/v1/user", (route) =>
+    route.fulfill({ contentType: "application/json", body: JSON.stringify(user) })
+  );
+  await page.route("**/api/profile/bootstrap", (route) =>
+    route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({
+        ok: true,
+        profile: {
+          id: userId,
+          username: "PortfolioTester",
+          cashBalance: 17_500,
+          favoriteArtistIds: [],
+          onboardingCompleted: true,
+          isAdmin: false
+        },
+        holdings: [
+          {
+            artistId: marketState.artists[0].id,
+            shares: 20,
+            averageBuyPrice: Number((marketState.artists[0].currentPrice * 0.8).toFixed(2))
+          },
+          {
+            artistId: marketState.artists[1].id,
+            shares: 8,
+            averageBuyPrice: Number((marketState.artists[1].currentPrice * 1.1).toFixed(2))
+          }
+        ],
+        shortPositions: [],
+        transactions: []
+      })
+    })
+  );
+  await page.route("**/api/watchlist", (route) =>
+    route.fulfill({ contentType: "application/json", body: JSON.stringify({ ok: true, watchlist: [] }) })
+  );
+}
+
 async function assertStablePublicPage(page: Page, path: string, heading: string, snapshot: string) {
   const response = await page.goto(path);
   expect(response?.ok()).toBeTruthy();
@@ -586,6 +651,28 @@ test("onboarding watchlist selections stay visibly selected", async ({ page }) =
   await page.getByRole("button", { name: "Continue" }).click();
   await expect(page.getByRole("heading", { name: "Your opening balance" })).toBeVisible();
   await expect(page.getByRole("paragraph").filter({ hasText: "$25,000" })).toBeVisible();
+});
+
+test("portfolio shows purchase basis and unrealized position performance", async ({ page }) => {
+  await installPortfolioFixture(page);
+  await page.goto("/portfolio");
+  await expect(page.getByRole("heading", { level: 1, name: "Your Portfolio" })).toBeVisible();
+  await expect(page.getByText("Avg. Buy", { exact: true })).toBeVisible();
+  await expect(page.getByText("Position Cost", { exact: true }).first()).toBeVisible();
+  await expect(page.getByText("Market Value", { exact: true }).first()).toBeVisible();
+  await expect(
+    page.locator(".hidden.overflow-x-auto.xl\\:block").getByText("Unrealized P/L", { exact: true })
+  ).toBeVisible();
+  await expect(page.getByText("Holdings Cost", { exact: true })).toBeVisible();
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(page.getByText("Avg. buy price", { exact: true }).first()).toBeVisible();
+  await expect(page.getByText("Current price", { exact: true }).first()).toBeVisible();
+  const dimensions = await page.evaluate(() => ({
+    clientWidth: document.documentElement.clientWidth,
+    scrollWidth: document.documentElement.scrollWidth
+  }));
+  expect(dimensions.scrollWidth).toBeLessThanOrEqual(dimensions.clientWidth + 1);
 });
 
 test("primary public pages do not overflow a mobile viewport", async ({ page }) => {
