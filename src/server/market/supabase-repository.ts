@@ -445,7 +445,7 @@ export async function loadObservationBaselines({
   const [recentResult, annualResult] = await Promise.all([
     supabase
       .from("market_observations")
-      .select("artist_id,metric,value,observed_date")
+      .select("artist_id,metric,value,observed_date,observed_at")
       .in("artist_id", artistIds)
       .eq("source", source)
       .in("metric", metrics)
@@ -456,7 +456,7 @@ export async function loadObservationBaselines({
     annualComparison
       ? supabase
           .from("market_observations")
-          .select("artist_id,metric,value,observed_date")
+          .select("artist_id,metric,value,observed_date,observed_at")
           .in("artist_id", artistIds)
           .eq("source", source)
           .in("metric", metrics)
@@ -476,10 +476,13 @@ export async function loadObservationBaselines({
     throw new Error(`Could not load annual observation baselines: ${annualResult.error.message}`);
   }
 
-  const rows = (data ?? []) as Pick<MarketObservationRow, "artist_id" | "metric" | "value" | "observed_date">[];
+  const rows = (data ?? []) as Pick<
+    MarketObservationRow,
+    "artist_id" | "metric" | "value" | "observed_date" | "observed_at"
+  >[];
   const annualRows = (annualResult.data ?? []) as Pick<
     MarketObservationRow,
-    "artist_id" | "metric" | "value" | "observed_date"
+    "artist_id" | "metric" | "value" | "observed_date" | "observed_at"
   >[];
 
   if (strategy === "latest") {
@@ -489,6 +492,11 @@ export async function loadObservationBaselines({
       if (typeof memo[row.artist_id][row.metric] !== "number") {
         memo[row.artist_id][row.metric] = Number(row.value);
         memo[row.artist_id][getBaselineAgeMetric(row.metric)] = getDateDistanceDays(beforeDate, row.observed_date);
+        const observedAtMilliseconds = new Date(row.observed_at).getTime();
+
+        if (Number.isFinite(observedAtMilliseconds)) {
+          memo[row.artist_id][`${row.metric}__observed_at_ms`] = observedAtMilliseconds;
+        }
       }
 
       return memo;
@@ -523,7 +531,7 @@ export async function loadObservationBaselines({
 
 function addRateBaselines(
   baselines: ObservationBaselines,
-  rows: Array<Pick<MarketObservationRow, "artist_id" | "metric" | "value" | "observed_date">>,
+  rows: Array<Pick<MarketObservationRow, "artist_id" | "metric" | "value" | "observed_date" | "observed_at">>,
   period: "recent" | "year_ago"
 ) {
   const grouped = groupObservationRows(rows);
@@ -536,7 +544,7 @@ function addRateBaselines(
         .slice(1)
         .map((row, index) => {
           const previous = metricRows[index];
-          const days = previous ? getDateDistanceDays(row.observed_date, previous.observed_date) : 0;
+          const days = previous ? getObservationDistanceDays(row, previous) : 0;
 
           return days > 0 && previous ? (Number(row.value) - Number(previous.value)) / days : null;
         })
@@ -554,7 +562,7 @@ function addRateBaselines(
 
 function addAnnualLevelBaselines(
   baselines: ObservationBaselines,
-  rows: Array<Pick<MarketObservationRow, "artist_id" | "metric" | "value" | "observed_date">>,
+  rows: Array<Pick<MarketObservationRow, "artist_id" | "metric" | "value" | "observed_date" | "observed_at">>,
   beforeDate: string
 ) {
   const targetDate = shiftDate(beforeDate, -365);
@@ -578,11 +586,11 @@ function addAnnualLevelBaselines(
 }
 
 function groupObservationRows(
-  rows: Array<Pick<MarketObservationRow, "artist_id" | "metric" | "value" | "observed_date">>
+  rows: Array<Pick<MarketObservationRow, "artist_id" | "metric" | "value" | "observed_date" | "observed_at">>
 ) {
   const grouped: Record<
     string,
-    Record<string, Array<Pick<MarketObservationRow, "value" | "observed_date">>>
+    Record<string, Array<Pick<MarketObservationRow, "value" | "observed_date" | "observed_at">>>
   > = {};
 
   for (const row of rows) {
@@ -590,13 +598,14 @@ function groupObservationRows(
     grouped[row.artist_id][row.metric] ??= [];
     grouped[row.artist_id][row.metric].push({
       value: row.value,
-      observed_date: row.observed_date
+      observed_date: row.observed_date,
+      observed_at: row.observed_at
     });
   }
 
   for (const metrics of Object.values(grouped)) {
     for (const metricRows of Object.values(metrics)) {
-      metricRows.sort((first, second) => first.observed_date.localeCompare(second.observed_date));
+      metricRows.sort((first, second) => getObservationTime(first) - getObservationTime(second));
     }
   }
 
@@ -756,6 +765,29 @@ function getDateDistanceDays(laterDate: string, earlierDate: string) {
   }
 
   return Math.max(1, Math.round((later - earlier) / 86_400_000));
+}
+
+function getObservationDistanceDays(
+  later: Pick<MarketObservationRow, "observed_date" | "observed_at">,
+  earlier: Pick<MarketObservationRow, "observed_date" | "observed_at">
+) {
+  const elapsedMilliseconds = getObservationTime(later) - getObservationTime(earlier);
+
+  if (!Number.isFinite(elapsedMilliseconds) || elapsedMilliseconds <= 0) {
+    return getDateDistanceDays(later.observed_date, earlier.observed_date);
+  }
+
+  return elapsedMilliseconds / 86_400_000;
+}
+
+function getObservationTime(
+  observation: Pick<MarketObservationRow, "observed_date" | "observed_at">
+) {
+  const observedAt = new Date(observation.observed_at).getTime();
+
+  return Number.isFinite(observedAt)
+    ? observedAt
+    : new Date(`${observation.observed_date}T00:00:00.000Z`).getTime();
 }
 
 function getAbsoluteDateDistanceDays(firstDate: string, secondDate: string) {

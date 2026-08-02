@@ -124,6 +124,7 @@ describe("Last.fm listening velocity", () => {
     const signal = result.signals[performer.id];
 
     expect(signal.stats.streamingGrowth).toBeLessThan(0);
+    expect(signal.stats.socialGrowth).toBeUndefined();
     expect(signal.rawPayload.playcountRateMomentum).toBeLessThan(0);
     expect(signal.rawPayload.velocityMinimumTickEligible).toBe(true);
   });

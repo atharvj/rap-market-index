@@ -275,6 +275,16 @@ export function calculateAnnualPointMomentum({
 }
 
 export function getBaselineAgeDays(baseline: Record<string, number>, metric: string) {
+  const observedAtMilliseconds = baseline[`${metric}__observed_at_ms`];
+
+  if (typeof observedAtMilliseconds === "number" && Number.isFinite(observedAtMilliseconds)) {
+    const exactAgeDays = (Date.now() - observedAtMilliseconds) / 86_400_000;
+
+    if (Number.isFinite(exactAgeDays) && exactAgeDays > 0) {
+      return exactAgeDays;
+    }
+  }
+
   const value = baseline[`${metric}__age_days`];
 
   return typeof value === "number" && Number.isFinite(value) ? value : undefined;

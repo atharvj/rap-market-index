@@ -199,18 +199,8 @@ function buildLastfmSignal({
       { value: playcountMomentum.value, weight: 0.25 },
       { value: listenerMomentum.value, weight: 0.2 }
     ]);
-    const socialGrowth = weightedAverage([
-      { value: listenerMomentum.value, weight: 0.55 },
-      { value: playcountRateMomentum.value, weight: 0.25 },
-      { value: playcountMomentum.value, weight: 0.1 }
-    ]);
-
     if (typeof streamingGrowth === "number") {
       stats.streamingGrowth = clamp(streamingGrowth, -25, 75);
-    }
-
-    if (typeof socialGrowth === "number") {
-      stats.socialGrowth = clamp(socialGrowth, -35, 120);
     }
   }
 

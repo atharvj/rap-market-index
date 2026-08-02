@@ -3,6 +3,11 @@ import type { AdapterSignal, AdapterSignals, MarketSignalModifier } from "@/serv
 import { getMarketModelVersion } from "@/server/market/model-version";
 import type { ArtistCategory, HypeStats } from "@/lib/types";
 import { getAudienceScaleAdjustment } from "@/server/market/audience-scale";
+import {
+  calibrateMarketWideAdapterSignals,
+  calibratePersistedMarketStats,
+  type MarketWideCalibrationAudit
+} from "@/server/market/market-wide-calibration";
 
 export type MarketUpdateSource =
   | "mock"
@@ -172,7 +177,8 @@ export type MarketUpdateSummary = {
 
 export function calculateDailyMarketUpdates(input: MarketUpdateInput) {
   const modelVersion = input.modelVersion ?? getMarketModelVersion();
-  const standaloneUpdates = input.artists.map((artist, index) =>
+  const persistedCalibration = calibratePersistedMarketStats(input.artists);
+  const standaloneUpdates = persistedCalibration.artists.map((artist, index) =>
     calculateArtistUpdate({
       artist,
       index,
@@ -180,7 +186,8 @@ export function calculateDailyMarketUpdates(input: MarketUpdateInput) {
       source: input.source,
       modelVersion,
       manualSignals: input.manualSignals,
-      adapterSignals: input.adapterSignals
+      adapterSignals: input.adapterSignals,
+      persistedMarketWideCalibration: persistedCalibration.audits[artist.id]
     })
   );
   const updates = applyMarketRelativePricing(standaloneUpdates, input.marketCoverageRatio)
@@ -808,7 +815,8 @@ function calculateArtistUpdate({
   source,
   modelVersion,
   manualSignals,
-  adapterSignals
+  adapterSignals,
+  persistedMarketWideCalibration
 }: {
   artist: MarketUpdateArtist;
   index: number;
@@ -817,12 +825,16 @@ function calculateArtistUpdate({
   modelVersion: string;
   manualSignals?: ManualSignals;
   adapterSignals?: AdapterSignals;
+  persistedMarketWideCalibration?: Partial<Record<keyof HypeStats, MarketWideCalibrationAudit>>;
 }): ArtistMarketUpdate {
   const signals = getSignalsForArtist(artist, index, runDate, source, manualSignals, adapterSignals);
   const decayedExistingStats = decayStatsTowardNeutral(artist.stats);
   const credibleEventSupport = hasCredibleEventSupport(signals.rawPayload, signals.modifiers);
   const eventMemoryAdjustedStats = dampStaleEventMemory(decayedExistingStats, credibleEventSupport);
-  const stats = signals.hasMomentumSignal ? blendStats(eventMemoryAdjustedStats, signals.stats) : eventMemoryAdjustedStats;
+  const marketCalibratedStats = getMarketWideCalibratedStatKeys(signals.rawPayload);
+  const stats = signals.hasMomentumSignal
+    ? blendStats(eventMemoryAdjustedStats, signals.stats, marketCalibratedStats)
+    : eventMemoryAdjustedStats;
   const staleMomentumDecayDelta = signals.hasMomentumSignal ? 0 : getStaleMomentumDecayDelta(artist.stats, source);
   const conflictMoveMultiplier = getConflictMoveMultiplier(signals.reliabilityDetails);
   const rawSignalDelta = signals.hasMomentumSignal
@@ -906,6 +918,15 @@ function calculateArtistUpdate({
     modelVersion,
     rawPayload: {
       ...signals.rawPayload,
+      ...(persistedMarketWideCalibration && Object.keys(persistedMarketWideCalibration).length
+        ? {
+            persistedMarketWideCalibration: {
+              version: 1,
+              reason: "stored_source_wide_directional_shift",
+              metrics: persistedMarketWideCalibration
+            }
+          }
+        : {}),
       modelVersion,
       hasMomentumSignal: signals.hasMomentumSignal,
       signalReliability: signals.reliability,
@@ -1431,11 +1452,7 @@ export function mergeAdapterSignals(...sources: Array<AdapterSignals | undefined
     }
   > = {};
 
-  for (const source of sources) {
-    if (!source) {
-      continue;
-    }
-
+  for (const source of calibrateMarketWideAdapterSignals(sources)) {
     for (const [artistId, signal] of Object.entries(source)) {
       const sourceName = getSignalSourceName(signal);
       const confidence = getSignalConfidence(signal, sourceName);
@@ -1584,8 +1601,7 @@ function getDefaultSignalConfidence(sourceName: string) {
 function getStatSourceWeight(key: keyof HypeStats, sourceName: string) {
   const weights: Record<string, Partial<Record<keyof HypeStats, number>>> = {
     lastfm: {
-      streamingGrowth: 1,
-      socialGrowth: 0.5
+      streamingGrowth: 1
     },
     listenbrainz: {
       streamingGrowth: 0.42,
@@ -2029,15 +2045,86 @@ function hasPartialStats(stats: Partial<HypeStats>) {
   ].some((value) => typeof value === "number");
 }
 
-function blendStats(existing: HypeStats, incoming: HypeStats): HypeStats {
+function blendStats(existing: HypeStats, incoming: HypeStats, freshStats = new Set<keyof HypeStats>()): HypeStats {
   return {
-    streamingGrowth: clamp(existing.streamingGrowth * 0.25 + incoming.streamingGrowth * 0.75, -25, 75),
-    youtubeGrowth: clamp(existing.youtubeGrowth * 0.25 + incoming.youtubeGrowth * 0.75, -25, 70),
-    searchGrowth: clamp(existing.searchGrowth * 0.25 + incoming.searchGrowth * 0.75, -30, 95),
-    socialGrowth: clamp(existing.socialGrowth * 0.25 + incoming.socialGrowth * 0.75, -35, 120),
-    newsScore: clamp(existing.newsScore * 0.35 + incoming.newsScore * 0.65, 0, 100),
-    traderDemand: clamp(existing.traderDemand * 0.45 + incoming.traderDemand * 0.55, -40, 40)
+    streamingGrowth: blendStat(
+      existing.streamingGrowth,
+      incoming.streamingGrowth,
+      0.25,
+      -25,
+      75,
+      freshStats.has("streamingGrowth")
+    ),
+    youtubeGrowth: blendStat(
+      existing.youtubeGrowth,
+      incoming.youtubeGrowth,
+      0.25,
+      -25,
+      70,
+      freshStats.has("youtubeGrowth")
+    ),
+    searchGrowth: blendStat(
+      existing.searchGrowth,
+      incoming.searchGrowth,
+      0.25,
+      -30,
+      95,
+      freshStats.has("searchGrowth")
+    ),
+    socialGrowth: blendStat(
+      existing.socialGrowth,
+      incoming.socialGrowth,
+      0.25,
+      -35,
+      120,
+      freshStats.has("socialGrowth")
+    ),
+    newsScore: blendStat(
+      existing.newsScore,
+      incoming.newsScore,
+      0.35,
+      0,
+      100,
+      freshStats.has("newsScore")
+    ),
+    traderDemand: blendStat(
+      existing.traderDemand,
+      incoming.traderDemand,
+      0.45,
+      -40,
+      40,
+      freshStats.has("traderDemand")
+    )
   };
+}
+
+function blendStat(
+  existing: number,
+  incoming: number,
+  existingWeight: number,
+  min: number,
+  max: number,
+  useFreshValue: boolean
+) {
+  return clamp(useFreshValue ? incoming : existing * existingWeight + incoming * (1 - existingWeight), min, max);
+}
+
+function getMarketWideCalibratedStatKeys(rawPayload: Record<string, unknown>) {
+  const keys = new Set<keyof HypeStats>();
+
+  for (const value of Object.values(rawPayload)) {
+    const sourcePayload = getObjectRecord(value);
+    const calibration = getObjectRecord(sourcePayload.marketWideCalibration);
+    const metrics = getObjectRecord(calibration.metrics);
+
+    for (const key of getHypeStatKeys()) {
+      if (metrics[key]) {
+        keys.add(key);
+      }
+    }
+  }
+
+  return keys;
 }
 
 function explainMove(
