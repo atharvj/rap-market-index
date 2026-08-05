@@ -39,7 +39,6 @@ export default function HomePage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="sr-only">Rap Market Index — fantasy markets for rapper momentum</h1>
       <section data-testid="home-market-hero" aria-label="Top market story">
         <div className="mb-3 flex items-end justify-between gap-4">
           <div>
