@@ -366,6 +366,8 @@ function getEventModifierReason(event: ScoredMarketEvent) {
     project_announcement: "project announcement",
     single_video_release: "single/video release",
     track_audio_release: "track upload",
+    music_interview: "music interview",
+    music_documentary: "music documentary",
     tracklist_reaction: "tracklist reaction",
     feature: "feature/cosign",
     major_feature: "major feature/cosign",
@@ -422,6 +424,8 @@ function getEventReasonPriority(subtype: string) {
     controversy: 8,
     decline: 8,
     single_video_release: 5,
+    music_documentary: 5,
+    music_interview: 4,
     snippet: 4,
     viral: 4,
     release: 4,
@@ -504,6 +508,10 @@ function getEventProvenance(event: MarketEvent, artist: MarketUpdateArtist) {
     return getYoutubeUploadEventProvenance(event);
   }
 
+  if (normalizedSource === "youtube_editorial_event") {
+    return getYoutubeEditorialEventProvenance(event);
+  }
+
   if (normalizedSource === "manual_event") {
     return {
       label: "manual",
@@ -516,6 +524,30 @@ function getEventProvenance(event: MarketEvent, artist: MarketUpdateArtist) {
     label: normalizedSource || "unknown",
     impactMultiplier: 1,
     confidenceMultiplier: 1
+  };
+}
+
+function getYoutubeEditorialEventProvenance(event: MarketEvent) {
+  const reason = getRawString(event.rawPayload.classificationReason) ?? "";
+  const authority = getRawString(event.rawPayload.publisherAuthority) ?? "";
+  const videoId = getRawString(event.rawPayload.videoId) ?? "";
+  const musicDemandConfirmed = getRawBoolean(event.rawPayload.musicDemandConfirmed);
+  const acceptedReason = ["lyrics_interview", "music_interview", "music_documentary", "editorial_performance"].includes(reason);
+
+  if (!acceptedReason || !musicDemandConfirmed || !/^[a-z0-9_-]{6,20}$/i.test(videoId)) {
+    return {
+      label: "editorial-video-unverified",
+      impactMultiplier: 0,
+      confidenceMultiplier: 0.25
+    };
+  }
+
+  const authorityMultiplier = authority === "primary" ? 0.9 : 0.82;
+
+  return {
+    label: authority === "primary" ? "trusted-editorial-video" : "established-editorial-video",
+    impactMultiplier: authorityMultiplier,
+    confidenceMultiplier: authority === "primary" ? 0.94 : 0.88
   };
 }
 
@@ -1609,6 +1641,10 @@ function getReactionSourceClass(event: ScoredMarketEvent) {
     return "official";
   }
 
+  if (source === "youtube_editorial_event") {
+    return "media";
+  }
+
   if (source === "musicbrainz_release_group") {
     return "release_database";
   }
@@ -1924,6 +1960,18 @@ function getEventSubtype(event: MarketEvent, artist?: MarketUpdateArtist) {
     return "feature";
   }
 
+  if (rawReason === "lyrics_interview" || rawReason === "music_interview") {
+    return "music_interview";
+  }
+
+  if (rawReason === "music_documentary") {
+    return "music_documentary";
+  }
+
+  if (rawReason === "editorial_performance") {
+    return "performance";
+  }
+
   const normalizedArtistName = artist ? normalizeEventText(artist.name) : "";
   const titleIdentifiesArtistAsFeature =
     normalizedArtistName &&
@@ -2190,6 +2238,8 @@ function getEventSubtypePriceProfile(subtype: string) {
     project_announcement: { divisor: 2900, minShock: -0.01, maxShock: 0.018 },
     single_video_release: { divisor: 1900, minShock: -0.018, maxShock: 0.035 },
     track_audio_release: { divisor: 3500, minShock: -0.008, maxShock: 0.012 },
+    music_interview: { divisor: 3200, minShock: -0.008, maxShock: 0.018 },
+    music_documentary: { divisor: 3000, minShock: -0.01, maxShock: 0.02 },
     tracklist_reaction: { divisor: 2100, minShock: -0.028, maxShock: 0.024 },
     public_reaction: { divisor: 2150, minShock: -0.032, maxShock: 0.034 },
     status_death: { divisor: 1550, minShock: -0.035, maxShock: 0.055 },
@@ -2360,6 +2410,8 @@ function getEventShockDecayMultiplier({
     project_announcement: 2.5,
     single_video_release: 3,
     track_audio_release: 1.5,
+    music_interview: 2.5,
+    music_documentary: 3.5,
     tracklist_reaction: 2.5,
     public_reaction: 2.5,
     social_conflict: 2.8,

@@ -1,4 +1,5 @@
 import type { HypeStats } from "@/lib/types";
+import { PRICE_SIGNAL_WEIGHTS } from "@/lib/pricing";
 
 export type ArtistSignalDriver = {
   key: string;
@@ -11,32 +12,32 @@ export function getArtistSignalDrivers(stats: HypeStats) {
     {
       key: "streaming",
       label: "Listening",
-      contribution: stats.streamingGrowth * 0.35
+      contribution: stats.streamingGrowth * PRICE_SIGNAL_WEIGHTS.listening
     },
     {
       key: "youtube",
       label: "Video",
-      contribution: stats.youtubeGrowth * 0.25
+      contribution: stats.youtubeGrowth * PRICE_SIGNAL_WEIGHTS.video
     },
     {
       key: "search",
       label: "Search",
-      contribution: stats.searchGrowth * 0.075
+      contribution: stats.searchGrowth * PRICE_SIGNAL_WEIGHTS.search
     },
     {
       key: "social",
       label: "Fan response",
-      contribution: stats.socialGrowth * 0.075
+      contribution: stats.socialGrowth * PRICE_SIGNAL_WEIGHTS.fanResponse
     },
     {
       key: "news",
       label: "Media",
-      contribution: (stats.newsScore - 50) * 0.075
+      contribution: (stats.newsScore - 50) * PRICE_SIGNAL_WEIGHTS.media
     },
     {
       key: "trading",
       label: "Trading",
-      contribution: stats.traderDemand * 0.1
+      contribution: stats.traderDemand * PRICE_SIGNAL_WEIGHTS.trading
     }
   ];
 

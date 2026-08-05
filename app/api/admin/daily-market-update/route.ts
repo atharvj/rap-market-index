@@ -43,6 +43,7 @@ import { collectWikimediaMarketSignals } from "@/server/market/wikimedia-source"
 import { collectYoutubeMarketSignals } from "@/server/market/youtube-source";
 import { collectYoutubeCommentMarketSignals } from "@/server/market/youtube-comments-source";
 import { collectYoutubeUploadEvents } from "@/server/market/youtube-upload-events-source";
+import { collectYoutubeEditorialEvents } from "@/server/market/youtube-editorial-events-source";
 import { getMarketDate } from "@/server/market/market-date";
 import { getMarketModelVersion } from "@/server/market/model-version";
 import { getMockMarketArtists } from "@/server/market/mock-source";
@@ -837,6 +838,26 @@ async function collectRealSignals({
           observations.push(...youtubeUploadEvents.observations);
           warnings.push(...youtubeUploadEvents.warnings);
           detectedEventsByArtist = mergeEvents(detectedEventsByArtist, youtubeUploadEvents.eventsByArtist);
+        }
+      }
+
+      const maxEditorialVideos = getEnvInteger("MARKET_YOUTUBE_EDITORIAL_EVENT_VIDEOS", 12, 0, 20);
+
+      if (maxEditorialVideos > 0) {
+        const youtubeEditorialEvents = await collectExternalSource("YouTube editorial videos", warnings, () =>
+          collectYoutubeEditorialEvents({
+            artists,
+            runDate,
+            apiKey: process.env.YOUTUBE_API_KEY,
+            maxVideosPerChannel: maxEditorialVideos,
+            lookbackDays: getEnvInteger("MARKET_YOUTUBE_EDITORIAL_EVENT_DAYS", 7, 1, 30)
+          })
+        );
+
+        if (youtubeEditorialEvents) {
+          observations.push(...youtubeEditorialEvents.observations);
+          warnings.push(...youtubeEditorialEvents.warnings);
+          detectedEventsByArtist = mergeEvents(detectedEventsByArtist, youtubeEditorialEvents.eventsByArtist);
         }
       }
 

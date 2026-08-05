@@ -18,6 +18,12 @@ export function isWatchNowMarketEvent(event: WatchNowMarketEvent) {
   const hasOfficialVideoClassification =
     classificationReason === "official_video_upload_title" ||
     classificationReason === "major_feature_upload_title";
+  const hasEditorialVideoClassification = [
+    "lyrics_interview",
+    "music_interview",
+    "music_documentary",
+    "editorial_performance"
+  ].includes(classificationReason);
   const isAudioOnly =
     title.includes("official audio") ||
     title.includes("lyric video") ||
@@ -28,11 +34,16 @@ export function isWatchNowMarketEvent(event: WatchNowMarketEvent) {
     (typeof durationSeconds === "number" && durationSeconds > 0 && durationSeconds <= 75) ||
     title.includes("#shorts") ||
     title.includes("youtube short");
+  const isEligibleOfficialUpload =
+    source === "youtube_upload_event" &&
+    (hasOfficialVideoTitle || hasOfficialVideoClassification);
+  const isEligibleEditorialVideo =
+    source === "youtube_editorial_event" &&
+    hasEditorialVideoClassification;
 
   return (
-    source === "youtube_upload_event" &&
+    (isEligibleOfficialUpload || isEligibleEditorialVideo) &&
     Boolean(videoId) &&
-    (hasOfficialVideoTitle || hasOfficialVideoClassification) &&
     !isAudioOnly &&
     !isShortForm
   );

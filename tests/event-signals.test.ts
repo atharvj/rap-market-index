@@ -233,6 +233,46 @@ describe("release performance and reception", () => {
   });
 });
 
+describe("trusted editorial video catalysts", () => {
+  it("gives a music interview a modest, source-verified price effect", () => {
+    const event: MarketEvent = {
+      artistId: artist.id,
+      eventDate: "2026-07-11",
+      eventType: "news",
+      title: "Young Thug explains the lyrics and meaning behind a new song",
+      sourceName: "Genius",
+      sourceUrl: "https://www.youtube.com/watch?v=VideoId123",
+      sentimentScore: 14,
+      impactScore: 22,
+      confidence: 0.84,
+      rawPayload: {
+        source: "youtube_editorial_event",
+        videoId: "VideoId123",
+        publisherAuthority: "primary",
+        classificationReason: "music_interview",
+        musicDemandConfirmed: true,
+        viewCount: 100_000,
+        reachRatio: 1.2
+      }
+    };
+    const signal = buildEventMarketSignals({
+      artists: [artist],
+      runDate: "2026-07-11",
+      eventsByArtist: { [artist.id]: [event] }
+    })[artist.id];
+    const modifier = signal.modifiers?.[0];
+    const scoredEvents = signal.rawPayload.events as Array<{ eventSubtype: string; provenanceLabel: string }>;
+
+    expect(scoredEvents[0]).toMatchObject({
+      eventSubtype: "music_interview",
+      provenanceLabel: "trusted-editorial-video"
+    });
+    expect(modifier?.reason).toContain("music interview");
+    expect(modifier?.priceShock).toBeGreaterThan(0);
+    expect(modifier?.priceShock).toBeLessThan(0.01);
+  });
+});
+
 describe("event story deduplication", () => {
   it("counts same-day coverage of one release only once", () => {
     const shared: Omit<MarketEvent, "title" | "sourceUrl"> = {

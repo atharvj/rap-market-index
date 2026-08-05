@@ -533,6 +533,10 @@ function isPublicMarketNewsEvent(
     return isPublicYoutubeUploadEvent(event, rawPayload, title, impactScore, confidence, feedMode);
   }
 
+  if (source === "youtube_editorial_event") {
+    return isPublicYoutubeEditorialEvent(rawPayload, impactScore, confidence, feedMode);
+  }
+
   if (source === "musicbrainz_release_group") {
     return (
       rawPayload.corroborated === true &&
@@ -726,9 +730,22 @@ function getPublicEventLabel(
   artistName: string | null
 ) {
   const artistRole = getRawString(rawPayload.artistRole);
+  const classificationReason = getRawString(rawPayload.classificationReason);
 
   if (artistRole === "featured" || (artistName && titleCreditsArtistAsFeature(event.title, artistName))) {
     return "Feature";
+  }
+
+  if (classificationReason === "lyrics_interview" || classificationReason === "music_interview") {
+    return "Interview";
+  }
+
+  if (classificationReason === "music_documentary") {
+    return "Profile";
+  }
+
+  if (classificationReason === "editorial_performance") {
+    return "Performance";
   }
 
   return null;
@@ -757,7 +774,7 @@ function getNewsImportanceScore(event: MarketEventRow, runDate: string) {
   const source = getRawString(rawPayload.source);
   const sourceWeight = getSourceWeight(source);
   const editorialWeight = getNewsEditorialWeight(rawPayload);
-  const reachScore = source === "youtube_upload_event" ? getYoutubeNewsReachScore(rawPayload) : 0;
+  const reachScore = isYoutubeNewsSource(source) ? getYoutubeNewsReachScore(rawPayload) : 0;
   const typeWeight: Record<MarketNewsType, number> = {
     release: 16,
     review: 13,
@@ -830,6 +847,10 @@ function getSourceWeight(source: string) {
     return -18;
   }
 
+  if (source === "youtube_editorial_event") {
+    return 8;
+  }
+
   return 0;
 }
 
@@ -858,6 +879,7 @@ function diversifyMarketNewsEvents(
   const artistCounts = new Map<string, number>();
   const seenHeadlineKeys = new Set<string>();
   const youtubeCap = getYoutubeCap(options.feedMode, options.limit);
+  let youtubeCount = 0;
   const perArtistCap = options.feedMode === "artist" ? options.limit : Math.max(1, Math.ceil(options.limit * 0.22));
 
   for (const event of events) {
@@ -870,7 +892,7 @@ function diversifyMarketNewsEvents(
     const artistCount = artistCounts.get(event.artist_id) ?? 0;
     const headlineKey = getNewsHeadlineKey(event);
 
-    if (source === "youtube_upload_event" && sourceCount >= youtubeCap) {
+    if (isYoutubeNewsSource(source) && youtubeCount >= youtubeCap) {
       continue;
     }
 
@@ -889,6 +911,9 @@ function diversifyMarketNewsEvents(
     selected.push(event);
     seenHeadlineKeys.add(headlineKey);
     sourceCounts.set(source, sourceCount + 1);
+    if (isYoutubeNewsSource(source)) {
+      youtubeCount += 1;
+    }
     artistCounts.set(event.artist_id, artistCount + 1);
   }
 
@@ -1114,6 +1139,32 @@ function isPublicYoutubeUploadEvent(
   return impactScore >= 35 && confidence >= 0.65;
 }
 
+function isPublicYoutubeEditorialEvent(
+  rawPayload: Record<string, unknown>,
+  impactScore: number,
+  confidence: number,
+  feedMode: NewsFeedMode
+) {
+  const reason = getRawString(rawPayload.classificationReason);
+  const authority = getRawString(rawPayload.publisherAuthority);
+  const videoId = getRawText(rawPayload.videoId);
+  const durationSeconds = getRawNumber(rawPayload.durationSeconds);
+  const viewCount = getRawNumber(rawPayload.viewCount) ?? 0;
+  const acceptedReason = ["lyrics_interview", "music_interview", "music_documentary", "editorial_performance"].includes(reason);
+  const isMainFeed = feedMode === "home" || feedMode === "news" || feedMode === "watch";
+
+  return (
+    acceptedReason &&
+    (authority === "primary" || authority === "established") &&
+    rawPayload.musicDemandConfirmed === true &&
+    /^[A-Za-z0-9_-]{6,20}$/.test(videoId) &&
+    (durationSeconds === null || durationSeconds > 75) &&
+    viewCount >= 2_500 &&
+    impactScore >= (isMainFeed ? 14 : 10) &&
+    confidence >= 0.65
+  );
+}
+
 function getYoutubeNewsReachScore(rawPayload: Record<string, unknown>) {
   const viewCount =
     getRawNumber(rawPayload.clusterMaxViews) ??
@@ -1121,12 +1172,16 @@ function getYoutubeNewsReachScore(rawPayload: Record<string, unknown>) {
     getRawNumber(rawPayload.viewCount) ??
     0;
   const totalViews = getRawNumber(rawPayload.clusterTotalViews) ?? viewCount;
-  const reachRatio = getRawNumber(rawPayload.clusterReachRatio) ?? 0;
+  const reachRatio = getRawNumber(rawPayload.clusterReachRatio) ?? getRawNumber(rawPayload.reachRatio) ?? 0;
   const viewLift = viewCount > 0 ? Math.log10(viewCount + 1) * 2.3 : 0;
   const totalLift = totalViews > 0 ? Math.log10(totalViews + 1) * 1.15 : 0;
   const ratioLift = reachRatio > 1 ? Math.min(7, reachRatio * 2.4) : reachRatio > 0 ? reachRatio * 2 : 0;
 
   return Math.min(18, viewLift + totalLift + ratioLift);
+}
+
+function isYoutubeNewsSource(source: string) {
+  return source === "youtube_upload_event" || source === "youtube_editorial_event";
 }
 
 function toRawPayload(value: unknown): Record<string, unknown> {

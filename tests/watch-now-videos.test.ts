@@ -42,6 +42,29 @@ describe("Watch Now video eligibility", () => {
     })).toBe(false);
   });
 
+  it("accepts trusted full-length music interviews and performances", () => {
+    expect(isWatchNowMarketEvent(event({
+      source: "youtube_editorial_event",
+      classificationReason: "lyrics_interview"
+    }))).toBe(true);
+    expect(isWatchNowMarketEvent(event({
+      source: "youtube_editorial_event",
+      classificationReason: "editorial_performance"
+    }))).toBe(true);
+  });
+
+  it("rejects unclassified editorial uploads and editorial shorts", () => {
+    expect(isWatchNowMarketEvent(event({
+      source: "youtube_editorial_event",
+      classificationReason: "generic_interview"
+    }))).toBe(false);
+    expect(isWatchNowMarketEvent(event({
+      source: "youtube_editorial_event",
+      classificationReason: "music_interview",
+      durationSeconds: 60
+    }))).toBe(false);
+  });
+
   it("recovers IDs from standard, short, and embed URLs", () => {
     expect(getYoutubeVideoId({}, "https://www.youtube.com/watch?v=Standard123")).toBe("Standard123");
     expect(getYoutubeVideoId({}, "https://youtu.be/ShortId123")).toBe("ShortId123");

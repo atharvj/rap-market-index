@@ -194,6 +194,29 @@ export function calculateRateMomentum({
   const annualRateChangePercent = hasAnnualRate
     ? ((currentDailyRate - yearAgoDailyRate) / yearAgoDailyRate) * 100
     : undefined;
+
+  // Cumulative provider counters can remain unchanged for a polling interval because
+  // of caching or rounding. One flat sample is not evidence that real activity fell
+  // all the way to zero, so leave it neutral until a positive increment confirms the rate.
+  if (monotonic && currentDailyRate === 0) {
+    return {
+      value: undefined,
+      baselineAgeDays,
+      baselineAgeFactor,
+      rawChangePercent: currentDailyRate,
+      normalizedChangePercent: undefined,
+      confidenceMultiplier: 0.34,
+      anomalyFlags: ["flat_counter_sample"],
+      currentDailyRate,
+      recentDailyRate,
+      yearAgoDailyRate,
+      recentRateSamples,
+      yearAgoRateSamples,
+      recentRateChangePercent,
+      annualRateChangePercent
+    };
+  }
+
   const anomalyFlags: string[] = [];
   let adjustedRecentChange = clamp(recentRateChangePercent, -100, 250);
   let adjustedAnnualChange =
