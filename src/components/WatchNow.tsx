@@ -1,7 +1,7 @@
 "use client";
 
 import { formatCompact, formatDate } from "@/lib/formatters";
-import type { MarketNewsItem } from "@/components/MarketNewsFeed";
+import { getNewsDisplayDate, type MarketNewsItem } from "@/components/MarketNewsFeed";
 import clsx from "clsx";
 import {
   Captions,
@@ -532,7 +532,7 @@ export function WatchNow() {
               </Link>
               <h3 className="mt-2 text-xl font-bold leading-tight text-paper">{currentVideo.title}</h3>
               <div className="mt-3 flex flex-wrap items-center gap-3 text-xs font-medium text-paper/45">
-                <span>{formatDate(currentVideo.eventDate)}</span>
+                <span>{formatDate(getNewsDisplayDate(currentVideo))}</span>
                 {typeof currentVideo.viewCount === "number" ? (
                   <span className="inline-flex items-center gap-1">
                     <Eye className="h-3.5 w-3.5" aria-hidden="true" />
@@ -577,7 +577,7 @@ export function WatchNow() {
                   <span className="min-w-0">
                     <span className="line-clamp-2 text-sm font-semibold leading-snug text-paper">{video.title}</span>
                     <span className="mt-1 block truncate text-[11px] font-medium text-paper/42">
-                      {video.artistName} · {formatDate(video.eventDate)}
+                      {video.artistName} · {formatDate(getNewsDisplayDate(video))}
                     </span>
                   </span>
                   {index === currentIndex ? (

@@ -916,27 +916,141 @@ export async function persistMarketEvents(supabase: Supabase, events: MarketEven
     return;
   }
 
-  await removeConflictingEventClassifications(supabase, events);
+  const dedupedEvents = dedupeEventsForPersistence(events);
+  await removeConflictingEventClassifications(supabase, dedupedEvents);
+  await removeConflictingSourceEvents(supabase, dedupedEvents);
+  const rows = dedupedEvents.map((event) => ({
+    artist_id: event.artistId,
+    event_date: event.eventDate,
+    event_type: event.eventType,
+    title: event.title,
+    source_name: event.sourceName ?? null,
+    source_url: event.sourceUrl ?? null,
+    sentiment_score: event.sentimentScore,
+    impact_score: event.impactScore,
+    confidence: event.confidence,
+    raw_payload: event.rawPayload as Json
+  }));
 
-  const { error } = await supabase.from("market_events").upsert(
-    events.map((event) => ({
-      artist_id: event.artistId,
-      event_date: event.eventDate,
-      event_type: event.eventType,
-      title: event.title,
-      source_name: event.sourceName ?? null,
-      source_url: event.sourceUrl ?? null,
-      sentiment_score: event.sentimentScore,
-      impact_score: event.impactScore,
-      confidence: event.confidence,
-      raw_payload: event.rawPayload as Json
-    })),
-    { onConflict: "artist_id,event_type,event_date,title" }
-  );
+  const { error } = await supabase.from("market_events").upsert(rows, {
+    onConflict: "artist_id,event_type,event_date,title"
+  });
 
   if (error) {
     throw new Error(`Could not save market events: ${error.message}`);
   }
+}
+
+export function dedupeEventsForPersistence(events: MarketEvent[]) {
+  const selected = new Map<string, MarketEvent>();
+
+  for (const event of events) {
+    const sourceUrl = normalizeEventSourceUrl(event.sourceUrl);
+    const key = sourceUrl
+      ? `${event.artistId}\u0000source\u0000${sourceUrl}`
+      : `${event.artistId}\u0000event\u0000${event.eventType}\u0000${event.eventDate}\u0000${event.title}`;
+    const current = selected.get(key);
+
+    if (!current || getEventPersistencePriority(event) > getEventPersistencePriority(current)) {
+      selected.set(key, sourceUrl ? { ...event, sourceUrl } : event);
+    }
+  }
+
+  return [...selected.values()];
+}
+
+function getEventPersistencePriority(event: MarketEvent) {
+  return Math.abs(event.impactScore) * event.confidence;
+}
+
+function normalizeEventSourceUrl(value: string | undefined) {
+  if (!value) {
+    return null;
+  }
+
+  try {
+    const url = new URL(value);
+    url.hash = "";
+
+    for (const key of [...url.searchParams.keys()]) {
+      if (/^(?:utm_|mc_|bil$|debugld$)/i.test(key)) {
+        url.searchParams.delete(key);
+      }
+    }
+
+    return url.toString();
+  } catch {
+    return value.trim() || null;
+  }
+}
+
+async function removeConflictingSourceEvents(supabase: Supabase, events: MarketEvent[]) {
+  const sourcedEvents = events.filter((event) => Boolean(event.sourceUrl));
+
+  if (!sourcedEvents.length) {
+    return;
+  }
+
+  const artistIds = Array.from(new Set(sourcedEvents.map((event) => event.artistId)));
+  const sourceUrls = Array.from(new Set(sourcedEvents.flatMap(getEventSourceAliases)));
+  const desiredEvents = new Set(
+    sourcedEvents.map(
+      (event) => `${event.artistId}\u0000${event.sourceUrl}\u0000${event.eventType}\u0000${event.eventDate}\u0000${event.title}`
+    )
+  );
+  const existingEvents: Array<{
+    id: string;
+    artist_id: string;
+    event_date: string;
+    event_type: string;
+    title: string;
+    source_url: string | null;
+  }> = [];
+
+  for (let offset = 0; offset < sourceUrls.length; offset += 50) {
+    const { data, error } = await supabase
+      .from("market_events")
+      .select("id,artist_id,event_date,event_type,title,source_url")
+      .in("artist_id", artistIds)
+      .in("source_url", sourceUrls.slice(offset, offset + 50));
+
+    if (error) {
+      throw new Error(`Could not inspect existing market event sources: ${error.message}`);
+    }
+
+    existingEvents.push(...(data ?? []));
+  }
+
+  const conflictingIds = existingEvents
+    .filter(
+      (row) =>
+        !desiredEvents.has(
+          `${row.artist_id}\u0000${row.source_url}\u0000${row.event_type}\u0000${row.event_date}\u0000${row.title}`
+        )
+    )
+    .map((row) => row.id);
+
+  for (let offset = 0; offset < conflictingIds.length; offset += 100) {
+    const { error: deleteError } = await supabase
+      .from("market_events")
+      .delete()
+      .in("id", conflictingIds.slice(offset, offset + 100));
+
+    if (deleteError) {
+      throw new Error(`Could not replace stale market event sources: ${deleteError.message}`);
+    }
+  }
+}
+
+function getEventSourceAliases(event: MarketEvent) {
+  const aliases = [event.sourceUrl];
+  const googleNewsUrl = event.rawPayload.googleNewsUrl;
+
+  if (typeof googleNewsUrl === "string") {
+    aliases.push(googleNewsUrl);
+  }
+
+  return aliases.filter((value): value is string => Boolean(value));
 }
 
 async function removeConflictingEventClassifications(supabase: Supabase, events: MarketEvent[]) {

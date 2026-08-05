@@ -1,5 +1,9 @@
 import type { MarketUpdateArtist } from "@/server/market/daily-update";
 import {
+  createArticleMetadataVerifier,
+  isGoogleNewsArticleUrl
+} from "@/server/market/article-metadata-verifier";
+import {
   hasArtistControversySubjectContext,
   hasArtistFeatureCreditContext,
   hasArtistReleaseSubjectContext,
@@ -74,6 +78,7 @@ const ARTICLE_COUNT = "article_count";
 const SOURCE_COUNT = "source_count";
 const CLASSIFIED_EVENT_COUNT = "classified_event_count";
 const REQUEST_ERROR = "request_error";
+const DATE_VERIFICATION_REJECTED_COUNT = "date_verification_rejected_count";
 const DEFAULT_LOOKBACK_DAYS = 30;
 const DEFAULT_MAX_ITEMS_PER_FEED = 40;
 const DEFAULT_MAX_EVENTS_PER_ARTIST = 4;
@@ -162,47 +167,61 @@ export async function collectMediaRssMarketEvents({
   const allArtistSearchItems = dedupeItems(
     artistSearchResults.flatMap(({ result }) => result?.ok ? result.items : [])
   );
+  const articleVerifier = createArticleMetadataVerifier({ fetchImpl, timeoutMs, concurrency: 8 });
+  scannedFeedCount += artistSearchResults.filter(({ result }) => Boolean(result)).length;
+  const artistBuilds = await Promise.all(
+    artistSearchResults.map(async ({ artist, query, result }) => {
+      const localObservations: MarketObservation[] = [];
+      const localWarnings: string[] = [];
+      let artistSearchItems: MediaFeedItem[] = [];
 
-  for (const { artist, query, result } of artistSearchResults) {
-    let artistSearchItems: MediaFeedItem[] = [];
-
-    if (result) {
-      scannedFeedCount += 1;
-
-      if (result.ok) {
-        artistSearchItems = result.items;
-      } else {
-        warnings.push(`${artist.ticker}: media search feed failed: ${result.error}`);
-        observations.push(
-          createObservation(artist.id, runDate, REQUEST_ERROR, 1, "flag", {
-            source: SOURCE,
-            feedUrl: result.feedUrl,
-            query,
-            error: result.error
-          })
-        );
+      if (result) {
+        if (result.ok) {
+          artistSearchItems = result.items;
+        } else {
+          localWarnings.push(`${artist.ticker}: media search feed failed: ${result.error}`);
+          localObservations.push(
+            createObservation(artist.id, runDate, REQUEST_ERROR, 1, "flag", {
+              source: SOURCE,
+              feedUrl: result.feedUrl,
+              query,
+              error: result.error
+            })
+          );
+        }
       }
-    }
 
-    const artistEvents = buildArtistEvents({
-      artist,
-      runDate,
-      query,
-      items: dedupeItems([
-        ...globalItems,
-        ...artistSearchItems,
-        ...allArtistSearchItems.filter(
-          (item) => item.searchArtistId !== artist.id && mentionsArtist(item.title, artist.name, query)
-        )
-      ]),
-      lookbackDays,
-      maxEventsPerArtist
-    });
+      const artistEvents = await buildArtistEvents({
+        artist,
+        runDate,
+        query,
+        items: dedupeItems([
+          ...globalItems,
+          ...artistSearchItems,
+          ...allArtistSearchItems.filter(
+            (item) => item.searchArtistId !== artist.id && mentionsArtist(item.title, artist.name, query)
+          )
+        ]),
+        lookbackDays,
+        maxEventsPerArtist,
+        articleVerifier
+      });
 
-    observations.push(...artistEvents.observations);
+      return {
+        artistId: artist.id,
+        events: artistEvents.events,
+        observations: [...localObservations, ...artistEvents.observations],
+        warnings: localWarnings
+      };
+    })
+  );
 
-    if (artistEvents.events.length) {
-      eventsByArtist[artist.id] = artistEvents.events;
+  for (const artistBuild of artistBuilds) {
+    warnings.push(...artistBuild.warnings);
+    observations.push(...artistBuild.observations);
+
+    if (artistBuild.events.length) {
+      eventsByArtist[artistBuild.artistId] = artistBuild.events;
     }
   }
 
@@ -214,13 +233,14 @@ export async function collectMediaRssMarketEvents({
   };
 }
 
-function buildArtistEvents({
+async function buildArtistEvents({
   artist,
   runDate,
   query,
   items,
   lookbackDays,
-  maxEventsPerArtist
+  maxEventsPerArtist,
+  articleVerifier
 }: {
   artist: MarketUpdateArtist;
   runDate: string;
@@ -228,6 +248,7 @@ function buildArtistEvents({
   items: MediaFeedItem[];
   lookbackDays: number;
   maxEventsPerArtist: number;
+  articleVerifier: ReturnType<typeof createArticleMetadataVerifier>;
 }) {
   const matchedItems = items
     .filter(
@@ -236,7 +257,11 @@ function buildArtistEvents({
         item.searchArtistId === artist.id ||
         mentionsArtist(item.title, artist.name, query)
     )
-    .filter((item) => isWithinLookback(item.publishedDate ?? runDate, runDate, lookbackDays))
+    .filter(
+      (item) =>
+        isGoogleNewsArticleUrl(item.url) ||
+        isWithinLookback(item.publishedDate ?? runDate, runDate, lookbackDays)
+    )
     .map((item) => ({
       item,
       titleMatchedArtist: mentionsArtist(item.title, artist.name, query),
@@ -247,7 +272,7 @@ function buildArtistEvents({
       (titleMatchedArtist || textMatchedArtist) && disambiguatedArtist
     );
 
-  const candidateEvents = matchedItems
+  const preliminaryCandidateEvents = matchedItems
     .map(({ item, titleMatchedArtist, textMatchedArtist, disambiguatedArtist }) => {
       const classificationText = `${item.title} ${item.summary}`.slice(0, 420);
       const initialClassification = classifyArticleEvent(classificationText, item.domain, undefined, {
@@ -330,9 +355,69 @@ function buildArtistEvents({
     })
     .filter((value): value is NonNullable<typeof value> => Boolean(value))
     .sort((first, second) => getEventRank(second) - getEventRank(first))
+    .slice(0, maxEventsPerArtist + 2);
+
+  const verifiedCandidates = await Promise.all(
+    preliminaryCandidateEvents.map(async (candidate) => {
+      if (!isGoogleNewsArticleUrl(candidate.item.url)) {
+        return {
+          candidate: {
+            ...candidate,
+            verifiedPublisherDate: null,
+            originalFeedDate: candidate.item.publishedDate,
+            originalGoogleNewsUrl: null
+          },
+          rejection: null
+        };
+      }
+
+      const verification = await articleVerifier.verifyGoogleNewsUrl(candidate.item.url);
+
+      if (!verification.ok) {
+        return { candidate: null, rejection: verification.reason };
+      }
+
+      const verifiedItem: MediaFeedItem = {
+        ...candidate.item,
+        url: verification.metadata.canonicalUrl,
+        domain: normalizeDomain(undefined, verification.metadata.canonicalUrl) ?? candidate.item.domain,
+        publishedDate: verification.metadata.publishedDate
+      };
+
+      if (!isWithinLookback(verification.metadata.publishedDate, runDate, lookbackDays)) {
+        return { candidate: null, rejection: "publisher_date_outside_lookback" };
+      }
+
+      return {
+        candidate: {
+          ...candidate,
+          item: verifiedItem,
+          verifiedPublisherDate: verification.metadata.publishedDate,
+          originalFeedDate: candidate.item.publishedDate,
+          originalGoogleNewsUrl: candidate.item.url
+        },
+        rejection: null
+      };
+    })
+  );
+  const rejectedDateCandidates = verifiedCandidates.filter(({ rejection }) => Boolean(rejection));
+  const seenCanonicalUrls = new Set<string>();
+  const candidateEvents = verifiedCandidates
+    .map(({ candidate }) => candidate)
+    .filter((candidate): candidate is NonNullable<typeof candidate> => Boolean(candidate))
+    .filter(({ item }) => {
+      const key = normalizeStoryUrl(item.url);
+
+      if (seenCanonicalUrls.has(key)) {
+        return false;
+      }
+
+      seenCanonicalUrls.add(key);
+      return true;
+    })
     .slice(0, maxEventsPerArtist);
 
-  const events = candidateEvents.map(({ item, titleMatchedArtist, textMatchedArtist, disambiguatedArtist, subjectMatchedArtist, artistRole, sourceTier, classification }) => {
+  const events = candidateEvents.map(({ item, titleMatchedArtist, textMatchedArtist, disambiguatedArtist, subjectMatchedArtist, artistRole, sourceTier, classification, verifiedPublisherDate, originalFeedDate, originalGoogleNewsUrl }) => {
     const classificationText = `${item.title} ${item.summary}`.slice(0, 600);
     const releaseDate = getReleaseEventDate({
       text: classificationText,
@@ -365,6 +450,9 @@ function buildArtistEvents({
         domain: item.domain,
         sourceTier,
         publishedDate: item.publishedDate,
+        feedPublishedDate: originalFeedDate ?? item.publishedDate,
+        publisherDateVerified: Boolean(verifiedPublisherDate),
+        googleNewsUrl: originalGoogleNewsUrl,
         releaseDate,
         classificationReason: classification.reason,
         releaseKind: classification.releaseKind ?? null,
@@ -390,6 +478,8 @@ function buildArtistEvents({
     matchedArticleCount: matchedItems.length,
     sourceCount,
     classifiedEventCount: events.length,
+    rejectedDateCandidateCount: rejectedDateCandidates.length,
+    rejectedDateCandidateReasons: countValues(rejectedDateCandidates.map(({ rejection }) => rejection ?? "unknown")),
     topArticles: matchedItems.slice(0, 6).map(({ item, titleMatchedArtist, textMatchedArtist }) => ({
       title: item.title,
       domain: item.domain,
@@ -408,7 +498,15 @@ function buildArtistEvents({
     observations: [
       createObservation(artist.id, runDate, ARTICLE_COUNT, matchedItems.length, "articles", rawPayload),
       createObservation(artist.id, runDate, SOURCE_COUNT, sourceCount, "domains", rawPayload),
-      createObservation(artist.id, runDate, CLASSIFIED_EVENT_COUNT, events.length, "events", rawPayload)
+      createObservation(artist.id, runDate, CLASSIFIED_EVENT_COUNT, events.length, "events", rawPayload),
+      createObservation(
+        artist.id,
+        runDate,
+        DATE_VERIFICATION_REJECTED_COUNT,
+        rejectedDateCandidates.length,
+        "articles",
+        rawPayload
+      )
     ]
   };
 }
@@ -785,7 +883,7 @@ function dedupeItems(items: MediaFeedItem[]) {
   const deduped: MediaFeedItem[] = [];
 
   for (const item of items) {
-    const key = `${item.url || item.title}:${item.publishedDate ?? ""}`.toLowerCase();
+    const key = item.url ? normalizeStoryUrl(item.url) : `${item.title}:${item.publishedDate ?? ""}`.toLowerCase();
 
     if (seen.has(key)) {
       continue;
@@ -796,6 +894,30 @@ function dedupeItems(items: MediaFeedItem[]) {
   }
 
   return deduped;
+}
+
+function normalizeStoryUrl(value: string) {
+  try {
+    const url = new URL(value);
+    url.hash = "";
+
+    for (const key of [...url.searchParams.keys()]) {
+      if (/^(?:utm_|mc_|bil$|debugld$)/i.test(key)) {
+        url.searchParams.delete(key);
+      }
+    }
+
+    return url.toString().toLowerCase();
+  } catch {
+    return value.trim().toLowerCase();
+  }
+}
+
+function countValues(values: string[]) {
+  return values.reduce<Record<string, number>>((counts, value) => {
+    counts[value] = (counts[value] ?? 0) + 1;
+    return counts;
+  }, {});
 }
 
 function createObservation(

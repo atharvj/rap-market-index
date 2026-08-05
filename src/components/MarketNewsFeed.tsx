@@ -22,6 +22,7 @@ export type MarketNewsItem = {
     ticker: string;
   }>;
   eventDate: string;
+  publishedDate?: string;
   eventType: string;
   eventLabel?: string | null;
   title: string;
@@ -253,7 +254,7 @@ function HomeLeadStory({ item }: { item: MarketNewsItem }) {
             <div className="flex flex-wrap items-center gap-2 text-xs font-semibold text-paper/55">
               <NewsTickerLinks item={item} />
               <EventBadge item={item} positive={positive} />
-              <span>{formatDate(item.eventDate)}</span>
+              <span>{formatDate(getNewsDisplayDate(item))}</span>
               <SourceMeta item={item} />
             </div>
             <h1 className="mt-3 text-2xl font-bold leading-[1.08] text-paper sm:text-4xl">
@@ -298,7 +299,7 @@ function HomeStoryCard({ item }: { item: MarketNewsItem }) {
         <div className="flex flex-wrap items-center gap-2 text-[11px] font-semibold text-paper/50">
           <NewsTickerLinks item={item} />
           <EventBadge item={item} positive={positive} />
-          <span>{formatDate(item.eventDate)}</span>
+          <span>{formatDate(getNewsDisplayDate(item))}</span>
           <SourceMeta item={item} />
         </div>
         <h3 className="min-h-[3.2rem] text-sm font-semibold leading-snug text-paper">
@@ -325,7 +326,7 @@ function HomeBrief({ item }: { item: MarketNewsItem }) {
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2 text-[11px] font-semibold text-paper/50">
             <NewsTickerLinks item={item} />
-            <span>{formatDate(item.eventDate)}</span>
+            <span>{formatDate(getNewsDisplayDate(item))}</span>
             <EventBadge item={item} positive={positive} />
             <SourceMeta item={item} />
           </div>
@@ -353,7 +354,7 @@ function MarketNewsArticle({
   const meta = (
     <div className="flex flex-wrap items-center gap-2 text-xs font-bold text-paper/50">
       <NewsTickerLinks item={item} />
-      <span>{formatDate(item.eventDate)}</span>
+      <span>{formatDate(getNewsDisplayDate(item))}</span>
       <span
         className={clsx(
           "rounded-[var(--radius-control)] px-1.5 py-0.5",
@@ -432,6 +433,10 @@ function getNewsArtists(item: MarketNewsItem) {
   return item.relatedArtists?.length
     ? item.relatedArtists
     : [{ artistId: item.artistId, artistName: item.artistName, ticker: item.ticker }];
+}
+
+export function getNewsDisplayDate(item: Pick<MarketNewsItem, "eventDate" | "publishedDate">) {
+  return item.publishedDate ?? item.eventDate;
 }
 
 function formatNewsArtistNames(item: MarketNewsItem) {

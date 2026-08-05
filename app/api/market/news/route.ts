@@ -62,6 +62,7 @@ type MarketNewsItem = {
     ticker: string;
   }>;
   eventDate: string;
+  publishedDate: string;
   eventType: string;
   eventLabel: string | null;
   title: string;
@@ -342,6 +343,7 @@ function mapMarketEventToNewsItem(
       : null;
   const sourceName = sourceEvent.source_name ?? null;
   const sourceDomain = getSourceDomain(sourceUrl, sourceName);
+  const sourcePayload = toRawPayload(sourceEvent.raw_payload);
   const storyPayloads = [
     rawPayload,
     ...storyEvents
@@ -368,6 +370,7 @@ function mapMarketEventToNewsItem(
     ticker: artist?.ticker ?? event.artist_id,
     relatedArtists: getRelatedNewsArtists(event, storyEvents, artistById),
     eventDate: event.event_date,
+    publishedDate: getRawPublishedDate(sourcePayload) ?? sourceEvent.event_date,
     eventType: event.event_type,
     eventLabel: getPublicEventLabel(event, rawPayload, artist?.name ?? null),
     title: event.title,
@@ -397,6 +400,12 @@ function mapMarketEventToNewsItem(
     statusSeverity: typeof rawPayload.statusSeverity === "string" ? rawPayload.statusSeverity : null,
     createdAt: event.created_at
   };
+}
+
+function getRawPublishedDate(rawPayload: Record<string, unknown>) {
+  const value = getRawString(rawPayload.publishedDate);
+
+  return value && normalizeDate(value) === value ? value : null;
 }
 
 function getRelatedNewsArtists(
