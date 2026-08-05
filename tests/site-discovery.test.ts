@@ -59,6 +59,7 @@ describe("site discovery metadata", () => {
   });
 
   it("publishes unique canonical public pages without private account routes", () => {
+    process.env.NEXT_PUBLIC_SITE_URL = "https://rap-market-index.vercel.app";
     const entries = sitemap();
     const urls = entries.map((entry) => entry.url);
 
