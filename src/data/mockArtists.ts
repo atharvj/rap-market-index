@@ -91,6 +91,10 @@ const roster: RosterSeed[] = [
   { id: "hurricane-wisdom", name: "Hurricane Wisdom", ticker: "WISDOM", price: 29.71, previousClose: 29.71, volatility: 1.6, category: "rising", historyBias: 5 }
 ];
 
+export function getInitialArtistIdentities() {
+  return roster.map(({ id, name, ticker }) => ({ id, name, ticker }));
+}
+
 export function createInitialArtists(): Artist[] {
   return roster.map((seed, index) => {
     const stats = buildStats(index, seed.volatility);

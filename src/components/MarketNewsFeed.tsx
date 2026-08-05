@@ -257,9 +257,9 @@ function HomeLeadStory({ item }: { item: MarketNewsItem }) {
               <span>{formatDate(getNewsDisplayDate(item))}</span>
               <SourceMeta item={item} />
             </div>
-            <h1 className="mt-3 text-2xl font-bold leading-[1.08] text-paper sm:text-4xl">
+            <h2 className="mt-3 text-2xl font-bold leading-[1.08] text-paper sm:text-4xl">
               {trimTitle(item.title, 132)}
-            </h1>
+            </h2>
             <p className="mt-3 text-sm leading-6 text-paper/58">
               {source} catalyst ranked by impact, confidence, and recency for {formatNewsArtistNames(item)}.
             </p>

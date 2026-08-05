@@ -3,20 +3,26 @@ import "./globals.css";
 import { AuthProvider } from "@/components/AuthProvider";
 import { GameProvider } from "@/components/GameProvider";
 import { Shell } from "@/components/Shell";
+import {
+  getSiteUrl,
+  isPublicIndexingEnabled,
+  SITE_DESCRIPTION,
+  SITE_NAME
+} from "@/lib/site-metadata";
 
-const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://rap-market-index.vercel.app";
-const publicIndexingEnabled = process.env.NEXT_PUBLIC_RMI_PUBLIC_INDEXING === "true";
+const siteUrl = getSiteUrl();
+const publicIndexingEnabled = isPublicIndexingEnabled();
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
-  applicationName: "Rap Market Index",
+  applicationName: SITE_NAME,
   manifest: "/manifest.webmanifest",
   category: "entertainment",
-  creator: "Rap Market Index",
-  publisher: "Rap Market Index",
-  authors: [{ name: "Rap Market Index", url: siteUrl }],
+  creator: SITE_NAME,
+  publisher: SITE_NAME,
+  authors: [{ name: SITE_NAME, url: siteUrl }],
   title: {
-    default: "Rap Market Index",
+    default: SITE_NAME,
     template: "%s | Rap Market Index"
   },
   alternates: {
@@ -27,17 +33,17 @@ export const metadata: Metadata = {
     email: false,
     telephone: false
   },
-  description: "Virtual rap exchange with artist prices, market news, portfolios, and fantasy cash.",
+  description: SITE_DESCRIPTION,
   icons: {
     icon: [{ url: "/logo.svg", type: "image/svg+xml" }],
     shortcut: "/logo.svg",
     apple: "/logo.svg"
   },
   openGraph: {
-    title: "Rap Market Index",
-    description: "Virtual rap exchange with artist prices, market news, portfolios, and fantasy cash.",
+    title: SITE_NAME,
+    description: SITE_DESCRIPTION,
     url: siteUrl,
-    siteName: "Rap Market Index",
+    siteName: SITE_NAME,
     images: [
       {
         url: "/opengraph-image",
@@ -50,8 +56,8 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "Rap Market Index",
-    description: "Virtual rap exchange with artist prices, market news, portfolios, and fantasy cash.",
+    title: SITE_NAME,
+    description: SITE_DESCRIPTION,
     images: ["/opengraph-image"]
   },
   robots: {
@@ -83,6 +89,16 @@ const themeScript = `
 })();
 `;
 
+const websiteStructuredData = JSON.stringify({
+  "@context": "https://schema.org",
+  "@type": "WebSite",
+  name: SITE_NAME,
+  alternateName: "RMI",
+  url: siteUrl,
+  description: SITE_DESCRIPTION,
+  inLanguage: "en-US"
+}).replace(/</g, "\\u003c");
+
 export default function RootLayout({
   children
 }: Readonly<{
@@ -94,6 +110,10 @@ export default function RootLayout({
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
       </head>
       <body>
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: websiteStructuredData }}
+        />
         <AuthProvider>
           <GameProvider>
             <Shell>{children}</Shell>

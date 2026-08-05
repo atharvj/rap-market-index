@@ -301,22 +301,24 @@ export function Shell({ children }: { children: React.ReactNode }) {
             {marketError}
           </div>
         ) : null}
-        {marketReady ? <>{children}</> : <MarketBootPlaceholder />}
+        {marketReady ? <>{children}</> : <MarketBootPlaceholder pathname={pathname} />}
       </main>
       <SiteFooter />
     </div>
   );
 }
 
-function MarketBootPlaceholder() {
+function MarketBootPlaceholder({ pathname }: { pathname: string }) {
+  const copy = getMarketBootCopy(pathname);
+
   return (
     <div className="space-y-6" role="status" aria-busy="true" aria-label="Loading current market data">
       <span className="sr-only">Loading current market data</span>
       <div className="rmi-hero grid min-h-[230px] overflow-hidden lg:grid-cols-[minmax(0,1.45fr)_minmax(290px,0.55fr)]">
         <div className="grid content-center gap-4 px-5 py-8 sm:px-8">
-          <div className="rmi-skeleton h-3 w-32 rounded" />
-          <div className="rmi-skeleton h-10 w-full max-w-lg rounded" />
-          <div className="rmi-skeleton h-4 w-full max-w-md rounded" />
+          <p className="rmi-kicker">Rap Market Index</p>
+          <h1 className="max-w-2xl text-3xl font-bold leading-tight sm:text-4xl">{copy.title}</h1>
+          <p className="max-w-xl text-sm leading-6 text-paper/55">{copy.description}</p>
           <div className="rmi-skeleton h-11 w-full max-w-xl rounded-md" />
         </div>
         <div className="grid divide-y divide-line border-t border-line bg-panelSoft/45 lg:border-l lg:border-t-0">
@@ -341,6 +343,67 @@ function MarketBootPlaceholder() {
       </div>
     </div>
   );
+}
+
+function getMarketBootCopy(pathname: string) {
+  const routeCopy: Record<string, { title: string; description: string }> = {
+    "/": {
+      title: "Fantasy markets for rapper momentum",
+      description: "Loading current artist quotes, verified catalysts, and market signals."
+    },
+    "/markets": {
+      title: "Artist Markets",
+      description: "Loading current fantasy quotes and daily market moves."
+    },
+    "/scout": {
+      title: "Scout Emerging Artists",
+      description: "Loading rising and underground artist signals."
+    },
+    "/news": {
+      title: "Market News",
+      description: "Loading the latest verified music catalysts."
+    },
+    "/watchlist": {
+      title: "Watchlist",
+      description: "Loading the artist markets you follow."
+    },
+    "/portfolio": {
+      title: "Portfolio",
+      description: "Loading your holdings and fantasy market performance."
+    },
+    "/leaderboard": {
+      title: "Leaderboard",
+      description: "Loading the latest public portfolio rankings."
+    },
+    "/rankings": {
+      title: "Leaderboard",
+      description: "Loading the latest public portfolio rankings."
+    },
+    "/leagues": {
+      title: "Leagues",
+      description: "Loading your fantasy market competitions."
+    },
+    "/help": {
+      title: "Help Center",
+      description: "Loading clear answers about accounts, quotes, and trading."
+    },
+    "/about": {
+      title: "About Rap Market Index",
+      description: "Loading how the fantasy artist market works."
+    }
+  };
+
+  if (pathname.startsWith("/artists/")) {
+    return {
+      title: "Artist Quote",
+      description: "Loading the current quote, signals, news, and price history."
+    };
+  }
+
+  return routeCopy[pathname] ?? {
+    title: "Rap Market Index",
+    description: "Loading the latest fantasy market data."
+  };
 }
 
 function MarketTape({ artists }: { artists: Artist[] }) {
