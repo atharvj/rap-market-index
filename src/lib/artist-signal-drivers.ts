@@ -1,5 +1,5 @@
 import type { HypeStats } from "@/lib/types";
-import { PRICE_SIGNAL_WEIGHTS } from "@/lib/pricing";
+import { SCORE_SIGNAL_MULTIPLIER, SCORE_SIGNAL_WEIGHTS } from "@/lib/pricing";
 
 export type ArtistSignalDriver = {
   key: string;
@@ -12,32 +12,32 @@ export function getArtistSignalDrivers(stats: HypeStats) {
     {
       key: "streaming",
       label: "Listening",
-      contribution: stats.streamingGrowth * PRICE_SIGNAL_WEIGHTS.listening
+      contribution: stats.streamingGrowth * SCORE_SIGNAL_WEIGHTS.listening * SCORE_SIGNAL_MULTIPLIER
     },
     {
       key: "youtube",
       label: "Video",
-      contribution: stats.youtubeGrowth * PRICE_SIGNAL_WEIGHTS.video
+      contribution: stats.youtubeGrowth * SCORE_SIGNAL_WEIGHTS.video * SCORE_SIGNAL_MULTIPLIER
     },
     {
       key: "search",
-      label: "Search",
-      contribution: stats.searchGrowth * PRICE_SIGNAL_WEIGHTS.search
+      label: "Discovery",
+      contribution: stats.searchGrowth * SCORE_SIGNAL_WEIGHTS.search * SCORE_SIGNAL_MULTIPLIER
     },
     {
       key: "social",
       label: "Fan response",
-      contribution: stats.socialGrowth * PRICE_SIGNAL_WEIGHTS.fanResponse
+      contribution: stats.socialGrowth * SCORE_SIGNAL_WEIGHTS.fanResponse * SCORE_SIGNAL_MULTIPLIER
     },
     {
       key: "news",
       label: "Media",
-      contribution: (stats.newsScore - 50) * PRICE_SIGNAL_WEIGHTS.media
+      contribution: (stats.newsScore - 50) * SCORE_SIGNAL_WEIGHTS.media * SCORE_SIGNAL_MULTIPLIER
     },
     {
       key: "trading",
       label: "Trading",
-      contribution: stats.traderDemand * PRICE_SIGNAL_WEIGHTS.trading
+      contribution: stats.traderDemand * SCORE_SIGNAL_WEIGHTS.trading * SCORE_SIGNAL_MULTIPLIER
     }
   ];
 

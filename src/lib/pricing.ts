@@ -1,7 +1,5 @@
 import type { HypeStats } from "@/lib/types";
 
-// The displayed Signal Breakdown and the quote calculation share these exact
-// coefficients so the UI cannot describe a different model than the one used.
 export const PRICE_SIGNAL_WEIGHTS = Object.freeze({
   listening: 0.35,
   video: 0.25,
@@ -15,6 +13,8 @@ export const SCORE_SIGNAL_WEIGHTS = Object.freeze({
   ...PRICE_SIGNAL_WEIGHTS,
   media: 0.15
 });
+
+export const SCORE_SIGNAL_MULTIPLIER = 1.4;
 
 export function clamp(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value));
@@ -37,7 +37,7 @@ export function calculateHypeScore(stats: HypeStats) {
     (stats.newsScore - 50) * SCORE_SIGNAL_WEIGHTS.media +
     stats.traderDemand * SCORE_SIGNAL_WEIGHTS.trading;
 
-  return Math.round(clamp(50 + momentum * 1.4, 1, 100));
+  return Math.round(clamp(50 + momentum * SCORE_SIGNAL_MULTIPLIER, 1, 100));
 }
 
 export function calculateSignalDelta(stats: HypeStats) {

@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { createInitialGameState } from "@/lib/market";
 import { sanitizeMoveExplanation } from "@/lib/artist-explanations";
+import { loadAllPages } from "@/lib/pagination";
+import { ONE_MONTH_HISTORY_DAYS } from "@/lib/price-series";
 import { createServiceRoleClient, getSupabaseConfigStatus } from "@/lib/supabase/server";
 import type { Database } from "@/lib/supabase/database.types";
 import type { Artist, GameState, HypeStats, PricePoint } from "@/lib/types";
@@ -18,7 +20,6 @@ type PriceHistoryPoint = Pick<
   "artist_id" | "price_date" | "price"
 >;
 
-const PRICE_HISTORY_LOOKBACK_DAYS = 28;
 const CACHE_HEADERS = { "Cache-Control": "public, max-age=30, s-maxage=60, stale-while-revalidate=300" };
 
 export async function GET() {
@@ -125,18 +126,24 @@ async function loadHistoryByArtist(
     return {};
   }
 
-  const { data, error } = await supabase
-    .from("price_history")
-    .select("artist_id, price_date, price")
-    .in("artist_id", artistIds)
-    .gte("price_date", shiftMarketDate(getMarketDate(), -PRICE_HISTORY_LOOKBACK_DAYS))
-    .order("price_date", { ascending: true });
+  const rows = await loadAllPages<PriceHistoryPoint>(async (from, to) => {
+    const { data, error } = await supabase
+      .from("price_history")
+      .select("artist_id, price_date, price")
+      .in("artist_id", artistIds)
+      .gte("price_date", shiftMarketDate(getMarketDate(), -ONE_MONTH_HISTORY_DAYS))
+      .order("price_date", { ascending: true })
+      .order("artist_id", { ascending: true })
+      .range(from, to);
 
-  if (error) {
-    throw new Error(`Could not load price history: ${error.message}`);
-  }
+    if (error) {
+      throw new Error(`Could not load price history: ${error.message}`);
+    }
 
-  return ((data ?? []) as PriceHistoryPoint[]).reduce<Record<string, PricePoint[]>>((grouped, point) => {
+    return (data ?? []) as PriceHistoryPoint[];
+  });
+
+  return rows.reduce<Record<string, PricePoint[]>>((grouped, point) => {
     grouped[point.artist_id] ??= [];
     grouped[point.artist_id].push({
       date: point.price_date,
@@ -169,7 +176,7 @@ function mapArtist(row: ArtistRow, stats: ArtistStatsRow | null, history: PriceP
     category: row.category,
     accent: row.accent,
     stats: mappedStats,
-    priceHistory: history.length ? history.slice(-PRICE_HISTORY_LOOKBACK_DAYS) : fallbackHistory,
+    priceHistory: history.length ? history : fallbackHistory,
     lastMoveExplanation: sanitizeMoveExplanation(
       row.ticker,
       row.last_move_explanation,

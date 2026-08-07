@@ -80,10 +80,10 @@ export default function HomePage() {
                 </div>
                 <MiniSparkline
                   data={artist.priceHistory}
-                  positive={getSeriesChangePercent(artist.priceHistory.slice(-18)) >= 0}
+                  positive={getSeriesChangePercent(artist.priceHistory) >= 0}
                   width={118}
                   height={38}
-                  label={`Price trend over ${Math.min(18, artist.priceHistory.length)} recorded sessions`}
+                  label={`One-month price trend over ${artist.priceHistory.length} recorded sessions`}
                 />
               </div>
               <div className="mt-3 flex items-center justify-between border-t border-line/60 pt-2">

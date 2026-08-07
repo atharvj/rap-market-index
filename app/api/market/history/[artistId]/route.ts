@@ -4,7 +4,8 @@ import {
   buildDailyPriceSeries,
   buildIntradayPriceSeries,
   hasPriceMovement,
-  keepLatestMarketRunPerDate
+  keepLatestMarketRunPerDate,
+  ONE_MONTH_HISTORY_DAYS
 } from "@/lib/price-series";
 import { createServiceRoleClient, getSupabaseConfigStatus } from "@/lib/supabase/server";
 import type { Database } from "@/lib/supabase/database.types";
@@ -26,7 +27,7 @@ type PriceTickRow = Pick<
 const RANGE_DAYS: Record<Exclude<HistoryRange, "ALL">, number> = {
   "1D": 1,
   "7D": 7,
-  "1M": 31,
+  "1M": ONE_MONTH_HISTORY_DAYS,
   "3M": 93,
   "6M": 186,
   "1Y": 365

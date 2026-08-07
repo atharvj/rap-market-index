@@ -84,7 +84,7 @@ function MarketList({
       </div>
       <div className="divide-y divide-line/75">
         {artists.map((artist) => {
-          const recentHistory = artist.priceHistory.slice(-18);
+          const recentHistory = artist.priceHistory;
 
           return (
             <Link
@@ -104,7 +104,7 @@ function MarketList({
                 positive={getSeriesChangePercent(recentHistory) >= 0}
                 width={64}
                 height={24}
-                label={`Price trend over ${Math.min(18, recentHistory.length)} recorded sessions`}
+                label={`One-month price trend over ${recentHistory.length} recorded sessions`}
               />
               <span className="text-right number-tabular">
                 <span className="block text-xs font-semibold">{formatCurrency(artist.currentPrice)}</span>

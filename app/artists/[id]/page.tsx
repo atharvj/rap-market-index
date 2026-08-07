@@ -194,7 +194,7 @@ function SignalBreakdown({
 
   return (
     <div className="p-4">
-      <p className="mb-3 text-xs text-paper/45">Impact on today&apos;s signal score.</p>
+      <p className="mb-3 text-xs text-paper/45">Largest contributions to the current RMI Signal.</p>
       <div className="grid gap-2 sm:grid-cols-2">
         {visibleDrivers.map((driver) => {
           const positive = driver.contribution > 0;

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { getArtistSignalDrivers } from "@/lib/artist-signal-drivers";
+import { calculateHypeScore } from "@/lib/pricing";
 
 describe("artist signal drivers", () => {
   it("ranks the largest weighted model inputs first", () => {
@@ -12,9 +13,25 @@ describe("artist signal drivers", () => {
       traderDemand: 2
     });
 
-    expect(drivers[0]).toMatchObject({ key: "youtube", contribution: -5 });
-    expect(drivers[1]).toMatchObject({ key: "streaming", contribution: 3.5 });
-    expect(drivers.find((driver) => driver.key === "news")?.contribution).toBe(0.75);
+    expect(drivers[0]).toMatchObject({ key: "youtube", contribution: -7 });
+    expect(drivers[1]).toMatchObject({ key: "streaming", contribution: 4.9 });
+    expect(drivers.find((driver) => driver.key === "news")?.contribution).toBe(2.1);
+  });
+
+  it("adds up to the unrounded score movement from neutral", () => {
+    const stats = {
+      streamingGrowth: 10,
+      youtubeGrowth: -4,
+      searchGrowth: 8,
+      socialGrowth: 4,
+      newsScore: 60,
+      traderDemand: 2
+    };
+    const contribution = getArtistSignalDrivers(stats)
+      .reduce((total, driver) => total + driver.contribution, 0);
+
+    expect(contribution).toBeCloseTo(7.14, 2);
+    expect(Math.round(50 + contribution)).toBe(calculateHypeScore(stats));
   });
 
   it("keeps neutral signals at zero", () => {

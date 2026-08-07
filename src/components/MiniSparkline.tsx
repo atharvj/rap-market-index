@@ -13,7 +13,7 @@ export function MiniSparkline({
   height?: number;
   label?: string;
 }) {
-  const points = data.slice(-18);
+  const points = data;
 
   if (points.length < 2) {
     return (
