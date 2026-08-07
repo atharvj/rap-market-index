@@ -1095,14 +1095,21 @@ export async function persistMarketUpdates({
   runDate,
   source,
   updates,
-  summary
+  summary,
+  recordRun = true
 }: {
   supabase: Supabase;
   runDate: string;
   source: string;
   updates: ArtistMarketUpdate[];
   summary: MarketUpdateSummary;
+  recordRun?: boolean;
 }) {
+  if (!recordRun) {
+    await persistUpdateBatch(supabase, runDate, updates);
+    return;
+  }
+
   const started = await supabase
     .from("market_update_runs")
     .upsert(

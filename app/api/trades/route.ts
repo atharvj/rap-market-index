@@ -1,7 +1,11 @@
 import { NextResponse } from "next/server";
 import { createAnonServerClient, createServiceRoleClient, getSupabaseConfigStatus } from "@/lib/supabase/server";
 import { enforceRateLimit } from "@/server/rate-limit";
-import { isPendingCatalyst } from "@/server/market/pending-catalyst";
+import {
+  isPendingCatalyst,
+  PENDING_CATALYST_MIN_CONFIDENCE,
+  PENDING_CATALYST_MIN_IMPACT
+} from "@/server/market/pending-catalyst";
 import { loadReleaseWindowStatus } from "@/server/market/release-window";
 import { reportServerError } from "@/server/observability";
 import { requireConfirmedUser } from "@/server/user-auth";
@@ -28,9 +32,6 @@ type PendingCatalyst = {
 };
 
 const MARKET_IMPACT_MIN_ACCOUNT_AGE_HOURS = 24;
-const PENDING_CATALYST_MIN_IMPACT = 35;
-const PENDING_CATALYST_MIN_CONFIDENCE = 0.65;
-
 export async function POST(request: Request) {
   const auth = await requireConfirmedUser(request);
 

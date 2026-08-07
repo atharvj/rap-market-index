@@ -13,7 +13,6 @@ import {
   isLowValueMarketArticleTitle,
   isUncorroboratedLowTierMarketClaim
 } from "@/server/market/artist-event-disambiguation";
-import { buildDefaultGdeltQuery } from "@/server/market/artist-text-identifiers";
 import {
   classifyArticleEvent,
   getSourceTier,
@@ -81,7 +80,7 @@ const REQUEST_ERROR = "request_error";
 const DATE_VERIFICATION_REJECTED_COUNT = "date_verification_rejected_count";
 const DEFAULT_LOOKBACK_DAYS = 30;
 const DEFAULT_MAX_ITEMS_PER_FEED = 40;
-const DEFAULT_MAX_EVENTS_PER_ARTIST = 4;
+const DEFAULT_MAX_EVENTS_PER_ARTIST = 6;
 const DEFAULT_DELAY_MS = 250;
 const DEFAULT_TIMEOUT_MS = 12000;
 const GOOGLE_NEWS_BASE_URL = "https://news.google.com/rss/search";
@@ -139,67 +138,74 @@ export async function collectMediaRssMarketEvents({
 
   const artistSearchResults = await Promise.all(
     artists.map(async (artist, index) => {
-      const query = buildArtistNewsQuery(artist, externalIds[artist.id]);
+      const queries = buildArtistNewsQueries(artist, externalIds[artist.id]);
 
       if (!includeGoogleNews) {
-        return { artist, query, result: null };
+        return { artist, queries, results: [] as FeedFetchResult[] };
       }
 
       if (index > 0 && delayMs > 0) {
         await sleep(index * delayMs);
       }
 
-      const feedUrl = buildGoogleNewsFeedUrl(query, lookbackDays);
-      const result = await fetchFeed({
-        feedUrl,
-        runDate,
-        feedScope: "artist_search",
-        searchArtistId: artist.id,
-        searchQuery: query,
-        maxItemsPerFeed,
-        timeoutMs,
-        fetchImpl
-      });
+      const results = await Promise.all(
+        queries.map((query) => fetchFeed({
+          feedUrl: buildGoogleNewsFeedUrl(query, lookbackDays),
+          runDate,
+          feedScope: "artist_search",
+          searchArtistId: artist.id,
+          searchQuery: query,
+          maxItemsPerFeed,
+          timeoutMs,
+          fetchImpl
+        }))
+      );
 
-      return { artist, query, result };
+      return { artist, queries, results };
     })
   );
   const allArtistSearchItems = dedupeItems(
-    artistSearchResults.flatMap(({ result }) => result?.ok ? result.items : [])
+    artistSearchResults.flatMap(({ results }) =>
+      results.flatMap((result) => result.ok ? result.items : [])
+    )
   );
   const articleVerifier = createArticleMetadataVerifier({ fetchImpl, timeoutMs, concurrency: 8 });
-  scannedFeedCount += artistSearchResults.filter(({ result }) => Boolean(result)).length;
+  scannedFeedCount += artistSearchResults.reduce((total, { results }) => total + results.length, 0);
   const artistBuilds = await Promise.all(
-    artistSearchResults.map(async ({ artist, query, result }) => {
+    artistSearchResults.map(async ({ artist, queries, results }) => {
       const localObservations: MarketObservation[] = [];
       const localWarnings: string[] = [];
       let artistSearchItems: MediaFeedItem[] = [];
 
-      if (result) {
+      for (const result of results) {
         if (result.ok) {
-          artistSearchItems = result.items;
+          artistSearchItems.push(...result.items);
         } else {
           localWarnings.push(`${artist.ticker}: media search feed failed: ${result.error}`);
           localObservations.push(
             createObservation(artist.id, runDate, REQUEST_ERROR, 1, "flag", {
               source: SOURCE,
               feedUrl: result.feedUrl,
-              query,
+              queries,
               error: result.error
             })
           );
         }
       }
 
+      artistSearchItems = dedupeItems(artistSearchItems);
+
       const artistEvents = await buildArtistEvents({
         artist,
         runDate,
-        query,
+        query: queries.join(" OR "),
         items: dedupeItems([
           ...globalItems,
           ...artistSearchItems,
           ...allArtistSearchItems.filter(
-            (item) => item.searchArtistId !== artist.id && mentionsArtist(item.title, artist.name, query)
+            (item) =>
+              item.searchArtistId !== artist.id &&
+              mentionsArtist(item.title, artist.name, queries.join(" OR "))
           )
         ]),
         lookbackDays,
@@ -266,14 +272,15 @@ async function buildArtistEvents({
       item,
       titleMatchedArtist: mentionsArtist(item.title, artist.name, query),
       textMatchedArtist: mentionsArtist(`${item.title} ${item.summary}`, artist.name, query),
-      disambiguatedArtist: hasRequiredArtistDisambiguation({ artist, item })
+      disambiguatedArtist: hasRequiredArtistDisambiguation({ artist, item }),
+      searchMatchedArtist: item.searchArtistId === artist.id && isGoogleNewsArticleUrl(item.url)
     }))
-    .filter(({ titleMatchedArtist, textMatchedArtist, disambiguatedArtist }) =>
-      (titleMatchedArtist || textMatchedArtist) && disambiguatedArtist
+    .filter(({ titleMatchedArtist, textMatchedArtist, disambiguatedArtist, searchMatchedArtist }) =>
+      (titleMatchedArtist || textMatchedArtist || searchMatchedArtist) && disambiguatedArtist
     );
 
-  const preliminaryCandidateEvents = matchedItems
-    .map(({ item, titleMatchedArtist, textMatchedArtist, disambiguatedArtist }) => {
+  const preliminaryCandidateEvents = selectDiverseEventCandidates(matchedItems
+    .map(({ item, titleMatchedArtist, textMatchedArtist, disambiguatedArtist, searchMatchedArtist }) => {
       const classificationText = `${item.title} ${item.summary}`.slice(0, 420);
       const initialClassification = classifyArticleEvent(classificationText, item.domain, undefined, {
         allowLowTierRelease: item.feedScope === "artist_search" && (titleMatchedArtist || textMatchedArtist)
@@ -334,6 +341,7 @@ async function buildArtistEvents({
           sourceTier,
           titleMatchedArtist,
           textMatchedArtist,
+          searchMatchedArtist,
           eventType: classification.eventType,
           classificationReason: classification.reason,
           impactScore: classification.impactScore
@@ -347,6 +355,7 @@ async function buildArtistEvents({
         titleMatchedArtist,
         textMatchedArtist,
         disambiguatedArtist,
+        searchMatchedArtist,
         subjectMatchedArtist,
         artistRole,
         sourceTier,
@@ -354,8 +363,7 @@ async function buildArtistEvents({
       };
     })
     .filter((value): value is NonNullable<typeof value> => Boolean(value))
-    .sort((first, second) => getEventRank(second) - getEventRank(first))
-    .slice(0, maxEventsPerArtist + 2);
+    .sort((first, second) => getEventRank(second) - getEventRank(first)), maxEventsPerArtist + 3);
 
   const verifiedCandidates = await Promise.all(
     preliminaryCandidateEvents.map(async (candidate) => {
@@ -381,8 +389,19 @@ async function buildArtistEvents({
         ...candidate.item,
         url: verification.metadata.canonicalUrl,
         domain: normalizeDomain(undefined, verification.metadata.canonicalUrl) ?? candidate.item.domain,
-        publishedDate: verification.metadata.publishedDate
+        publishedDate: verification.metadata.publishedDate,
+        summary: verification.metadata.summary ?? candidate.item.summary
       };
+
+      const verifiedTextMatchedArtist = mentionsArtist(
+        `${verifiedItem.title} ${verifiedItem.summary}`,
+        artist.name,
+        candidate.item.searchQuery
+      );
+
+      if (!candidate.titleMatchedArtist && !verifiedTextMatchedArtist) {
+        return { candidate: null, rejection: "publisher_artist_not_confirmed" };
+      }
 
       if (!isWithinLookback(verification.metadata.publishedDate, runDate, lookbackDays)) {
         return { candidate: null, rejection: "publisher_date_outside_lookback" };
@@ -392,6 +411,7 @@ async function buildArtistEvents({
         candidate: {
           ...candidate,
           item: verifiedItem,
+          textMatchedArtist: verifiedTextMatchedArtist,
           verifiedPublisherDate: verification.metadata.publishedDate,
           originalFeedDate: candidate.item.publishedDate,
           originalGoogleNewsUrl: candidate.item.url
@@ -402,7 +422,7 @@ async function buildArtistEvents({
   );
   const rejectedDateCandidates = verifiedCandidates.filter(({ rejection }) => Boolean(rejection));
   const seenCanonicalUrls = new Set<string>();
-  const candidateEvents = verifiedCandidates
+  const candidateEvents = selectDiverseEventCandidates(verifiedCandidates
     .map(({ candidate }) => candidate)
     .filter((candidate): candidate is NonNullable<typeof candidate> => Boolean(candidate))
     .filter(({ item }) => {
@@ -414,8 +434,7 @@ async function buildArtistEvents({
 
       seenCanonicalUrls.add(key);
       return true;
-    })
-    .slice(0, maxEventsPerArtist);
+    }), maxEventsPerArtist);
 
   const events = candidateEvents.map(({ item, titleMatchedArtist, textMatchedArtist, disambiguatedArtist, subjectMatchedArtist, artistRole, sourceTier, classification, verifiedPublisherDate, originalFeedDate, originalGoogleNewsUrl }) => {
     const classificationText = `${item.title} ${item.summary}`.slice(0, 600);
@@ -574,6 +593,7 @@ function isRelevantMediaEvent({
   sourceTier,
   titleMatchedArtist,
   textMatchedArtist,
+  searchMatchedArtist,
   eventType,
   classificationReason,
   impactScore
@@ -582,6 +602,7 @@ function isRelevantMediaEvent({
   sourceTier: number;
   titleMatchedArtist: boolean;
   textMatchedArtist: boolean;
+  searchMatchedArtist: boolean;
   eventType: MarketEvent["eventType"];
   classificationReason: string;
   impactScore: number;
@@ -617,6 +638,15 @@ function isRelevantMediaEvent({
     return true;
   }
 
+  if (
+    searchMatchedArtist &&
+    sourceTier >= 2 &&
+    eventType === "tour" &&
+    classificationReason === "tour_terms"
+  ) {
+    return true;
+  }
+
   return false;
 }
 
@@ -645,6 +675,36 @@ function getEventRank(value: {
     value.sourceTier * 12 +
     freshness
   );
+}
+
+function selectDiverseEventCandidates<
+  T extends { classification: { eventType: MarketEvent["eventType"] } }
+>(candidates: T[], limit: number) {
+  const selected: T[] = [];
+  const seenTypes = new Set<MarketEvent["eventType"]>();
+
+  for (const candidate of candidates) {
+    if (selected.length >= limit) {
+      break;
+    }
+
+    if (!seenTypes.has(candidate.classification.eventType)) {
+      selected.push(candidate);
+      seenTypes.add(candidate.classification.eventType);
+    }
+  }
+
+  for (const candidate of candidates) {
+    if (selected.length >= limit) {
+      break;
+    }
+
+    if (!selected.includes(candidate)) {
+      selected.push(candidate);
+    }
+  }
+
+  return selected;
 }
 
 async function fetchFeeds({
@@ -822,33 +882,40 @@ function parseFeedItem({
   };
 }
 
-function buildArtistNewsQuery(artist: MarketUpdateArtist, externalIds?: ArtistExternalIds) {
-  const baseQuery = externalIds?.gdeltQuery?.trim() || buildDefaultGdeltQuery(artist.name);
+export function buildArtistNewsQueries(artist: MarketUpdateArtist, externalIds?: ArtistExternalIds) {
   const primaryName = quoteSearchPhrase(externalIds?.lastfmName || artist.name);
-  const catalystTerms = [
+  const releaseTerms = [
     "album",
     "mixtape",
     "EP",
     "single",
+    "song",
     "feature",
     "tracklist",
+    "release",
     "review",
+    "chart",
+    "streams"
+  ].join(" OR ");
+  const liveAndNewsTerms = [
+    "tour",
+    "concert",
+    "tickets",
+    "festival",
+    "interview",
+    "performance",
     "controversy",
     "fight",
     "arrest",
     "viral",
     "snippet",
-    "performance",
-    "surprise guest",
-    "headline",
-    "festival",
-    "sold out",
-    "chart",
-    "streams",
-    "tour"
+    "sold out"
   ].join(" OR ");
 
-  return `(${baseQuery} OR ${primaryName}) (${catalystTerms})`;
+  return [
+    `${primaryName} (${releaseTerms})`,
+    `${primaryName} (${liveAndNewsTerms})`
+  ];
 }
 
 function buildGoogleNewsFeedUrl(query: string, lookbackDays: number) {
@@ -1275,7 +1342,9 @@ function getDateTime(value: string | null | undefined) {
 }
 
 function quoteSearchPhrase(value: string) {
-  return value.replace(/"/g, "").replace(/\s+/g, " ").trim();
+  const normalized = value.replace(/"/g, "").replace(/\s+/g, " ").trim();
+
+  return `"${normalized}"`;
 }
 
 function escapeRegExp(value: string) {

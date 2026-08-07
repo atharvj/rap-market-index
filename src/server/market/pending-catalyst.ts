@@ -1,5 +1,8 @@
 import { getMarketDate, getMarketDayBoundsUtc } from "@/server/market/market-date";
 
+export const PENDING_CATALYST_MIN_IMPACT = 28;
+export const PENDING_CATALYST_MIN_CONFIDENCE = 0.65;
+
 export type PendingCatalystCandidate = {
   createdAt: string;
   eventDate: string;

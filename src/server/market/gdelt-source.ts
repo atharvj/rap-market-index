@@ -732,7 +732,7 @@ export function classifyArticleEvent(
     }
   }
 
-  if (hasAny(lowerTitle, TOUR_TERMS)) {
+  if (hasTourAnnouncementSignal(lowerTitle)) {
     return {
       eventType: "tour" as const,
       sentimentScore: clamp(25 + Math.max(0, toneScore), -20, 70),
@@ -1424,6 +1424,14 @@ const TOUR_TERMS = [
   "tour dates",
   "world tour"
 ];
+
+function hasTourAnnouncementSignal(value: string) {
+  if (hasAny(value, TOUR_TERMS)) {
+    return true;
+  }
+
+  return /\b(?:announc(?:e|es|ed|ing)|launch(?:es|ed|ing)?|plot(?:s|ted|ting)?|reveal(?:s|ed|ing)?|schedul(?:e|es|ed|ing)|unveil(?:s|ed|ing)?)\b(?:\s+[a-z0-9&'*.-]+){0,6}\s+tour\b/i.test(value);
+}
 const AWARD_TERMS = [
   "award",
   "bet awards",

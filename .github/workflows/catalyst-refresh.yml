@@ -1,0 +1,34 @@
+name: Refresh verified catalysts
+
+on:
+  schedule:
+    - cron: "*/30 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: market-news-refresh
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Discover catalysts and refresh affected quotes
+        env:
+          MARKET_UPDATE_SECRET: ${{ secrets.MARKET_UPDATE_SECRET }}
+        run: |
+          if [ -z "$MARKET_UPDATE_SECRET" ]; then
+            echo "Add MARKET_UPDATE_SECRET in GitHub repository Settings > Secrets and variables > Actions."
+            exit 1
+          fi
+
+          curl --fail-with-body --silent --show-error --max-time 420 \
+            --retry 2 \
+            --retry-delay 10 \
+            --retry-all-errors \
+            --header "x-market-update-secret: $MARKET_UPDATE_SECRET" \
+            https://rap-market-index.vercel.app/api/cron/catalyst-refresh

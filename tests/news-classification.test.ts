@@ -3,6 +3,16 @@ import { isLowValueMarketArticleTitle } from "@/server/market/artist-event-disam
 import { classifyArticleEvent } from "@/server/market/gdelt-source";
 
 describe("market news classification", () => {
+  it("classifies branded tour announcements with words between the action and tour", () => {
+    const result = classifyArticleEvent(
+      "Young Thug Announces YSL Tour",
+      "pitchfork.com"
+    );
+
+    expect(result?.eventType).toBe("tour");
+    expect(result?.impactScore).toBeGreaterThan(0);
+  });
+
   it("does not classify an unrelated bet win as an award", () => {
     const result = classifyArticleEvent(
       "Drake Pulls Up To FIFA World Cup Final To See If He Won His Massive Bet",

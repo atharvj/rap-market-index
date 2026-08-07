@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import type { MarketUpdateArtist } from "@/server/market/daily-update";
-import { collectMediaRssMarketEvents } from "@/server/market/media-rss-source";
+import {
+  buildArtistNewsQueries,
+  collectMediaRssMarketEvents
+} from "@/server/market/media-rss-source";
 
 const artist: MarketUpdateArtist = {
   id: "baby-keem",
@@ -25,6 +28,16 @@ const googleUrl = "https://news.google.com/rss/articles/CBMiTestArticle?oc=5";
 const canonicalUrl = "https://www.billboard.com/music/rb-hip-hop/baby-keem-casino-123/";
 
 describe("media RSS publisher-date verification", () => {
+  it("uses separate focused searches so major live announcements are not buried by general coverage", () => {
+    const queries = buildArtistNewsQueries({ ...artist, name: "Young Thug" });
+
+    expect(queries).toHaveLength(2);
+    expect(queries[0]).toContain('"Young Thug"');
+    expect(queries[0]).toContain("album");
+    expect(queries[1]).toContain("tour");
+    expect(queries[1]).toContain("interview");
+  });
+
   it("rejects a resurfaced old article even when Google News gives it a recent RSS date", async () => {
     const result = await collectMediaRssMarketEvents({
       artists: [artist],
@@ -63,6 +76,35 @@ describe("media RSS publisher-date verification", () => {
         publisherDateVerified: true
       }
     });
+  });
+
+  it("attributes a trusted tour story to a supporting artist only when the publisher names them", async () => {
+    const supportingArtist = { ...artist, id: "tezzus", name: "Tezzus", ticker: "TEZZUS" };
+    const accepted = await collectMediaRssMarketEvents({
+      artists: [supportingArtist],
+      runDate: "2026-08-03",
+      feedUrls: ["https://feeds.example.com/music.xml"],
+      lookbackDays: 30,
+      delayMs: 0,
+      timeoutMs: 1_000,
+      fetchImpl: createTourFetch("The New Generation Tour features Tezzus alongside Young Thug.")
+    });
+    const rejected = await collectMediaRssMarketEvents({
+      artists: [supportingArtist],
+      runDate: "2026-08-03",
+      feedUrls: ["https://feeds.example.com/music.xml"],
+      lookbackDays: 30,
+      delayMs: 0,
+      timeoutMs: 1_000,
+      fetchImpl: createTourFetch("The New Generation Tour features Young Thug.")
+    });
+
+    expect(accepted.eventsByArtist.tezzus?.[0]).toMatchObject({
+      artistId: "tezzus",
+      eventType: "tour",
+      eventDate: "2026-07-13"
+    });
+    expect(rejected.eventsByArtist.tezzus).toBeUndefined();
   });
 });
 
@@ -109,6 +151,55 @@ function createMediaFetch(publishedAt: string): typeof fetch {
     }
 
     throw new Error(`Unexpected media request: ${url}`);
+  };
+}
+
+function createTourFetch(summary: string): typeof fetch {
+  const tourCanonicalUrl = "https://pitchfork.com/story/young-thug-announces-ysl-tour/";
+
+  return async (input, init) => {
+    const url = String(input);
+
+    if (url === "https://feeds.example.com/music.xml") {
+      return xmlResponse("<rss><channel></channel></rss>");
+    }
+
+    if (url.startsWith("https://news.google.com/rss/search")) {
+      return xmlResponse(`
+        <rss><channel><item>
+          <title>Young Thug Announces YSL Tour</title>
+          <link>${googleUrl.replace(/&/g, "&amp;")}</link>
+          <pubDate>Mon, 13 Jul 2026 07:00:00 GMT</pubDate>
+          <description>Young Thug announces the New Generation Tour.</description>
+          <source url="https://pitchfork.com">Pitchfork</source>
+        </item></channel></rss>
+      `);
+    }
+
+    if (url.startsWith("https://news.google.com/articles/CBMiTestArticle")) {
+      return htmlResponse('<c-wiz><div data-n-a-ts="1785905819" data-n-a-sg="test-signature"></div></c-wiz>');
+    }
+
+    if (url === "https://news.google.com/_/DotsSplashUi/data/batchexecute" && init?.method === "POST") {
+      return new Response(
+        `)]}'\n\n${JSON.stringify([
+          ["wrb.fr", "Fbv4je", JSON.stringify(["garturlres", tourCanonicalUrl, 1]), null, null, null, "generic"]
+        ])}`,
+        { status: 200 }
+      );
+    }
+
+    if (url.startsWith(tourCanonicalUrl)) {
+      return htmlResponse(`
+        <html><head>
+          <link rel="canonical" href="${tourCanonicalUrl}"/>
+          <meta property="og:description" content="${summary}"/>
+          <script type="application/ld+json">{"datePublished":"2026-07-13T07:00:00Z"}</script>
+        </head></html>
+      `);
+    }
+
+    throw new Error(`Unexpected tour request: ${url}`);
   };
 }
 

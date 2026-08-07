@@ -82,6 +82,8 @@ type DailyUpdateBody = {
   manualEvents?: ManualMarketEvents;
   artistLimit?: number;
   artistOffset?: number;
+  artistIds?: string[];
+  intraday?: boolean;
 };
 
 type ArtistBatch = {
@@ -147,8 +149,16 @@ export async function POST(request: Request) {
       supabase,
       dryRun,
       artistLimit: body.artistLimit,
-      artistOffset: body.artistOffset
+      artistOffset: body.artistOffset,
+      artistIds: body.artistIds
     });
+
+    if (Array.isArray(body.artistIds) && !artists.length) {
+      return NextResponse.json(
+        { ok: false, error: "No active artists matched the requested catalyst refresh." },
+        { status: 400 }
+      );
+    }
 
     if (supabase && isRealExternalSource(source)) {
       artists = await applyMarketHistoryBaselines({
@@ -217,7 +227,8 @@ export async function POST(request: Request) {
         runDate,
         source,
         updates: result.updates,
-        summary
+        summary,
+        recordRun: body.intraday !== true
       });
     }
 
@@ -312,14 +323,36 @@ async function loadArtistBatch({
   supabase,
   dryRun,
   artistLimit,
-  artistOffset
+  artistOffset,
+  artistIds
 }: {
   source: MarketUpdateSource;
   supabase: ReturnType<typeof createServiceRoleClient> | null;
   dryRun: boolean;
   artistLimit: unknown;
   artistOffset: unknown;
+  artistIds: unknown;
 }): Promise<ArtistBatch> {
+  const requestedArtistIds = normalizeArtistIds(artistIds);
+
+  if (Array.isArray(artistIds)) {
+    const allArtists = supabase && source !== "mock"
+      ? await loadActiveArtists(supabase)
+      : getMockMarketArtists();
+    const requested = new Set(requestedArtistIds);
+    const artists = allArtists.filter((artist) => requested.has(artist.id));
+
+    return {
+      artists,
+      batch: buildBatchSummary({
+        offset: 0,
+        limit: artists.length,
+        artistCount: artists.length,
+        totalArtists: artists.length
+      })
+    };
+  }
+
   const request = normalizeArtistBatchRequest({ source, dryRun, artistLimit, artistOffset });
 
   if (!supabase || source === "mock" || (dryRun && !isRealExternalSource(source))) {
@@ -356,6 +389,21 @@ async function loadArtistBatch({
       totalArtists
     })
   };
+}
+
+function normalizeArtistIds(value: unknown) {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return Array.from(
+    new Set(
+      value
+        .filter((artistId): artistId is string => typeof artistId === "string")
+        .map((artistId) => artistId.trim().toLowerCase())
+        .filter((artistId) => /^[a-z0-9-]+$/.test(artistId))
+    )
+  ).slice(0, 25);
 }
 
 function normalizeArtistBatchRequest({

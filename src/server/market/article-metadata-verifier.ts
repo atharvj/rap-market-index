@@ -8,6 +8,7 @@ type ArticleMetadataVerifierOptions = {
 export type VerifiedArticleMetadata = {
   canonicalUrl: string;
   publishedDate: string;
+  summary?: string;
 };
 
 export type ArticleMetadataVerification =
@@ -106,6 +107,7 @@ async function verifyGoogleNewsArticle({
     });
     const canonicalUrl = getCanonicalUrl(publisherPage.text, publisherPage.finalUrl ?? decodedUrl);
     const publishedDate = getPublisherDate(publisherPage.text);
+    const summary = getPublisherSummary(publisherPage.text);
 
     if (!canonicalUrl) {
       return { ok: false, reason: "missing_canonical_url" };
@@ -119,7 +121,8 @@ async function verifyGoogleNewsArticle({
       ok: true,
       metadata: {
         canonicalUrl,
-        publishedDate
+        publishedDate,
+        ...(summary ? { summary } : {})
       }
     };
   } catch (error) {
@@ -316,6 +319,42 @@ function getPublisherDate(html: string) {
   }
 
   return null;
+}
+
+function getPublisherSummary(html: string) {
+  for (const tag of Array.from(html.matchAll(/<meta\b[^>]*>/gi), (match) => match[0])) {
+    const key = (
+      getTagAttribute(tag, "property") ??
+      getTagAttribute(tag, "name") ??
+      ""
+    ).toLowerCase();
+
+    if (!["description", "og:description", "twitter:description"].includes(key)) {
+      continue;
+    }
+
+    const summary = normalizePublisherSummary(getTagAttribute(tag, "content"));
+
+    if (summary) {
+      return summary;
+    }
+  }
+
+  const jsonLdMatch = html.match(/["']description["']\s*:\s*["']([^"']+)["']/i);
+  return normalizePublisherSummary(jsonLdMatch?.[1]);
+}
+
+function normalizePublisherSummary(value: string | null | undefined) {
+  if (!value) {
+    return null;
+  }
+
+  const normalized = decodeHtml(value)
+    .replace(/<[^>]+>/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  return normalized ? normalized.slice(0, 1_200) : null;
 }
 
 function normalizePublishedDate(value: string | null | undefined) {
