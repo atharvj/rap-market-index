@@ -2,6 +2,10 @@ import { get as httpsGet } from "node:https";
 import { clamp } from "@/lib/pricing";
 import type { MarketUpdateArtist } from "@/server/market/daily-update";
 import { isLowValueMarketArticleTitle } from "@/server/market/artist-event-disambiguation";
+import {
+  createArticleMetadataVerifier,
+  type VerifiedArticleMetadata
+} from "@/server/market/article-metadata-verifier";
 import { buildDefaultGdeltQuery } from "@/server/market/artist-text-identifiers";
 import {
   classifyArticleEvent,
@@ -169,6 +173,12 @@ export async function collectAiResearchMarketEvents({
   const eventsByArtist: Record<string, MarketEvent[]> = {};
   const warnings: string[] = [];
   const resolvedModel = normalizeAiResearchModel(model);
+  const articleVerifier = createArticleMetadataVerifier({
+    fetchImpl,
+    timeoutMs,
+    concurrency: 6,
+    requestSpacingMs: 100
+  });
   let requestCircuitOpen = false;
 
   await Promise.all(artists.map(async (artist, index) => {
@@ -264,9 +274,20 @@ export async function collectAiResearchMarketEvents({
       return;
     }
 
-    const normalizedEvents = result.events
-      .map((event) =>
-        normalizeAiResearchEvent({
+    const verifiedCandidates = await Promise.all(result.events.map(async (event) => {
+      const sourceUrl = getString(event.sourceUrl);
+
+      if (!sourceUrl || !hasSourceUrlInSearchResults(sourceUrl, result.searchResults)) {
+        return { event: null, rejection: "source_url_not_exact_search_result" };
+      }
+
+      const verification = await articleVerifier.verifyPublisherArticleUrl(sourceUrl);
+
+      if (!verification.ok) {
+        return { event: null, rejection: verification.reason };
+      }
+
+      const normalized = normalizeAiResearchEvent({
           value: event,
           artist,
           runDate,
@@ -275,13 +296,24 @@ export async function collectAiResearchMarketEvents({
           model: resolvedModel,
           lookbackDays,
           searchResults: result.searchResults,
-          executedToolCount: result.executedToolCount
-        })
-      )
+          executedToolCount: result.executedToolCount,
+          publisherMetadata: verification.metadata
+        });
+
+      return {
+        event: normalized,
+        rejection: normalized ? null : "publisher_claim_not_supported"
+      };
+    }));
+    const normalizedEvents = verifiedCandidates
+      .map(({ event }) => event)
       .filter((event): event is MarketEvent => Boolean(event))
       .sort((first, second) => getEventRank(second) - getEventRank(first))
       .slice(0, maxEventsPerArtist);
     const uniqueEvents = dedupeEvents(normalizedEvents);
+    const rejectionReasons = verifiedCandidates
+      .map(({ rejection }) => rejection)
+      .filter((reason): reason is string => Boolean(reason));
 
     observations.push(
       createObservation(artist.id, runDate, EVENT_COUNT, uniqueEvents.length, "events", {
@@ -290,6 +322,8 @@ export async function collectAiResearchMarketEvents({
         model: resolvedModel,
         query,
         returnedCandidateCount: result.events.length,
+        rejectedCandidateCount: rejectionReasons.length,
+        rejectedCandidateReasons: countValues(rejectionReasons),
         returnedCandidates: result.events.slice(0, 4).map((event) => ({
           title: getString(event.title),
           eventDate: getString(event.eventDate),
@@ -507,6 +541,7 @@ function buildResearchPrompt({
     `Verified identity context: ${query}. Return at most ${maxEventsPerArtist} source-backed events.`,
     "Run separate concise web searches for: (1) artist + latest release/news, (2) newest project title + review/reception, and (3) artist or project + fan reaction/community. Do not paste every topic into one search query.",
     "Use only music-market catalysts: album/project/single/feature, review/reception, tour or festival demand, backlash/legal/health that affects career availability, a viral performance/snippet/song trend, chart milestone, or a measured decline.",
+    "The primary sourceUrl must be the exact individual article, review, or announcement page returned by search. Never use a homepage, artist/profile hub, tag, topic, category, search, or archive page. Copy the publisher headline and original publication date; do not synthesize either one.",
     "Reject fragrance, beauty, fashion, brand, product, relationship, food, shopping, acting, casting, generic celebrity, and challenge-participation stories. If a non-music event causes independently measured listening, chart, search, ticket, or fan-demand growth, report that downstream music-demand change instead of the lifestyle headline.",
     "Classify marketConnection as direct_music when the event directly concerns music demand, career_availability when it changes the artist's ability to record, release, tour, or perform, or attention_only when it only raises celebrity visibility. Set musicDemandConfirmed true only when independent listening, chart, search, ticket, or fan-demand evidence connects the event to music interest. Never assume fame automatically means music demand.",
     "If many tracks dropped together, report the project, not one random track. Social/community items need factual confirmation and public reaction.",
@@ -540,6 +575,7 @@ function buildCompactResearchPrompt({
     "Prioritize the newest release or EP and its fan/critic reception, then music-related controversy, charts, tours, or viral performances. Classify marketConnection as direct_music or career_availability; use attention_only only to reject a candidate.",
     "Reject fragrance, beauty, fashion, brand, product, relationship, food, shopping, acting, casting, generic celebrity, and challenge-participation stories. If they cause verified listening, chart, search, ticket, or fan-demand growth, report that downstream music-demand change instead.",
     "Require a real accessible source URL. Search the newest release title with fan reaction, Reddit, review, and community terms. Fan sentiment needs two independent sources returned by web search; list them in corroboratingSourceUrls, otherwise set publicReactionConfirmed false and fanReactionEvidenceCount 0. Reject rumors, sarcasm, private posts, and low-view uploads.",
+    "sourceUrl must be the exact individual article/review page returned by search, never a homepage, artist hub, tag, category, search, or archive. Copy its publisher headline and original date exactly.",
     "Scale release impact by verified performance relative to that artist's usual audience, not by the fact that a song exists. Treat reach and reception separately: viral attention may be strong even when corroborated fan or critic sentiment is negative.",
     "A guest credit alone is low signal. Confirm feature-driven demand with chart, listening, search, ticket, or broad corroborated reaction evidence; repeated articles about the same credit are not demand evidence. Do not infer decline merely from silence.",
     "Score sentimentScore, fanSentimentScore, criticSentimentScore, and impactScore as integers from -100 to 100; confidence is a decimal from 0 to 1. Use a valid calendar date in YYYY-MM-DD format.",
@@ -556,7 +592,8 @@ function normalizeAiResearchEvent({
   model,
   lookbackDays,
   searchResults,
-  executedToolCount
+  executedToolCount,
+  publisherMetadata
 }: {
   value: AiResearchResponseEvent;
   artist: MarketUpdateArtist;
@@ -567,33 +604,54 @@ function normalizeAiResearchEvent({
   lookbackDays: number;
   searchResults: GroqSearchResult[];
   executedToolCount: number;
+  publisherMetadata: VerifiedArticleMetadata;
 }): MarketEvent | null {
-  const sourceUrl = getString(value.sourceUrl);
+  const requestedSourceUrl = getString(value.sourceUrl);
+  const sourceUrl = publisherMetadata.canonicalUrl;
   const sourceName = getString(value.sourceName);
-  const title = getString(value.title);
-  const summary = getString(value.summary);
+  const modelTitle = getString(value.title);
+  const modelSummary = getString(value.summary);
+  const modelEventDate = normalizeDate(getString(value.eventDate));
+  const title = publisherMetadata.headline;
+  const summary = publisherMetadata.summary ?? null;
   const whyItMatters = getString(value.whyItMatters);
-  const sourceType = normalizeLabel(getString(value.sourceType));
-  const evidenceLevel = normalizeEvidenceLevel(getString(value.evidenceLevel));
-  const reachScope = normalizeLabel(getString(value.reachScope));
-  const marketConnection = normalizeMarketConnection(getString(value.marketConnection));
-  const musicDemandConfirmed = getBoolean(value.musicDemandConfirmed);
+  const claimedSourceType = normalizeLabel(getString(value.sourceType));
+  const sourceType = publisherMetadata.pageType === "review"
+    ? "review"
+    : ["music_publication", "mainstream_news", "official"].includes(claimedSourceType)
+      ? claimedSourceType
+      : "music_publication";
+  const claimedEvidenceLevel = normalizeEvidenceLevel(getString(value.evidenceLevel));
+  const claimedReachScope = normalizeLabel(getString(value.reachScope));
+  const claimedMarketConnection = normalizeMarketConnection(getString(value.marketConnection));
+  const claimedMusicDemandConfirmed = getBoolean(value.musicDemandConfirmed);
+  const musicDemandConfirmed = false;
   const supportingMediaUrl = getString(value.supportingMediaUrl);
   const supportingMedia = normalizeSupportingMedia({
     url: supportingMediaUrl,
     type: getString(value.supportingMediaType)
   });
-  const eventDate =
-    normalizeDate(getString(value.eventDate)) ??
-    getSearchResultPublishedDate(sourceUrl, searchResults);
+  const eventDate = publisherMetadata.publishedDate;
   const domain = normalizeDomain(undefined, sourceUrl ?? undefined);
-  const sourceWasFoundBySearch = hasSourceUrlInSearchResults(sourceUrl, searchResults);
-  const eventType = normalizeEventType(getString(value.eventType));
+  const sourceWasFoundBySearch = hasSourceUrlInSearchResults(requestedSourceUrl, searchResults);
+  const claimedEventType = normalizeEventType(getString(value.eventType));
   const sourceTier = domain ? getSourceTier(domain) : 0;
   const classification = classifyArticleEvent(`${title ?? ""} ${summary ?? ""}`, domain ?? "", undefined, {
     allowLowTierRelease: true
   });
-  const resolvedEventType = eventType ?? classification?.eventType ?? null;
+  const publisherPageEventType = publisherMetadata.pageType === "review" ? "review" : null;
+  const resolvedEventType = classification?.eventType ?? publisherPageEventType;
+
+  if (!resolvedEventType || (claimedEventType && claimedEventType !== resolvedEventType)) {
+    return null;
+  }
+
+  const evidenceLevel = claimedSourceType === "official" && claimedEvidenceLevel === "confirmed"
+    ? "confirmed"
+    : "reported";
+  const reachScope = "scene";
+  const marketConnection = classification?.statusSubtype ? "career_availability" : "direct_music";
+
   const claimedCorroboratingSourceCount = clamp(
     Math.round(getNumber(value.corroboratingSourceCount, 1)),
     0,
@@ -605,53 +663,41 @@ function normalizeAiResearchEvent({
     20
   );
   const corroboratingSourceUrls = normalizeEvidenceUrls(value.corroboratingSourceUrls);
-  const verifiedCorroboratingSources = getVerifiedIndependentSources(
-    [sourceUrl, ...corroboratingSourceUrls],
+  const searchMatchedCorroboratingSources = getVerifiedIndependentSources(
+    corroboratingSourceUrls,
     searchResults
   );
-  const corroboratingSourceCount = verifiedCorroboratingSources.length;
-  const fanReactionEvidenceCount = Math.min(
-    claimedFanReactionEvidenceCount,
-    corroboratingSourceCount
+  // Search snippets only prove discovery, not that independent pages support a reaction claim.
+  // Until corroborating publisher pages are verified, AI fan/reception assertions cannot amplify prices.
+  const corroboratingSourceCount = 0;
+  const fanReactionEvidenceCount = 0;
+  const publicReactionConfirmed = false;
+  const fanSentimentScore = null;
+  const criticSentimentScore = null;
+  const sentimentAgreement = "unknown";
+  const rawSentimentScore = classification?.sentimentScore ?? 0;
+  const deterministicImpact = classification?.impactScore ?? Math.abs(rawSentimentScore);
+  const impactCap = resolvedEventType === "review" ? 38 : 48;
+  const rawImpactScore = clamp(deterministicImpact, -impactCap, impactCap);
+  const confidence = Math.min(
+    clamp(getNumber(value.confidence, classification?.confidence ?? 0.55), 0, 1),
+    classification?.confidence ?? 0.58,
+    0.82
   );
-  const publicReactionConfirmed =
-    getBoolean(value.publicReactionConfirmed) && fanReactionEvidenceCount >= 2;
-  const fanSentimentScore = normalizeOptionalSignedScore(value.fanSentimentScore);
-  const criticSentimentScore = normalizeOptionalSignedScore(value.criticSentimentScore);
-  const sentimentAgreement = normalizeSentimentAgreement(getString(value.sentimentAgreement));
-  const rawSentimentScore = resolveEvidenceWeightedSentiment({
-    aggregateSentiment: normalizeSignedScore(
-      value.sentimentScore,
-      classification?.sentimentScore ?? 0
-    ),
-    fanSentiment: fanSentimentScore,
-    criticSentiment: criticSentimentScore,
-    publicReactionConfirmed,
-    fanReactionEvidenceCount,
-    sentimentAgreement
-  });
-  const rawImpactScore = normalizeSignedScore(
-    value.impactScore,
-    classification?.impactScore ?? rawSentimentScore
-  );
-  const confidence = clamp(getNumber(value.confidence, classification?.confidence ?? 0.55), 0, 1);
   const relatedArtistNames = Array.isArray(value.relatedArtistNames)
     ? value.relatedArtistNames.map((item) => getString(item)).filter((item): item is string => Boolean(item))
     : [];
   const riskFlags = Array.isArray(value.riskFlags)
     ? value.riskFlags.map((item) => getString(item)).filter((item): item is string => Boolean(item))
     : [];
-  const factualClaimConfirmed = getBoolean(value.factualClaimConfirmed);
+  const factualClaimConfirmed = true;
   const artistRole = normalizeArtistRole(getString(value.artistRole), title, artist.name);
 
   if (artistRole === "mentioned") {
     return null;
   }
 
-  if (
-    (title && isLowValueMarketArticleTitle(title)) ||
-    (marketConnection === "attention_only" && !musicDemandConfirmed)
-  ) {
+  if (title && isLowValueMarketArticleTitle(title)) {
     return null;
   }
 
@@ -660,7 +706,7 @@ function normalizeAiResearchEvent({
   const sentimentScore = clamp(rawSentimentScore * roleSentimentMultiplier, -100, 100);
   const impactScore = clamp(rawImpactScore * roleImpactMultiplier, -100, 100);
 
-  if (!title || !eventDate || !sourceUrl || !domain || !isSafeHttpUrl(sourceUrl) || !resolvedEventType) {
+  if (!title || !eventDate || !sourceUrl || !domain || !isSafeHttpUrl(sourceUrl)) {
     return null;
   }
 
@@ -708,22 +754,32 @@ function normalizeAiResearchEvent({
       provider,
       model,
       query,
+      evidenceVersion: 2,
       domain,
       sourceTier,
       sourceType,
       evidenceLevel,
       reachScope,
       marketConnection,
+      claimedEvidenceLevel,
+      claimedReachScope,
+      claimedMarketConnection,
       musicDemandConfirmed,
+      claimedMusicDemandConfirmed,
       artistRole,
       roleImpactMultiplier,
       summary,
+      modelTitle,
+      modelSummary,
+      modelEventDate,
       whyItMatters,
       relatedArtistNames,
       corroboratingSourceCount,
       claimedCorroboratingSourceCount,
       corroboratingSourceUrls,
-      verifiedCorroboratingSourceUrls: verifiedCorroboratingSources.map((source) => source.url),
+      searchMatchedCorroboratingSourceCount: searchMatchedCorroboratingSources.length,
+      searchMatchedCorroboratingSourceUrls: searchMatchedCorroboratingSources.map((source) => source.url),
+      verifiedCorroboratingSourceUrls: [],
       publicReactionConfirmed,
       fanReactionEvidenceCount,
       claimedFanReactionEvidenceCount,
@@ -734,8 +790,9 @@ function normalizeAiResearchEvent({
       riskFlags,
       executedToolCount,
       sourceWasFoundBySearch,
+      sourceUrlExactSearchMatch: sourceWasFoundBySearch,
       searchResultCount: searchResults.length,
-      supportingSearchResults: getSupportingSearchResults(sourceUrl, searchResults).slice(0, 4),
+      supportingSearchResults: getSupportingSearchResults(requestedSourceUrl, searchResults).slice(0, 4),
       supportingMediaUrl: supportingMedia?.url ?? null,
       supportingMediaType: supportingMedia?.type ?? null,
       classificationReason:
@@ -744,7 +801,15 @@ function normalizeAiResearchEvent({
       statusSubtype: classification?.statusSubtype ?? null,
       statusSeverity: classification?.statusSeverity ?? null,
       statusHaltRecommended: classification?.statusHaltRecommended ?? false,
-      aiValidated: true
+      aiValidated: true,
+      publisherArticleVerified: true,
+      publisherDateVerified: true,
+      publisherHeadlineVerified: true,
+      publisherCanonicalUrl: sourceUrl,
+      publisherPublishedDate: eventDate,
+      publisherHeadline: displayTitle,
+      publisherPageType: publisherMetadata.pageType,
+      requestedSourceUrl
     }
   };
 }
@@ -845,16 +910,6 @@ function hasHighRiskAiFlags(riskFlags: string[]) {
   });
 }
 
-function normalizeSentimentAgreement(value: string | null) {
-  const normalized = normalizeLabel(value);
-
-  if (normalized === "agree" || normalized === "mixed" || normalized === "disagree") {
-    return normalized;
-  }
-
-  return "unknown";
-}
-
 function normalizeMarketConnection(value: string | null) {
   const normalized = normalizeLabel(value);
 
@@ -867,42 +922,6 @@ function normalizeMarketConnection(value: string | null) {
   }
 
   return "unknown";
-}
-
-function resolveEvidenceWeightedSentiment({
-  aggregateSentiment,
-  fanSentiment,
-  criticSentiment,
-  publicReactionConfirmed,
-  fanReactionEvidenceCount,
-  sentimentAgreement
-}: {
-  aggregateSentiment: number;
-  fanSentiment: number | null;
-  criticSentiment: number | null;
-  publicReactionConfirmed: boolean;
-  fanReactionEvidenceCount: number;
-  sentimentAgreement: string;
-}) {
-  const confirmedFanSentiment =
-    publicReactionConfirmed && fanReactionEvidenceCount >= 2 && fanSentiment !== null
-      ? clamp(fanSentiment, -100, 100)
-      : null;
-  const cleanCriticSentiment = criticSentiment === null ? null : clamp(criticSentiment, -100, 100);
-  let resolved = clamp(aggregateSentiment, -100, 100);
-
-  if (confirmedFanSentiment !== null && cleanCriticSentiment !== null) {
-    resolved = confirmedFanSentiment * 0.65 + cleanCriticSentiment * 0.35;
-  } else if (confirmedFanSentiment !== null) {
-    resolved = confirmedFanSentiment;
-  } else if (cleanCriticSentiment !== null) {
-    resolved = cleanCriticSentiment;
-  }
-
-  const disagreementMultiplier =
-    sentimentAgreement === "disagree" ? 0.55 : sentimentAgreement === "mixed" ? 0.72 : 1;
-
-  return clamp(resolved * disagreementMultiplier, -100, 100);
 }
 
 function createObservation(
@@ -1200,11 +1219,7 @@ function hasSourceUrlInSearchResults(sourceUrl: string | null, searchResults: Gr
 
     const resultKey = normalizeUrlForComparison(result.url);
 
-    if (resultKey === sourceKey || resultKey.includes(sourceKey) || sourceKey.includes(resultKey)) {
-      return true;
-    }
-
-    return false;
+    return resultKey === sourceKey;
   });
 }
 
@@ -1239,7 +1254,7 @@ function getVerifiedIndependentSources(urls: Array<string | null>, searchResults
 
       const resultKey = normalizeUrlForComparison(result.url);
 
-      return resultKey === candidateKey || resultKey.includes(candidateKey) || candidateKey.includes(resultKey);
+      return resultKey === candidateKey;
     });
 
     if (!matchingResult?.url) {
@@ -1312,6 +1327,13 @@ function dedupeEvents(events: MarketEvent[]) {
   }
 
   return deduped;
+}
+
+function countValues(values: string[]) {
+  return values.reduce<Record<string, number>>((counts, value) => {
+    counts[value] = (counts[value] ?? 0) + 1;
+    return counts;
+  }, {});
 }
 
 function normalizeEventType(value: string | null): MarketEvent["eventType"] | null {
@@ -1424,19 +1446,6 @@ function getOptionalNumber(value: unknown) {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
-function normalizeSignedScore(value: unknown, fallback: number) {
-  const parsed = getNumber(value, fallback);
-  const scaled = parsed !== 0 && Math.abs(parsed) <= 1 ? parsed * 100 : parsed;
-
-  return clamp(scaled, -100, 100);
-}
-
-function normalizeOptionalSignedScore(value: unknown) {
-  const parsed = getOptionalNumber(value);
-
-  return parsed === null ? null : normalizeSignedScore(parsed, 0);
-}
-
 function getBoolean(value: unknown) {
   if (typeof value === "boolean") {
     return value;
@@ -1475,25 +1484,6 @@ function isDateInsideWindow(date: string, runDate: string, lookbackDays: number)
   const distanceDays = Math.round((runTime - eventTime) / 86_400_000);
 
   return distanceDays >= -45 && distanceDays <= Math.max(1, lookbackDays);
-}
-
-function getSearchResultPublishedDate(sourceUrl: string | null, searchResults: GroqSearchResult[]) {
-  if (!sourceUrl) {
-    return null;
-  }
-
-  const sourceKey = normalizeUrlForComparison(sourceUrl);
-  const result = searchResults.find((candidate) => {
-    if (!candidate.url) {
-      return false;
-    }
-
-    const candidateKey = normalizeUrlForComparison(candidate.url);
-    return candidateKey === sourceKey || candidateKey.includes(sourceKey) || sourceKey.includes(candidateKey);
-  });
-  const publishedDate = result?.published_date?.slice(0, 10) ?? null;
-
-  return normalizeDate(publishedDate);
 }
 
 function isSafeHttpUrl(value: string) {

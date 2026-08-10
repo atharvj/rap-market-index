@@ -43,6 +43,14 @@ function featureEvent(rawPayload: Record<string, unknown>): MarketEvent {
       artistRole: "featured",
       factualClaimConfirmed: true,
       corroboratingSourceCount: 2,
+      evidenceVersion: 2,
+      sourceUrlExactSearchMatch: true,
+      publisherArticleVerified: true,
+      publisherDateVerified: true,
+      publisherHeadlineVerified: true,
+      publisherCanonicalUrl: "https://example.com/story",
+      publisherPublishedDate: "2026-07-10",
+      publisherHeadline: "Diamond surprise mixtape featuring Young Thug",
       ...rawPayload
     }
   };
@@ -60,6 +68,21 @@ function evidenceMultiplier(event: MarketEvent) {
 }
 
 describe("feature evidence safeguards", () => {
+  it("drops a legacy AI event that has no publisher provenance", () => {
+    const event = featureEvent({
+      publisherArticleVerified: false,
+      publisherDateVerified: false,
+      publisherHeadlineVerified: false
+    });
+    const signals = buildEventMarketSignals({
+      artists: [artist],
+      runDate: "2026-07-11",
+      eventsByArtist: { [artist.id]: [event] }
+    });
+
+    expect(signals[artist.id]).toBeUndefined();
+  });
+
   it("nearly removes a credited feature with no demonstrated demand", () => {
     expect(evidenceMultiplier(featureEvent({}))).toBeLessThanOrEqual(0.14);
   });
@@ -89,6 +112,7 @@ describe("music relevance safeguards", () => {
     });
     event.eventType = "news";
     event.title = "Young Thug launches a new fragrance collection";
+    event.rawPayload.publisherHeadline = event.title;
 
     expect(evidenceMultiplier(event)).toBe(0);
   });
@@ -100,6 +124,7 @@ describe("music relevance safeguards", () => {
     });
     event.eventType = "news";
     event.title = "Young Thug challenge coincides with verified streaming demand";
+    event.rawPayload.publisherHeadline = event.title;
 
     expect(evidenceMultiplier(event)).toBe(0.28);
   });

@@ -78,6 +78,24 @@ describe("media RSS publisher-date verification", () => {
     });
   });
 
+  it("rejects a direct RSS item that points to an artist archive", async () => {
+    const result = await collectMediaRssMarketEvents({
+      artists: [{ ...artist, id: "kendrick-lamar", name: "Kendrick Lamar", ticker: "KDOT" }],
+      runDate: "2026-08-09",
+      feedUrls: ["https://feeds.example.com/music.xml"],
+      includeGoogleNews: false,
+      lookbackDays: 30,
+      delayMs: 0,
+      timeoutMs: 1_000,
+      fetchImpl: createArchiveFeedFetch()
+    });
+
+    expect(result.eventsByArtist["kendrick-lamar"]).toBeUndefined();
+    expect(
+      result.observations.find((observation) => observation.metric === "date_verification_rejected_count")?.value
+    ).toBe(1);
+  });
+
   it("attributes a trusted tour story to a supporting artist only when the publisher names them", async () => {
     const supportingArtist = { ...artist, id: "tezzus", name: "Tezzus", ticker: "TEZZUS" };
     const accepted = await collectMediaRssMarketEvents({
@@ -145,7 +163,10 @@ function createMediaFetch(publishedAt: string): typeof fetch {
       return htmlResponse(`
         <html><head>
           <link rel="canonical" href="${canonicalUrl}"/>
-          <script type="application/ld+json">{"datePublished":"${publishedAt}"}</script>
+          <meta property="og:type" content="article"/>
+          <meta property="og:title" content="Baby Keem Announces Ca$ino Album Release Date"/>
+          <meta property="og:description" content="Baby Keem announces the new Ca$ino album."/>
+          <script type="application/ld+json">{"@type":"NewsArticle","url":"${canonicalUrl}","headline":"Baby Keem Announces Ca$ino Album Release Date","datePublished":"${publishedAt}"}</script>
         </head></html>
       `);
     }
@@ -193,13 +214,50 @@ function createTourFetch(summary: string): typeof fetch {
       return htmlResponse(`
         <html><head>
           <link rel="canonical" href="${tourCanonicalUrl}"/>
+          <meta property="og:type" content="article"/>
+          <meta property="og:title" content="Young Thug Announces YSL Tour"/>
           <meta property="og:description" content="${summary}"/>
-          <script type="application/ld+json">{"datePublished":"2026-07-13T07:00:00Z"}</script>
+          <script type="application/ld+json">{"@type":"NewsArticle","url":"${tourCanonicalUrl}","headline":"Young Thug Announces YSL Tour","datePublished":"2026-07-13T07:00:00Z"}</script>
         </head></html>
       `);
     }
 
     throw new Error(`Unexpected tour request: ${url}`);
+  };
+}
+
+function createArchiveFeedFetch(): typeof fetch {
+  const archiveUrl = "https://pitchfork.com/artists/29812-kendrick-lamar/";
+
+  return async (input) => {
+    const url = String(input);
+
+    if (url === "https://feeds.example.com/music.xml") {
+      return xmlResponse(`
+        <rss><channel><item>
+          <title>Kendrick Lamar GNX Album Review Receives Critical Acclaim</title>
+          <link>${archiveUrl}</link>
+          <pubDate>Fri, 07 Aug 2026 19:18:00 GMT</pubDate>
+          <description>A new review says Kendrick Lamar's GNX continues to receive critical acclaim.</description>
+          <source url="https://pitchfork.com">Pitchfork</source>
+        </item></channel></rss>
+      `);
+    }
+
+    if (url === archiveUrl) {
+      return htmlResponse(`
+        <html><head>
+          <link rel="canonical" href="${archiveUrl}"/>
+          <meta property="og:type" content="website"/>
+          <meta property="og:title" content="Kendrick Lamar - Albums, Songs, and News | Pitchfork"/>
+          <script type="application/ld+json">
+            {"@type":"Review","url":"https://pitchfork.com/reviews/albums/kendrick-lamar-gnx/","headline":"GNX","datePublished":"2024-11-26"}
+          </script>
+        </head><body><h1>Kendrick Lamar</h1></body></html>
+      `);
+    }
+
+    throw new Error(`Unexpected archive feed request: ${url}`);
   };
 }
 

@@ -32,6 +32,7 @@ import {
   isTrustedEmergingEditorialCoverage,
   promoteEmergingEditorialCoverage
 } from "@/server/market/emerging-news";
+import { hasVerifiedAiResearchArticleProvenance } from "@/server/market/event-integrity";
 
 export const dynamic = "force-dynamic";
 
@@ -669,6 +670,14 @@ function isPublicAiResearchEvent(
   impactScore: number,
   confidence: number
 ) {
+  if (!hasVerifiedAiResearchArticleProvenance(rawPayload, {
+    eventDate: event.event_date,
+    title: event.title,
+    sourceUrl: event.source_url
+  })) {
+    return false;
+  }
+
   const evidenceLevel = getRawString(rawPayload.evidenceLevel);
   const sourceType = getRawString(rawPayload.sourceType);
   const sourceTier = getRawNumber(rawPayload.sourceTier) ?? 0;
@@ -828,7 +837,7 @@ function getSourceWeight(source: string) {
   }
 
   if (source === "ai_research_event") {
-    return 24;
+    return 12;
   }
 
   if (source === "reddit_post") {

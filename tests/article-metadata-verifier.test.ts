@@ -20,7 +20,9 @@ describe("article metadata verifier", () => {
       ok: true,
       metadata: {
         canonicalUrl,
-        publishedDate: "2026-02-10"
+        publishedDate: "2026-02-10",
+        headline: "Baby Keem Announces Ca$ino Album Release Date",
+        pageType: "news_article"
       }
     });
   });
@@ -71,6 +73,46 @@ describe("article metadata verifier", () => {
     expect(isGoogleNewsArticleUrl(canonicalUrl)).toBe(false);
     expect(isGoogleNewsArticleUrl("https://news.google.com/topstories")).toBe(false);
   });
+
+  it("rejects an artist archive even when a child card contains an article date", async () => {
+    const archiveUrl = "https://pitchfork.com/artists/29812-kendrick-lamar/";
+    const verifier = createArticleMetadataVerifier({
+      fetchImpl: async () => htmlResponse(`
+        <html><head>
+          <link rel="canonical" href="${archiveUrl}"/>
+          <meta property="og:type" content="website"/>
+          <meta property="og:title" content="Kendrick Lamar - Albums, Songs, and News | Pitchfork"/>
+          <script type="application/ld+json">
+            {"@type":"Review","url":"https://pitchfork.com/reviews/albums/kendrick-lamar-gnx/","headline":"GNX","datePublished":"2024-11-26"}
+          </script>
+        </head><body><h1>Kendrick Lamar</h1></body></html>
+      `),
+      timeoutMs: 1_000,
+      requestSpacingMs: 0
+    });
+
+    await expect(verifier.verifyPublisherArticleUrl(archiveUrl)).resolves.toEqual({
+      ok: false,
+      reason: "non_article_page"
+    });
+  });
+
+  it("rejects private publisher targets before fetching them", async () => {
+    let fetched = false;
+    const verifier = createArticleMetadataVerifier({
+      fetchImpl: async () => {
+        fetched = true;
+        return htmlResponse("<html></html>");
+      },
+      requestSpacingMs: 0
+    });
+
+    await expect(verifier.verifyPublisherArticleUrl("http://127.0.0.1/private")).resolves.toEqual({
+      ok: false,
+      reason: "unsafe_publisher_url"
+    });
+    expect(fetched).toBe(false);
+  });
 });
 
 function createVerificationFetch(publishedAt: string | null): typeof fetch {
@@ -91,8 +133,17 @@ function createVerificationFetch(publishedAt: string | null): typeof fetch {
     }
 
     if (url.startsWith(canonicalUrl)) {
-      const dateMarkup = publishedAt ? `<script type="application/ld+json">{"datePublished":"${publishedAt}"}</script>` : "";
-      return htmlResponse(`<html><head><link rel="canonical" href="${canonicalUrl}"/>${dateMarkup}</head></html>`);
+      const dateMarkup = publishedAt ? `,"datePublished":"${publishedAt}"` : "";
+      return htmlResponse(`
+        <html><head>
+          <link rel="canonical" href="${canonicalUrl}"/>
+          <meta property="og:type" content="article"/>
+          <meta property="og:title" content="Baby Keem Announces Ca$ino Album Release Date"/>
+          <script type="application/ld+json">
+            {"@type":"NewsArticle","url":"${canonicalUrl}","headline":"Baby Keem Announces Ca$ino Album Release Date"${dateMarkup}}
+          </script>
+        </head></html>
+      `);
     }
 
     throw new Error(`Unexpected verification request: ${url}`);

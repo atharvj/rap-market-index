@@ -367,19 +367,10 @@ async function buildArtistEvents({
 
   const verifiedCandidates = await Promise.all(
     preliminaryCandidateEvents.map(async (candidate) => {
-      if (!isGoogleNewsArticleUrl(candidate.item.url)) {
-        return {
-          candidate: {
-            ...candidate,
-            verifiedPublisherDate: null,
-            originalFeedDate: candidate.item.publishedDate,
-            originalGoogleNewsUrl: null
-          },
-          rejection: null
-        };
-      }
-
-      const verification = await articleVerifier.verifyGoogleNewsUrl(candidate.item.url);
+      const googleNewsUrl = isGoogleNewsArticleUrl(candidate.item.url) ? candidate.item.url : null;
+      const verification = googleNewsUrl
+        ? await articleVerifier.verifyGoogleNewsUrl(candidate.item.url)
+        : await articleVerifier.verifyPublisherArticleUrl(candidate.item.url);
 
       if (!verification.ok) {
         return { candidate: null, rejection: verification.reason };
@@ -390,16 +381,21 @@ async function buildArtistEvents({
         url: verification.metadata.canonicalUrl,
         domain: normalizeDomain(undefined, verification.metadata.canonicalUrl) ?? candidate.item.domain,
         publishedDate: verification.metadata.publishedDate,
+        title: verification.metadata.headline,
         summary: verification.metadata.summary ?? candidate.item.summary
       };
-
+      const verifiedTitleMatchedArtist = mentionsArtist(
+        verifiedItem.title,
+        artist.name,
+        candidate.item.searchQuery
+      );
       const verifiedTextMatchedArtist = mentionsArtist(
         `${verifiedItem.title} ${verifiedItem.summary}`,
         artist.name,
         candidate.item.searchQuery
       );
 
-      if (!candidate.titleMatchedArtist && !verifiedTextMatchedArtist) {
+      if (!verifiedTextMatchedArtist) {
         return { candidate: null, rejection: "publisher_artist_not_confirmed" };
       }
 
@@ -407,14 +403,68 @@ async function buildArtistEvents({
         return { candidate: null, rejection: "publisher_date_outside_lookback" };
       }
 
+      const verifiedClassificationText = `${verifiedItem.title} ${verifiedItem.summary}`.slice(0, 600);
+      const initialVerifiedClassification = classifyArticleEvent(
+        verifiedClassificationText,
+        verifiedItem.domain,
+        undefined,
+        { allowLowTierRelease: candidate.item.feedScope === "artist_search" }
+      );
+
+      if (!initialVerifiedClassification) {
+        return { candidate: null, rejection: "publisher_event_not_classified" };
+      }
+
+      const verifiedArtistRole = hasArtistFeatureCreditContext({
+        artistName: artist.name,
+        text: verifiedClassificationText,
+        query
+      })
+        ? "featured"
+        : "primary";
+      const verifiedClassification =
+        initialVerifiedClassification.eventType === "release" && verifiedArtistRole === "featured"
+          ? {
+              ...initialVerifiedClassification,
+              eventType: "viral" as const,
+              sentimentScore: 30,
+              impactScore: 48,
+              confidence: Math.min(initialVerifiedClassification.confidence, 0.82),
+              reason: "feature_terms",
+              releaseKind: undefined
+            }
+          : initialVerifiedClassification;
+      const verifiedSubjectMatchedArtist = hasRequiredEventSubjectContext({
+        artist,
+        query,
+        item: verifiedItem,
+        classificationText: verifiedClassificationText,
+        classification: verifiedClassification
+      });
+
+      if (
+        !verifiedSubjectMatchedArtist ||
+        (isLowValueMarketArticleTitle(verifiedItem.title) && !verifiedClassification.statusSubtype)
+      ) {
+        return { candidate: null, rejection: "publisher_claim_not_supported" };
+      }
+
       return {
         candidate: {
           ...candidate,
           item: verifiedItem,
+          titleMatchedArtist: verifiedTitleMatchedArtist,
           textMatchedArtist: verifiedTextMatchedArtist,
+          disambiguatedArtist: hasRequiredArtistDisambiguation({ artist, item: verifiedItem }),
+          subjectMatchedArtist: verifiedSubjectMatchedArtist,
+          artistRole: verifiedArtistRole,
+          sourceTier: getSourceTier(verifiedItem.domain),
+          classification: verifiedClassification,
           verifiedPublisherDate: verification.metadata.publishedDate,
+          verifiedPublisherHeadline: verification.metadata.headline,
+          verifiedPublisherPageType: verification.metadata.pageType,
           originalFeedDate: candidate.item.publishedDate,
-          originalGoogleNewsUrl: candidate.item.url
+          originalGoogleNewsUrl: googleNewsUrl
         },
         rejection: null
       };
@@ -436,7 +486,7 @@ async function buildArtistEvents({
       return true;
     }), maxEventsPerArtist);
 
-  const events = candidateEvents.map(({ item, titleMatchedArtist, textMatchedArtist, disambiguatedArtist, subjectMatchedArtist, artistRole, sourceTier, classification, verifiedPublisherDate, originalFeedDate, originalGoogleNewsUrl }) => {
+  const events = candidateEvents.map(({ item, titleMatchedArtist, textMatchedArtist, disambiguatedArtist, subjectMatchedArtist, artistRole, sourceTier, classification, verifiedPublisherDate, verifiedPublisherHeadline, verifiedPublisherPageType, originalFeedDate, originalGoogleNewsUrl }) => {
     const classificationText = `${item.title} ${item.summary}`.slice(0, 600);
     const releaseDate = getReleaseEventDate({
       text: classificationText,
@@ -471,6 +521,12 @@ async function buildArtistEvents({
         publishedDate: item.publishedDate,
         feedPublishedDate: originalFeedDate ?? item.publishedDate,
         publisherDateVerified: Boolean(verifiedPublisherDate),
+        publisherArticleVerified: true,
+        publisherHeadlineVerified: Boolean(verifiedPublisherHeadline),
+        publisherCanonicalUrl: item.url,
+        publisherPublishedDate: verifiedPublisherDate,
+        publisherHeadline: verifiedPublisherHeadline,
+        publisherPageType: verifiedPublisherPageType,
         googleNewsUrl: originalGoogleNewsUrl,
         releaseDate,
         classificationReason: classification.reason,

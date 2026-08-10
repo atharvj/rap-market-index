@@ -13,6 +13,7 @@ import type {
   ObservationBaselines
 } from "@/server/market/market-data";
 import type { ArtistCategory, HypeStats } from "@/lib/types";
+import { isMarketEventSourceIntegrityValid } from "@/server/market/event-integrity";
 
 type Supabase = SupabaseClient<Database>;
 
@@ -893,8 +894,7 @@ export async function loadRecentMarketEvents({
   }
 
   return ((data ?? []) as MarketEventRow[]).reduce<Record<string, MarketEvent[]>>((grouped, row) => {
-    grouped[row.artist_id] ??= [];
-    grouped[row.artist_id].push({
+    const event: MarketEvent = {
       id: row.id,
       artistId: row.artist_id,
       eventDate: row.event_date,
@@ -906,17 +906,26 @@ export async function loadRecentMarketEvents({
       impactScore: Number(row.impact_score),
       confidence: Number(row.confidence),
       rawPayload: row.raw_payload as Record<string, unknown>
-    });
+    };
+
+    if (!isMarketEventSourceIntegrityValid(event)) {
+      return grouped;
+    }
+
+    grouped[row.artist_id] ??= [];
+    grouped[row.artist_id].push(event);
     return grouped;
   }, {});
 }
 
 export async function persistMarketEvents(supabase: Supabase, events: MarketEvent[]) {
-  if (!events.length) {
+  const integrityCheckedEvents = events.filter(isMarketEventSourceIntegrityValid);
+
+  if (!integrityCheckedEvents.length) {
     return;
   }
 
-  const dedupedEvents = dedupeEventsForPersistence(events);
+  const dedupedEvents = dedupeEventsForPersistence(integrityCheckedEvents);
   await removeConflictingEventClassifications(supabase, dedupedEvents);
   await removeConflictingSourceEvents(supabase, dedupedEvents);
   const rows = dedupedEvents.map((event) => ({

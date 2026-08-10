@@ -5,6 +5,7 @@ import { getArtistStatusSubtype } from "@/server/market/status-events";
 import type { HypeStats } from "@/lib/types";
 import { areNewsStoryEventsEquivalent } from "@/server/market/news-story-groups";
 import { isLowValueMarketArticleTitle } from "@/server/market/artist-event-disambiguation";
+import { isMarketEventSourceIntegrityValid } from "@/server/market/event-integrity";
 
 export type ManualMarketEventInput = {
   artistId?: string;
@@ -34,7 +35,7 @@ export function buildEventMarketSignals({
   const signals: AdapterSignals = {};
 
   for (const artist of artists) {
-    const events = eventsByArtist[artist.id] ?? [];
+    const events = (eventsByArtist[artist.id] ?? []).filter(isMarketEventSourceIntegrityValid);
 
     if (!events.length) {
       continue;
@@ -902,6 +903,14 @@ function getMediaRssEventProvenance(event: MarketEvent) {
 }
 
 function getAiResearchEventProvenance(event: MarketEvent, artist: MarketUpdateArtist) {
+  if (!isMarketEventSourceIntegrityValid(event)) {
+    return {
+      label: "ai-research-rejected-unverified-publisher",
+      impactMultiplier: 0,
+      confidenceMultiplier: 0
+    };
+  }
+
   const sourceTier = getRawNumber(event.rawPayload.sourceTier, 0);
   const evidenceLevel = getRawString(event.rawPayload.evidenceLevel) ?? "reported";
   const sourceType = getRawString(event.rawPayload.sourceType) ?? "";

@@ -54,6 +54,7 @@ import type {
   MarketObservation,
   ObservationBaselines
 } from "@/server/market/market-data";
+import { hasVerifiedAiResearchArticleProvenance } from "@/server/market/event-integrity";
 import {
   loadActiveArtists,
   loadActiveArtistCount,
@@ -1280,6 +1281,14 @@ function isStoredEventEligibleForPricing(
 
   if (eventSource === "musicbrainz_release_group") {
     return event.rawPayload.corroborated === true;
+  }
+
+  if (eventSource === "ai_research_event") {
+    return hasVerifiedAiResearchArticleProvenance(event.rawPayload, {
+      eventDate: event.eventDate,
+      title: event.title,
+      sourceUrl: event.sourceUrl
+    });
   }
 
   if ((eventSource !== "media_rss_item" && eventSource !== "gdelt_article") || !artist) {

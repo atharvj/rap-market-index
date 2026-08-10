@@ -8,6 +8,8 @@ type ArticleMetadataVerifierOptions = {
 export type VerifiedArticleMetadata = {
   canonicalUrl: string;
   publishedDate: string;
+  headline: string;
+  pageType: "article" | "news_article" | "review" | "blog_posting" | "report";
   summary?: string;
 };
 
@@ -19,6 +21,7 @@ const GOOGLE_NEWS_HOST = "news.google.com";
 const DEFAULT_TIMEOUT_MS = 12_000;
 const DEFAULT_REQUEST_SPACING_MS = 125;
 const MAX_FETCH_ATTEMPTS = 3;
+const MAX_ARTICLE_HTML_BYTES = 2_500_000;
 
 export function createArticleMetadataVerifier({
   fetchImpl = fetch,
@@ -32,7 +35,7 @@ export function createArticleMetadataVerifier({
 
   return {
     verifyGoogleNewsUrl(sourceUrl: string) {
-      const cacheKey = normalizeUrlForCache(sourceUrl);
+      const cacheKey = `google:${normalizeUrlForCache(sourceUrl)}`;
       const cached = cache.get(cacheKey);
 
       if (cached) {
@@ -42,6 +45,21 @@ export function createArticleMetadataVerifier({
       const verification = limit(async () => {
         await pace();
         return verifyGoogleNewsArticle({ sourceUrl, fetchImpl, timeoutMs });
+      });
+      cache.set(cacheKey, verification);
+      return verification;
+    },
+    verifyPublisherArticleUrl(sourceUrl: string) {
+      const cacheKey = `publisher:${normalizeUrlForCache(sourceUrl)}`;
+      const cached = cache.get(cacheKey);
+
+      if (cached) {
+        return cached;
+      }
+
+      const verification = limit(async () => {
+        await pace();
+        return verifyPublisherArticle({ sourceUrl, fetchImpl, timeoutMs });
       });
       cache.set(cacheKey, verification);
       return verification;
@@ -99,29 +117,82 @@ async function verifyGoogleNewsArticle({
       return { ok: false, reason: "google_news_decode_failed" };
     }
 
+    return verifyPublisherArticle({ sourceUrl: decodedUrl, fetchImpl, timeoutMs });
+  } catch (error) {
+    return {
+      ok: false,
+      reason: error instanceof Error ? error.message.slice(0, 120) : "article_verification_failed"
+    };
+  }
+}
+
+async function verifyPublisherArticle({
+  sourceUrl,
+  fetchImpl,
+  timeoutMs
+}: {
+  sourceUrl: string;
+  fetchImpl: typeof fetch;
+  timeoutMs: number;
+}): Promise<ArticleMetadataVerification> {
+  if (!isSafePublisherUrl(sourceUrl)) {
+    return { ok: false, reason: "unsafe_publisher_url" };
+  }
+
+  try {
     const publisherPage = await fetchTextWithTimeout({
-      url: decodedUrl,
+      url: sourceUrl,
       fetchImpl,
       timeoutMs,
       headers: { accept: "text/html,application/xhtml+xml" }
     });
-    const canonicalUrl = getCanonicalUrl(publisherPage.text, publisherPage.finalUrl ?? decodedUrl);
-    const publishedDate = getPublisherDate(publisherPage.text);
-    const summary = getPublisherSummary(publisherPage.text);
+    const finalUrl = publisherPage.finalUrl ?? sourceUrl;
+
+    if (!isSafePublisherUrl(finalUrl)) {
+      return { ok: false, reason: "unsafe_publisher_redirect" };
+    }
+
+    if (
+      publisherPage.contentType &&
+      !publisherPage.contentType.includes("text/html") &&
+      !publisherPage.contentType.includes("application/xhtml+xml")
+    ) {
+      return { ok: false, reason: "publisher_response_not_html" };
+    }
+
+    const canonicalUrl = getCanonicalUrl(publisherPage.text, finalUrl);
 
     if (!canonicalUrl) {
       return { ok: false, reason: "missing_canonical_url" };
     }
 
-    if (!publishedDate) {
+    if (isLikelyNonArticlePageUrl(canonicalUrl)) {
+      return { ok: false, reason: "non_article_page" };
+    }
+
+    const articleMetadata = getPublisherArticleMetadata(publisherPage.text, canonicalUrl);
+
+    if (!articleMetadata) {
+      return { ok: false, reason: "non_article_page" };
+    }
+
+    if (!articleMetadata.headline) {
+      return { ok: false, reason: "missing_publisher_headline" };
+    }
+
+    if (!articleMetadata.publishedDate) {
       return { ok: false, reason: "missing_publisher_date" };
     }
+
+    const summary = getPublisherSummary(publisherPage.text, articleMetadata.jsonLdNode);
 
     return {
       ok: true,
       metadata: {
         canonicalUrl,
-        publishedDate,
+        headline: articleMetadata.headline,
+        publishedDate: articleMetadata.publishedDate,
+        pageType: articleMetadata.pageType,
         ...(summary ? { summary } : {})
       }
     };
@@ -233,10 +304,24 @@ async function fetchTextWithTimeout({
           ...headers
         }
       });
+      const contentLength = Number.parseInt(response.headers.get("content-length") ?? "", 10);
+
+      if (Number.isFinite(contentLength) && contentLength > MAX_ARTICLE_HTML_BYTES) {
+        throw new Error("article_verification_response_too_large");
+      }
+
       const text = await response.text();
 
+      if (text.length > MAX_ARTICLE_HTML_BYTES) {
+        throw new Error("article_verification_response_too_large");
+      }
+
       if (response.ok) {
-        return { text, finalUrl: response.url || url };
+        return {
+          text,
+          finalUrl: response.url || url,
+          contentType: response.headers.get("content-type")?.toLowerCase() ?? ""
+        };
       }
 
       if (!isRetryableStatus(response.status) || attempt === MAX_FETCH_ATTEMPTS - 1) {
@@ -277,34 +362,205 @@ function getCanonicalUrl(html: string, fallbackUrl: string) {
   return isSafePublisherUrl(candidate) ? stripTrackingParameters(candidate) : null;
 }
 
-function getPublisherDate(html: string) {
-  const jsonLdMatch = html.match(/["']datePublished["']\s*:\s*["']([^"']+)["']/i);
-  const jsonLdDate = normalizePublishedDate(jsonLdMatch?.[1]);
+type JsonLdNode = Record<string, unknown>;
 
-  if (jsonLdDate) {
-    return jsonLdDate;
+type PublisherArticleMetadata = {
+  headline: string | null;
+  publishedDate: string | null;
+  pageType: VerifiedArticleMetadata["pageType"];
+  jsonLdNode?: JsonLdNode;
+};
+
+const ARTICLE_JSON_LD_TYPES = new Map<string, VerifiedArticleMetadata["pageType"]>([
+  ["article", "article"],
+  ["newsarticle", "news_article"],
+  ["review", "review"],
+  ["musicreview", "review"],
+  ["criticreview", "review"],
+  ["blogposting", "blog_posting"],
+  ["report", "report"]
+]);
+
+function getPublisherArticleMetadata(html: string, canonicalUrl: string): PublisherArticleMetadata | null {
+  const jsonLdArticles = getJsonLdArticleNodes(html);
+  const linkedJsonLdArticle = jsonLdArticles
+    .map((node) => ({ node, score: getJsonLdPageMatchScore(node, canonicalUrl) }))
+    .filter(({ score }) => score > 0)
+    .sort((first, second) => second.score - first.score)[0]?.node;
+  const ogType = getMetaContent(html, ["og:type"])?.toLowerCase().replace(/[^a-z]/g, "") ?? "";
+  const ogArticleType = ARTICLE_JSON_LD_TYPES.get(ogType);
+  const metaPublishedDate = getPublisherMetaDate(html);
+  const singleArticleElement = (html.match(/<article\b/gi) ?? []).length === 1;
+  const jsonLdNode = linkedJsonLdArticle ?? (ogArticleType && jsonLdArticles.length === 1 ? jsonLdArticles[0] : undefined);
+  const jsonLdPageType = jsonLdNode ? getJsonLdArticleType(jsonLdNode) : null;
+  const pageType = jsonLdPageType ?? ogArticleType ?? (metaPublishedDate ? "article" : null);
+
+  if (!pageType && !singleArticleElement) {
+    return null;
   }
 
-  for (const tag of Array.from(html.matchAll(/<meta\b[^>]*>/gi), (match) => match[0])) {
-    const key = (
-      getTagAttribute(tag, "property") ??
-      getTagAttribute(tag, "name") ??
-      getTagAttribute(tag, "itemprop") ??
-      ""
-    ).toLowerCase();
+  const publishedDate =
+    getJsonLdDate(jsonLdNode) ??
+    metaPublishedDate ??
+    (singleArticleElement ? getSingleArticleElementDate(html) : null);
+  const headline =
+    normalizePublisherText(getJsonLdString(jsonLdNode, "headline")) ??
+    normalizePublisherText(getJsonLdString(jsonLdNode, "name")) ??
+    getPublisherHeadline(html);
 
-    if (!["article:published_time", "datepublished", "pubdate", "publishdate", "publish-date"].includes(key)) {
+  return {
+    headline,
+    publishedDate,
+    pageType: pageType ?? "article",
+    ...(jsonLdNode ? { jsonLdNode } : {})
+  };
+}
+
+function getJsonLdArticleNodes(html: string) {
+  const nodes: JsonLdNode[] = [];
+
+  for (const match of html.matchAll(/<script\b[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi)) {
+    const payload = match[1]?.trim();
+
+    if (!payload) {
       continue;
     }
 
-    const publishedDate = normalizePublishedDate(getTagAttribute(tag, "content"));
-
-    if (publishedDate) {
-      return publishedDate;
+    try {
+      collectJsonLdNodes(JSON.parse(payload), nodes);
+    } catch {
+      // Invalid structured data cannot prove that this is an article page.
     }
   }
 
-  for (const tag of Array.from(html.matchAll(/<time\b[^>]*>/gi), (match) => match[0])) {
+  return nodes.filter((node) => Boolean(getJsonLdArticleType(node)));
+}
+
+function collectJsonLdNodes(value: unknown, nodes: JsonLdNode[]) {
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      collectJsonLdNodes(item, nodes);
+    }
+    return;
+  }
+
+  if (!value || typeof value !== "object") {
+    return;
+  }
+
+  const node = value as JsonLdNode;
+  nodes.push(node);
+
+  if (Array.isArray(node["@graph"])) {
+    collectJsonLdNodes(node["@graph"], nodes);
+  }
+}
+
+function getJsonLdArticleType(node: JsonLdNode) {
+  const values = Array.isArray(node["@type"]) ? node["@type"] : [node["@type"]];
+
+  for (const value of values) {
+    if (typeof value !== "string") {
+      continue;
+    }
+
+    const pageType = ARTICLE_JSON_LD_TYPES.get(value.toLowerCase().replace(/[^a-z]/g, ""));
+
+    if (pageType) {
+      return pageType;
+    }
+  }
+
+  return null;
+}
+
+function getJsonLdPageMatchScore(node: JsonLdNode, canonicalUrl: string) {
+  const candidates = [
+    getJsonLdUrl(node.url),
+    getJsonLdUrl(node.mainEntityOfPage),
+    getJsonLdUrl(node["@id"])
+  ].filter((value): value is string => Boolean(value));
+  const matchesCanonical = candidates.some((value) => areEquivalentArticleUrls(value, canonicalUrl));
+
+  if (!matchesCanonical) {
+    return 0;
+  }
+
+  let score = 8;
+
+  if (getJsonLdString(node, "headline")) {
+    score += 2;
+  }
+
+  if (getJsonLdDate(node)) {
+    score += 2;
+  }
+
+  return score;
+}
+
+function getJsonLdUrl(value: unknown): string | null {
+  if (typeof value === "string") {
+    return value;
+  }
+
+  if (value && typeof value === "object") {
+    const record = value as Record<string, unknown>;
+    return typeof record["@id"] === "string"
+      ? record["@id"]
+      : typeof record.url === "string"
+        ? record.url
+        : null;
+  }
+
+  return null;
+}
+
+function getJsonLdString(node: JsonLdNode | undefined, key: string) {
+  const value = node?.[key];
+  return typeof value === "string" ? value : null;
+}
+
+function getJsonLdDate(node: JsonLdNode | undefined) {
+  return normalizePublishedDate(getJsonLdString(node, "datePublished"));
+}
+
+function areEquivalentArticleUrls(first: string, second: string) {
+  try {
+    const normalize = (value: string) => {
+      const url = new URL(decodeHtml(value));
+      url.hash = "";
+      url.search = "";
+      url.pathname = url.pathname.replace(/\/+$/, "") || "/";
+      return `${url.hostname.toLowerCase().replace(/^www\./, "")}${url.pathname}`;
+    };
+
+    return normalize(first) === normalize(second);
+  } catch {
+    return false;
+  }
+}
+
+function getPublisherMetaDate(html: string) {
+  const value = getMetaContent(html, [
+    "article:published_time",
+    "datepublished",
+    "pubdate",
+    "publishdate",
+    "publish-date"
+  ]);
+
+  return normalizePublishedDate(value);
+}
+
+function getSingleArticleElementDate(html: string) {
+  const article = html.match(/<article\b[\s\S]*?<\/article>/i)?.[0];
+
+  if (!article) {
+    return null;
+  }
+
+  for (const tag of Array.from(article.matchAll(/<time\b[^>]*>/gi), (match) => match[0])) {
     const itemProp = getTagAttribute(tag, "itemprop")?.toLowerCase();
 
     if (itemProp !== "datepublished") {
@@ -321,27 +577,89 @@ function getPublisherDate(html: string) {
   return null;
 }
 
-function getPublisherSummary(html: string) {
+function getPublisherHeadline(html: string) {
+  const metaHeadline = getMetaContent(html, ["og:title", "twitter:title"]);
+
+  if (metaHeadline) {
+    return normalizePublisherText(metaHeadline);
+  }
+
+  const h1 = html.match(/<h1\b[^>]*>([\s\S]*?)<\/h1>/i)?.[1];
+  const title = html.match(/<title\b[^>]*>([\s\S]*?)<\/title>/i)?.[1];
+
+  return normalizePublisherText(h1) ?? normalizePublisherText(title);
+}
+
+function getMetaContent(html: string, acceptedKeys: string[]) {
+  const normalizedKeys = new Set(acceptedKeys.map((key) => key.toLowerCase()));
+
   for (const tag of Array.from(html.matchAll(/<meta\b[^>]*>/gi), (match) => match[0])) {
     const key = (
       getTagAttribute(tag, "property") ??
       getTagAttribute(tag, "name") ??
+      getTagAttribute(tag, "itemprop") ??
       ""
     ).toLowerCase();
 
-    if (!["description", "og:description", "twitter:description"].includes(key)) {
+    if (!normalizedKeys.has(key)) {
       continue;
     }
 
-    const summary = normalizePublisherSummary(getTagAttribute(tag, "content"));
+    const content = getTagAttribute(tag, "content");
 
-    if (summary) {
-      return summary;
+    if (content) {
+      return content;
     }
   }
 
-  const jsonLdMatch = html.match(/["']description["']\s*:\s*["']([^"']+)["']/i);
-  return normalizePublisherSummary(jsonLdMatch?.[1]);
+  return null;
+}
+
+function getPublisherSummary(html: string, jsonLdNode?: JsonLdNode) {
+  const metaSummary = getMetaContent(html, ["description", "og:description", "twitter:description"]);
+  const summary = normalizePublisherSummary(metaSummary);
+
+  if (summary) {
+    return summary;
+  }
+
+  return normalizePublisherSummary(getJsonLdString(jsonLdNode, "description"));
+}
+
+function normalizePublisherText(value: string | null | undefined) {
+  if (!value) {
+    return null;
+  }
+
+  const normalized = decodeHtml(value)
+    .replace(/<[^>]+>/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  return normalized ? normalized.slice(0, 300) : null;
+}
+
+function isLikelyNonArticlePageUrl(value: string) {
+  try {
+    const url = new URL(value);
+    const path = url.pathname.toLowerCase().replace(/\/+$/, "") || "/";
+
+    if (path === "/" || /\.(?:xml|rss|json)$/.test(path)) {
+      return true;
+    }
+
+    if (/^\/(?:artists?|authors?|contributors?|tags?|topics?|categories?|search)(?:\/|$)/.test(path)) {
+      return true;
+    }
+
+    if (/^\/(?:news|reviews?|features?|lists?|columns?|video|music|rap)$/.test(path)) {
+      return true;
+    }
+
+    return url.searchParams.has("s") || url.searchParams.has("search");
+  } catch {
+    return true;
+  }
 }
 
 function normalizePublisherSummary(value: string | null | undefined) {
@@ -403,7 +721,52 @@ function stripTrackingParameters(value: string) {
 function isSafePublisherUrl(value: string) {
   try {
     const url = new URL(decodeHtml(value));
-    return ["http:", "https:"].includes(url.protocol) && url.hostname !== GOOGLE_NEWS_HOST;
+    const hostname = url.hostname.toLowerCase().replace(/^\[|\]$/g, "");
+
+    if (
+      !["http:", "https:"].includes(url.protocol) ||
+      !hostname ||
+      hostname === GOOGLE_NEWS_HOST ||
+      url.username ||
+      url.password ||
+      (url.port && !["80", "443"].includes(url.port))
+    ) {
+      return false;
+    }
+
+    if (
+      hostname === "localhost" ||
+      hostname.endsWith(".localhost") ||
+      hostname.endsWith(".local") ||
+      hostname.endsWith(".internal") ||
+      hostname === "::1" ||
+      hostname.startsWith("fc") ||
+      hostname.startsWith("fd") ||
+      hostname.startsWith("fe80:")
+    ) {
+      return false;
+    }
+
+    const ipv4 = hostname.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+
+    if (ipv4) {
+      const octets = ipv4.slice(1).map(Number);
+      const [first, second] = octets;
+
+      if (
+        octets.some((octet) => octet > 255) ||
+        first === 0 ||
+        first === 10 ||
+        first === 127 ||
+        (first === 169 && second === 254) ||
+        (first === 172 && second >= 16 && second <= 31) ||
+        (first === 192 && second === 168)
+      ) {
+        return false;
+      }
+    }
+
+    return true;
   } catch {
     return false;
   }
