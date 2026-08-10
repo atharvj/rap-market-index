@@ -5,6 +5,7 @@ import { useGame } from "@/components/GameProvider";
 import { MiniSparkline } from "@/components/MiniSparkline";
 import { ChangeText, RmiButton, RmiSection } from "@/components/RmiPrimitives";
 import { PriceChart } from "@/components/PriceChart";
+import { ScoreInfo } from "@/components/ScoreInfo";
 import { WatchlistButton } from "@/components/WatchlistButton";
 import { formatCurrency, formatDate, formatPercent } from "@/lib/formatters";
 import { buildMarketIndexSeries, getMarketBreadth, getSeriesChangePercent } from "@/lib/market-analytics";
@@ -154,7 +155,9 @@ export default function MarketsPage() {
         <div className="rmi-table-head grid grid-cols-[minmax(0,1fr)_72px_60px_32px] gap-x-1 px-2 py-3 sm:grid-cols-[minmax(0,1fr)_104px_84px_36px] sm:gap-x-3 sm:px-4 lg:grid-cols-[minmax(220px,1fr)_140px_124px_104px_84px_44px] lg:gap-x-4">
           <span>Artist</span>
           <span className="hidden text-right lg:block">Recent sessions</span>
-          <span className="hidden text-right lg:block">Signal Score</span>
+          <span className="hidden items-center justify-end gap-1.5 text-right lg:flex">
+            Signal Score <ScoreInfo />
+          </span>
           <span className="text-right">Price</span>
           <span className="text-right">24h</span>
           <span className="sr-only">watchlist</span>

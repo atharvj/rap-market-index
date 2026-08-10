@@ -532,10 +532,12 @@ function getYoutubeEditorialEventProvenance(event: MarketEvent) {
   const reason = getRawString(event.rawPayload.classificationReason) ?? "";
   const authority = getRawString(event.rawPayload.publisherAuthority) ?? "";
   const videoId = getRawString(event.rawPayload.videoId) ?? "";
-  const musicDemandConfirmed = getRawBoolean(event.rawPayload.musicDemandConfirmed);
+  const editorialAttentionVerified =
+    getRawBoolean(event.rawPayload.editorialAttentionVerified) ||
+    getRawBoolean(event.rawPayload.musicDemandConfirmed);
   const acceptedReason = ["lyrics_interview", "music_interview", "music_documentary", "editorial_performance"].includes(reason);
 
-  if (!acceptedReason || !musicDemandConfirmed || !/^[a-z0-9_-]{6,20}$/i.test(videoId)) {
+  if (!acceptedReason || !editorialAttentionVerified || !/^[a-z0-9_-]{6,20}$/i.test(videoId)) {
     return {
       label: "editorial-video-unverified",
       impactMultiplier: 0,

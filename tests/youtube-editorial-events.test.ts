@@ -64,7 +64,8 @@ describe("trusted YouTube editorial catalysts", () => {
     expect(events[0].rawPayload).toMatchObject({
       source: "youtube_editorial_event",
       classificationReason: "lyrics_interview",
-      musicDemandConfirmed: true,
+      editorialAttentionVerified: true,
+      musicDemandConfirmed: false,
       videoId: "VideoId123"
     });
     expect(events[0].impactScore).toBeGreaterThan(15);

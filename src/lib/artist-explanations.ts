@@ -1,7 +1,7 @@
 import type { HypeStats } from "@/lib/types";
 
 export const MARKET_SCORE_EXPLANATION =
-  "A 1–100 snapshot of an artist’s current momentum. Around 50 means signals are mixed.";
+  "Current momentum, not a forecast. Around 50 means mixed signals; higher means stronger recent evidence.";
 
 export function getMarketSignalLabel(score: number) {
   if (score >= 60) {

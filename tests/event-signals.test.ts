@@ -275,7 +275,8 @@ describe("trusted editorial video catalysts", () => {
         videoId: "VideoId123",
         publisherAuthority: "primary",
         classificationReason: "music_interview",
-        musicDemandConfirmed: true,
+        editorialAttentionVerified: true,
+        musicDemandConfirmed: false,
         viewCount: 100_000,
         reachRatio: 1.2
       }
@@ -295,6 +296,8 @@ describe("trusted editorial video catalysts", () => {
     expect(modifier?.reason).toContain("music interview");
     expect(modifier?.priceShock).toBeGreaterThan(0);
     expect(modifier?.priceShock).toBeLessThan(0.01);
+    expect(signal.stats.streamingGrowth).toBeUndefined();
+    expect(signal.stats.youtubeGrowth).toBeUndefined();
   });
 });
 
