@@ -75,6 +75,47 @@ describe("Bluesky market source", () => {
     });
   });
 
+  it("treats mocked livestream coverage as negative fan response, not a positive performance", async () => {
+    const drake = { ...artist, id: "drake", name: "Drake", ticker: "DRAKE" };
+    const result = await collectBlueskyMarketSignals({
+      artists: [drake],
+      runDate: "2026-08-10",
+      delayMs: 0,
+      fetchImpl: async () =>
+        new Response(
+          JSON.stringify({
+            posts: [
+              {
+                uri: "at://did:plc:publisher/app.bsky.feed.post/mock-stream",
+                author: { handle: "publisher.bsky.social", displayName: "Publisher" },
+                record: {
+                  text: "Drake was mocked and ridiculed by fans after a viral livestream clip.",
+                  createdAt: "2026-08-10T12:00:00.000Z"
+                },
+                likeCount: 40,
+                repostCount: 8,
+                replyCount: 12,
+                quoteCount: 4
+              }
+            ]
+          }),
+          { status: 200 }
+        )
+    });
+
+    expect(result.signals[drake.id].rawPayload).toMatchObject({
+      negativePostCount: 1,
+      hypePostCount: 1
+    });
+    expect(result.signals[drake.id].stats.socialGrowth).toBeLessThan(0);
+    expect(result.eventsByArtist[drake.id]?.[0]).toMatchObject({
+      eventType: "controversy",
+      sentimentScore: expect.any(Number),
+      rawPayload: { classificationReason: "backlash_terms" }
+    });
+    expect(result.eventsByArtist[drake.id]?.[0].sentimentScore).toBeLessThan(0);
+  });
+
   it("drops a partial prefix when most roster searches fail", async () => {
     const artists = Array.from({ length: 12 }, (_, index) => ({
       ...artist,
