@@ -8,6 +8,7 @@ import {
 } from "@/server/market/pending-catalyst";
 import { enforceRateLimit, getRequestIp } from "@/server/rate-limit";
 import { secureCompare } from "@/server/secrets";
+import { isStoredMarketEventSourceIntegrityValid } from "@/server/market/event-integrity";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
@@ -21,6 +22,8 @@ type AutomationResponse = {
 type CandidateEvent = {
   artist_id: string;
   title: string;
+  source_url: string | null;
+  raw_payload: unknown;
   event_date: string;
   event_type: string;
   created_at: string;
@@ -158,7 +161,7 @@ async function loadPendingCatalysts() {
   ).toISOString();
   const { data: events, error: eventError } = await supabase
     .from("market_events")
-    .select("artist_id,title,event_date,event_type,created_at")
+    .select("artist_id,title,source_url,raw_payload,event_date,event_type,created_at")
     .gte("created_at", detectedAfter)
     .gte("confidence", PENDING_CATALYST_MIN_CONFIDENCE)
     .or(`impact_score.gte.${PENDING_CATALYST_MIN_IMPACT},impact_score.lte.-${PENDING_CATALYST_MIN_IMPACT}`)
@@ -200,6 +203,18 @@ async function loadPendingCatalysts() {
 
   for (const event of candidates) {
     if (selected.has(event.artist_id)) {
+      continue;
+    }
+
+    const rawPayload = event.raw_payload && typeof event.raw_payload === "object" && !Array.isArray(event.raw_payload)
+      ? event.raw_payload as Record<string, unknown>
+      : {};
+
+    if (!isStoredMarketEventSourceIntegrityValid(rawPayload, {
+      eventDate: event.event_date,
+      title: event.title,
+      sourceUrl: event.source_url
+    })) {
       continue;
     }
 

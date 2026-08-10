@@ -7,17 +7,24 @@ type EventIdentity = {
 };
 
 export function isMarketEventSourceIntegrityValid(event: MarketEvent) {
-  const source = getString(event.rawPayload.source)?.toLowerCase();
+  return isStoredMarketEventSourceIntegrityValid(event.rawPayload, {
+    eventDate: event.eventDate,
+    title: event.title,
+    sourceUrl: event.sourceUrl
+  });
+}
+
+export function isStoredMarketEventSourceIntegrityValid(
+  rawPayload: Record<string, unknown>,
+  event: EventIdentity
+) {
+  const source = getString(rawPayload.source)?.toLowerCase();
 
   if (source !== "ai_research_event") {
     return true;
   }
 
-  return hasVerifiedAiResearchArticleProvenance(event.rawPayload, {
-    eventDate: event.eventDate,
-    title: event.title,
-    sourceUrl: event.sourceUrl
-  });
+  return hasVerifiedAiResearchArticleProvenance(rawPayload, event);
 }
 
 export function hasVerifiedAiResearchArticleProvenance(

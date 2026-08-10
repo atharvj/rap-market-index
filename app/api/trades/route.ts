@@ -7,6 +7,7 @@ import {
   PENDING_CATALYST_MIN_IMPACT
 } from "@/server/market/pending-catalyst";
 import { loadReleaseWindowStatus } from "@/server/market/release-window";
+import { isStoredMarketEventSourceIntegrityValid } from "@/server/market/event-integrity";
 import { reportServerError } from "@/server/observability";
 import { requireConfirmedUser } from "@/server/user-auth";
 
@@ -281,7 +282,7 @@ async function loadPendingCatalyst(
   const [eventResult, quoteResult] = await Promise.all([
     supabase
       .from("market_events")
-      .select("title,created_at,event_date,event_type")
+      .select("title,source_url,raw_payload,created_at,event_date,event_type")
       .eq("artist_id", artistId)
       .gte("confidence", PENDING_CATALYST_MIN_CONFIDENCE)
       .or(`impact_score.gte.${PENDING_CATALYST_MIN_IMPACT},impact_score.lte.-${PENDING_CATALYST_MIN_IMPACT}`)
@@ -304,14 +305,24 @@ async function loadPendingCatalyst(
   }
 
   const quotedAt = quoteResult.data?.observed_at ?? null;
-  const event = eventResult.data.find((candidate) => isPendingCatalyst({
-    event: {
-      createdAt: candidate.created_at,
+  const event = eventResult.data.find((candidate) => {
+    const rawPayload = candidate.raw_payload && typeof candidate.raw_payload === "object" && !Array.isArray(candidate.raw_payload)
+      ? candidate.raw_payload as Record<string, unknown>
+      : {};
+
+    return isStoredMarketEventSourceIntegrityValid(rawPayload, {
       eventDate: candidate.event_date,
-      eventType: candidate.event_type
-    },
-    quotedAt
-  }));
+      title: candidate.title,
+      sourceUrl: candidate.source_url
+    }) && isPendingCatalyst({
+      event: {
+        createdAt: candidate.created_at,
+        eventDate: candidate.event_date,
+        eventType: candidate.event_type
+      },
+      quotedAt
+    });
+  });
 
   if (!event) {
     return null;
