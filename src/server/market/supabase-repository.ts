@@ -14,6 +14,7 @@ import type {
 } from "@/server/market/market-data";
 import type { ArtistCategory, HypeStats } from "@/lib/types";
 import { isMarketEventSourceIntegrityValid } from "@/server/market/event-integrity";
+import { decodeHtmlEntities } from "@/lib/html-entities";
 
 type Supabase = SupabaseClient<Database>;
 
@@ -899,7 +900,7 @@ export async function loadRecentMarketEvents({
       artistId: row.artist_id,
       eventDate: row.event_date,
       eventType: row.event_type,
-      title: row.title,
+      title: decodeHtmlEntities(row.title),
       sourceName: row.source_name ?? undefined,
       sourceUrl: row.source_url ?? undefined,
       sentimentScore: Number(row.sentiment_score),
@@ -919,7 +920,9 @@ export async function loadRecentMarketEvents({
 }
 
 export async function persistMarketEvents(supabase: Supabase, events: MarketEvent[]) {
-  const integrityCheckedEvents = events.filter(isMarketEventSourceIntegrityValid);
+  const integrityCheckedEvents = events
+    .filter(isMarketEventSourceIntegrityValid)
+    .map((event) => ({ ...event, title: decodeHtmlEntities(event.title) }));
 
   if (!integrityCheckedEvents.length) {
     return;

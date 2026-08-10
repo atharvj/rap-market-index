@@ -117,7 +117,7 @@ export function TradeTicket({
         return limitReason;
       }
 
-      return `Max ${formatTradeLimit(maxBuy)} · ${getBuyLimitLabel({
+      return `Max ${formatTradeLimit(maxBuy)} shares · ${getBuyLimitLabel({
         cashBalance: state.cashBalance,
         remainingDailyBuyValue,
         remainingPositionValue
@@ -279,7 +279,7 @@ export function TradeTicket({
             </span>
           </div>
           <div className="mt-2 flex items-center justify-between gap-3 text-xs font-bold text-paper/50">
-            <span>Commission</span>
+            <span>Fantasy commission</span>
             <span className="number-tabular">{formatCurrency(estimatedCommission || 0)}</span>
           </div>
           <div className="mt-1 flex items-center justify-between gap-3 text-xs font-bold text-paper/50">
@@ -460,12 +460,12 @@ function getBuyLimitLabel({
   remainingPositionValue: number;
 }) {
   if (remainingDailyBuyValue <= Math.min(cashBalance, remainingPositionValue)) {
-    return "24h artist limit";
+    return "limited by 24h cap";
   }
 
   if (remainingPositionValue <= cashBalance) {
-    return "25% artist limit";
+    return "limited by 25% cap";
   }
 
-  return "cash available";
+  return "limited by fantasy cash";
 }

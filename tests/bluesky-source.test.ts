@@ -22,6 +22,22 @@ const artist: MarketUpdateArtist = {
 };
 
 describe("Bluesky market source", () => {
+  it("disambiguates short artist names without excluding adjacent public attention", async () => {
+    let requestedQuery = "";
+    await collectBlueskyMarketSignals({
+      artists: [{ ...artist, id: "drake", name: "Drake", ticker: "DRAKE" }],
+      runDate: "2026-08-10",
+      delayMs: 0,
+      fetchImpl: async (input) => {
+        requestedQuery = new URL(String(input)).searchParams.get("q") ?? "";
+        return new Response(JSON.stringify({ posts: [] }), { status: 200 });
+      }
+    });
+
+    expect(requestedQuery).toContain('"Drake"');
+    expect(requestedQuery).toBe('"Drake" rapper');
+  });
+
   it("collects a music-specific social catalyst without credentials", async () => {
     const result = await collectBlueskyMarketSignals({
       artists: [artist],

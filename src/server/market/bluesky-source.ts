@@ -942,7 +942,10 @@ function buildBlueskyQuery(artist: MarketUpdateArtist, externalIds?: ArtistExter
   const cleanName = name.replace(/"/g, "").trim();
 
   if (cleanName.split(/\s+/).length === 1 && cleanName.length <= 6) {
-    return `"${cleanName}" rapper music album snippet tracklist`;
+    // Bluesky currently treats a Lucene-style OR group as an overly strict
+    // match here. The artist-role qualifier disambiguates names such as Future
+    // while still finding music and adjacent public-attention stories.
+    return `"${cleanName}" rapper`;
   }
 
   return `"${cleanName}"`;

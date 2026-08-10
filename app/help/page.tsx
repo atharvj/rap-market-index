@@ -40,7 +40,7 @@ const topics = [
     id: "trading",
     category: "Trading",
     title: "Buy and sell artist shares",
-    summary: "Order estimates, execution prices, commissions, available cash, and position limits.",
+    summary: "Order estimates, execution prices, fantasy commissions, available cash, and position limits.",
     icon: CandlestickChart,
     answers: [
       "Open an artist quote, choose Buy or Sell, enter a whole number of shares, and review the estimated total.",
@@ -51,7 +51,8 @@ const topics = [
       "Rapid duplicate orders and daily activity can be limited to protect the fantasy market. Wait for the message shown on the ticket before trying again.",
       "The final execution price can differ slightly from the displayed quote because of spread and slippage.",
       "A positive daily move describes what already happened since the previous close; buying a current gainer does not automatically earn that past return.",
-      "Buying and immediately selling normally loses fantasy cash because buys execute above the midpoint, sells execute below it, and each side pays commission.",
+      "Fantasy commission adds realistic trading friction and discourages rapid flipping; no real money is charged.",
+      "Buying and immediately selling normally loses fantasy cash because buys execute above the midpoint, sells execute below it, and each side pays fantasy commission.",
       "RMI uses fantasy cash only. Shares cannot be converted into real money."
     ]
   },

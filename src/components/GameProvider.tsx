@@ -706,7 +706,7 @@ function formatTradeMessage({
       : "";
   const commissionText =
     typeof commission === "number" && Number.isFinite(commission)
-      ? ` Commission ${new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(commission)}.`
+      ? ` Fantasy commission ${new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(commission)}.`
       : "";
   return `${getTradeVerb(side)} ${shares} ${ticker ?? "shares"}${executionText}.${commissionText}`;
 }

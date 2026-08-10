@@ -4,7 +4,6 @@ import { ArtistAvatar } from "@/components/ArtistAvatar";
 import { useGame } from "@/components/GameProvider";
 import { MiniSparkline } from "@/components/MiniSparkline";
 import { formatCurrency, formatPercent } from "@/lib/formatters";
-import { getSeriesChangePercent } from "@/lib/market-analytics";
 import type { Artist } from "@/lib/types";
 import { Activity, Star, TrendingDown, TrendingUp } from "lucide-react";
 import Link from "next/link";
@@ -84,7 +83,10 @@ function MarketList({
       </div>
       <div className="divide-y divide-line/75">
         {artists.map((artist) => {
-          const recentHistory = artist.priceHistory;
+          const recentHistory = [
+            { date: "previous-close", price: artist.previousClose },
+            { date: "latest-close", price: artist.currentPrice }
+          ];
 
           return (
             <Link
@@ -101,10 +103,10 @@ function MarketList({
               </span>
               <MiniSparkline
                 data={recentHistory}
-                positive={getSeriesChangePercent(recentHistory) >= 0}
+                positive={artist.dailyChangePercent >= 0}
                 width={64}
                 height={24}
-                label={`One-month price trend over ${recentHistory.length} recorded sessions`}
+                label="24-hour price move"
               />
               <span className="text-right number-tabular">
                 <span className="block text-xs font-semibold">{formatCurrency(artist.currentPrice)}</span>

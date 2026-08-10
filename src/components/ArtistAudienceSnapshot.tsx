@@ -10,12 +10,12 @@ type ObservationsResponse = {
 };
 
 const preferredSeries = [
-  { key: "youtube:subscriber_count", label: "Video Audience" },
-  { key: "youtube:channel_views", label: "Channel Views" },
-  { key: "wikimedia:pageviews_7d", label: "Public Attention (7d)" },
-  { key: "media_rss:source_count", label: "Recent Media Sources" },
-  { key: "trade_flow:unique_trader_count", label: "Active Traders" },
-  { key: "trade_flow:trade_count", label: "Recent Orders" }
+  { key: "youtube:subscriber_count", label: "YouTube Subscribers · Total" },
+  { key: "youtube:channel_views", label: "YouTube Views · Lifetime" },
+  { key: "wikimedia:pageviews_7d", label: "Wikipedia Views · 7D" },
+  { key: "media_rss:source_count", label: "Media Sources · 30D" },
+  { key: "trade_flow:unique_trader_count", label: "Active Traders · 24H" },
+  { key: "trade_flow:trade_count", label: "Orders · 24H" }
 ];
 
 export function ArtistAudienceSnapshot({ artistId }: { artistId: string }) {
@@ -79,7 +79,7 @@ export function ArtistAudienceSnapshot({ artistId }: { artistId: string }) {
           <div key={metric.key} className="min-w-0 px-3 py-3">
             <p className="truncate text-[10px] font-semibold uppercase text-paper/42">{metric.label}</p>
             <p className="mt-1 text-sm font-semibold number-tabular">{formatCompact(metric.value)}</p>
-            <p className="mt-1 text-[10px] text-paper/35">{formatDate(metric.date)}</p>
+            <p className="mt-1 text-[10px] text-paper/35">Updated {formatDate(metric.date)}</p>
           </div>
         ))}
       </div>

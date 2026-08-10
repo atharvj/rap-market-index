@@ -119,6 +119,32 @@ describe("market-maker trading economics", () => {
     })).toBe(104);
   });
 
+  it("shows a whole-share maximum that reconciles with a 24-hour dollar cap", () => {
+    const maxShares = getMaximumBuyShares({
+      cashBalance: 25_000,
+      remainingPositionValue: 10_000,
+      remainingDailyBuyValue: 1_349,
+      midPrice: 134.89,
+      volatility: 1
+    });
+    const maxQuote = estimateMarketMakerQuote({
+      side: "buy",
+      midPrice: 134.89,
+      shares: maxShares,
+      volatility: 1
+    });
+    const nextQuote = estimateMarketMakerQuote({
+      side: "buy",
+      midPrice: 134.89,
+      shares: maxShares + 1,
+      volatility: 1
+    });
+
+    expect(maxShares).toBe(9);
+    expect(maxQuote.orderValue).toBeLessThanOrEqual(1_349);
+    expect(nextQuote.orderValue).toBeGreaterThan(1_349);
+  });
+
   it("matches the database daily allowance and subtracts only recent buys for that artist", () => {
     const now = Date.parse("2026-07-31T18:00:00Z");
 

@@ -1,4 +1,5 @@
 import type { MarketUpdateArtist } from "@/server/market/daily-update";
+import { decodeHtmlEntities } from "@/lib/html-entities";
 import {
   createArticleMetadataVerifier,
   isGoogleNewsArticleUrl
@@ -1305,7 +1306,8 @@ function getInferredReleaseTitle({
     return null;
   }
 
-  const title = extractProjectTitle(articleTitle) ?? extractProjectTitle(text);
+  const title = extractProjectTitle(decodeHtmlEntities(articleTitle)) ??
+    extractProjectTitle(decodeHtmlEntities(text));
 
   if (!title) {
     return null;

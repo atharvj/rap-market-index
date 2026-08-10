@@ -33,6 +33,7 @@ import {
   promoteEmergingEditorialCoverage
 } from "@/server/market/emerging-news";
 import { hasVerifiedAiResearchArticleProvenance } from "@/server/market/event-integrity";
+import { decodeHtmlEntities } from "@/lib/html-entities";
 
 export const dynamic = "force-dynamic";
 
@@ -374,7 +375,7 @@ function mapMarketEventToNewsItem(
     publishedDate: getRawPublishedDate(sourcePayload) ?? sourceEvent.event_date,
     eventType: event.event_type,
     eventLabel: getPublicEventLabel(event, rawPayload, artist?.name ?? null),
-    title: event.title,
+    title: decodeHtmlEntities(event.title),
     sourceName,
     sourceUrl,
     sourceDomain,
@@ -523,11 +524,7 @@ function isPublicMarketNewsEvent(
   }
 
   if (source === "reddit_post") {
-    if (isPublicSocialCatalystEvent(event, rawPayload, impactScore, confidence)) {
-      return true;
-    }
-
-    return impactScore >= 45 && confidence >= 0.7 && !isLowSignalSocialTitle(title);
+    return false;
   }
 
   if (source === "youtube_upload_event") {

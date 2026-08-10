@@ -1,3 +1,5 @@
+import { decodeHtmlEntities } from "@/lib/html-entities";
+
 type ArticleMetadataVerifierOptions = {
   fetchImpl?: typeof fetch;
   timeoutMs?: number;
@@ -783,11 +785,7 @@ function normalizeUrlForCache(value: string) {
 }
 
 function decodeHtml(value: string) {
-  return value
-    .replace(/&amp;/g, "&")
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;|&apos;/g, "'")
-    .replace(/&#x2F;/gi, "/");
+  return decodeHtmlEntities(value).replace(/&#x2F;/gi, "/");
 }
 
 function createConcurrencyLimiter(limit: number) {

@@ -1,4 +1,5 @@
 import type { HypeStats } from "@/lib/types";
+import { decodeHtmlEntities } from "@/lib/html-entities";
 
 export const MARKET_SCORE_EXPLANATION =
   "Current momentum, not a forecast. Around 50 means mixed signals; higher means stronger recent evidence.";
@@ -60,7 +61,9 @@ export function sanitizeMoveExplanation(
   dailyChangePercent?: number,
   stats?: HypeStats
 ) {
-  const trimmed = normalizeProjectAnnouncementLabel(explanation?.trim());
+  const trimmed = normalizeProjectAnnouncementLabel(
+    explanation ? decodeHtmlEntities(explanation).trim() : undefined
+  );
   const hasChange = typeof dailyChangePercent === "number" && Number.isFinite(dailyChangePercent);
 
   if (trimmed?.toLowerCase().includes(EVIDENCE_MARKER)) {

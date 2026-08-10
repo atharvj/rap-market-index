@@ -1124,7 +1124,7 @@ function buildRedditQuery(artist: MarketUpdateArtist, externalIds?: ArtistExtern
   const cleanName = name.replace(/"/g, "").trim();
 
   if (cleanName.split(/\s+/).length === 1 && cleanName.length <= 6) {
-    return `"${cleanName}" rapper OR "${cleanName}" music OR "${cleanName}" hip hop`;
+    return `"${cleanName}" rapper OR "${cleanName}" music OR "${cleanName}" hip hop OR "${cleanName}" livestream OR "${cleanName}" interview OR "${cleanName}" fans OR "${cleanName}" viral OR "${cleanName}" controversy OR "${cleanName}" challenge`;
   }
 
   return `"${cleanName}"`;
