@@ -2,6 +2,7 @@
 
 import { formatCompact, formatDate } from "@/lib/formatters";
 import { getNewsDisplayDate, type MarketNewsItem } from "@/components/MarketNewsFeed";
+import { MARKET_CONTENT_REFRESH_MS } from "@/lib/refresh-policy";
 import clsx from "clsx";
 import {
   Captions,
@@ -35,6 +36,7 @@ export function WatchNow() {
   const endedVideoRef = useRef<string | null>(null);
   const controlHideTimerRef = useRef<number | null>(null);
   const pointerOverPlayerRef = useRef(false);
+  const currentVideoIdRef = useRef<string | null>(null);
   const [videos, setVideos] = useState<MarketNewsItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -48,6 +50,10 @@ export function WatchNow() {
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const currentVideo = videos[currentIndex] ?? null;
+
+  useEffect(() => {
+    currentVideoIdRef.current = currentVideo?.id ?? null;
+  }, [currentVideo?.id]);
 
   const postPlayerCommand = useCallback((func: string, args: unknown[] = []) => {
     iframeRef.current?.contentWindow?.postMessage(
@@ -127,7 +133,7 @@ export function WatchNow() {
       sort: "latest"
     });
 
-    fetch(`/api/market/news?${params.toString()}`, { signal: controller.signal })
+    const loadVideos = () => fetch(`/api/market/news?${params.toString()}`, { signal: controller.signal })
       .then((response) => response.json() as Promise<WatchNowResponse>)
       .then((payload) => {
         if (!payload.ok) {
@@ -135,7 +141,19 @@ export function WatchNow() {
           return;
         }
 
-        setVideos((payload.news ?? []).filter((item) => Boolean(item.videoId)));
+        const nextVideos = (payload.news ?? []).filter((item) => Boolean(item.videoId));
+        const selectedVideoId = currentVideoIdRef.current;
+        setVideos(nextVideos);
+        setCurrentIndex((previousIndex) => {
+          if (!nextVideos.length) {
+            return 0;
+          }
+
+          const selectedIndex = selectedVideoId
+            ? nextVideos.findIndex((item) => item.id === selectedVideoId)
+            : -1;
+          return selectedIndex >= 0 ? selectedIndex : Math.min(previousIndex, nextVideos.length - 1);
+        });
       })
       .catch(() => {
         if (!controller.signal.aborted) {
@@ -148,7 +166,27 @@ export function WatchNow() {
         }
       });
 
-    return () => controller.abort();
+    void loadVideos();
+
+    const interval = window.setInterval(() => {
+      if (document.visibilityState === "visible") {
+        void loadVideos();
+      }
+    }, MARKET_CONTENT_REFRESH_MS);
+    const refreshVisibleVideos = () => {
+      if (document.visibilityState === "visible") {
+        void loadVideos();
+      }
+    };
+    window.addEventListener("focus", refreshVisibleVideos);
+    document.addEventListener("visibilitychange", refreshVisibleVideos);
+
+    return () => {
+      controller.abort();
+      window.clearInterval(interval);
+      window.removeEventListener("focus", refreshVisibleVideos);
+      document.removeEventListener("visibilitychange", refreshVisibleVideos);
+    };
   }, []);
 
   useEffect(() => {

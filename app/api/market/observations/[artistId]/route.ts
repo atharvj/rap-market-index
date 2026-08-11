@@ -20,7 +20,7 @@ const RANGE_DAYS: Record<Exclude<ObservationRange, "ALL">, number> = {
   "6M": 186,
   "1Y": 365
 };
-const CACHE_HEADERS = { "Cache-Control": "public, max-age=60, s-maxage=300, stale-while-revalidate=1800" };
+const CACHE_HEADERS = { "Cache-Control": "public, max-age=30, s-maxage=60, stale-while-revalidate=300" };
 
 const SERIES_DEFINITIONS: Record<string, { label: string; unit: string }> = {
   "lastfm:listeners": {

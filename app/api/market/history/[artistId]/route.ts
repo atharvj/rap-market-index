@@ -32,7 +32,7 @@ const RANGE_DAYS: Record<Exclude<HistoryRange, "ALL">, number> = {
   "6M": 186,
   "1Y": 365
 };
-const CACHE_HEADERS = { "Cache-Control": "public, max-age=30, s-maxage=60, stale-while-revalidate=300" };
+const CACHE_HEADERS = { "Cache-Control": "public, max-age=10, s-maxage=15, stale-while-revalidate=60" };
 
 export async function GET(request: Request, context: { params: Promise<{ artistId: string }> }) {
   const { artistId } = await context.params;

@@ -1,6 +1,7 @@
 "use client";
 
 import { formatCompact, formatDate } from "@/lib/formatters";
+import { MARKET_OBSERVATION_REFRESH_MS } from "@/lib/refresh-policy";
 import type { MarketObservationSeries } from "@/lib/types";
 import { useEffect, useMemo, useState } from "react";
 
@@ -24,7 +25,7 @@ export function ArtistAudienceSnapshot({ artistId }: { artistId: string }) {
   useEffect(() => {
     const controller = new AbortController();
 
-    fetch(`/api/market/observations/${artistId}?range=1M`, { signal: controller.signal })
+    const loadObservations = () => fetch(`/api/market/observations/${artistId}?range=1M`, { signal: controller.signal })
       .then((response) => response.json() as Promise<ObservationsResponse>)
       .then((payload) => {
         if (payload.ok && payload.series) {
@@ -37,7 +38,27 @@ export function ArtistAudienceSnapshot({ artistId }: { artistId: string }) {
         }
       });
 
-    return () => controller.abort();
+    void loadObservations();
+
+    const interval = window.setInterval(() => {
+      if (document.visibilityState === "visible") {
+        void loadObservations();
+      }
+    }, MARKET_OBSERVATION_REFRESH_MS);
+    const refreshVisibleObservations = () => {
+      if (document.visibilityState === "visible") {
+        void loadObservations();
+      }
+    };
+    window.addEventListener("focus", refreshVisibleObservations);
+    document.addEventListener("visibilitychange", refreshVisibleObservations);
+
+    return () => {
+      controller.abort();
+      window.clearInterval(interval);
+      window.removeEventListener("focus", refreshVisibleObservations);
+      document.removeEventListener("visibilitychange", refreshVisibleObservations);
+    };
   }, [artistId]);
 
   const metrics = useMemo(() => {

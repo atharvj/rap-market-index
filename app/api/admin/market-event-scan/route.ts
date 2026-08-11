@@ -6,6 +6,7 @@ import { collectAiResearchMarketEvents } from "@/server/market/ai-research-sourc
 import { collectGdeltMarketSignals } from "@/server/market/gdelt-source";
 import { collectMediaRssMarketEvents, getDefaultMediaRssFeedUrls } from "@/server/market/media-rss-source";
 import { getMarketDate } from "@/server/market/market-date";
+import { selectArtistsByOldestCoverage } from "@/server/market/event-scan-selection";
 import type { MarketUpdateArtist } from "@/server/market/daily-update";
 import type { MarketEvent } from "@/server/market/market-data";
 import { getArtistStatusSubtype, shouldRecommendStatusTradingHalt } from "@/server/market/status-events";
@@ -111,6 +112,9 @@ export async function POST(request: Request) {
     const maxRecords = normalizeInteger(body.maxRecords, DEFAULT_MAX_RECORDS, 1, MAX_GDELT_RECORDS);
     const delayMs = normalizeInteger(body.delayMs, DEFAULT_DELAY_MS, 0, 15000);
     const timeoutMs = normalizeInteger(body.timeoutMs, DEFAULT_TIMEOUT_MS, 1000, 30000);
+    const gdeltEnabled = body.includeGdelt ?? getEnvBoolean("MARKET_GDELT_ENABLED", false);
+    const mediaRssEnabled = body.includeMediaRss !== false;
+    const aiResearchEnabled = body.includeAiResearch ?? getEnvBoolean("MARKET_AI_RESEARCH_ENABLED", config.aiResearchConfigured);
     const supabase = createServiceRoleClient();
     const allArtists = await loadActiveArtists(supabase);
     const artistIds = allArtists.map((artist) => artist.id);
@@ -143,9 +147,11 @@ export async function POST(request: Request) {
         })
       : selectArtistsForEventScan({
           artists: allArtists,
-          latestGdeltDates,
-          latestMediaRssDates,
-          latestAiResearchDates,
+          latestDateMaps: [
+            ...(gdeltEnabled ? [latestGdeltDates] : []),
+            ...(mediaRssEnabled ? [latestMediaRssDates] : []),
+            ...(aiResearchEnabled ? [latestAiResearchDates] : [])
+          ],
           limit: artistLimit
         });
     const selectedArtistIds = artists.map((artist) => artist.id);
@@ -160,8 +166,6 @@ export async function POST(request: Request) {
         lookbackDays: 30
       })
     ]);
-    const gdeltEnabled = body.includeGdelt ?? getEnvBoolean("MARKET_GDELT_ENABLED", false);
-    const mediaRssEnabled = body.includeMediaRss !== false;
     const gdeltArtistLimit = requestedArtistIds.length
       ? artists.length
       : normalizeInteger(
@@ -173,7 +177,6 @@ export async function POST(request: Request) {
     const gdeltArtists = gdeltEnabled
       ? selectOldestSourceArtists(artists, latestGdeltDates, gdeltArtistLimit)
       : [];
-    const aiResearchEnabled = body.includeAiResearch ?? getEnvBoolean("MARKET_AI_RESEARCH_ENABLED", config.aiResearchConfigured);
     const aiResearchArtistLimit = normalizeInteger(
       body.aiResearchArtistLimit,
       getEnvInteger("MARKET_AI_RESEARCH_ARTIST_LIMIT", DEFAULT_AI_RESEARCH_ARTIST_LIMIT, 0, MAX_AI_RESEARCH_ARTIST_LIMIT),
@@ -423,17 +426,7 @@ function selectOldestSourceArtists(
   latestDates: Record<string, string>,
   limit: number
 ) {
-  return [...artists]
-    .sort((first, second) => {
-      const dateDifference = (latestDates[first.id] ?? "").localeCompare(latestDates[second.id] ?? "");
-
-      if (dateDifference !== 0) {
-        return dateDifference;
-      }
-
-      return first.ticker.localeCompare(second.ticker);
-    })
-    .slice(0, limit);
+  return selectArtistsByOldestCoverage({ artists, latestDateMaps: [latestDates], limit });
 }
 
 function mergedEventsPreview(
@@ -473,39 +466,14 @@ function selectRequestedArtists({
 
 function selectArtistsForEventScan({
   artists,
-  latestGdeltDates,
-  latestMediaRssDates,
-  latestAiResearchDates,
+  latestDateMaps,
   limit
 }: {
   artists: MarketUpdateArtist[];
-  latestGdeltDates: Record<string, string>;
-  latestMediaRssDates: Record<string, string>;
-  latestAiResearchDates: Record<string, string>;
+  latestDateMaps: Array<Record<string, string>>;
   limit: number;
 }) {
-  return [...artists]
-    .sort((first, second) => {
-      const firstDate =
-        getOldestScanDate(
-          latestGdeltDates[first.id],
-          latestMediaRssDates[first.id],
-          latestAiResearchDates[first.id]
-        ) ?? "";
-      const secondDate =
-        getOldestScanDate(
-          latestGdeltDates[second.id],
-          latestMediaRssDates[second.id],
-          latestAiResearchDates[second.id]
-        ) ?? "";
-
-      if (firstDate !== secondDate) {
-        return firstDate.localeCompare(secondDate);
-      }
-
-      return first.ticker.localeCompare(second.ticker);
-    })
-    .slice(0, limit);
+  return selectArtistsByOldestCoverage({ artists, latestDateMaps, limit });
 }
 
 function countEventsByType(events: MarketEvent[]) {

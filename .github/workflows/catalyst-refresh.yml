@@ -2,7 +2,8 @@ name: Refresh verified catalysts
 
 on:
   schedule:
-    - cron: "*/30 * * * *"
+    # Scan at most 100 least-recently-covered artists per run, so larger rosters rotate fairly.
+    - cron: "*/15 * * * *"
   workflow_dispatch:
 
 permissions:

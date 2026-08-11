@@ -31,6 +31,8 @@ type CandidateEvent = {
 
 const MAX_INTRADAY_ARTISTS = 25;
 const RECENT_DETECTION_WINDOW_HOURS = 48;
+const FAST_SCAN_ARTIST_CAP = 100;
+const FAST_SCAN_RATE_LIMIT_PER_HOUR = 20;
 
 export async function GET(request: Request) {
   if (!isAuthorized(request)) {
@@ -41,7 +43,7 @@ export async function GET(request: Request) {
     request,
     identifier: getRequestIp(request),
     scope: "catalyst-refresh-cron",
-    limit: 8,
+    limit: FAST_SCAN_RATE_LIMIT_PER_HOUR,
     windowSeconds: 3600
   });
 
@@ -74,7 +76,7 @@ export async function GET(request: Request) {
     body: JSON.stringify({
       dryRun: false,
       runDate,
-      artistLimit: 100,
+      artistLimit: FAST_SCAN_ARTIST_CAP,
       includeGdelt: false,
       includeMediaRss: true,
       includeGoogleNews: true,

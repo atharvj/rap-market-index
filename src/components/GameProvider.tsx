@@ -12,6 +12,7 @@ import {
   resetGame,
   simulateDailyUpdate
 } from "@/lib/market";
+import { MARKET_CONTENT_REFRESH_MS, MARKET_SNAPSHOT_REFRESH_MS } from "@/lib/refresh-policy";
 import { estimateMarketMakerQuote, getRemainingDailyArtistBuyValue } from "@/lib/trading";
 import type { Artist, GameState, HoldingView, LeaderboardEntry, ShortPositionView, TradeResult } from "@/lib/types";
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
@@ -179,7 +180,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       if (document.visibilityState === "visible") {
         void loadMarketSnapshot();
       }
-    }, 60_000);
+    }, MARKET_SNAPSHOT_REFRESH_MS);
     const refreshVisibleMarket = () => {
       if (document.visibilityState === "visible") {
         void loadMarketSnapshot();
@@ -384,6 +385,27 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     setProfileLoaded(false);
     void refreshLeaderboard();
   }, [authConfigured, authLoading, hydrated, refreshLeaderboard, refreshServerState, session]);
+
+  useEffect(() => {
+    if (!hydrated || authLoading) {
+      return;
+    }
+
+    const refreshVisibleLeaderboard = () => {
+      if (document.visibilityState === "visible") {
+        void refreshLeaderboard(session?.user.id, session?.access_token);
+      }
+    };
+    const interval = window.setInterval(refreshVisibleLeaderboard, MARKET_CONTENT_REFRESH_MS);
+    window.addEventListener("focus", refreshVisibleLeaderboard);
+    document.addEventListener("visibilitychange", refreshVisibleLeaderboard);
+
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener("focus", refreshVisibleLeaderboard);
+      document.removeEventListener("visibilitychange", refreshVisibleLeaderboard);
+    };
+  }, [authLoading, hydrated, refreshLeaderboard, session?.access_token, session?.user.id]);
 
   useEffect(() => {
     if (

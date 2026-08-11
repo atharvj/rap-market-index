@@ -2,6 +2,7 @@
 
 import { PriceChart } from "@/components/PriceChart";
 import { formatDate } from "@/lib/formatters";
+import { MARKET_CONTENT_REFRESH_MS } from "@/lib/refresh-policy";
 import type { PricePoint } from "@/lib/types";
 import clsx from "clsx";
 import { Activity, Crosshair } from "lucide-react";
@@ -44,7 +45,7 @@ export function ArtistPriceHistoryPanel({
 
     setStatus("loading");
 
-    fetch(`/api/market/history/${artistId}?range=${range}`, {
+    const loadHistory = () => fetch(`/api/market/history/${artistId}?range=${range}`, {
       signal: controller.signal
     })
       .then((response) => response.json() as Promise<HistoryResponse>)
@@ -73,8 +74,26 @@ export function ArtistPriceHistoryPanel({
         setStatus(error instanceof Error ? "error" : "error");
       });
 
+    void loadHistory();
+
+    const interval = window.setInterval(() => {
+      if (document.visibilityState === "visible") {
+        void loadHistory();
+      }
+    }, MARKET_CONTENT_REFRESH_MS);
+    const refreshVisibleHistory = () => {
+      if (document.visibilityState === "visible") {
+        void loadHistory();
+      }
+    };
+    window.addEventListener("focus", refreshVisibleHistory);
+    document.addEventListener("visibilitychange", refreshVisibleHistory);
+
     return () => {
       controller.abort();
+      window.clearInterval(interval);
+      window.removeEventListener("focus", refreshVisibleHistory);
+      document.removeEventListener("visibilitychange", refreshVisibleHistory);
     };
   }, [artistId, fallbackData, range]);
 

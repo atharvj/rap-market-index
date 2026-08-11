@@ -1,6 +1,7 @@
 "use client";
 
 import { formatDate } from "@/lib/formatters";
+import { MARKET_CONTENT_REFRESH_MS } from "@/lib/refresh-policy";
 import type { MarketNewsSort } from "@/lib/market-news-sort";
 import {
   shouldShowNewsMediaAction,
@@ -137,7 +138,7 @@ export function MarketNewsFeed({
       if (document.visibilityState === "visible") {
         void loadNews();
       }
-    }, 5 * 60_000);
+    }, MARKET_CONTENT_REFRESH_MS);
     const refreshVisibleNews = () => {
       if (document.visibilityState === "visible") {
         void loadNews();

@@ -92,7 +92,7 @@ const DEFAULT_LOOKBACK_DAYS = 30;
 const MAX_LOOKBACK_DAYS = 365;
 const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 100;
-const CACHE_HEADERS = { "Cache-Control": "public, max-age=60, s-maxage=300, stale-while-revalidate=1800" };
+const CACHE_HEADERS = { "Cache-Control": "public, max-age=30, s-maxage=60, stale-while-revalidate=300" };
 
 export async function GET(request: Request) {
   const config = getSupabaseConfigStatus();
