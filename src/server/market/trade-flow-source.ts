@@ -2,7 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { clamp } from "@/lib/pricing";
 import type { Database } from "@/lib/supabase/database.types";
 import type { MarketUpdateArtist } from "@/server/market/daily-update";
-import { getMarketLookbackBoundsUtc } from "@/server/market/market-date";
+import { getMarketDayBoundsUtc, getMarketLookbackBoundsUtc } from "@/server/market/market-date";
 import type { AdapterSignals, MarketObservation } from "@/server/market/market-data";
 import type { HypeStats } from "@/lib/types";
 
@@ -13,6 +13,7 @@ type TradeFlowCollectOptions = {
   artists: MarketUpdateArtist[];
   runDate: string;
   lookbackDays?: number;
+  through?: Date;
 };
 
 type TradeRow = Pick<
@@ -61,7 +62,8 @@ export async function collectTradeFlowMarketSignals({
   supabase,
   artists,
   runDate,
-  lookbackDays = 1
+  lookbackDays = 1,
+  through
 }: TradeFlowCollectOptions): Promise<TradeFlowMarketSignals> {
   if (!artists.length) {
     return {
@@ -72,7 +74,11 @@ export async function collectTradeFlowMarketSignals({
   }
 
   const artistIds = artists.map((artist) => artist.id);
-  const { start: windowStart, end: windowEnd } = getMarketLookbackBoundsUtc(runDate, lookbackDays);
+  const { start: windowStart, end: windowEnd } = getTradeFlowWindow({
+    runDate,
+    lookbackDays,
+    through
+  });
   const { data, error } = await supabase
     .from("market_trade_events")
     .select("artist_id,user_id,type,shares,price,cash_delta,gross_value,market_eligible,created_at")
@@ -152,6 +158,28 @@ export async function collectTradeFlowMarketSignals({
     signals,
     observations,
     warnings
+  };
+}
+
+export function getTradeFlowWindow({
+  runDate,
+  lookbackDays,
+  through
+}: {
+  runDate: string;
+  lookbackDays: number;
+  through?: Date;
+}) {
+  if (!through) {
+    return getMarketLookbackBoundsUtc(runDate, lookbackDays);
+  }
+
+  const day = getMarketDayBoundsUtc(runDate);
+  const throughIso = through.toISOString();
+
+  return {
+    start: day.start,
+    end: throughIso < day.start ? day.start : throughIso > day.end ? day.end : throughIso
   };
 }
 

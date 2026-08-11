@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/database.types";
 import type { MarketUpdateArtist } from "@/server/market/daily-update";
-import { collectTradeFlowMarketSignals } from "@/server/market/trade-flow-source";
+import { collectTradeFlowMarketSignals, getTradeFlowWindow } from "@/server/market/trade-flow-source";
 
 const artist: MarketUpdateArtist = {
   id: "artist",
@@ -24,6 +24,25 @@ const artist: MarketUpdateArtist = {
 };
 
 describe("trade-flow market source", () => {
+  it("uses completed prior market days for daily runs and the current market day for intraday runs", () => {
+    expect(getTradeFlowWindow({
+      runDate: "2026-07-29",
+      lookbackDays: 1
+    })).toEqual({
+      start: "2026-07-28T04:00:00.000Z",
+      end: "2026-07-29T04:00:00.000Z"
+    });
+
+    expect(getTradeFlowWindow({
+      runDate: "2026-07-29",
+      lookbackDays: 1,
+      through: new Date("2026-07-29T16:30:00.000Z")
+    })).toEqual({
+      start: "2026-07-29T04:00:00.000Z",
+      end: "2026-07-29T16:30:00.000Z"
+    });
+  });
+
   it("defensively excludes admin and market-exempt accounts even if their trades are marked eligible", async () => {
     const supabase = createSupabaseMock({
       trades: [

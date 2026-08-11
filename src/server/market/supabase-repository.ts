@@ -14,6 +14,7 @@ import type {
 } from "@/server/market/market-data";
 import type { ArtistCategory, HypeStats } from "@/lib/types";
 import { isMarketEventSourceIntegrityValid } from "@/server/market/event-integrity";
+import { shouldRecordIntradayPriceTick } from "@/server/market/intraday-refresh";
 import { decodeHtmlEntities } from "@/lib/html-entities";
 
 type Supabase = SupabaseClient<Database>;
@@ -207,6 +208,44 @@ export async function loadPreviousSignalStats({
 
     return statsByArtist;
   }, {});
+}
+
+export async function loadCurrentSignalStats({
+  supabase,
+  artistIds,
+  runDate
+}: {
+  supabase: Supabase;
+  artistIds: string[];
+  runDate: string;
+}): Promise<Record<string, HypeStats>> {
+  if (!artistIds.length) {
+    return {};
+  }
+
+  const { data, error } = await supabase
+    .from("market_signal_snapshots")
+    .select("artist_id,streaming_growth,youtube_growth,search_growth,social_growth,news_score,trader_demand")
+    .in("artist_id", artistIds)
+    .eq("source_date", runDate);
+
+  if (error) {
+    throw new Error(`Could not load current signal snapshots: ${error.message}`);
+  }
+
+  return Object.fromEntries(
+    (data ?? []).map((row) => [
+      row.artist_id,
+      {
+        streamingGrowth: Number(row.streaming_growth),
+        youtubeGrowth: Number(row.youtube_growth),
+        searchGrowth: Number(row.search_growth),
+        socialGrowth: Number(row.social_growth),
+        newsScore: Number(row.news_score),
+        traderDemand: Number(row.trader_demand)
+      }
+    ])
+  );
 }
 
 export async function loadPriceTrendContexts({
@@ -712,7 +751,7 @@ export async function loadLatestObservationDates({
   }, {});
 }
 
-export async function loadLatestSourceObservationDates({
+export async function loadLatestSourceObservationTimes({
   supabase,
   artistIds,
   source,
@@ -731,23 +770,25 @@ export async function loadLatestSourceObservationDates({
 
   const { data, error } = await supabase
     .from("market_observations")
-    .select("artist_id,observed_date")
+    .select("artist_id,observed_date,observed_at")
     .in("artist_id", artistIds)
     .eq("source", source)
     .gte("observed_date", shiftDate(runDate, -lookbackDays))
     .lte("observed_date", runDate)
-    .order("observed_date", { ascending: false })
+    .order("observed_at", { ascending: false })
     .limit(Math.min(10000, Math.max(artistIds.length * lookbackDays, artistIds.length)));
 
   if (error) {
-    throw new Error(`Could not load latest ${source} observation dates: ${error.message}`);
+    throw new Error(`Could not load latest ${source} observation times: ${error.message}`);
   }
 
-  return ((data ?? []) as Pick<MarketObservationRow, "artist_id" | "observed_date">[]).reduce<
+  return ((data ?? []) as Pick<MarketObservationRow, "artist_id" | "observed_date" | "observed_at">[]).reduce<
     Record<string, string>
   >((latest, row) => {
-    if (!latest[row.artist_id] || row.observed_date > latest[row.artist_id]) {
-      latest[row.artist_id] = row.observed_date;
+    const observedAt = row.observed_at || `${row.observed_date}T00:00:00.000Z`;
+
+    if (!latest[row.artist_id] || observedAt > latest[row.artist_id]) {
+      latest[row.artist_id] = observedAt;
     }
 
     return latest;
@@ -1108,7 +1149,10 @@ export async function persistMarketUpdates({
   source,
   updates,
   summary,
-  recordRun = true
+  recordRun = true,
+  intraday = false,
+  tickComparisonPrices,
+  forceTickArtistIds = []
 }: {
   supabase: Supabase;
   runDate: string;
@@ -1116,10 +1160,17 @@ export async function persistMarketUpdates({
   updates: ArtistMarketUpdate[];
   summary: MarketUpdateSummary;
   recordRun?: boolean;
+  intraday?: boolean;
+  tickComparisonPrices?: Record<string, number>;
+  forceTickArtistIds?: string[];
 }) {
   if (!recordRun) {
-    await persistUpdateBatch(supabase, runDate, updates);
-    return;
+    const priceTickCount = await persistUpdateBatch(supabase, runDate, updates, {
+      intraday,
+      tickComparisonPrices,
+      forceTickArtistIds
+    });
+    return { priceTickCount };
   }
 
   const started = await supabase
@@ -1145,7 +1196,7 @@ export async function persistMarketUpdates({
   }
 
   try {
-    await persistUpdateBatch(supabase, runDate, updates);
+    const priceTickCount = await persistUpdateBatch(supabase, runDate, updates);
 
     const completed = await supabase
       .from("market_update_runs")
@@ -1160,6 +1211,7 @@ export async function persistMarketUpdates({
     if (completed.error) {
       throw new Error(`Could not complete market update run: ${completed.error.message}`);
     }
+    return { priceTickCount };
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown market update failure.";
     await supabase
@@ -1178,11 +1230,18 @@ export async function persistMarketUpdates({
 async function persistUpdateBatch(
   supabase: Supabase,
   runDate: string,
-  updates: ArtistMarketUpdate[]
+  updates: ArtistMarketUpdate[],
+  options: {
+    intraday?: boolean;
+    tickComparisonPrices?: Record<string, number>;
+    forceTickArtistIds?: string[];
+  } = {}
 ) {
   if (!updates.length) {
-    return;
+    return 0;
   }
+
+  const forcedTickArtistIds = new Set(options.forceTickArtistIds ?? []);
 
   const statsRows = updates.map((update) => ({
     artist_id: update.artistId,
@@ -1213,24 +1272,37 @@ async function persistUpdateBatch(
     model_version: update.modelVersion,
     explanation: update.explanation
   }));
-  const tickRows = updates.map((update) => ({
-    artist_id: update.artistId,
-    price: update.currentPrice,
-    source: "market_run" as const,
-    model_version: update.modelVersion,
-    raw_payload: {
-      source: "market_run",
-      runDate,
-      ticker: update.ticker,
-      dailyChangePercent: update.dailyChangePercent
-    } as Json
-  }));
+  const tickRows = updates
+    .filter((update) => {
+      const comparisonPrice = options.tickComparisonPrices?.[update.artistId];
+
+      return shouldRecordIntradayPriceTick({
+        currentPrice: update.currentPrice,
+        comparisonPrice,
+        forced: forcedTickArtistIds.has(update.artistId)
+      });
+    })
+    .map((update) => ({
+      artist_id: update.artistId,
+      price: update.currentPrice,
+      source: "market_run" as const,
+      model_version: update.modelVersion,
+      raw_payload: {
+        source: "market_run",
+        runDate,
+        ticker: update.ticker,
+        dailyChangePercent: update.dailyChangePercent,
+        intraday: options.intraday === true
+      } as Json
+    }));
 
   const [statsUpsert, signalUpsert, historyUpsert] = await Promise.all([
     supabase.from("artist_stats").upsert(statsRows, { onConflict: "artist_id" }),
-    supabase.from("market_signal_snapshots").upsert(signalRows, {
-      onConflict: "artist_id,source_date"
-    }),
+    options.intraday
+      ? Promise.resolve({ error: null })
+      : supabase.from("market_signal_snapshots").upsert(signalRows, {
+          onConflict: "artist_id,source_date"
+        }),
     supabase.from("price_history").upsert(historyRows, {
       onConflict: "artist_id,price_date"
     })
@@ -1268,11 +1340,17 @@ async function persistUpdateBatch(
     );
   }
 
+  if (!tickRows.length) {
+    return 0;
+  }
+
   const tickInsert = await supabase.from("price_ticks").insert(tickRows);
 
   if (tickInsert.error && !isMissingPriceTicksError(tickInsert.error.message)) {
     throw new Error(`Could not save market price ticks: ${tickInsert.error.message}`);
   }
+
+  return tickRows.length;
 }
 
 function isMissingPriceTicksError(message: string) {

@@ -46,6 +46,7 @@ import { collectYoutubeUploadEvents } from "@/server/market/youtube-upload-event
 import { collectYoutubeEditorialEvents } from "@/server/market/youtube-editorial-events-source";
 import { getMarketDate } from "@/server/market/market-date";
 import { getMarketModelVersion } from "@/server/market/model-version";
+import { shouldRecordIntradayPriceTick } from "@/server/market/intraday-refresh";
 import { getMockMarketArtists } from "@/server/market/mock-source";
 import type {
   AdapterSignals,
@@ -60,6 +61,7 @@ import {
   loadActiveArtistCount,
   loadActiveArtistsPage,
   loadArtistExternalIds,
+  loadCurrentSignalStats,
   loadExistingPriceHistoryArtistIds,
   loadLatestObservationPayloads,
   loadObservationBaselines,
@@ -84,6 +86,7 @@ type DailyUpdateBody = {
   artistLimit?: number;
   artistOffset?: number;
   artistIds?: string[];
+  forceTickArtistIds?: string[];
   intraday?: boolean;
 };
 
@@ -153,6 +156,9 @@ export async function POST(request: Request) {
       artistOffset: body.artistOffset,
       artistIds: body.artistIds
     });
+    const tickComparisonPrices = Object.fromEntries(
+      artists.map((artist) => [artist.id, artist.currentPrice])
+    );
 
     if (Array.isArray(body.artistIds) && !artists.length) {
       return NextResponse.json(
@@ -165,7 +171,8 @@ export async function POST(request: Request) {
       artists = await applyMarketHistoryBaselines({
         supabase,
         artists,
-        runDate
+        runDate,
+        intraday: body.intraday === true
       });
     }
 
@@ -174,7 +181,8 @@ export async function POST(request: Request) {
       artists,
       runDate,
       supabase,
-      dryRun
+      dryRun,
+      intraday: body.intraday === true
     });
     const eventSignals = await collectEventSignals({
       source,
@@ -184,7 +192,8 @@ export async function POST(request: Request) {
       dryRun,
       externalIds: realSignals.externalIds,
       seedDetectedEventsByArtist: realSignals.detectedEventsByArtist,
-      manualEvents: body.manualEvents
+      manualEvents: body.manualEvents,
+      intraday: body.intraday === true
     });
     const modelVersion = getMarketModelVersion();
     const adapterSignals = attachAudienceScaleCalibration({
@@ -203,12 +212,24 @@ export async function POST(request: Request) {
       modelVersion,
       manualSignals: sanitizeManualSignals(body.manualSignals),
       adapterSignals,
-      marketCoverageRatio: getMarketCoverageRatio(batch)
+      marketCoverageRatio: getMarketCoverageRatio(batch),
+      intraday: body.intraday === true
     });
     const summary = {
       ...result.summary,
       batch
     } satisfies MarketUpdateSummary;
+    const forceTickArtistIds = normalizeArtistIds(body.forceTickArtistIds);
+    const forcedTickArtistIdSet = new Set(forceTickArtistIds);
+    const quoteChangeCount = body.intraday === true
+      ? result.updates.filter((update) => shouldRecordIntradayPriceTick({
+          currentPrice: update.currentPrice,
+          comparisonPrice: tickComparisonPrices[update.artistId],
+          forced: forcedTickArtistIdSet.has(update.artistId)
+        })).length
+      : result.updates.length;
+
+    let priceTickCount = 0;
 
     if (!dryRun) {
       const eventsToPersist = flattenEvents(
@@ -223,14 +244,18 @@ export async function POST(request: Request) {
         await persistMarketObservations(createServiceRoleClient(), realSignals.observations);
       }
 
-      await persistMarketUpdates({
+      const persistence = await persistMarketUpdates({
         supabase: createServiceRoleClient(),
         runDate,
         source,
         updates: result.updates,
         summary,
-        recordRun: body.intraday !== true
+        recordRun: body.intraday !== true,
+        intraday: body.intraday === true,
+        tickComparisonPrices: body.intraday === true ? tickComparisonPrices : undefined,
+        forceTickArtistIds
       });
+      priceTickCount = persistence.priceTickCount;
     }
 
     return NextResponse.json({
@@ -243,6 +268,9 @@ export async function POST(request: Request) {
       eventCount: eventSignals.eventCount,
       detectedEventCount: flattenEvents(eventSignals.detectedEventsByArtist).length,
       submittedEventCount: flattenEvents(eventSignals.submittedEventsByArtist).length,
+      priceTickCount,
+      quoteChangeCount,
+      intraday: body.intraday === true,
       batch,
       summary,
       updates: result.updates
@@ -404,7 +432,7 @@ function normalizeArtistIds(value: unknown) {
         .map((artistId) => artistId.trim().toLowerCase())
         .filter((artistId) => /^[a-z0-9-]+$/.test(artistId))
     )
-  ).slice(0, 25);
+  ).slice(0, MAX_ARTIST_BATCH_SIZE);
 }
 
 function normalizeArtistBatchRequest({
@@ -488,14 +516,16 @@ function getMarketCoverageRatio(batch: NonNullable<MarketUpdateSummary["batch"]>
 async function applyMarketHistoryBaselines({
   supabase,
   artists,
-  runDate
+  runDate,
+  intraday
 }: {
   supabase: ReturnType<typeof createServiceRoleClient>;
   artists: ReturnType<typeof getMockMarketArtists>;
   runDate: string;
+  intraday: boolean;
 }) {
   const artistIds = artists.map((artist) => artist.id);
-  const [previousCloses, priceTrends, existingPriceHistoryArtistIds, previousSignalStats] = await Promise.all([
+  const [previousCloses, priceTrends, existingPriceHistoryArtistIds, previousSignalStats, currentSignalStats] = await Promise.all([
     loadPreviousClosePrices({
       supabase,
       artistIds,
@@ -515,7 +545,10 @@ async function applyMarketHistoryBaselines({
       supabase,
       artistIds,
       runDate
-    })
+    }),
+    intraday
+      ? loadCurrentSignalStats({ supabase, artistIds, runDate })
+      : Promise.resolve<Record<string, HypeStats>>({})
   ]);
 
   return artists.map((artist) => {
@@ -526,6 +559,7 @@ async function applyMarketHistoryBaselines({
     if (previousClose === undefined || !Number.isFinite(previousClose) || previousClose <= 0) {
       return {
         ...artist,
+        quotedPrice: artist.currentPrice,
         priceTrend
       };
     }
@@ -535,7 +569,10 @@ async function applyMarketHistoryBaselines({
       currentPrice: isSameDayRecalculation ? previousClose : artist.currentPrice,
       previousClose,
       previousCloseSource: "price_history" as const,
-      stats: isSameDayRecalculation ? previousSignalStats[artist.id] ?? artist.stats : artist.stats,
+      quotedPrice: artist.currentPrice,
+      stats: isSameDayRecalculation
+        ? currentSignalStats[artist.id] ?? previousSignalStats[artist.id] ?? artist.stats
+        : artist.stats,
       priceTrend
     };
   });
@@ -546,13 +583,15 @@ async function collectRealSignals({
   artists,
   runDate,
   supabase,
-  dryRun
+  dryRun,
+  intraday
 }: {
   source: MarketUpdateSource;
   artists: ReturnType<typeof getMockMarketArtists>;
   runDate: string;
   supabase: ReturnType<typeof createServiceRoleClient> | null;
   dryRun: boolean;
+  intraday: boolean;
 }): Promise<{
   adapterSignals?: AdapterSignals;
   adapterSignalSources: AdapterSignals[];
@@ -562,22 +601,25 @@ async function collectRealSignals({
   detectedEventsByArtist: Record<string, MarketEvent[]>;
   audienceScaleSnapshots: AudienceScaleSnapshots;
 }> {
-  const useGdelt = source === "gdelt" || source === "blended";
+  const useGdelt = !intraday && (source === "gdelt" || source === "blended");
   const useLastfm =
     getEnvBoolean("MARKET_LASTFM_ENABLED", true) &&
-    (source === "lastfm" || source === "core" || source === "blended");
+    (intraday || source === "lastfm" || source === "core" || source === "blended");
   const useListenBrainz =
+    !intraday &&
     getEnvBoolean("MARKET_LISTENBRAINZ_ENABLED", false) &&
     (source === "lastfm" || source === "core" || source === "blended");
   const useSpotify =
-    source === "spotify" || ((source === "core" || source === "blended") && hasSpotifyCredentials());
-  const useYoutube = source === "youtube" || source === "core" || source === "blended";
-  const useWikimedia = source === "wikimedia" || source === "core" || source === "blended";
-  const useReddit = source === "reddit" || ((source === "core" || source === "blended") && hasRedditCredentials());
+    !intraday && (source === "spotify" || ((source === "core" || source === "blended") && hasSpotifyCredentials()));
+  const useYoutube = intraday || source === "youtube" || source === "core" || source === "blended";
+  const useWikimedia = intraday || source === "wikimedia" || source === "core" || source === "blended";
+  const useReddit = !intraday && (source === "reddit" || ((source === "core" || source === "blended") && hasRedditCredentials()));
   const useBluesky =
-    source === "bluesky" || ((source === "core" || source === "blended") && getEnvBoolean("MARKET_BLUESKY_ENABLED", true));
+    !intraday &&
+    (source === "bluesky" || source === "core" || source === "blended") &&
+    getEnvBoolean("MARKET_BLUESKY_ENABLED", true);
   const usePolymarket =
-    (source === "core" || source === "blended") &&
+    (intraday || source === "core" || source === "blended") &&
     getEnvBoolean("MARKET_POLYMARKET_ENABLED", true);
   const useTradeFlow = Boolean(supabase) && isRealExternalSource(source);
   const warnings: string[] = [];
@@ -591,7 +633,8 @@ async function collectRealSignals({
     !useWikimedia &&
     !useReddit &&
     !useBluesky &&
-    !usePolymarket
+    !usePolymarket &&
+    !useTradeFlow
   ) {
     return {
       adapterSignalSources: [],
@@ -796,7 +839,10 @@ async function collectRealSignals({
           runDate,
           apiKey: process.env.LASTFM_API_KEY,
           externalIds,
-          baselines: lastfmBaselines
+          baselines: lastfmBaselines,
+          delayMs: intraday
+            ? getEnvInteger("MARKET_INTRADAY_LASTFM_DELAY_MS", 500, 250, 2000)
+            : undefined
         })
       );
 
@@ -869,7 +915,9 @@ async function collectRealSignals({
         warnings.push(...youtube.warnings);
       }
 
-      const maxUploadEventVideos = getEnvInteger("MARKET_YOUTUBE_UPLOAD_EVENT_VIDEOS", 12, 0, 12);
+      const maxUploadEventVideos = intraday
+        ? 0
+        : getEnvInteger("MARKET_YOUTUBE_UPLOAD_EVENT_VIDEOS", 12, 0, 12);
 
       if (maxUploadEventVideos > 0) {
         const youtubeUploadEvents = await collectExternalSource("YouTube upload events", warnings, () =>
@@ -890,7 +938,9 @@ async function collectRealSignals({
         }
       }
 
-      const maxEditorialVideos = getEnvInteger("MARKET_YOUTUBE_EDITORIAL_EVENT_VIDEOS", 12, 0, 20);
+      const maxEditorialVideos = intraday
+        ? 0
+        : getEnvInteger("MARKET_YOUTUBE_EDITORIAL_EVENT_VIDEOS", 12, 0, 20);
 
       if (maxEditorialVideos > 0) {
         const youtubeEditorialEvents = await collectExternalSource("YouTube editorial videos", warnings, () =>
@@ -910,7 +960,9 @@ async function collectRealSignals({
         }
       }
 
-      const maxVideosPerArtist = getEnvInteger("MARKET_YOUTUBE_COMMENT_VIDEOS", 1, 0, 3);
+      const maxVideosPerArtist = intraday
+        ? 0
+        : getEnvInteger("MARKET_YOUTUBE_COMMENT_VIDEOS", 1, 0, 3);
 
       if (maxVideosPerArtist > 0) {
         const youtubeComments = await collectExternalSource("YouTube comments", warnings, () =>
@@ -1029,7 +1081,8 @@ async function collectRealSignals({
         collectTradeFlowMarketSignals({
           supabase,
           artists,
-          runDate
+          runDate,
+          through: intraday ? new Date() : undefined
         })
       );
 
@@ -1178,7 +1231,8 @@ async function collectEventSignals({
   dryRun,
   externalIds,
   seedDetectedEventsByArtist = {},
-  manualEvents
+  manualEvents,
+  intraday
 }: {
   source: MarketUpdateSource;
   artists: ReturnType<typeof getMockMarketArtists>;
@@ -1188,6 +1242,7 @@ async function collectEventSignals({
   externalIds: Record<string, ArtistExternalIds>;
   seedDetectedEventsByArtist?: Record<string, MarketEvent[]>;
   manualEvents?: ManualMarketEvents;
+  intraday: boolean;
 }) {
   const artistIds = artists.map((artist) => artist.id);
   let storedEvents = {};
@@ -1212,6 +1267,7 @@ async function collectEventSignals({
 
   if (
     (source === "core" || source === "blended") &&
+    !intraday &&
     supabase &&
     getEnvBoolean("MARKET_MUSICBRAINZ_RELEASES_ENABLED", false)
   ) {

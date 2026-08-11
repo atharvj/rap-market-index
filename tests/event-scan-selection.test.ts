@@ -48,4 +48,16 @@ describe("event scan artist rotation", () => {
       limit: 2
     }).map((artist) => artist.id)).toEqual(["alpha", "beta"]);
   });
+
+  it("rotates artists scanned on the same day using their actual scan times", () => {
+    expect(selectArtistsByOldestCoverage({
+      artists,
+      latestDateMaps: [{
+        alpha: "2026-08-11T16:45:00.000Z",
+        beta: "2026-08-11T16:15:00.000Z",
+        gamma: "2026-08-11T16:30:00.000Z"
+      }],
+      limit: 2
+    }).map((artist) => artist.id)).toEqual(["beta", "gamma"]);
+  });
 });

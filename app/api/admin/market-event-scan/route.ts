@@ -13,7 +13,7 @@ import { getArtistStatusSubtype, shouldRecommendStatusTradingHalt } from "@/serv
 import {
   loadActiveArtists,
   loadArtistExternalIds,
-  loadLatestSourceObservationDates,
+  loadLatestSourceObservationTimes,
   loadObservationBaselines,
   persistMarketEvents,
   persistMarketObservations
@@ -118,20 +118,20 @@ export async function POST(request: Request) {
     const supabase = createServiceRoleClient();
     const allArtists = await loadActiveArtists(supabase);
     const artistIds = allArtists.map((artist) => artist.id);
-    const [latestGdeltDates, latestMediaRssDates, latestAiResearchDates] = await Promise.all([
-      loadLatestSourceObservationDates({
+    const [latestGdeltTimes, latestMediaRssTimes, latestAiResearchTimes] = await Promise.all([
+      loadLatestSourceObservationTimes({
         supabase,
         artistIds,
         source: "gdelt",
         runDate
       }),
-      loadLatestSourceObservationDates({
+      loadLatestSourceObservationTimes({
         supabase,
         artistIds,
         source: "media_rss",
         runDate
       }),
-      loadLatestSourceObservationDates({
+      loadLatestSourceObservationTimes({
         supabase,
         artistIds,
         source: "ai_research",
@@ -148,9 +148,9 @@ export async function POST(request: Request) {
       : selectArtistsForEventScan({
           artists: allArtists,
           latestDateMaps: [
-            ...(gdeltEnabled ? [latestGdeltDates] : []),
-            ...(mediaRssEnabled ? [latestMediaRssDates] : []),
-            ...(aiResearchEnabled ? [latestAiResearchDates] : [])
+            ...(gdeltEnabled ? [latestGdeltTimes] : []),
+            ...(mediaRssEnabled ? [latestMediaRssTimes] : []),
+            ...(aiResearchEnabled ? [latestAiResearchTimes] : [])
           ],
           limit: artistLimit
         });
@@ -175,7 +175,7 @@ export async function POST(request: Request) {
           MAX_GDELT_ARTIST_LIMIT
         );
     const gdeltArtists = gdeltEnabled
-      ? selectOldestSourceArtists(artists, latestGdeltDates, gdeltArtistLimit)
+      ? selectOldestSourceArtists(artists, latestGdeltTimes, gdeltArtistLimit)
       : [];
     const aiResearchArtistLimit = normalizeInteger(
       body.aiResearchArtistLimit,
@@ -260,7 +260,7 @@ export async function POST(request: Request) {
         selectAiResearchArtists(
           artists,
           mergedEventsPreview(mediaRss.eventsByArtist, result.eventsByArtist),
-          latestAiResearchDates,
+          latestAiResearchTimes,
           runDate,
           aiResearchArtistLimit
         )
@@ -331,10 +331,10 @@ export async function POST(request: Request) {
         ticker: artist.ticker,
         name: artist.name,
         latestNewsScanDate: getOldestScanDate(
-          latestGdeltDates[artist.id],
-          latestMediaRssDates[artist.id],
-          latestAiResearchDates[artist.id]
-        )
+          latestGdeltTimes[artist.id],
+          latestMediaRssTimes[artist.id],
+          latestAiResearchTimes[artist.id]
+        )?.slice(0, 10)
       })),
       topEvents: events.slice(0, 8).map((event) => ({
         artistId: event.artistId,
@@ -363,7 +363,7 @@ export async function POST(request: Request) {
 function selectAiResearchArtists(
   artists: MarketUpdateArtist[],
   existingEventsByArtist: Record<string, MarketEvent[]>,
-  latestAiResearchDates: Record<string, string>,
+  latestAiResearchTimes: Record<string, string>,
   runDate: string,
   limit: number
 ) {
@@ -376,7 +376,8 @@ function selectAiResearchArtists(
   const priorityArtists = [...artists]
     .filter(
       (artist) =>
-        (existingEventsByArtist[artist.id]?.length ?? 0) > 0 && latestAiResearchDates[artist.id] !== runDate
+        (existingEventsByArtist[artist.id]?.length ?? 0) > 0 &&
+        latestAiResearchTimes[artist.id]?.slice(0, 10) !== runDate
     )
     .sort((first, second) => {
       const eventDifference = getArtistEventPriority(existingEventsByArtist[second.id]) -
@@ -386,15 +387,15 @@ function selectAiResearchArtists(
         return eventDifference;
       }
 
-      return (latestAiResearchDates[first.id] ?? "").localeCompare(latestAiResearchDates[second.id] ?? "");
+      return (latestAiResearchTimes[first.id] ?? "").localeCompare(latestAiResearchTimes[second.id] ?? "");
     })
     .slice(0, prioritySlotCount);
   const selected = new Set(priorityArtists.map((artist) => artist.id));
   const rotatingArtists = [...artists]
     .filter((artist) => !selected.has(artist.id))
     .sort((first, second) => {
-      const firstScanDate = latestAiResearchDates[first.id] ?? "";
-      const secondScanDate = latestAiResearchDates[second.id] ?? "";
+      const firstScanDate = latestAiResearchTimes[first.id] ?? "";
+      const secondScanDate = latestAiResearchTimes[second.id] ?? "";
 
       if (firstScanDate !== secondScanDate) {
         return firstScanDate.localeCompare(secondScanDate);

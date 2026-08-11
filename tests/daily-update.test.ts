@@ -25,6 +25,28 @@ function artist(): MarketUpdateArtist {
 }
 
 describe("daily market valuation pressure", () => {
+  it("holds the live quote during an intraday calculation with no new pricing signal", () => {
+    const current = {
+      ...artist(),
+      currentPrice: 5,
+      quotedPrice: 5.12,
+      previousClose: 5
+    };
+    const result = calculateDailyMarketUpdates({
+      artists: [current],
+      runDate: "2026-07-13",
+      source: "core",
+      intraday: true
+    });
+
+    expect(result.updates[0]).toMatchObject({ currentPrice: 5.12, signalDelta: 0 });
+    expect(result.updates[0].dailyChangePercent).toBeCloseTo(2.4);
+    expect(result.updates[0].rawPayload.intradayHold).toMatchObject({
+      applied: true,
+      reason: "no_new_intraday_pricing_signal"
+    });
+  });
+
   it("tracks missing history separately from genuine source anomalies", () => {
     const result = calculateDailyMarketUpdates({
       artists: [artist()],

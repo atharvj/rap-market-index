@@ -9,6 +9,7 @@ import {
 import { enforceRateLimit, getRequestIp } from "@/server/rate-limit";
 import { secureCompare } from "@/server/secrets";
 import { isStoredMarketEventSourceIntegrityValid } from "@/server/market/event-integrity";
+import { buildIntradayArtistBatch } from "@/server/market/intraday-refresh";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
@@ -103,18 +104,25 @@ export async function GET(request: Request) {
   }
 
   const pending = await loadPendingCatalysts();
+  const scannedArtistIds = getScannedArtistIds(eventScan);
+  const pendingArtistIds = pending.map((candidate) => candidate.artistId);
+  const artistIds = buildIntradayArtistBatch({
+    pendingArtistIds,
+    scannedArtistIds,
+    limit: FAST_SCAN_ARTIST_CAP
+  });
 
-  if (!pending.length) {
+  if (!artistIds.length) {
     return NextResponse.json({
       ok: true,
       runDate,
       repriced: false,
-      reason: "No newly detected high-impact catalysts need repricing.",
+      recalculated: false,
+      reason: "The scan returned no artists to recalculate.",
       eventScan
     });
   }
 
-  const artistIds = pending.map((candidate) => candidate.artistId);
   const marketUpdateResponse = await fetch(new URL("/api/admin/daily-market-update", request.url), {
     method: "POST",
     headers: {
@@ -126,6 +134,7 @@ export async function GET(request: Request) {
       source: "core",
       runDate,
       artistIds,
+      forceTickArtistIds: pendingArtistIds,
       intraday: true
     })
   });
@@ -137,7 +146,7 @@ export async function GET(request: Request) {
         ok: false,
         runDate,
         stage: "repricing",
-        error: marketUpdate.error ?? "Catalysts were found, but quote refresh failed; affected trades remain paused.",
+        error: marketUpdate.error ?? "The intraday price calculation failed; affected catalyst trades remain paused.",
         affectedArtists: pending,
         eventScan,
         marketUpdate
@@ -150,9 +159,27 @@ export async function GET(request: Request) {
     ok: true,
     runDate,
     repriced: true,
+    recalculated: true,
+    recalculatedArtistCount: artistIds.length,
+    catalystRepriced: pending.length > 0,
     affectedArtists: pending,
     eventScan,
     marketUpdate
+  });
+}
+
+function getScannedArtistIds(eventScan: AutomationResponse) {
+  if (!Array.isArray(eventScan.artists)) {
+    return [];
+  }
+
+  return eventScan.artists.flatMap((artist) => {
+    if (!artist || typeof artist !== "object" || Array.isArray(artist)) {
+      return [];
+    }
+
+    const id = (artist as Record<string, unknown>).id;
+    return typeof id === "string" ? [id] : [];
   });
 }
 

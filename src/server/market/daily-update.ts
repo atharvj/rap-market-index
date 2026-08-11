@@ -90,6 +90,7 @@ export type MarketUpdateArtist = {
   name: string;
   ticker: string;
   currentPrice: number;
+  quotedPrice?: number;
   previousClose: number;
   previousCloseSource?: "artist" | "price_history";
   hypeScore: number;
@@ -109,6 +110,7 @@ export type MarketUpdateInput = {
   manualSignals?: ManualSignals;
   adapterSignals?: AdapterSignals;
   marketCoverageRatio?: number;
+  intraday?: boolean;
 };
 
 export type ArtistMarketUpdate = {
@@ -190,7 +192,10 @@ export function calculateDailyMarketUpdates(input: MarketUpdateInput) {
       persistedMarketWideCalibration: persistedCalibration.audits[artist.id]
     })
   );
-  const updates = applyMarketRelativePricing(standaloneUpdates, input.marketCoverageRatio)
+  const pricedUpdates = input.intraday
+    ? standaloneUpdates.map((update, index) => holdUnchangedIntradayQuote(update, input.artists[index]))
+    : applyMarketRelativePricing(standaloneUpdates, input.marketCoverageRatio);
+  const updates = pricedUpdates
     .map(applyMeasuredMinimumTick);
 
   const averageMovePercent =
@@ -268,6 +273,36 @@ export function calculateDailyMarketUpdates(input: MarketUpdateInput) {
         ? pickLeaderboardMove(sorted[sorted.length - 1])
         : null
     } satisfies MarketUpdateSummary
+  };
+}
+
+function holdUnchangedIntradayQuote(
+  update: ArtistMarketUpdate,
+  artist: MarketUpdateArtist
+): ArtistMarketUpdate {
+  if (update.rawPayload.hasMomentumSignal === true) {
+    return update;
+  }
+
+  const quotedPrice = getValidPrice(artist.quotedPrice ?? update.currentPrice, update.currentPrice);
+
+  return {
+    ...update,
+    oldPrice: quotedPrice,
+    currentPrice: quotedPrice,
+    dailyChangePercent: getDailyChangePercent(quotedPrice, update.previousClose),
+    hypeScore: calculateHypeScore(artist.stats),
+    stats: artist.stats,
+    explanation: `${update.ticker} held its current quote with no new intraday pricing signal.`,
+    signalDelta: 0,
+    rawPayload: {
+      ...update.rawPayload,
+      intradayHold: {
+        applied: true,
+        reason: "no_new_intraday_pricing_signal",
+        quotedPrice
+      }
+    }
   };
 }
 
