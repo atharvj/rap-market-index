@@ -376,13 +376,26 @@ test("Watch Now starts in view and stays inside the RMI player", async ({ page }
     "src",
     /youtube-nocookie\.com\/embed\/RmiVideo001/
   );
-  await expect(page.getByRole("link", { name: /youtube/i })).toHaveCount(0);
+  const youtubeLink = page.getByRole("link", { name: /open .* on youtube/i });
+  await expect(youtubeLink).toHaveCount(1);
+  await expect(youtubeLink).toHaveAttribute(
+    "href",
+    `https://www.youtube.com/watch?v=${marketVideos[0].videoId}`
+  );
+  await expect(youtubeLink).toHaveAttribute("target", "_blank");
   await expect(
     page.getByRole("link", { name: `${marketVideos[0].artistName} artist page` })
   ).toHaveAttribute("href", `/artists/${marketVideos[0].artistId}`);
   await expect(page.locator('section[aria-labelledby="watch-now-title"]')).toHaveScreenshot("watch-now.png");
 
   const player = page.locator("[data-watch-player]");
+  const [playerBox, youtubeLinkBox] = await Promise.all([
+    player.boundingBox(),
+    youtubeLink.boundingBox()
+  ]);
+  expect(playerBox).not.toBeNull();
+  expect(youtubeLinkBox).not.toBeNull();
+  expect(youtubeLinkBox!.y).toBeGreaterThanOrEqual(playerBox!.y + playerBox!.height);
   const controls = page.locator("[data-watch-controls]");
   await player.hover();
   await expect(controls).toHaveClass(/opacity-100/);
