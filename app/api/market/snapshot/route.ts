@@ -2,7 +2,11 @@ import { NextResponse } from "next/server";
 import { createInitialGameState } from "@/lib/market";
 import { sanitizeMoveExplanation } from "@/lib/artist-explanations";
 import { loadAllPages } from "@/lib/pagination";
-import { ONE_MONTH_HISTORY_DAYS } from "@/lib/price-series";
+import {
+  buildIntradayPriceSeries,
+  keepLatestMarketRunPerDate,
+  ONE_MONTH_HISTORY_DAYS
+} from "@/lib/price-series";
 import { createServiceRoleClient, getSupabaseConfigStatus } from "@/lib/supabase/server";
 import type { Database } from "@/lib/supabase/database.types";
 import type { Artist, GameState, HypeStats, PricePoint } from "@/lib/types";
@@ -18,6 +22,10 @@ type ArtistStatsRow = Database["public"]["Tables"]["artist_stats"]["Row"];
 type PriceHistoryPoint = Pick<
   Database["public"]["Tables"]["price_history"]["Row"],
   "artist_id" | "price_date" | "price"
+>;
+type PriceTickPoint = Pick<
+  Database["public"]["Tables"]["price_ticks"]["Row"],
+  "artist_id" | "observed_at" | "price" | "source"
 >;
 
 const CACHE_HEADERS = { "Cache-Control": "public, max-age=30, s-maxage=60, stale-while-revalidate=300" };
@@ -54,9 +62,11 @@ export async function GET() {
 
     const typedArtists = (artists ?? []) as ArtistRow[];
     const artistIds = typedArtists.map((artist) => artist.id);
-    const [statsByArtist, historyByArtist, imageByArtistId] = await Promise.all([
+    const snapshotTime = new Date();
+    const [statsByArtist, historyByArtist, intradayByArtist, imageByArtistId] = await Promise.all([
       loadStatsByArtist(artistIds, supabase),
       loadHistoryByArtist(artistIds, supabase),
+      loadIntradayByArtist(artistIds, typedArtists, supabase, snapshotTime),
       loadArtistImageUrls(
         supabase,
         artistIds,
@@ -71,6 +81,7 @@ export async function GET() {
           artist,
           statsByArtist[artist.id] ?? null,
           historyByArtist[artist.id] ?? [],
+          intradayByArtist[artist.id] ?? [],
           imageByArtistId.get(artist.id)
         )
       ),
@@ -96,6 +107,58 @@ export async function GET() {
       { status: 500, headers: CACHE_HEADERS }
     );
   }
+}
+
+async function loadIntradayByArtist(
+  artistIds: string[],
+  artists: ArtistRow[],
+  supabase: ReturnType<typeof createServiceRoleClient>,
+  now: Date
+): Promise<Record<string, PricePoint[]>> {
+  if (!artistIds.length) {
+    return {};
+  }
+
+  const cutoff = new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString();
+  const rows = await loadAllPages<PriceTickPoint>(async (from, to) => {
+    const { data, error } = await supabase
+      .from("price_ticks")
+      .select("artist_id, observed_at, price, source")
+      .in("artist_id", artistIds)
+      .neq("source", "migration")
+      .gte("observed_at", cutoff)
+      .order("observed_at", { ascending: true })
+      .order("artist_id", { ascending: true })
+      .range(from, to);
+
+    if (error) {
+      throw new Error(`Could not load intraday price ticks: ${error.message}`);
+    }
+
+    return (data ?? []) as PriceTickPoint[];
+  });
+  const ticksByArtist = rows.reduce<Record<string, Array<PricePoint & { source: string; marketDate: string }>>>(
+    (grouped, point) => {
+      grouped[point.artist_id] ??= [];
+      grouped[point.artist_id].push({
+        date: point.observed_at,
+        price: Number(point.price),
+        source: point.source,
+        marketDate: getMarketDate(new Date(point.observed_at))
+      });
+      return grouped;
+    },
+    {}
+  );
+
+  return artists.reduce<Record<string, PricePoint[]>>((grouped, artist) => {
+    grouped[artist.id] = buildIntradayPriceSeries({
+      ticks: keepLatestMarketRunPerDate(ticksByArtist[artist.id] ?? []),
+      currentPrice: Number(artist.current_price),
+      now: now.toISOString()
+    });
+    return grouped;
+  }, {});
 }
 
 async function loadStatsByArtist(
@@ -153,7 +216,13 @@ async function loadHistoryByArtist(
   }, {});
 }
 
-function mapArtist(row: ArtistRow, stats: ArtistStatsRow | null, history: PricePoint[], imageUrl?: string): Artist {
+function mapArtist(
+  row: ArtistRow,
+  stats: ArtistStatsRow | null,
+  history: PricePoint[],
+  intradayHistory: PricePoint[],
+  imageUrl?: string
+): Artist {
   const fallbackHistory = [
     {
       date: getMarketDate(),
@@ -177,6 +246,7 @@ function mapArtist(row: ArtistRow, stats: ArtistStatsRow | null, history: PriceP
     accent: row.accent,
     stats: mappedStats,
     priceHistory: history.length ? history : fallbackHistory,
+    intradayPriceHistory: intradayHistory.length >= 2 ? intradayHistory : undefined,
     lastMoveExplanation: sanitizeMoveExplanation(
       row.ticker,
       row.last_move_explanation,

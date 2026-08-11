@@ -216,6 +216,26 @@ function getMockHistoryResponse(artistId: string, range: HistoryRange) {
     };
   }
 
+  if (range === "1D") {
+    const now = new Date();
+    const start = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+    const points = buildIntradayPriceSeries({
+      ticks: [{ date: start.toISOString(), price: artist.previousClose }],
+      currentPrice: artist.currentPrice,
+      now: now.toISOString()
+    });
+
+    return {
+      points,
+      hasRealHistory: false,
+      recordedCloseCount: 0,
+      granularity: "intraday" as const,
+      hasMovement: hasPriceMovement(points),
+      historyStart: points[0]?.date ?? null,
+      historyEnd: points[points.length - 1]?.date ?? null
+    };
+  }
+
   const cutoff = range === "ALL" ? null : shiftMarketDate(getMarketDate(), -RANGE_DAYS[range]);
   const points = cutoff
     ? artist.priceHistory.filter((point) => point.date >= cutoff)

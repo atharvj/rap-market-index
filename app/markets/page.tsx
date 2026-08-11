@@ -148,13 +148,13 @@ export default function MarketsPage() {
           <div>
             <h2 className="text-sm font-semibold">Market board</h2>
             <p className="mt-1 max-w-3xl text-xs leading-5 text-paper/50">
-              Sparklines show up to 18 sessions. 24h uses the previous close.
+              24h paths use recorded quote changes. Quiet artists can stay flat between verified repricings.
             </p>
           </div>
         </div>
         <div className="rmi-table-head grid grid-cols-[minmax(0,1fr)_72px_60px_32px] gap-x-1 px-2 py-3 sm:grid-cols-[minmax(0,1fr)_104px_84px_36px] sm:gap-x-3 sm:px-4 lg:grid-cols-[minmax(220px,1fr)_140px_124px_104px_84px_44px] lg:gap-x-4">
           <span>Artist</span>
-          <span className="hidden text-right lg:block">Recent sessions</span>
+          <span className="hidden text-right lg:block">24h quote path</span>
           <span className="hidden items-center justify-end gap-1.5 text-right lg:flex">
             Signal Score <ScoreInfo />
           </span>
@@ -181,11 +181,15 @@ export default function MarketsPage() {
             </Link>
             <div className="hidden justify-end lg:flex">
               <MiniSparkline
-                data={artist.priceHistory}
-                positive={getSeriesChangePercent(artist.priceHistory) >= 0}
+                data={artist.intradayPriceHistory ?? [
+                  { date: "previous-close", price: artist.previousClose },
+                  { date: "current-quote", price: artist.currentPrice }
+                ]}
+                positive={artist.dailyChangePercent >= 0}
                 width={116}
                 height={30}
-                label={`One-month price trend over ${artist.priceHistory.length} recorded sessions`}
+                label={`24-hour recorded quote path for ${artist.name}`}
+                interpolation="step"
               />
             </div>
             <ScoreCell value={artist.hypeScore} />

@@ -182,7 +182,7 @@ export function PriceChart({
               formatter={(value) => [formatCurrency(Number(value)), "RMI quote"]}
             />
             <Area
-              type="linear"
+              type={intraday ? "stepAfter" : "linear"}
               dataKey="price"
               stroke={color}
               strokeWidth={compact ? 2 : 2.5}

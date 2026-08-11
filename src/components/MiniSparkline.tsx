@@ -1,17 +1,20 @@
 import type { PricePoint } from "@/lib/types";
+import { buildSparklinePath } from "@/lib/sparkline";
 
 export function MiniSparkline({
   data,
   positive,
   width = 116,
   height = 34,
-  label = "Recent recorded price trend"
+  label = "Recent recorded price trend",
+  interpolation = "linear"
 }: {
   data: PricePoint[];
   positive: boolean;
   width?: number;
   height?: number;
   label?: string;
+  interpolation?: "linear" | "step";
 }) {
   const points = data;
 
@@ -30,17 +33,22 @@ export function MiniSparkline({
   const prices = points.map((point) => point.price);
   const min = Math.min(...prices);
   const max = Math.max(...prices);
-  const range = Math.max(0.01, max - min);
+  const range = max - min;
+  const timestamps = points.map((point) => new Date(point.date).getTime());
+  const useTimeScale = timestamps.every(Number.isFinite) && timestamps[timestamps.length - 1] > timestamps[0];
+  const timeRange = useTimeScale ? timestamps[timestamps.length - 1] - timestamps[0] : 0;
   const step = width / Math.max(1, points.length - 1);
   const coordinates = points.map((point, index) => {
-    const x = index * step;
-    const y = height - ((point.price - min) / range) * (height - 4) - 2;
+    const x = useTimeScale
+      ? ((timestamps[index] - timestamps[0]) / timeRange) * width
+      : index * step;
+    const y = range <= 0
+      ? height / 2
+      : height - ((point.price - min) / range) * (height - 4) - 2;
 
     return { x, y };
   });
-  const path = coordinates
-    .map((point, index) => `${index === 0 ? "M" : "L"}${point.x.toFixed(2)},${point.y.toFixed(2)}`)
-    .join(" ");
+  const path = buildSparklinePath(coordinates, interpolation);
   const last = coordinates[coordinates.length - 1];
 
   return (
@@ -53,8 +61,8 @@ export function MiniSparkline({
       aria-label={label}
     >
       <title>{label}</title>
-      <path d={path} fill="none" stroke="currentColor" strokeOpacity="0.16" strokeWidth="6" />
-      <path d={path} fill="none" stroke="currentColor" strokeWidth="2.1" />
+      <path d={path} fill="none" stroke="currentColor" strokeOpacity="0.14" strokeWidth="5" />
+      <path d={path} fill="none" stroke="currentColor" strokeWidth="2" />
       <circle cx={last.x} cy={last.y} r="2.6" fill="currentColor" />
     </svg>
   );

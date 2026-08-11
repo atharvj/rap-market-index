@@ -22,7 +22,7 @@ type HistoryResponse = {
   historyEnd?: string | null;
 };
 
-const ranges: HistoryRange[] = ["7D", "1M", "3M", "6M", "1Y", "ALL"];
+const ranges: HistoryRange[] = ["1D", "7D", "1M", "3M", "6M", "1Y", "ALL"];
 
 export function ArtistPriceHistoryPanel({
   artistId,
@@ -31,13 +31,13 @@ export function ArtistPriceHistoryPanel({
   artistId: string;
   fallbackData: PricePoint[];
 }) {
-  const [range, setRange] = useState<HistoryRange>("1M");
+  const [range, setRange] = useState<HistoryRange>("1D");
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
-  const [history, setHistory] = useState<PricePoint[]>(fallbackData);
-  const [hasRealHistory, setHasRealHistory] = useState(fallbackData.length > 0);
-  const [recordedCloseCount, setRecordedCloseCount] = useState(fallbackData.length);
+  const [history, setHistory] = useState<PricePoint[]>([]);
+  const [hasRealHistory, setHasRealHistory] = useState(false);
+  const [recordedCloseCount, setRecordedCloseCount] = useState(0);
   const [hasMovement, setHasMovement] = useState(false);
-  const [granularity, setGranularity] = useState<"intraday" | "daily">("daily");
+  const [granularity, setGranularity] = useState<"intraday" | "daily">("intraday");
 
   useEffect(() => {
     const controller = new AbortController();
@@ -65,11 +65,11 @@ export function ArtistPriceHistoryPanel({
           return;
         }
 
-        setHistory(fallbackData);
+        setHistory(range === "1D" ? [] : fallbackData);
         setHasRealHistory(false);
-        setRecordedCloseCount(fallbackData.length);
+        setRecordedCloseCount(range === "1D" ? 0 : fallbackData.length);
         setHasMovement(false);
-        setGranularity("daily");
+        setGranularity(range === "1D" ? "intraday" : "daily");
         setStatus(error instanceof Error ? "error" : "error");
       });
 
@@ -123,7 +123,9 @@ export function ArtistPriceHistoryPanel({
       <div className="p-4 sm:p-5">
         <div className="rmi-chart-shell p-2 sm:p-3"><PriceChart data={history} height={290} timeScale={granularity} /></div>
         <p className="mt-3 text-xs text-paper/42">
-          {status === "ready" && !hasMovement
+          {status === "loading"
+            ? "Loading recorded market quotes."
+            : status === "ready" && !hasMovement
             ? range === "1D"
               ? "No intraday market-quote movement yet. Individual order fills are not charted."
               : "No additional recorded close or eligible trade quote in this range."
