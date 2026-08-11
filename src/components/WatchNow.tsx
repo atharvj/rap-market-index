@@ -7,6 +7,7 @@ import {
   Captions,
   ChevronRight,
   Eye,
+  ExternalLink,
   Maximize2,
   Minimize2,
   Pause,
@@ -539,6 +540,17 @@ export function WatchNow() {
                     {formatCompact(currentVideo.viewCount)} views
                   </span>
                 ) : null}
+                <a
+                  data-watch-youtube-link
+                  href={`https://www.youtube.com/watch?v=${currentVideo.videoId}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="ml-auto inline-flex min-h-9 items-center gap-1.5 rounded-[var(--radius-control)] border border-line bg-panelSoft px-2.5 py-1.5 text-[11px] font-semibold text-paper/60 transition hover:border-cyan/45 hover:text-cyan focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan"
+                  aria-label={`Open ${currentVideo.title} on YouTube in a new tab`}
+                >
+                  Open on YouTube
+                  <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
+                </a>
               </div>
             </div>
           </div>
