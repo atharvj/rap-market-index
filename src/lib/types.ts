@@ -44,7 +44,6 @@ export type Artist = {
   accent: string;
   stats: HypeStats;
   priceHistory: PricePoint[];
-  intradayPriceHistory?: PricePoint[];
   lastMoveExplanation: string;
 };
 

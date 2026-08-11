@@ -32,12 +32,6 @@ const marketState: GameState = (() => {
       };
     });
     priceHistory[priceHistory.length - 1].price = currentPrice;
-    const intradayPriceHistory = [
-      { date: "2026-07-16T17:00:00.000Z", price: previousClose },
-      { date: "2026-07-16T21:20:00.000Z", price: Number((previousClose * 1.004).toFixed(2)) },
-      { date: "2026-07-17T02:45:00.000Z", price: Number((currentPrice * 0.996).toFixed(2)) },
-      { date: "2026-07-17T12:00:00.000Z", price: currentPrice }
-    ];
 
     return {
       ...artist,
@@ -46,7 +40,6 @@ const marketState: GameState = (() => {
       dailyChangePercent,
       hypeScore: Math.min(94, 61 + index * 2),
       priceHistory,
-      intradayPriceHistory,
       lastMoveExplanation: `${artist.ticker} moved as verified audience and release signals changed.`
     };
   });
@@ -343,7 +336,6 @@ test.beforeEach(async ({ page }) => {
 test("homepage visual contract", async ({ page }) => {
   await assertStablePublicPage(page, "/", marketNews[0].title, "homepage.png");
   await expect(page.getByText("Top Market Story", { exact: true })).toBeVisible();
-  await expect(page.getByText("24H quote path", { exact: true })).toHaveCount(6);
 });
 
 test("homepage leads with one top story and does not repeat it below", async ({ page }) => {
@@ -470,7 +462,6 @@ test("Watch Now starts in view and stays inside the RMI player", async ({ page }
 
 test("markets visual contract", async ({ page }) => {
   await assertStablePublicPage(page, "/markets", "Artist Markets", "markets.png");
-  await expect(page.getByText("24h quote path", { exact: true })).toBeVisible();
 });
 
 test("market artist names retain readable space on mobile", async ({ page }) => {
@@ -497,8 +488,8 @@ test("artist pages include related markets without repeating the current artist"
   const section = page.locator("section").filter({ has: heading }).first();
   await expect(section.locator('a[href^="/artists/"]')).toHaveCount(4);
   await expect(section.locator(`a[href="/artists/${currentArtist.id}"]`)).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "1D" })).toHaveAttribute("aria-pressed", "true");
-  await expect(page.getByText(/The 1D view shows recorded market quotes, not individual order fills\./)).toBeVisible();
+  await expect(page.getByRole("button", { name: "1M" })).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByText(/The chart shows market quotes, not individual order fills\./)).toBeVisible();
 });
 
 test("public metrics do not use decorative colored side borders", async ({ page }) => {

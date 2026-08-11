@@ -83,9 +83,9 @@ function MarketList({
       </div>
       <div className="divide-y divide-line/75">
         {artists.map((artist) => {
-          const recentHistory = artist.intradayPriceHistory ?? [
+          const recentHistory = [
             { date: "previous-close", price: artist.previousClose },
-            { date: "current-quote", price: artist.currentPrice }
+            { date: "latest-close", price: artist.currentPrice }
           ];
 
           return (
@@ -106,8 +106,7 @@ function MarketList({
                 positive={artist.dailyChangePercent >= 0}
                 width={64}
                 height={24}
-                label={`24-hour recorded quote path for ${artist.name}`}
-                interpolation="step"
+                label="24-hour price move"
               />
               <span className="text-right number-tabular">
                 <span className="block text-xs font-semibold">{formatCurrency(artist.currentPrice)}</span>

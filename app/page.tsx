@@ -8,7 +8,7 @@ import { MarketNewsFeed } from "@/components/MarketNewsFeed";
 import { MiniSparkline } from "@/components/MiniSparkline";
 import { WatchNow } from "@/components/WatchNow";
 import { formatCurrency, formatPercent } from "@/lib/formatters";
-import { getMarketBreadth } from "@/lib/market-analytics";
+import { getMarketBreadth, getSeriesChangePercent } from "@/lib/market-analytics";
 import { Activity, ArrowDownRight, ArrowUpRight, Gauge } from "lucide-react";
 import Link from "next/link";
 import { useMemo } from "react";
@@ -78,20 +78,13 @@ export default function HomePage() {
                   <p className="text-lg font-bold number-tabular">{formatCurrency(artist.currentPrice)}</p>
                   <ChangeText value={artist.dailyChangePercent} />
                 </div>
-                <div className="text-right">
-                  <span className="rmi-data-label mb-1 block text-[9px]">24H quote path</span>
-                  <MiniSparkline
-                    data={artist.intradayPriceHistory ?? [
-                      { date: "previous-close", price: artist.previousClose },
-                      { date: "current-quote", price: artist.currentPrice }
-                    ]}
-                    positive={artist.dailyChangePercent >= 0}
-                    width={118}
-                    height={38}
-                    label={`24-hour recorded quote path for ${artist.name}`}
-                    interpolation="step"
-                  />
-                </div>
+                <MiniSparkline
+                  data={artist.priceHistory}
+                  positive={getSeriesChangePercent(artist.priceHistory) >= 0}
+                  width={118}
+                  height={38}
+                  label={`One-month price trend over ${artist.priceHistory.length} recorded sessions`}
+                />
               </div>
               <div className="mt-3 flex items-center justify-between border-t border-line/60 pt-2">
                 <span className="rmi-data-label">RMI signal</span>

@@ -31,13 +31,13 @@ export function ArtistPriceHistoryPanel({
   artistId: string;
   fallbackData: PricePoint[];
 }) {
-  const [range, setRange] = useState<HistoryRange>("1D");
+  const [range, setRange] = useState<HistoryRange>("1M");
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
-  const [history, setHistory] = useState<PricePoint[]>([]);
-  const [hasRealHistory, setHasRealHistory] = useState(false);
-  const [recordedCloseCount, setRecordedCloseCount] = useState(0);
+  const [history, setHistory] = useState<PricePoint[]>(fallbackData);
+  const [hasRealHistory, setHasRealHistory] = useState(fallbackData.length > 0);
+  const [recordedCloseCount, setRecordedCloseCount] = useState(fallbackData.length);
   const [hasMovement, setHasMovement] = useState(false);
-  const [granularity, setGranularity] = useState<"intraday" | "daily">("intraday");
+  const [granularity, setGranularity] = useState<"intraday" | "daily">("daily");
 
   useEffect(() => {
     const controller = new AbortController();
@@ -65,11 +65,11 @@ export function ArtistPriceHistoryPanel({
           return;
         }
 
-        setHistory(range === "1D" ? [] : fallbackData);
+        setHistory(fallbackData);
         setHasRealHistory(false);
-        setRecordedCloseCount(range === "1D" ? 0 : fallbackData.length);
+        setRecordedCloseCount(fallbackData.length);
         setHasMovement(false);
-        setGranularity(range === "1D" ? "intraday" : "daily");
+        setGranularity("daily");
         setStatus(error instanceof Error ? "error" : "error");
       });
 
