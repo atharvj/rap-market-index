@@ -336,6 +336,12 @@ test.beforeEach(async ({ page }) => {
 test("homepage visual contract", async ({ page }) => {
   await assertStablePublicPage(page, "/", marketNews[0].title, "homepage.png");
   await expect(page.getByText("Top Market Story", { exact: true })).toBeVisible();
+
+  const railSparkline = page.getByRole("img", {
+    name: new RegExp(`Recent recorded price history for ${marketState.artists[0].name}`)
+  }).first();
+  const railPath = await railSparkline.locator("path").last().getAttribute("d");
+  expect((railPath?.match(/L/g) ?? []).length).toBeGreaterThan(2);
 });
 
 test("homepage leads with one top story and does not repeat it below", async ({ page }) => {

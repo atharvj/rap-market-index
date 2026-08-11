@@ -83,10 +83,12 @@ function MarketList({
       </div>
       <div className="divide-y divide-line/75">
         {artists.map((artist) => {
-          const recentHistory = [
-            { date: "previous-close", price: artist.previousClose },
-            { date: "latest-close", price: artist.currentPrice }
-          ];
+          const recentHistory = artist.priceHistory.length >= 2
+            ? artist.priceHistory
+            : [
+                { date: "previous-close", price: artist.previousClose },
+                { date: "latest-close", price: artist.currentPrice }
+              ];
 
           return (
             <Link
@@ -106,7 +108,7 @@ function MarketList({
                 positive={artist.dailyChangePercent >= 0}
                 width={64}
                 height={24}
-                label="24-hour price move"
+                label={`Recent recorded price history for ${artist.name}; color follows the 24-hour move`}
               />
               <span className="text-right number-tabular">
                 <span className="block text-xs font-semibold">{formatCurrency(artist.currentPrice)}</span>
