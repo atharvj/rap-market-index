@@ -34,6 +34,7 @@ import {
 } from "@/server/market/emerging-news";
 import { hasVerifiedAiResearchArticleProvenance } from "@/server/market/event-integrity";
 import { decodeHtmlEntities } from "@/lib/html-entities";
+import { hasMaterialMarketImpact } from "@/lib/market-news-impact";
 
 export const dynamic = "force-dynamic";
 
@@ -512,7 +513,7 @@ function isPublicMarketNewsEvent(
   }
 
   if (hasStatusSubtype) {
-    return impactScore >= 18 && confidence >= 0.45;
+    return hasMaterialMarketImpact(impactScore, 18) && confidence >= 0.45;
   }
 
   if (title.includes("reaction on social") && !isPublicSocialCatalystEvent(event, rawPayload, impactScore, confidence)) {
@@ -539,7 +540,7 @@ function isPublicMarketNewsEvent(
     return (
       rawPayload.corroborated === true &&
       event.event_type === "release" &&
-      impactScore >= 25 &&
+      hasMaterialMarketImpact(impactScore, 25) &&
       confidence >= 0.55
     );
   }
@@ -550,7 +551,7 @@ function isPublicMarketNewsEvent(
 
   if (source === "gdelt_article" || source === "media_rss_item") {
     return (
-      impactScore >= 22 &&
+      hasMaterialMarketImpact(impactScore, 22) &&
       confidence >= 0.55 &&
       !isLowSignalSocialTitle(title) &&
       !isLowValueArticleTitle(title)
@@ -558,10 +559,10 @@ function isPublicMarketNewsEvent(
   }
 
   if (source === "manual_event") {
-    return impactScore >= 18 && confidence >= 0.45;
+    return hasMaterialMarketImpact(impactScore, 18) && confidence >= 0.45;
   }
 
-  return impactScore >= 35 && confidence >= 0.65 && !isLowSignalSocialTitle(title);
+  return hasMaterialMarketImpact(impactScore, 35) && confidence >= 0.65 && !isLowSignalSocialTitle(title);
 }
 
 function isStoredMediaEventStillValid(
@@ -1090,7 +1091,7 @@ function isPublicYoutubeUploadEvent(
       viewCount >= minimumProjectGuessViews &&
       !hasLowSignalYoutubeTitle(title) &&
       qualityMultiplier >= 0.9 &&
-      impactScore >= (isMainFeed ? 54 : 42) &&
+      hasMaterialMarketImpact(impactScore, isMainFeed ? 54 : 42) &&
       confidence >= (isMainFeed ? 0.76 : 0.68)
     );
   }
@@ -1105,7 +1106,7 @@ function isPublicYoutubeUploadEvent(
       typeof viewCount === "number" &&
       viewCount >= (isMainFeed ? mainFeedMinimumViews : artistFeedMinimumViews) &&
       (isMainFeed ? hasStrongEngagement || viewCount >= 2_500_000 : true) &&
-      impactScore >= (isMainFeed ? 58 : 48) &&
+      hasMaterialMarketImpact(impactScore, isMainFeed ? 58 : 48) &&
       confidence >= (isMainFeed ? 0.76 : 0.7)
     );
   }
@@ -1135,14 +1136,14 @@ function isPublicYoutubeUploadEvent(
   }
 
   if (event.event_type === "release") {
-    return impactScore >= (isMainFeed ? 42 : 32) && confidence >= (isMainFeed ? 0.66 : 0.58);
+    return hasMaterialMarketImpact(impactScore, isMainFeed ? 42 : 32) && confidence >= (isMainFeed ? 0.66 : 0.58);
   }
 
   if (event.event_type === "viral" || event.event_type === "controversy") {
-    return impactScore >= 45 && confidence >= 0.7;
+    return hasMaterialMarketImpact(impactScore, 45) && confidence >= 0.7;
   }
 
-  return impactScore >= 35 && confidence >= 0.65;
+  return hasMaterialMarketImpact(impactScore, 35) && confidence >= 0.65;
 }
 
 function isPublicYoutubeEditorialEvent(
@@ -1166,7 +1167,7 @@ function isPublicYoutubeEditorialEvent(
     /^[A-Za-z0-9_-]{6,20}$/.test(videoId) &&
     (durationSeconds === null || durationSeconds > 75) &&
     viewCount >= 2_500 &&
-    impactScore >= (isMainFeed ? 14 : 10) &&
+    hasMaterialMarketImpact(impactScore, isMainFeed ? 14 : 10) &&
     confidence >= 0.65
   );
 }
