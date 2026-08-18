@@ -4,6 +4,7 @@ import { useGame } from "@/components/GameProvider";
 import { MarketNewsFeed, type MarketNewsItem } from "@/components/MarketNewsFeed";
 import { ArtistIdentity, ChangeText, RmiButton } from "@/components/RmiPrimitives";
 import type { MarketNewsSort } from "@/lib/market-news-sort";
+import { MARKET_NEWS_TAG_OPTIONS } from "@/lib/market-news-tags";
 import { Activity, ArrowUpDown, ListFilter, Music, Radio, ShieldCheck } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
 
@@ -11,7 +12,7 @@ export default function NewsPage() {
   const { state } = useGame();
   const [newsArtistIds, setNewsArtistIds] = useState<Set<string>>(new Set());
   const [newsSort, setNewsSort] = useState<MarketNewsSort>("top");
-  const [eventType, setEventType] = useState("");
+  const [newsTag, setNewsTag] = useState("");
   const movers = useMemo(
     () => [...state.artists]
       .filter((artist) => newsArtistIds.has(artist.id) && Math.abs(artist.dailyChangePercent) >= 0.01)
@@ -40,15 +41,15 @@ export default function NewsPage() {
               <ListFilter className="h-4 w-4" aria-hidden="true" />
               <span>Filter</span>
               <select
-                value={eventType}
-                onChange={(event) => setEventType(event.target.value)}
+                value={newsTag}
+                onChange={(event) => setNewsTag(event.target.value)}
                 className="min-w-28 bg-transparent font-semibold text-paper outline-none"
                 aria-label="Filter market news"
               >
                 <option value="">All Stories</option>
-                <option value="release">Releases</option>
-                <option value="viral">Viral</option>
-                <option value="tour">Tours</option>
+                {MARKET_NEWS_TAG_OPTIONS.map((option) => (
+                  <option key={option.key} value={option.key}>{option.label}</option>
+                ))}
               </select>
             </label>
             <label className="rmi-terminal-input flex items-center gap-2 px-3 text-xs font-medium text-paper/55">
@@ -71,7 +72,7 @@ export default function NewsPage() {
             limit={40}
             variant="full"
             sort={newsSort}
-            eventType={eventType || undefined}
+            newsTag={newsTag || undefined}
             onItemsChange={handleNewsItems}
           />
         </div>
@@ -99,7 +100,7 @@ export default function NewsPage() {
           <Music className="h-5 w-5 text-cyan" aria-hidden="true" />
           <h2 className="mt-3 text-sm font-semibold">How stories are selected</h2>
           <p className="mt-2 text-sm leading-6 text-paper/60">
-            Routine uploads, reposts, and low-signal chatter are excluded. A story must clear evidence and relevance checks before it appears here.
+            Direct music demand is weighted highest. Verified career, legal, or cultural events can still appear when they plausibly affect an artist market; celebrity attention alone is excluded. Stories can carry multiple context tags.
           </p>
         </section>
 

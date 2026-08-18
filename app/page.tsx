@@ -62,8 +62,8 @@ export default function HomePage() {
       </section>
 
       <RmiSection
-        title="Market Signals"
-        subtitle="Artists with the strongest combination of market movement and current RMI signal."
+        title="Market Momentum"
+        subtitle="Artists with the strongest combination of quote movement and current RMI Momentum."
         action={<Link href="/markets" className="text-xs font-semibold text-cyan hover:text-paper">Open Markets</Link>}
       >
         <div className="grid gap-px bg-line/70 sm:grid-cols-2 xl:grid-cols-3">
@@ -87,7 +87,7 @@ export default function HomePage() {
                 />
               </div>
               <div className="mt-3 flex items-center justify-between border-t border-line/60 pt-2">
-                <span className="rmi-data-label">RMI signal</span>
+                <span className="rmi-data-label">RMI Momentum</span>
                 <span className="text-xs font-semibold text-cyan number-tabular">{artist.hypeScore}/100</span>
               </div>
             </Link>

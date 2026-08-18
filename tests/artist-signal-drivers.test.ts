@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getArtistSignalDrivers } from "@/lib/artist-signal-drivers";
+import { formatArtistMomentumContribution, getArtistSignalDrivers } from "@/lib/artist-signal-drivers";
 import { calculateHypeScore } from "@/lib/pricing";
 
 describe("artist signal drivers", () => {
@@ -13,9 +13,11 @@ describe("artist signal drivers", () => {
       traderDemand: 2
     });
 
-    expect(drivers[0]).toMatchObject({ key: "youtube", contribution: -7 });
-    expect(drivers[1]).toMatchObject({ key: "streaming", contribution: 4.9 });
-    expect(drivers.find((driver) => driver.key === "news")?.contribution).toBe(2.1);
+    expect(drivers[0].key).toBe("youtube");
+    expect(drivers[0].contribution).toBeCloseTo(-7, 8);
+    expect(drivers[1].key).toBe("streaming");
+    expect(drivers[1].contribution).toBeCloseTo(4.9, 8);
+    expect(drivers.find((driver) => driver.key === "news")?.contribution).toBeCloseTo(2.1, 8);
   });
 
   it("adds up to the unrounded score movement from neutral", () => {
@@ -43,5 +45,21 @@ describe("artist signal drivers", () => {
       newsScore: 50,
       traderDemand: 0
     }).every((driver) => driver.contribution === 0)).toBe(true);
+  });
+
+  it("preserves and explains tiny real inputs instead of rounding them to zero", () => {
+    const video = getArtistSignalDrivers({
+      streamingGrowth: 0,
+      youtubeGrowth: 0.0013,
+      searchGrowth: 0,
+      socialGrowth: 0.0005,
+      newsScore: 50,
+      traderDemand: 0
+    }).find((driver) => driver.key === "youtube");
+
+    expect(video?.contribution).toBeCloseTo(0.000455, 8);
+    expect(formatArtistMomentumContribution(video?.contribution ?? 0)).toBe("Slight +");
+    expect(formatArtistMomentumContribution(0)).toBe("Flat");
+    expect(formatArtistMomentumContribution(-0.004)).toBe("Slight −");
   });
 });

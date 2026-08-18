@@ -26,6 +26,7 @@ export type MarketNewsItem = {
   publishedDate?: string;
   eventType: string;
   eventLabel?: string | null;
+  tags?: string[];
   title: string;
   sourceName?: string | null;
   sourceUrl?: string | null;
@@ -66,6 +67,7 @@ export function MarketNewsFeed({
   artistId,
   artistIds,
   eventType,
+  newsTag,
   limit = 8,
   skip = 0,
   compact = false,
@@ -76,6 +78,7 @@ export function MarketNewsFeed({
   artistId?: string;
   artistIds?: string[];
   eventType?: string;
+  newsTag?: string;
   limit?: number;
   skip?: number;
   compact?: boolean;
@@ -109,6 +112,10 @@ export function MarketNewsFeed({
 
     if (eventType) {
       params.set("eventType", eventType);
+    }
+
+    if (newsTag) {
+      params.set("tag", newsTag);
     }
 
     const loadNews = () => fetch(`/api/market/news?${params.toString()}`, {
@@ -153,7 +160,7 @@ export function MarketNewsFeed({
       window.removeEventListener("focus", refreshVisibleNews);
       document.removeEventListener("visibilitychange", refreshVisibleNews);
     };
-  }, [artistId, artistIdsKey, eventType, limit, onItemsChange, resolvedVariant, safeSkip, sort]);
+  }, [artistId, artistIdsKey, eventType, limit, newsTag, onItemsChange, resolvedVariant, safeSkip, sort]);
 
   if (loading) {
     return <MarketNewsSkeleton compact={resolvedVariant === "compact"} />;
@@ -254,7 +261,7 @@ function HomeLeadStory({ item }: { item: MarketNewsItem }) {
           <div>
             <div className="flex flex-wrap items-center gap-2 text-xs font-semibold text-paper/55">
               <NewsTickerLinks item={item} />
-              <EventBadge item={item} positive={positive} />
+              <EventBadges item={item} positive={positive} />
               <span>{formatDate(getNewsDisplayDate(item))}</span>
               <SourceMeta item={item} />
             </div>
@@ -299,7 +306,7 @@ function HomeStoryCard({ item }: { item: MarketNewsItem }) {
       <div className="grid gap-3 p-3.5">
         <div className="flex flex-wrap items-center gap-2 text-[11px] font-semibold text-paper/50">
           <NewsTickerLinks item={item} />
-          <EventBadge item={item} positive={positive} />
+          <EventBadges item={item} positive={positive} />
           <span>{formatDate(getNewsDisplayDate(item))}</span>
           <SourceMeta item={item} />
         </div>
@@ -328,7 +335,7 @@ function HomeBrief({ item }: { item: MarketNewsItem }) {
           <div className="flex flex-wrap items-center gap-2 text-[11px] font-semibold text-paper/50">
             <NewsTickerLinks item={item} />
             <span>{formatDate(getNewsDisplayDate(item))}</span>
-            <EventBadge item={item} positive={positive} />
+            <EventBadges item={item} positive={positive} />
             <SourceMeta item={item} />
           </div>
           <h3 className="mt-1 truncate text-sm font-semibold text-paper">{item.title}</h3>
@@ -356,14 +363,7 @@ function MarketNewsArticle({
     <div className="flex flex-wrap items-center gap-2 text-xs font-bold text-paper/50">
       <NewsTickerLinks item={item} />
       <span>{formatDate(getNewsDisplayDate(item))}</span>
-      <span
-        className={clsx(
-          "rounded-[var(--radius-control)] px-1.5 py-0.5",
-          positive ? "bg-mint/[0.08] text-mint" : "bg-ember/[0.08] text-ember"
-        )}
-      >
-        {getEventLabel(item)}
-      </span>
+      <EventBadges item={item} positive={positive} />
       <SourceMeta item={item} />
     </div>
   );
@@ -542,22 +542,33 @@ function getNewsFallbackClass(item: MarketNewsItem) {
   return "bg-panelSoft";
 }
 
-function EventBadge({ item, positive }: { item: MarketNewsItem; positive: boolean }) {
+function EventBadges({ item, positive }: { item: MarketNewsItem; positive: boolean }) {
+  const tags = item.tags?.length ? item.tags : [getEventLabel(item)];
+
   return (
-    <span
-      className={clsx(
-        "rounded-[var(--radius-control)] px-1.5 py-0.5",
-        item.eventType === "controversy"
-          ? "bg-ember/[0.09] text-ember"
-          : item.eventType === "review"
-            ? "bg-cyan/[0.09] text-cyan"
-            : positive
-              ? "bg-mint/[0.08] text-mint"
-              : "bg-ember/[0.08] text-ember"
-      )}
-    >
-      {getEventLabel(item)}
-    </span>
+    <>
+      {tags.map((tag) => {
+        const normalized = tag.toLowerCase();
+
+        return (
+          <span
+            key={normalized}
+            className={clsx(
+              "rounded-[var(--radius-control)] px-1.5 py-0.5",
+              normalized === "controversy"
+                ? "bg-ember/[0.09] text-ember"
+                : normalized === "review"
+                  ? "bg-cyan/[0.09] text-cyan"
+                  : positive
+                    ? "bg-mint/[0.08] text-mint"
+                    : "bg-ember/[0.08] text-ember"
+            )}
+          >
+            {tag}
+          </span>
+        );
+      })}
+    </>
   );
 }
 

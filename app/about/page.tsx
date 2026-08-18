@@ -18,9 +18,9 @@ const sections = [
     body: "An RMI quote is a fantasy index value, not an artist's net worth, revenue, or literal market capitalization. A larger established audience generally supports a higher long-term range, while verified momentum and catalysts determine how the quote moves from one market session to the next."
   },
   {
-    id: "signal-score",
-    title: "What the RMI Signal Score means",
-    body: "RMI Signal Score is a 1–100 reading of current directional evidence across audience momentum, public attention, verified catalysts, reception, and eligible trading demand. It does not measure fame, audience size, or career stature. Limited or mixed evidence stays near 50, so a smaller artist with stronger current momentum can score above an established artist while still carrying a much lower quote."
+    id: "momentum",
+    title: "What RMI Momentum means",
+    body: "RMI Momentum is a 1–100 reading of current directional evidence across audience changes, public attention, verified catalysts, reception, and eligible trading demand. It is not the same as 24h: 24h reports the realized quote move since the previous close, while Momentum describes the evidence feeding future market runs. It does not measure fame, audience size, or career stature. Limited or mixed evidence stays near 50."
   },
   {
     id: "audience-size",

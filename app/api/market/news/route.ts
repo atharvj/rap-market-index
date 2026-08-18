@@ -35,6 +35,7 @@ import {
 import { hasVerifiedAiResearchArticleProvenance } from "@/server/market/event-integrity";
 import { decodeHtmlEntities } from "@/lib/html-entities";
 import { hasMaterialMarketImpact } from "@/lib/market-news-impact";
+import { getMarketNewsTags, marketNewsHasTag, normalizeMarketNewsTag } from "@/lib/market-news-tags";
 
 export const dynamic = "force-dynamic";
 
@@ -68,6 +69,7 @@ type MarketNewsItem = {
   publishedDate: string;
   eventType: string;
   eventLabel: string | null;
+  tags: string[];
   title: string;
   sourceName: string | null;
   sourceUrl: string | null;
@@ -123,6 +125,7 @@ export async function GET(request: Request) {
     const requestedArtistIds = normalizeArtistIds(url.searchParams.get("artistIds"));
     const ticker = url.searchParams.get("ticker")?.toUpperCase() ?? null;
     const eventType = normalizeEventType(url.searchParams.get("eventType"));
+    const newsTag = normalizeMarketNewsTag(url.searchParams.get("tag"));
     const feedMode = normalizeFeedMode(url.searchParams.get("feed"));
     const newsSort = normalizeMarketNewsSort(url.searchParams.get("sort"));
     const supabase = createServiceRoleClient();
@@ -198,6 +201,11 @@ export async function GET(request: Request) {
             feedMode: effectiveFeedMode,
             artist: artistById.get(event.artist_id) ?? null
           }) &&
+          (!newsTag || marketNewsHasTag({
+            eventType: event.event_type,
+            eventLabel: getPublicEventLabel(event, toRawPayload(event.raw_payload), artistById.get(event.artist_id)?.name ?? null),
+            title: event.title
+          }, newsTag)) &&
           (effectiveFeedMode !== "watch" || isWatchNowMarketEvent(event))
       ),
       newsSort,
@@ -365,6 +373,7 @@ function mapMarketEventToNewsItem(
   const supportingMediaUrl = getSupportingMediaUrl(supportingMediaPayload);
   const supportingMediaType = getSupportingMediaType(supportingMediaPayload);
   const eventThumbnailUrl = storyPayloads.map(getEventThumbnailUrl).find(Boolean) ?? null;
+  const eventLabel = getPublicEventLabel(event, rawPayload, artist?.name ?? null);
 
   return {
     id: event.id,
@@ -375,7 +384,8 @@ function mapMarketEventToNewsItem(
     eventDate: event.event_date,
     publishedDate: getRawPublishedDate(sourcePayload) ?? sourceEvent.event_date,
     eventType: event.event_type,
-    eventLabel: getPublicEventLabel(event, rawPayload, artist?.name ?? null),
+    eventLabel,
+    tags: getMarketNewsTags({ eventType: event.event_type, eventLabel, title: event.title }),
     title: decodeHtmlEntities(event.title),
     sourceName,
     sourceUrl,
@@ -783,13 +793,13 @@ function getNewsImportanceScore(event: MarketEventRow, runDate: string) {
   const editorialWeight = getNewsEditorialWeight(rawPayload);
   const reachScore = isYoutubeNewsSource(source) ? getYoutubeNewsReachScore(rawPayload) : 0;
   const typeWeight: Record<MarketNewsType, number> = {
-    release: 16,
-    review: 13,
-    news: 8,
-    controversy: 18,
-    award: 7,
-    tour: 6,
-    viral: 12
+    release: 18,
+    review: 15,
+    news: 6,
+    controversy: 10,
+    award: 12,
+    tour: 13,
+    viral: 11
   };
 
   return (
@@ -820,6 +830,14 @@ function getNewsEditorialWeight(rawPayload: Record<string, unknown>) {
 
   if (classificationReason === "feature_terms" || classificationReason === "artist_feature_credit") {
     return getRawBoolean(rawPayload.musicDemandConfirmed) ? 0.82 : 0.48;
+  }
+
+  if (marketConnection === "direct_music") {
+    return 1.08;
+  }
+
+  if (marketConnection === "career_availability") {
+    return 0.92;
   }
 
   return 1;

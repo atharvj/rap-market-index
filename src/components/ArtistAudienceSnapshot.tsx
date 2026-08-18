@@ -13,7 +13,7 @@ type ObservationsResponse = {
 const preferredSeries = [
   { key: "youtube:subscriber_count", label: "YouTube Subscribers · Total" },
   { key: "youtube:channel_views", label: "YouTube Views · Lifetime" },
-  { key: "wikimedia:pageviews_7d", label: "Wikipedia Views · 7D" },
+  { key: "wikimedia:pageviews_7d", label: "Wikipedia Attention · 7D" },
   { key: "media_rss:source_count", label: "Media Sources · 30D" },
   { key: "trade_flow:unique_trader_count", label: "Active Traders · 24H" },
   { key: "trade_flow:trade_count", label: "Orders · 24H" }

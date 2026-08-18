@@ -8,10 +8,10 @@ import { useGame } from "@/components/GameProvider";
 import { MarketSideRail } from "@/components/MarketSideRail";
 import { MarketNewsFeed } from "@/components/MarketNewsFeed";
 import { ArtistMiniCard, ChangeText, RmiButton, RmiSection } from "@/components/RmiPrimitives";
-import { ScoreInfo } from "@/components/ScoreInfo";
+import { MomentumInfo } from "@/components/MomentumInfo";
 import { TradeTicket } from "@/components/TradeTicket";
 import { WatchlistButton } from "@/components/WatchlistButton";
-import { getArtistSignalDrivers } from "@/lib/artist-signal-drivers";
+import { formatArtistMomentumContribution, getArtistSignalDrivers } from "@/lib/artist-signal-drivers";
 import { formatCurrency, formatShares } from "@/lib/formatters";
 import { getRelatedArtists } from "@/lib/related-artists";
 import { estimateMarketMakerQuote } from "@/lib/trading";
@@ -59,7 +59,7 @@ export default function ArtistDetailPage() {
   const moveRank = [...state.artists]
     .sort((first, second) => second.dailyChangePercent - first.dailyChangePercent)
     .findIndex((candidate) => candidate.id === activeArtist.id) + 1;
-  const signalRank = [...state.artists]
+  const momentumRank = [...state.artists]
     .sort((first, second) => second.hypeScore - first.hypeScore)
     .findIndex((candidate) => candidate.id === activeArtist.id) + 1;
   const relatedArtists = getRelatedArtists(activeArtist, state.artists, 4);
@@ -79,12 +79,12 @@ export default function ArtistDetailPage() {
                 <WatchlistButton artistId={artist.id} />
               </div>
               <p className="mt-1 flex flex-wrap items-center gap-1.5 text-sm font-medium text-paper/60">
-                <span>${artist.ticker} · RMI Signal {artist.hypeScore}/100</span>
-                <ScoreInfo />
+                <span>${artist.ticker} · RMI Momentum {artist.hypeScore}/100</span>
+                <MomentumInfo />
               </p>
               <div className="mt-3 flex flex-wrap gap-2">
                 <span className="rmi-status-chip">{formatArtistCategory(artist.category)}</span>
-                <span className="rmi-status-chip text-cyan"><Zap className="h-3 w-3" /> Signal rank #{signalRank}</span>
+                <span className="rmi-status-chip text-cyan"><Zap className="h-3 w-3" /> Momentum rank #{momentumRank}</span>
               </div>
             </div>
           </div>
@@ -111,17 +111,17 @@ export default function ArtistDetailPage() {
           <QuoteStat label="Recorded Low" value={formatCurrency(recordedLow)} />
           <QuoteStat label="Recorded High" value={formatCurrency(recordedHigh)} />
           <QuoteStat label="24h Rank" value={`#${moveRank}`} />
-          <QuoteStat label="Signal Rank" value={`#${signalRank}`} />
+          <QuoteStat label="Momentum Rank" value={`#${momentumRank}`} />
         </section>
 
         <ArtistAudienceSnapshot artistId={artist.id} />
 
-        <RmiSection title={<span className="flex items-center gap-2"><Activity className="h-4 w-4 text-mint" /> Signal Breakdown</span>}>
+        <RmiSection title={<span className="flex items-center gap-2"><Activity className="h-4 w-4 text-mint" /> Momentum Breakdown</span>}>
           <SignalBreakdown drivers={signalDrivers} />
         </RmiSection>
 
         {relatedArtists.length ? (
-          <RmiSection title="Related Artists" subtitle="Similar market tier and current signal profile.">
+          <RmiSection title="Related Artists" subtitle="Similar market tier and current momentum profile.">
             <div className="grid gap-3 p-4 sm:grid-cols-2 xl:grid-cols-4">
               {relatedArtists.map((relatedArtist) => (
                 <ArtistMiniCard key={relatedArtist.id} artist={relatedArtist} />
@@ -189,12 +189,14 @@ function SignalBreakdown({
 }: {
   drivers: ReturnType<typeof getArtistSignalDrivers>;
 }) {
-  const visibleDrivers = drivers.slice(0, 4);
+  const visibleDrivers = drivers;
   const largestMagnitude = Math.max(0.01, ...visibleDrivers.map((driver) => Math.abs(driver.contribution)));
 
   return (
     <div className="p-4">
-      <p className="mb-3 text-xs text-paper/45">Largest contributions to the current RMI Signal.</p>
+      <p className="mb-3 text-xs leading-5 text-paper/45">
+        Weighted contributions to current RMI Momentum. Flat means the measured input has not materially changed from its baseline—not that its data is missing.
+      </p>
       <div className="grid gap-2 sm:grid-cols-2">
         {visibleDrivers.map((driver) => {
           const positive = driver.contribution > 0;
@@ -207,13 +209,13 @@ function SignalBreakdown({
               <div className="flex items-center justify-between gap-3 text-xs">
                 <span className="font-semibold text-paper/60">{driver.label}</span>
                 <span className={`font-semibold number-tabular ${textTone}`}>
-                  {driver.contribution > 0 ? "+" : ""}{driver.contribution.toFixed(2)}
+                  {formatArtistMomentumContribution(driver.contribution)}
                 </span>
               </div>
               <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-paper/10" aria-hidden="true">
                 <span
                   className={`block h-full rounded-full ${tone}`}
-                  style={{ width: `${Math.max(3, Math.abs(driver.contribution) / largestMagnitude * 100)}%` }}
+                  style={{ width: driver.contribution === 0 ? "0%" : `${Math.max(3, Math.abs(driver.contribution) / largestMagnitude * 100)}%` }}
                 />
               </div>
             </div>

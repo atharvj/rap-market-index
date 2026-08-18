@@ -64,7 +64,7 @@ export default function ScoutPage() {
           </div>
         </RmiSection>
 
-        <RmiSection title="Radar Leader" subtitle="Highest combined signal and positive momentum.">
+        <RmiSection title="Radar Leader" subtitle="Highest combined RMI Momentum and positive quote movement.">
           {breakoutLeader ? (
             <div className="p-4">
               <div className="flex items-center justify-between gap-3">
@@ -72,7 +72,7 @@ export default function ScoutPage() {
                 <ChangeText value={breakoutLeader.dailyChangePercent} />
               </div>
               <div className="mt-4 grid grid-cols-2 gap-2 text-xs">
-                <SignalTile label="RMI Signal" value={`${breakoutLeader.hypeScore}/100`} />
+                <SignalTile label="RMI Momentum" value={`${breakoutLeader.hypeScore}/100`} />
                 <SignalTile label="Volatility" value={`${breakoutLeader.volatility.toFixed(2)}x`} />
               </div>
             </div>
@@ -84,7 +84,7 @@ export default function ScoutPage() {
         <div className="mb-3 flex items-end justify-between gap-4">
           <div>
           <h2 className="text-lg font-semibold">On the Radar</h2>
-            <p className="mt-1 text-sm text-paper/55">Smaller active listings showing the strongest current RMI signals.</p>
+            <p className="mt-1 text-sm text-paper/55">Smaller active listings showing the strongest current RMI Momentum.</p>
           </div>
           <span className="text-xs text-paper/45">{emergingArtists.length} shown</span>
         </div>

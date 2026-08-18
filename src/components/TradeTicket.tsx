@@ -4,6 +4,7 @@ import { useAuth } from "@/components/AuthProvider";
 import { useGame } from "@/components/GameProvider";
 import { RmiNotice } from "@/components/RmiPrimitives";
 import { formatCurrency } from "@/lib/formatters";
+import { getShortingReadiness } from "@/lib/shorting-readiness";
 import {
   clampTradeShareInput,
   estimateMarketMakerQuote,
@@ -14,7 +15,7 @@ import {
   roundShareQuantityDown
 } from "@/lib/trading";
 import type { Artist } from "@/lib/types";
-import { ArrowDownRight, ArrowUpRight, LoaderCircle, Minus, Plus, Radio } from "lucide-react";
+import { ArrowDownRight, ArrowUpRight, LoaderCircle, LockKeyhole, Minus, Plus, Radio } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
 export function TradeTicket({
@@ -68,6 +69,7 @@ export function TradeTicket({
     volatility: artist.volatility
   });
   const maxShares = side === "buy" ? maxBuy : maxSell;
+  const shortingReadiness = getShortingReadiness(artist.priceHistory);
   const tradeUnavailableReason = getTradeUnavailableReason({
     authLoading,
     hasSession: Boolean(session),
@@ -229,6 +231,13 @@ export function TradeTicket({
             Sell
           </button>
         </div>
+
+        {!shortingReadiness.enabled ? (
+          <div className="mt-3 flex items-start gap-2 border border-line bg-panelSoft px-3 py-2 text-xs font-medium leading-5 text-paper/50">
+            <LockKeyhole className="mt-0.5 h-3.5 w-3.5 shrink-0 text-brass" aria-hidden="true" />
+            <span>{shortingReadiness.reason}</span>
+          </div>
+        ) : null}
 
         <label className="mt-4 block text-xs font-semibold text-paper/50" htmlFor="shares">
           Shares

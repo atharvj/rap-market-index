@@ -11,6 +11,7 @@ import { reportServerError } from "@/server/observability";
 import { STARTING_CASH } from "@/lib/trading";
 import { enforceRateLimit } from "@/server/rate-limit";
 import { requireConfirmedUser } from "@/server/user-auth";
+import { mapMarketTradeEvent, type MarketTradeEventRow } from "@/server/market-trade-events";
 
 export const dynamic = "force-dynamic";
 
@@ -27,7 +28,6 @@ type BootstrapBody = {
 type ProfileRow = Database["public"]["Tables"]["profiles"]["Row"];
 type HoldingRow = Database["public"]["Tables"]["holdings"]["Row"];
 type ShortPositionRow = Database["public"]["Tables"]["short_positions"]["Row"];
-type TransactionRow = Database["public"]["Views"]["market_trade_events"]["Row"];
 
 export async function POST(request: Request) {
   const config = getSupabaseConfigStatus();
@@ -411,22 +411,12 @@ async function loadTransactions(
 
   const transactions = Array.from(
     new Map(
-      ([...(historyResult.data ?? []), ...(recentBuyResult.data ?? [])] as TransactionRow[])
+      ([...(historyResult.data ?? []), ...(recentBuyResult.data ?? [])] as MarketTradeEventRow[])
         .map((transaction) => [transaction.id, transaction])
     ).values()
   ).sort((first, second) => Date.parse(second.created_at) - Date.parse(first.created_at));
 
-  return transactions.map((transaction) => ({
-    id: transaction.id,
-    artistId: transaction.artist_id,
-    type: transaction.type,
-    shares: Number(transaction.shares),
-    price: Number(transaction.price),
-    grossValue: Number(transaction.gross_value ?? Math.abs(transaction.cash_delta)),
-    commission: Number(transaction.commission ?? 0),
-    marketEligible: Boolean(transaction.market_eligible ?? true),
-    createdAt: transaction.created_at
-  }));
+  return transactions.map(mapMarketTradeEvent);
 }
 
 async function parseBody(request: Request): Promise<BootstrapBody> {

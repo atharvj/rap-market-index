@@ -233,6 +233,17 @@ describe("repository security boundaries", () => {
     expect(migration).not.toMatch(/create policy/i);
   });
 
+  it("keeps paginated transaction history private to the authenticated account", () => {
+    const route = readTrackedFile("app/api/profile/transactions/route.ts");
+
+    expect(route).toContain("requireConfirmedUser(request)");
+    expect(route).toContain('scope: "profile-transactions"');
+    expect(route).toContain('createServiceRoleClient()');
+    expect(route).toContain('.from("market_trade_events")');
+    expect(route).toContain('.eq("user_id", auth.user.id)');
+    expect(route).not.toMatch(/searchParams\.get\(["']userId["']\)/);
+  });
+
   it("reasserts raw database privilege boundaries in the latest migration", () => {
     const migration = readTrackedFile("supabase/migrations/026_reassert_security_boundaries.sql");
 

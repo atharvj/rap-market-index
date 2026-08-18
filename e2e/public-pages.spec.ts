@@ -311,6 +311,39 @@ async function installPortfolioFixture(page: Page) {
       })
     })
   );
+  await page.route("**/api/profile/transactions**", (route) => {
+    const requestUrl = new URL(route.request().url());
+    const requestedPage = Number(requestUrl.searchParams.get("page") ?? 1);
+    const pageSize = Number(requestUrl.searchParams.get("pageSize") ?? 20);
+    const allTransactions = Array.from({ length: 21 }, (_, index) => ({
+      id: `portfolio-transaction-${index + 1}`,
+      artistId: marketState.artists[index % 2].id,
+      type: index % 2 ? "sell" : "buy",
+      shares: index + 1,
+      price: marketState.artists[index % 2].currentPrice,
+      grossValue: (index + 1) * marketState.artists[index % 2].currentPrice,
+      commission: 1.25,
+      marketEligible: true,
+      createdAt: new Date(Date.UTC(2026, 6, 21, 12, index)).toISOString()
+    }));
+    const start = (requestedPage - 1) * pageSize;
+
+    return route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({
+        ok: true,
+        transactions: allTransactions.slice(start, start + pageSize),
+        pagination: {
+          page: requestedPage,
+          pageSize,
+          totalCount: allTransactions.length,
+          totalPages: Math.ceil(allTransactions.length / pageSize),
+          hasPrevious: requestedPage > 1,
+          hasNext: requestedPage * pageSize < allTransactions.length
+        }
+      })
+    });
+  });
   await page.route("**/api/watchlist", (route) =>
     route.fulfill({ contentType: "application/json", body: JSON.stringify({ ok: true, watchlist: [] }) })
   );
@@ -678,7 +711,7 @@ test("portfolio shows purchase basis and unrealized position performance", async
   await installPortfolioFixture(page);
   await page.goto("/portfolio");
   await expect(page.getByRole("heading", { level: 1, name: "Your Portfolio" })).toBeVisible();
-  await expect(page.locator(".rmi-table-head")).toContainText("Avg. Fill");
+  await expect(page.locator(".rmi-table-head").first()).toContainText("Avg. Fill");
   await expect(page.getByText("Position Cost", { exact: true }).first()).toBeVisible();
   await expect(page.getByText("Market Value", { exact: true }).first()).toBeVisible();
   await expect(
@@ -688,9 +721,13 @@ test("portfolio shows purchase basis and unrealized position performance", async
   const desktopHoldings = page.locator(".hidden.overflow-x-auto.xl\\:block");
   const averageFillInfo = desktopHoldings.getByRole("button", { name: "Explain average fill price" });
   await averageFillInfo.hover();
-  await expect(desktopHoldings.getByRole("tooltip")).toHaveText(
+  await expect(page.getByRole("tooltip")).toHaveText(
     "Your average price paid per share. Buys can fill slightly above the chart price."
   );
+  await expect(page.getByRole("heading", { name: "Transaction History" })).toBeVisible();
+  await expect(page.getByText("Page 1 of 2")).toBeVisible();
+  await page.getByRole("button", { name: "Next", exact: true }).click();
+  await expect(page.getByText("Page 2 of 2")).toBeVisible();
 
   await page.setViewportSize({ width: 390, height: 844 });
   await expect(page.locator(".xl\\:hidden").first()).toContainText("Avg. fill");
@@ -700,6 +737,27 @@ test("portfolio shows purchase basis and unrealized position performance", async
     scrollWidth: document.documentElement.scrollWidth
   }));
   expect(dimensions.scrollWidth).toBeLessThanOrEqual(dimensions.clientWidth + 1);
+});
+
+test("artist position average-fill help escapes the sticky sidebar", async ({ page }) => {
+  await installPortfolioFixture(page);
+  await page.goto(`/artists/${marketState.artists[0].id}`);
+  const averageFillInfo = page.getByRole("button", { name: "Explain average fill price" });
+  await averageFillInfo.hover();
+  const tooltip = page.getByRole("tooltip");
+  await expect(tooltip).toBeVisible();
+  await expect(tooltip).toHaveText(
+    "Your average price paid per share. Buys can fill slightly above the chart price."
+  );
+
+  const [tooltipBox, viewport] = await Promise.all([
+    tooltip.boundingBox(),
+    page.evaluate(() => ({ width: window.innerWidth, height: window.innerHeight }))
+  ]);
+  expect(tooltipBox).not.toBeNull();
+  expect(tooltipBox!.x).toBeGreaterThanOrEqual(0);
+  expect(tooltipBox!.x + tooltipBox!.width).toBeLessThanOrEqual(viewport.width);
+  expect(tooltipBox!.y + tooltipBox!.height).toBeLessThanOrEqual(viewport.height);
 });
 
 test("primary public pages do not overflow a mobile viewport", async ({ page }) => {

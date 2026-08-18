@@ -116,11 +116,11 @@ export default function WatchlistPage() {
         <section>
           <div className="mb-3">
             <h2 className="text-base font-semibold">Watchlist Briefing</h2>
-            <p className="mt-1 text-sm text-paper/50">The strongest quote and signal activity among the artists you follow.</p>
+            <p className="mt-1 text-sm text-paper/50">The strongest quote and momentum activity among the artists you follow.</p>
           </div>
           <div className="grid gap-3 md:grid-cols-3">
               {biggestMover ? <WatchlistInsight label="Biggest Move" artist={biggestMover} value={<ChangeText value={biggestMover.dailyChangePercent} />} /> : null}
-              {signalLeader ? <WatchlistInsight label="Signal Leader" artist={signalLeader} value={`${signalLeader.hypeScore}/100`} /> : null}
+              {signalLeader ? <WatchlistInsight label="Momentum Leader" artist={signalLeader} value={`${signalLeader.hypeScore}/100`} /> : null}
               <div className="rmi-card grid grid-cols-3 gap-2 p-4 text-center text-xs">
                 <BriefingCount label="Up" value={breadth.advancers} tone="good" />
                 <BriefingCount label="Down" value={breadth.decliners} tone="bad" />
@@ -135,7 +135,7 @@ export default function WatchlistPage() {
           <span>Artist</span>
           <span className="text-right">Price</span>
           <span className="text-right">24h</span>
-          <span className="hidden text-right sm:block">Signal</span>
+          <span className="hidden text-right sm:block">Momentum</span>
           <span className="sr-only">remove from watchlist</span>
         </div>
         {watchlistArtists.length ? (
@@ -164,7 +164,7 @@ export default function WatchlistPage() {
             <div>
               <h2 className="text-lg font-semibold">Build your watchlist</h2>
               <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-paper/55">
-                Save artists to compare their quote movement, signal strength, and verified catalysts in one place.
+                Save artists to compare their quote movement, momentum, and verified catalysts in one place.
               </p>
               <div className="mt-4"><RmiButton href="/markets">Browse Markets</RmiButton></div>
             </div>

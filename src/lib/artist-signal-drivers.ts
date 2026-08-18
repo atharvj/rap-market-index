@@ -41,10 +41,17 @@ export function getArtistSignalDrivers(stats: HypeStats) {
     }
   ];
 
-  return drivers
-    .map((driver) => ({
-      ...driver,
-      contribution: Math.round(driver.contribution * 100) / 100
-    }))
-    .sort((first, second) => Math.abs(second.contribution) - Math.abs(first.contribution));
+  return drivers.sort((first, second) => Math.abs(second.contribution) - Math.abs(first.contribution));
+}
+
+export function formatArtistMomentumContribution(contribution: number) {
+  if (!Number.isFinite(contribution) || Math.abs(contribution) < Number.EPSILON) {
+    return "Flat";
+  }
+
+  if (Math.abs(contribution) < 0.01) {
+    return contribution > 0 ? "Slight +" : "Slight −";
+  }
+
+  return `${contribution > 0 ? "+" : ""}${contribution.toFixed(2)}`;
 }

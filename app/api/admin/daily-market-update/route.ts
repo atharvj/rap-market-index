@@ -47,6 +47,7 @@ import { collectYoutubeEditorialEvents } from "@/server/market/youtube-editorial
 import { getMarketDate } from "@/server/market/market-date";
 import { getMarketModelVersion } from "@/server/market/model-version";
 import { shouldRecordIntradayPriceTick } from "@/server/market/intraday-refresh";
+import { shouldCollectWikimediaSource } from "@/server/market/source-refresh-policy";
 import { getMockMarketArtists } from "@/server/market/mock-source";
 import type {
   AdapterSignals,
@@ -612,7 +613,7 @@ async function collectRealSignals({
   const useSpotify =
     !intraday && (source === "spotify" || ((source === "core" || source === "blended") && hasSpotifyCredentials()));
   const useYoutube = intraday || source === "youtube" || source === "core" || source === "blended";
-  const useWikimedia = intraday || source === "wikimedia" || source === "core" || source === "blended";
+  const useWikimedia = shouldCollectWikimediaSource(source, intraday);
   const useReddit = !intraday && (source === "reddit" || ((source === "core" || source === "blended") && hasRedditCredentials()));
   const useBluesky =
     !intraday &&

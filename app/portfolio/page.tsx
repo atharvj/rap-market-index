@@ -6,8 +6,9 @@ import { useAuth } from "@/components/AuthProvider";
 import { useGame } from "@/components/GameProvider";
 import { PriceChart } from "@/components/PriceChart";
 import { SignedInGate } from "@/components/SignedInGate";
+import { TransactionHistory } from "@/components/TransactionHistory";
 import { RmiButton, RmiSection } from "@/components/RmiPrimitives";
-import { formatCurrency, formatDate, formatPercent, formatShares } from "@/lib/formatters";
+import { formatCurrency, formatPercent, formatShares } from "@/lib/formatters";
 import { buildPortfolioQuoteSeries, getSeriesChangePercent } from "@/lib/market-analytics";
 import { STARTING_CASH } from "@/lib/market";
 import Link from "next/link";
@@ -33,7 +34,6 @@ export default function PortfolioPage() {
     [holdings, shortPositions, state.cashBalance]
   );
   const quoteHistoryChange = getSeriesChangePercent(chartData);
-  const recentTransactions = state.transactions.slice(0, 6);
 
   if (!session) {
     return (
@@ -239,29 +239,7 @@ export default function PortfolioPage() {
         </div>
       </div>
 
-      <RmiSection title="Recent Activity" subtitle="Latest executed fantasy trades in this account.">
-        {recentTransactions.length ? (
-          <div className="divide-y divide-line">
-            {recentTransactions.map((transaction) => {
-              const artist = state.artists.find((candidate) => candidate.id === transaction.artistId);
-
-              return (
-                <div key={transaction.id} className="grid gap-2 px-4 py-3 text-sm sm:grid-cols-[minmax(0,1fr)_90px_100px_80px] sm:items-center">
-                  <div className="min-w-0">
-                    <p className="truncate font-semibold">{artist?.name ?? transaction.artistId}</p>
-                    <p className="text-xs text-paper/45">{formatDate(transaction.createdAt)}</p>
-                  </div>
-                  <span className="font-medium capitalize">{transaction.type}</span>
-                  <span className="font-semibold number-tabular">{formatShares(transaction.shares)} shares</span>
-                  <span className="text-right font-semibold number-tabular">{formatCurrency(transaction.price)}</span>
-                </div>
-              );
-            })}
-          </div>
-        ) : (
-          <div className="p-5 text-sm text-paper/55">No executed trades yet.</div>
-        )}
-      </RmiSection>
+      <TransactionHistory artists={state.artists} initialTransactions={state.transactions} />
     </div>
   );
 }

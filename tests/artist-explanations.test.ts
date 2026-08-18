@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { getMarketSignalLabel, sanitizeMoveExplanation } from "@/lib/artist-explanations";
+import { getMarketMomentumLabel, sanitizeMoveExplanation } from "@/lib/artist-explanations";
 
 describe("market signal labels", () => {
   it("describes neutral and directional scores without implying artist stature", () => {
-    expect(getMarketSignalLabel(50)).toBe("Neutral / mixed");
-    expect(getMarketSignalLabel(58)).toBe("Positive");
-    expect(getMarketSignalLabel(35)).toBe("Strong negative");
+    expect(getMarketMomentumLabel(50)).toBe("Neutral / mixed");
+    expect(getMarketMomentumLabel(58)).toBe("Positive");
+    expect(getMarketMomentumLabel(35)).toBe("Strong negative");
   });
 });
 

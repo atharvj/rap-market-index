@@ -50,6 +50,7 @@ const topics = [
       "Trading may pause briefly while the daily market update is verified, while a newly detected artist catalyst is incorporated into the quote, or when market integrity controls are active.",
       "Rapid duplicate orders and daily activity can be limited to protect the fantasy market. Wait for the message shown on the ticket before trying again.",
       "The final execution price can differ slightly from the displayed quote because of spread and slippage.",
+      "Shorting is disabled while market-wide risk and liquidation controls are validated. Each artist is tracked automatically and must first build at least 30 recorded, meaningfully changing market sessions.",
       "A positive daily move describes what already happened since the previous close; buying a current gainer does not automatically earn that past return.",
       "Fantasy commission adds realistic trading friction and discourages rapid flipping; no real money is charged.",
       "Buying and immediately selling normally loses fantasy cash because buys execute above the midpoint, sells execute below it, and each side pays fantasy commission.",
@@ -66,7 +67,7 @@ const topics = [
       "A quote is a fantasy index value, not an artist's income, net worth, or literal market capitalization.",
       "Audience momentum, durable reach, verified catalysts, reception, and eligible market demand can affect a quote.",
       "Source-backed quotes refresh each morning; eligible orders can also record price movement during the day.",
-      "Top Gainer means the largest current-session increase. Strongest Signal means the highest combined RMI signal score, so they can be different artists."
+      "Top Gainer means the largest realized current-session increase. Momentum Leader means the highest 1–100 reading of current cross-source evidence, so they can be different artists."
     ]
   },
   {

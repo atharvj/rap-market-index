@@ -1,10 +1,10 @@
 import type { HypeStats } from "@/lib/types";
 import { decodeHtmlEntities } from "@/lib/html-entities";
 
-export const MARKET_SCORE_EXPLANATION =
-  "Current momentum, not a forecast. Around 50 means mixed signals; higher means stronger recent evidence.";
+export const MARKET_MOMENTUM_EXPLANATION =
+  "A 1–100 reading of current cross-source momentum, not a forecast. Around 50 means flat or mixed evidence. Unlike 24h, it can move before or without a realized quote change.";
 
-export function getMarketSignalLabel(score: number) {
+export function getMarketMomentumLabel(score: number) {
   if (score >= 60) {
     return "Strong positive";
   }
