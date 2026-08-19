@@ -560,6 +560,7 @@ async function applyMarketHistoryBaselines({
     if (previousClose === undefined || !Number.isFinite(previousClose) || previousClose <= 0) {
       return {
         ...artist,
+        baselineOnly: true,
         quotedPrice: artist.currentPrice,
         priceTrend
       };

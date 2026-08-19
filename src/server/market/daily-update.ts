@@ -91,6 +91,7 @@ export type MarketUpdateArtist = {
   ticker: string;
   currentPrice: number;
   quotedPrice?: number;
+  baselineOnly?: boolean;
   previousClose: number;
   previousCloseSource?: "artist" | "price_history";
   hypeScore: number;
@@ -196,7 +197,8 @@ export function calculateDailyMarketUpdates(input: MarketUpdateInput) {
     ? standaloneUpdates.map((update, index) => holdUnchangedIntradayQuote(update, input.artists[index]))
     : applyMarketRelativePricing(standaloneUpdates, input.marketCoverageRatio);
   const updates = pricedUpdates
-    .map(applyMeasuredMinimumTick);
+    .map(applyMeasuredMinimumTick)
+    .map((update, index) => holdOpeningBaseline(update, input.artists[index]));
 
   const averageMovePercent =
     updates.reduce((total, update) => total + update.dailyChangePercent, 0) / Math.max(1, updates.length);
@@ -273,6 +275,37 @@ export function calculateDailyMarketUpdates(input: MarketUpdateInput) {
         ? pickLeaderboardMove(sorted[sorted.length - 1])
         : null
     } satisfies MarketUpdateSummary
+  };
+}
+
+function holdOpeningBaseline(
+  update: ArtistMarketUpdate,
+  artist: MarketUpdateArtist
+): ArtistMarketUpdate {
+  if (!artist.baselineOnly) {
+    return update;
+  }
+
+  const openingPrice = getValidPrice(artist.quotedPrice ?? artist.currentPrice, artist.currentPrice);
+
+  return {
+    ...update,
+    previousClose: openingPrice,
+    oldPrice: openingPrice,
+    currentPrice: openingPrice,
+    dailyChangePercent: 0,
+    explanation: `${update.ticker} established its opening source baseline. Later observations will measure real change.`,
+    signalDelta: 0,
+    rawPayload: {
+      ...update.rawPayload,
+      hasMomentumSignal: false,
+      openingBaselineHold: {
+        applied: true,
+        openingPrice,
+        suppressedSignalDelta: update.signalDelta,
+        suppressedPrice: update.currentPrice
+      }
+    }
   };
 }
 

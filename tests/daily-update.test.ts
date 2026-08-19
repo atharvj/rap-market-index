@@ -25,6 +25,57 @@ function artist(): MarketUpdateArtist {
 }
 
 describe("daily market valuation pressure", () => {
+  it("holds a new listing at its verified opening quote while sources establish baselines", () => {
+    const current = {
+      ...artist(),
+      currentPrice: 45.66,
+      quotedPrice: 45.66,
+      previousClose: 45.66,
+      baselineOnly: true
+    };
+    const result = calculateDailyMarketUpdates({
+      artists: [current],
+      runDate: "2026-08-19",
+      source: "core",
+      adapterSignals: {
+        artist: {
+          stats: { youtubeGrowth: -0.4 },
+          rawPayload: {
+            audienceScaleCalibration: {
+              status: "ok",
+              targetPrice: 30,
+              coverage: 1,
+              confidence: 0.9
+            },
+            sourceWeights: { youtube: { youtubeGrowth: 0.8 } },
+            sourceValues: { youtube: { youtubeGrowth: -0.4 } }
+          }
+        }
+      }
+    });
+
+    expect(result.updates[0]).toMatchObject({
+      currentPrice: 45.66,
+      previousClose: 45.66,
+      dailyChangePercent: 0,
+      signalDelta: 0
+    });
+    expect(result.updates[0].rawPayload).toMatchObject({
+      hasMomentumSignal: false,
+      openingBaselineHold: {
+        applied: true,
+        openingPrice: 45.66
+      }
+    });
+    expect(result.updates[0].explanation).toContain("opening source baseline");
+    expect(result.summary).toMatchObject({
+      momentumArtistCount: 0,
+      upMoveCount: 0,
+      downMoveCount: 0,
+      flatMoveCount: 1
+    });
+  });
+
   it("holds the live quote during an intraday calculation with no new pricing signal", () => {
     const current = {
       ...artist(),
