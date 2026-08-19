@@ -251,7 +251,7 @@ export async function POST(request: Request) {
         source,
         updates: result.updates,
         summary,
-        recordRun: body.intraday !== true,
+        recordRun: body.intraday !== true && !Array.isArray(body.artistIds),
         intraday: body.intraday === true,
         tickComparisonPrices: body.intraday === true ? tickComparisonPrices : undefined,
         forceTickArtistIds
