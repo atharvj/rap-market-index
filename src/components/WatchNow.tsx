@@ -37,6 +37,7 @@ export function WatchNow() {
   const controlHideTimerRef = useRef<number | null>(null);
   const pointerOverPlayerRef = useRef(false);
   const currentVideoIdRef = useRef<string | null>(null);
+  const unavailableVideoIdsRef = useRef(new Set<string>());
   const [videos, setVideos] = useState<MarketNewsItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -124,6 +125,24 @@ export function WatchNow() {
     setIsPlaying(true);
   }, [videos.length]);
 
+  const skipUnavailableVideo = useCallback((videoId: string) => {
+    unavailableVideoIdsRef.current.add(videoId);
+
+    const failedIndex = videos.findIndex((video) => video.videoId === videoId);
+    const remainingVideos = videos.filter((video) => video.videoId !== videoId);
+    const nextIndex = remainingVideos.length
+      ? failedIndex >= remainingVideos.length
+        ? 0
+        : Math.max(0, failedIndex)
+      : 0;
+
+    setVideos(remainingVideos);
+    setCurrentIndex(nextIndex);
+    endedVideoRef.current = videoId;
+    setHasStarted(true);
+    setIsPlaying(remainingVideos.length > 0);
+  }, [videos]);
+
   useEffect(() => {
     const controller = new AbortController();
     const params = new URLSearchParams({
@@ -141,7 +160,9 @@ export function WatchNow() {
           return;
         }
 
-        const nextVideos = (payload.news ?? []).filter((item) => Boolean(item.videoId));
+        const nextVideos = (payload.news ?? []).filter((item) =>
+          Boolean(item.videoId) && !unavailableVideoIdsRef.current.has(item.videoId as string)
+        );
         const selectedVideoId = currentVideoIdRef.current;
         setVideos(nextVideos);
         setCurrentIndex((previousIndex) => {
@@ -265,6 +286,15 @@ export function WatchNow() {
           : typeof info.playerState === "number"
             ? info.playerState
             : null;
+      const playerErrorCode =
+        payload.event === "onError" && typeof payload.info === "number"
+          ? payload.info
+          : null;
+
+      if (playerErrorCode !== null && currentVideo.videoId) {
+        skipUnavailableVideo(currentVideo.videoId);
+        return;
+      }
 
       if (typeof info.currentTime === "number" && Number.isFinite(info.currentTime)) {
         setCurrentTime(Math.max(0, info.currentTime));
@@ -286,7 +316,7 @@ export function WatchNow() {
 
     window.addEventListener("message", handlePlayerMessage);
     return () => window.removeEventListener("message", handlePlayerMessage);
-  }, [currentVideo, playNext]);
+  }, [currentVideo, playNext, skipUnavailableVideo]);
 
   useEffect(() => {
     endedVideoRef.current = null;
@@ -339,6 +369,7 @@ export function WatchNow() {
         PLAYER_ORIGIN
       );
       postPlayerCommand("addEventListener", ["onStateChange"]);
+      postPlayerCommand("addEventListener", ["onError"]);
       postPlayerCommand(isMuted ? "mute" : "unMute");
       postPlayerCommand("loadModule", ["captions"]);
       postPlayerCommand("setOption", [

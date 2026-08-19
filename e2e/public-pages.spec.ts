@@ -489,12 +489,21 @@ test("Watch Now starts in view and stays inside the RMI player", async ({ page }
     window.parent.postMessage(JSON.stringify({ event: "onStateChange", info: 0 }), "*");
   });
   await expect(page.getByRole("heading", { name: marketVideos[1].title })).toBeVisible();
+  await page.getByRole("button", { name: "Previous video" }).click();
+  await expect(page.getByRole("heading", { name: marketVideos[0].title })).toBeVisible();
+
+  const restrictedFrame = page.frames().find((frame) => frame.url().includes("youtube-nocookie.com/embed/RmiVideo001"));
+  await restrictedFrame?.evaluate(() => {
+    window.parent.postMessage(JSON.stringify({ event: "onError", info: 150 }), "*");
+  });
+  await expect(page.getByRole("heading", { name: marketVideos[1].title })).toBeVisible();
+  await expect(page.getByRole("heading", { name: marketVideos[0].title })).toHaveCount(0);
   await expect(page.locator('iframe[title*="video player"]')).toHaveAttribute(
     "src",
     /youtube-nocookie\.com\/embed\/RmiVideo002/
   );
-  await page.getByRole("button", { name: "Previous video" }).click();
-  await expect(page.getByRole("heading", { name: marketVideos[0].title })).toBeVisible();
+  await expect(page.getByText("1 / 2")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Previous video" })).toBeDisabled();
   await page.getByRole("button", { name: "Unmute video" }).click();
   await expect(page.getByRole("button", { name: "Mute video" })).toBeVisible();
 });

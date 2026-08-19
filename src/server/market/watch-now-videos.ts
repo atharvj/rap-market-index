@@ -11,6 +11,9 @@ export function isWatchNowMarketEvent(event: WatchNowMarketEvent) {
   const title = event.title.toLowerCase();
   const videoId = getYoutubeVideoId(rawPayload, event.source_url);
   const durationSeconds = getRawNumber(rawPayload.durationSeconds);
+  const youtubeEmbeddable = getRawBoolean(rawPayload.youtubeEmbeddable);
+  const youtubePrivacyStatus = getRawString(rawPayload.youtubePrivacyStatus);
+  const youtubeUploadStatus = getRawString(rawPayload.youtubeUploadStatus);
   const hasOfficialVideoTitle =
     title.includes("official video") ||
     title.includes("official music video") ||
@@ -44,6 +47,9 @@ export function isWatchNowMarketEvent(event: WatchNowMarketEvent) {
   return (
     (isEligibleOfficialUpload || isEligibleEditorialVideo) &&
     Boolean(videoId) &&
+    youtubeEmbeddable !== false &&
+    (!youtubePrivacyStatus || youtubePrivacyStatus === "public") &&
+    (!youtubeUploadStatus || youtubeUploadStatus === "processed") &&
     !isAudioOnly &&
     !isShortForm
   );
@@ -92,4 +98,8 @@ function getRawText(value: unknown) {
 
 function getRawNumber(value: unknown) {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+function getRawBoolean(value: unknown) {
+  return typeof value === "boolean" ? value : null;
 }

@@ -66,6 +66,11 @@ type YoutubeVideosListResponse = {
       likeCount?: string;
       commentCount?: string;
     };
+    status?: {
+      embeddable?: boolean;
+      privacyStatus?: string;
+      uploadStatus?: string;
+    };
   }>;
   error?: {
     message?: string;
@@ -84,6 +89,9 @@ type YoutubeVideo = {
   viewCount?: number | null;
   likeCount?: number | null;
   commentCount?: number | null;
+  embeddable?: boolean | null;
+  privacyStatus?: string | null;
+  uploadStatus?: string | null;
 };
 
 type YoutubeUploadClassification = {
@@ -311,6 +319,9 @@ function buildYoutubeUploadEvents({
         viewCount: video.viewCount ?? null,
         likeCount: video.likeCount ?? null,
         commentCount: video.commentCount ?? null,
+        youtubeEmbeddable: video.embeddable ?? null,
+        youtubePrivacyStatus: video.privacyStatus ?? null,
+        youtubeUploadStatus: video.uploadStatus ?? null,
         descriptionProjectName: inferProjectTitleFromDescription(video.description, artist.name),
         thumbnailUrl: video.thumbnailUrl ?? null,
         artistCategory: artist.category,
@@ -1290,7 +1301,7 @@ async function hydrateYoutubeVideoDetails({
 
   const url = new URL("https://www.googleapis.com/youtube/v3/videos");
 
-  url.searchParams.set("part", "snippet,contentDetails,statistics");
+  url.searchParams.set("part", "snippet,contentDetails,statistics,status");
   url.searchParams.set("id", videos.map((video) => video.id).join(","));
   url.searchParams.set("key", apiKey);
 
@@ -1318,7 +1329,10 @@ async function hydrateYoutubeVideoDetails({
           durationSeconds: parseIsoDurationSeconds(item.contentDetails?.duration),
           viewCount: parseOptionalInteger(item.statistics?.viewCount),
           likeCount: parseOptionalInteger(item.statistics?.likeCount),
-          commentCount: parseOptionalInteger(item.statistics?.commentCount)
+          commentCount: parseOptionalInteger(item.statistics?.commentCount),
+          embeddable: typeof item.status?.embeddable === "boolean" ? item.status.embeddable : null,
+          privacyStatus: item.status?.privacyStatus?.trim() || null,
+          uploadStatus: item.status?.uploadStatus?.trim() || null
         }
       ])
   );

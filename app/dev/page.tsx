@@ -4349,7 +4349,7 @@ function AutoArtistPreviewCard({
     source.key === "spotifyId" || source.key === "youtubeChannelId" || source.key === "musicbrainzId"
   );
   const textLookupSources = savedSources.filter((source) => source.key === "lastfmName" || source.key === "gdeltQuery");
-  const sourceQuality = getAutoArtistSourceQuality(verifiedSources.length, textLookupSources.length);
+  const sourceQuality = getAutoArtistSourceQuality(verifiedSources, textLookupSources.length);
   const candidates = preview.suggestions.flatMap((suggestion) =>
     Object.entries(suggestion.candidates).flatMap(([source, sourceCandidates]) =>
       (sourceCandidates ?? []).slice(0, 2).map((candidate) => ({
@@ -4379,7 +4379,7 @@ function AutoArtistPreviewCard({
         <button
           type="button"
           onClick={onSave}
-          disabled={saving}
+          disabled={saving || !sourceQuality.canSave}
           className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md border border-mint/45 bg-mint/10 px-4 text-sm font-black text-mint disabled:cursor-wait disabled:opacity-55"
         >
           <CheckCircle2 className="h-4 w-4" />
@@ -4465,42 +4465,54 @@ function AutoArtistPreviewCard({
   );
 }
 
-function getAutoArtistSourceQuality(verifiedSourceCount: number, textLookupSourceCount: number) {
-  if (verifiedSourceCount >= 2) {
+function getAutoArtistSourceQuality(
+  verifiedSources: Array<{ key: keyof Omit<ManualSourceIdForm, "artistId"> }>,
+  textLookupSourceCount: number
+) {
+  const hasYoutube = verifiedSources.some((source) => source.key === "youtubeChannelId");
+  const hasIdentitySource = verifiedSources.some((source) =>
+    source.key === "spotifyId" || source.key === "musicbrainzId"
+  );
+
+  if (hasYoutube && hasIdentitySource) {
     return {
       label: "High-confidence listing",
       saveLabel: "Save verified listing",
       className: "border-mint/40 bg-mint/10 text-mint",
-      warning: null
+      warning: "The first observation establishes an honest baseline. Daily movement begins as later source readings change.",
+      canSave: true
     };
   }
 
-  if (verifiedSourceCount === 1) {
+  if (verifiedSources.length > 0) {
     return {
-      label: "Needs quick review",
-      saveLabel: "Save after review",
-      className: "border-brass/40 bg-brass/10 text-brass",
+      label: "More source verification needed",
+      saveLabel: "Cannot list yet",
+      className: "border-ember/40 bg-ember/10 text-ember",
       warning:
-        "Only one exact platform/release ID was found. This can be okay, but check the candidate manually before trusting market data."
+        "A public ticker needs an exact YouTube channel plus Spotify or MusicBrainz identity. Add the missing ID before listing so the quote can receive durable daily inputs.",
+      canSave: false
     };
   }
 
   if (textLookupSourceCount > 0) {
     return {
       label: "Text-only match",
-      saveLabel: "Save text-only listing",
-      className: "border-brass/40 bg-brass/10 text-brass",
+      saveLabel: "Cannot list yet",
+      className: "border-ember/40 bg-ember/10 text-ember",
       warning:
-        "This preview found only text lookups, not exact Spotify, YouTube, or MusicBrainz IDs. Save only if you plan to add exact IDs immediately."
+        "Text matching alone is too ambiguous for a public quote. Add an exact YouTube channel plus Spotify or MusicBrainz identity before listing.",
+      canSave: false
     };
   }
 
   return {
     label: "Low-confidence listing",
-    saveLabel: "Save without IDs",
+    saveLabel: "Cannot list yet",
     className: "border-ember/40 bg-ember/10 text-ember",
     warning:
-      "No reliable source IDs were found. Do not use this artist in the public market until exact source IDs are added."
+      "No reliable source IDs were found. This artist cannot enter the public market until the required exact IDs are available.",
+    canSave: false
   };
 }
 

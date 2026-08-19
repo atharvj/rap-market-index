@@ -65,6 +65,16 @@ describe("Watch Now video eligibility", () => {
     }))).toBe(false);
   });
 
+  it("rejects videos YouTube explicitly marks unavailable for embedded playback", () => {
+    expect(isWatchNowMarketEvent(event({ youtubeEmbeddable: false }))).toBe(false);
+    expect(isWatchNowMarketEvent(event({ youtubePrivacyStatus: "private" }))).toBe(false);
+    expect(isWatchNowMarketEvent(event({ youtubeUploadStatus: "rejected" }))).toBe(false);
+  });
+
+  it("keeps legacy videos whose YouTube playback status was not recorded", () => {
+    expect(isWatchNowMarketEvent(event())).toBe(true);
+  });
+
   it("recovers IDs from standard, short, and embed URLs", () => {
     expect(getYoutubeVideoId({}, "https://www.youtube.com/watch?v=Standard123")).toBe("Standard123");
     expect(getYoutubeVideoId({}, "https://youtu.be/ShortId123")).toBe("ShortId123");

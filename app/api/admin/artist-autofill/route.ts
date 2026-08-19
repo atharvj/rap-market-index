@@ -132,16 +132,27 @@ export async function POST(request: Request) {
     let finalArtist = mapMarketArtist(valuedArtist);
     let savedSourceIds: Awaited<ReturnType<typeof upsertArtistExternalIds>> = {};
     const previewSourceIds = dryRun ? null : normalizePreviewSourceIds(body.sourceIds, artist.id);
+    const sourceRecords = previewSourceIds ? [previewSourceIds] : resolverResult.records;
+    const listingReadiness = getListingReadiness(sourceRecords[0]);
 
     if (!dryRun) {
+      if (!listingReadiness.ready) {
+        return NextResponse.json(
+          {
+            ok: false,
+            error: `${name} is not ready to list. Add a verified YouTube channel plus a Spotify or MusicBrainz ID so its daily inputs can build real baselines instead of a permanently flat quote.`,
+            listingReadiness
+          },
+          { status: 422 }
+        );
+      }
+
       if (valuation.source === "default") {
         finalArtist = mapArtistRow(await upsertArtist(supabase, valuedArtist));
       } else {
         await upsertArtist(supabase, valuedArtist);
         finalArtist = mapArtistRow(await updateStarterValuation(supabase, valuedArtist));
       }
-
-      const sourceRecords = previewSourceIds ? [previewSourceIds] : resolverResult.records;
 
       savedSourceIds = sourceRecords.length ? await upsertArtistExternalIds(supabase, sourceRecords) : {};
     }
@@ -162,7 +173,8 @@ export async function POST(request: Request) {
         price: valuation.price,
         category: valuation.category,
         volatility: valuation.volatility
-      }
+      },
+      listingReadiness
     });
   } catch (error) {
     return NextResponse.json(
@@ -174,6 +186,22 @@ export async function POST(request: Request) {
       { status: 500 }
     );
   }
+}
+
+function getListingReadiness(record: {
+  youtubeChannelId?: unknown;
+  spotifyId?: unknown;
+  musicbrainzId?: unknown;
+} | null | undefined) {
+  const hasYoutube = Boolean(record?.youtubeChannelId);
+  const hasIdentitySource = Boolean(record?.spotifyId || record?.musicbrainzId);
+
+  return {
+    ready: hasYoutube && hasIdentitySource,
+    hasYoutube,
+    hasIdentitySource,
+    status: hasYoutube && hasIdentitySource ? "ready" : "needs_verified_sources"
+  };
 }
 
 async function parseBody(request: Request): Promise<ArtistAutofillBody> {

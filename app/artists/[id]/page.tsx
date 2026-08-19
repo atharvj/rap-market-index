@@ -117,7 +117,7 @@ export default function ArtistDetailPage() {
         <ArtistAudienceSnapshot artistId={artist.id} />
 
         <RmiSection title={<span className="flex items-center gap-2"><Activity className="h-4 w-4 text-mint" /> Momentum Breakdown</span>}>
-          <SignalBreakdown drivers={signalDrivers} />
+          <SignalBreakdown drivers={signalDrivers} buildingBaseline={activeArtist.priceHistory.length < 2} />
         </RmiSection>
 
         {relatedArtists.length ? (
@@ -185,9 +185,11 @@ function QuoteStat({
 }
 
 function SignalBreakdown({
-  drivers
+  drivers,
+  buildingBaseline
 }: {
   drivers: ReturnType<typeof getArtistSignalDrivers>;
+  buildingBaseline: boolean;
 }) {
   const visibleDrivers = drivers;
   const largestMagnitude = Math.max(0.01, ...visibleDrivers.map((driver) => Math.abs(driver.contribution)));
@@ -195,7 +197,9 @@ function SignalBreakdown({
   return (
     <div className="p-4">
       <p className="mb-3 text-xs leading-5 text-paper/45">
-        Weighted contributions to current RMI Momentum. Flat means the measured input has not materially changed from its baseline—not that its data is missing.
+        {buildingBaseline
+          ? "Building the first source baseline. The quote stays at its verified opening value until later observations provide a real change to measure."
+          : "Weighted contributions to current RMI Momentum. Flat means the measured input has not materially changed from its baseline—not that its data is missing."}
       </p>
       <div className="grid gap-2 sm:grid-cols-2">
         {visibleDrivers.map((driver) => {

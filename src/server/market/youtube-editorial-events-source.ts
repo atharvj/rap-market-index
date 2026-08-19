@@ -29,6 +29,9 @@ type YoutubeVideo = {
   viewCount?: number | null;
   likeCount?: number | null;
   commentCount?: number | null;
+  embeddable?: boolean | null;
+  privacyStatus?: string | null;
+  uploadStatus?: string | null;
 };
 
 type EditorialClassification = {
@@ -188,6 +191,9 @@ export function buildYoutubeEditorialEvents({
           viewCount: video.viewCount ?? null,
           likeCount: video.likeCount ?? null,
           commentCount: video.commentCount ?? null,
+          youtubeEmbeddable: video.embeddable ?? null,
+          youtubePrivacyStatus: video.privacyStatus ?? null,
+          youtubeUploadStatus: video.uploadStatus ?? null,
           thumbnailUrl: video.thumbnailUrl ?? null,
           classificationReason: classification.reason,
           editorialAttentionVerified: true,
@@ -372,7 +378,7 @@ async function fetchRecentUploadedVideos({
   }
 
   const videoUrl = new URL("https://www.googleapis.com/youtube/v3/videos");
-  videoUrl.searchParams.set("part", "snippet,contentDetails,statistics");
+  videoUrl.searchParams.set("part", "snippet,contentDetails,statistics,status");
   videoUrl.searchParams.set("id", videos.map((video) => video.id).join(","));
   videoUrl.searchParams.set("key", apiKey);
   const videoResult = await fetchJson(videoUrl.toString(), timeoutMs, fetchImpl);
@@ -387,6 +393,7 @@ async function fetchRecentUploadedVideos({
       const snippet = toRecord(row.snippet);
       const statistics = toRecord(row.statistics);
       const contentDetails = toRecord(row.contentDetails);
+      const status = toRecord(row.status);
 
       return [getString(row.id), {
         title: getString(snippet.title),
@@ -396,7 +403,10 @@ async function fetchRecentUploadedVideos({
         durationSeconds: parseIsoDurationSeconds(getString(contentDetails.duration)),
         viewCount: parseOptionalNumber(statistics.viewCount),
         likeCount: parseOptionalNumber(statistics.likeCount),
-        commentCount: parseOptionalNumber(statistics.commentCount)
+        commentCount: parseOptionalNumber(statistics.commentCount),
+        embeddable: typeof status.embeddable === "boolean" ? status.embeddable : null,
+        privacyStatus: getString(status.privacyStatus) || null,
+        uploadStatus: getString(status.uploadStatus) || null
       }]
     })
   );
