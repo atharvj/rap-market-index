@@ -154,6 +154,25 @@ describe("release demand safeguards", () => {
     expect(evidenceMultiplier(releaseEvent())).toBeLessThan(1);
   });
 
+  it("does not infer fan response or media coverage from an official release", () => {
+    const event = releaseEvent({
+      source: "youtube_upload_event",
+      classificationReason: "official_video_upload_title",
+      releaseKind: "single",
+      viewCount: 250_000
+    });
+    event.sourceName = "YouTube";
+    const signal = buildEventMarketSignals({
+      artists: [artist],
+      runDate: "2026-07-11",
+      eventsByArtist: { [artist.id]: [event] }
+    })[artist.id];
+
+    expect(signal.stats.searchGrowth).toBeGreaterThan(0);
+    expect(signal.stats.socialGrowth).toBe(0);
+    expect(signal.stats.newsScore).toBe(50);
+  });
+
   it("restores release authority when independent music demand is confirmed", () => {
     expect(evidenceMultiplier(releaseEvent({ musicDemandConfirmed: true }))).toBe(1);
   });

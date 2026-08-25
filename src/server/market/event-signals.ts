@@ -163,11 +163,26 @@ function buildArtistEventSignal(artist: MarketUpdateArtist, runDate: string, eve
   const newsSignal = scoredEvents
     .filter((event) => event.event.eventType === "news" || event.event.eventType === "viral")
     .reduce((total, event) => total + event.weightedImpact, 0);
+  const fanResponseSignal = scoredEvents
+    .filter(hasMeasuredFanResponse)
+    .reduce((total, event) => total + event.weightedImpact, 0);
+  const mediaSignal = scoredEvents
+    .filter(hasMeasuredMediaCoverage)
+    .reduce((total, event) => total + event.weightedImpact, 0);
+  const mediaReviewSignal = scoredEvents
+    .filter((event) => hasMeasuredMediaCoverage(event) && event.event.eventType === "review")
+    .reduce((total, event) => total + event.weightedImpact, 0);
+  const mediaControversySignal = scoredEvents
+    .filter((event) => hasMeasuredMediaCoverage(event) && event.event.eventType === "controversy")
+    .reduce((total, event) => total + event.weightedImpact, 0);
   const sourceConfirmedEventCount = scoredEvents.filter((event) => event.clusterSourceCount > 1).length;
   const stats: Partial<HypeStats> = {
     searchGrowth: clamp(totalSignal * 0.18 + newsSignal * 0.12, -30, 95),
-    socialGrowth: clamp(totalSignal * 0.2 + releaseSignal * 0.18, -35, 120),
-    newsScore: clamp(50 + totalSignal * 0.32 + reviewSignal * 0.22 + controversySignal * 0.18, 0, 100)
+    // A release creates attention, but is not evidence that fans liked it.
+    socialGrowth: clamp(fanResponseSignal * 0.38, -35, 120),
+    // Official uploads are not press coverage. Media reflects publisher and
+    // critic evidence instead of inheriting every event's direction.
+    newsScore: clamp(50 + mediaSignal * 0.32 + mediaReviewSignal * 0.22 + mediaControversySignal * 0.18, 0, 100)
   };
   const modifiers = buildPriceModifiers(scoredEvents);
 
@@ -182,6 +197,8 @@ function buildArtistEventSignal(artist: MarketUpdateArtist, runDate: string, eve
       totalSignal,
       reviewSignal,
       releaseSignal,
+      fanResponseSignal,
+      mediaSignal,
       sourceConfirmedEventCount,
       events: scoredEvents.map((event) => ({
         title: event.event.title,
@@ -220,6 +237,24 @@ function buildArtistEventSignal(artist: MarketUpdateArtist, runDate: string, eve
       }))
     }
   };
+}
+
+function hasMeasuredFanResponse(event: ScoredMarketEvent) {
+  const sourceClass = getReactionSourceClass(event);
+  const publicReactionConfirmed = getRawBoolean(event.event.rawPayload.publicReactionConfirmed);
+  const fanReactionEvidenceCount = getRawOptionalNumber(event.event.rawPayload.fanReactionEvidenceCount) ?? 0;
+
+  return (
+    sourceClass === "community" ||
+    sourceClass === "social" ||
+    (publicReactionConfirmed && fanReactionEvidenceCount > 0)
+  );
+}
+
+function hasMeasuredMediaCoverage(event: ScoredMarketEvent) {
+  const sourceClass = getReactionSourceClass(event);
+
+  return sourceClass === "media" || sourceClass === "critic";
 }
 
 type ScoredMarketEvent = ReturnType<typeof scoreEvent> & {

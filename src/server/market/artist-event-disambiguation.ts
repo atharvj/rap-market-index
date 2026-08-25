@@ -224,7 +224,10 @@ export function hasArtistFeatureCreditContext({
     }
 
     const alias = toRegexPhrase(normalizedAlias);
-    const creditPrefix = "(?:feat|ft|featuring|features|with|alongside)";
+    // "with" and "alongside" describe many non-credit relationships (for
+    // example, "beef with Kendrick Lamar"). Require explicit music-credit
+    // language before changing the artist's role to featured.
+    const creditPrefix = "(?:feat|ft|featuring|features)";
 
     return (
       new RegExp(`\\b${creditPrefix}(?:\\s+\\S+){0,2}\\s+${alias}\\b`).test(normalizedText) ||
@@ -413,7 +416,9 @@ function hasDirectReleaseSubject(normalizedText: string, normalizedAlias: string
     "(?:announces|announced|drops|dropped|delivers|previews|previewed|releases|released|returns\\s+with|shares|shared|stream|teases|teased|unveils|unveiled|watch)";
   const patterns = [
     new RegExp(`\\b${alias}\\b(?:\\s+\\S+){0,5}\\s+${releaseActions}\\b`),
-    new RegExp(`\\b${alias}\\b(?:\\s+\\S+){0,8}\\s+${releaseNouns}\\b`),
+    // Keep ownership adjacent. The old eight-word window turned headlines such
+    // as "takes shots at Kendrick Lamar on new album" into Kendrick releases.
+    new RegExp(`\\b${alias}\\b(?:\\s+s)?\\s+(?:(?:new|latest|upcoming)\\s+)?${releaseNouns}\\b`),
     new RegExp(`\\b${releaseNouns}\\s+(?:from|by)\\s+${alias}\\b`)
   ];
 

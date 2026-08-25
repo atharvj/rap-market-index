@@ -188,10 +188,11 @@ export async function collectRedditMarketSignals({
     }
 
     const query = buildRedditQuery(artist, externalIds[artist.id]);
+    const artistSubreddits = buildArtistRedditSubreddits(artist, cleanSubreddits);
     const result = await fetchRedditSearch({
       accessToken: token.accessToken,
       userAgent,
-      subreddits: cleanSubreddits,
+      subreddits: artistSubreddits,
       query,
       postsPerArtist,
       timeoutMs,
@@ -204,7 +205,7 @@ export async function collectRedditMarketSignals({
         rawPayload: {
           source: SOURCE,
           query,
-          subreddits: cleanSubreddits,
+          subreddits: artistSubreddits,
           status: "error",
           error: result.error
         }
@@ -213,7 +214,7 @@ export async function collectRedditMarketSignals({
         createObservation(artist.id, runDate, REQUEST_ERROR, 1, "flag", {
           source: SOURCE,
           query,
-          subreddits: cleanSubreddits,
+          subreddits: artistSubreddits,
           error: result.error
         })
       );
@@ -248,6 +249,17 @@ export async function collectRedditMarketSignals({
     eventsByArtist: dedupeEventsByArtist(eventsByArtist),
     warnings
   };
+}
+
+export function buildArtistRedditSubreddits(artist: Pick<MarketUpdateArtist, "name" | "ticker">, defaults: string[]) {
+  const artistCandidates = [artist.name, artist.ticker]
+    .map((value) => value.replace(/^\$/, "").replace(/[^a-zA-Z0-9_]+/g, ""))
+    .filter((value) => value.length >= 3);
+
+  // Artist communities often contain the most direct release reception. Add
+  // likely community names to the existing music-wide set in the same API
+  // request, so coverage improves without increasing request count per artist.
+  return normalizeSubreddits([...defaults, ...artistCandidates]);
 }
 
 function buildRedditSignal({

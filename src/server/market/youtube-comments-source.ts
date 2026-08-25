@@ -339,17 +339,19 @@ function buildYoutubeCommentSignal({
     : 0;
   const stats: Partial<HypeStats> = {};
 
-  if (hasBaseline && hasEnoughComments) {
-    const reactionScore =
-      sentimentChange * 0.92 +
-      likeMomentum * 0.38 +
-      countMomentum * 0.18 +
-      netShareChange * 0.24;
+  if (hasEnoughComments) {
+    // Reception has an absolute level as well as momentum. Previously the
+    // first sample was forced flat, so an overwhelmingly disliked new song
+    // established a negative baseline without displaying that reaction.
+    const absoluteReaction = weightedSentiment * 0.34 + netShare * 0.2;
+    const momentumReaction = hasBaseline
+      ? sentimentChange * 0.68 + likeMomentum * 0.28 + countMomentum * 0.14 + netShareChange * 0.18
+      : 0;
+    const reactionScore = absoluteReaction + momentumReaction;
 
     stats.socialGrowth = clamp(reactionScore, -35, 90);
-    stats.newsScore = clamp(50 + sentimentChange * 0.34 + netShareChange * 0.18 + countMomentum * 0.15, 0, 100);
-    stats.searchGrowth = clamp(countMomentum * 0.35 + likeMomentum * 0.18 + sentimentChange * 0.16, -20, 50);
-    stats.youtubeGrowth = clamp(likeMomentum * 0.22 + countMomentum * 0.16 + sentimentChange * 0.08, -20, 45);
+    stats.searchGrowth = clamp(countMomentum * 0.35 + likeMomentum * 0.18 + weightedSentiment * 0.06, -20, 50);
+    stats.youtubeGrowth = clamp(likeMomentum * 0.22 + countMomentum * 0.16 + weightedSentiment * 0.04, -20, 45);
   }
 
   const rawPayload = {
@@ -375,7 +377,7 @@ function buildYoutubeCommentSignal({
     videoIds: videos.map((video) => video.id),
     selectionBias: "artist_owned_channel_core_fans",
     interpretation: "confirmation_only_not_broad_fan_consensus",
-    status: hasBaseline ? (hasEnoughComments ? "momentum" : "insufficient_comments") : "baseline_only"
+    status: hasEnoughComments ? (hasBaseline ? "momentum_and_reception" : "reception_baseline") : "insufficient_comments"
   };
   const observations = [
     createObservation(artist.id, runDate, COMMENT_SENTIMENT, weightedSentiment, "score", rawPayload),
