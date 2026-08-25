@@ -210,7 +210,6 @@ function buildGdeltSignal({
     const toneContribution = clamp(averageTone * 4, -18, 18);
 
     stats.searchGrowth = clamp(coverageMomentum * 0.5 + sourceDiversity, -30, 95);
-    stats.socialGrowth = clamp(coverageMomentum * 0.25 + Math.min(articleCount, 20) * 0.7, -35, 120);
     stats.newsScore = clamp(50 + coverageMomentum * 0.16 + toneContribution + sourceDiversity * 0.5, 0, 100);
   }
 

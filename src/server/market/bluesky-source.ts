@@ -429,7 +429,6 @@ function buildStatsFromBluesky({
   const hypeSignal = hypeMomentum ?? catalystPostCount * 7;
   const negativeSignal = negativeMomentum ?? negativePostCount * 8;
   const breadthSignal = clamp(uniqueAuthorCount * 2.5, 0, 18);
-  const absoluteAttentionLift = clamp(Math.log10(engagementScore + 1) * 4.5 + postCount * 0.75, 0, 26);
   const catalystLift = catalystPostCount * 8 + Math.max(0, eventImpact) * 0.24;
   const negativeDrag = negativeSignal * 0.92 + negativePostCount * 5.5 + Math.max(0, -eventImpact) * 0.28;
 
@@ -443,11 +442,6 @@ function buildStatsFromBluesky({
       engagementSignal * 0.58 + postSignal * 0.18 + hypeSignal * 0.5 + catalystLift + breadthSignal - negativeDrag,
       -50,
       130
-    ),
-    newsScore: clamp(
-      50 + eventImpact * 0.24 + averageSentiment * 0.18 + absoluteAttentionLift - negativeDrag * 0.32,
-      0,
-      100
     )
   };
 }

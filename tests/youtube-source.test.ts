@@ -78,6 +78,7 @@ describe("YouTube audience velocity", () => {
     const signal = result.signals[testArtist.id];
 
     expect(signal.stats.youtubeGrowth).toBeLessThan(0);
+    expect(signal.stats.newsScore).toBeUndefined();
     expect(signal.rawPayload.viewRateMomentum).toBeLessThan(0);
     expect(signal.rawPayload.velocityMinimumTickEligible).toBe(true);
   });

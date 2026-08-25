@@ -489,7 +489,6 @@ function buildStatsFromReddit({
   const hypeSignal = hypeMomentum ?? catalystPostCount * 7;
   const negativeSignal = negativeMomentum ?? negativePostCount * 7;
   const breadthSignal = clamp(uniqueSubredditCount * 4, 0, 18);
-  const absoluteAttentionLift = clamp(Math.log10(engagementScore + 1) * 4 + postCount * 0.8, 0, 24);
   const catalystLift = catalystPostCount * 7 + Math.max(0, eventImpact) * 0.22;
   const negativeDrag = negativeSignal * 0.8 + negativePostCount * 5 + Math.max(0, -eventImpact) * 0.22;
 
@@ -503,11 +502,6 @@ function buildStatsFromReddit({
       engagementSignal * 0.52 + postSignal * 0.22 + hypeSignal * 0.5 + catalystLift + breadthSignal - negativeDrag,
       -45,
       125
-    ),
-    newsScore: clamp(
-      50 + eventImpact * 0.22 + averageSentiment * 0.18 + absoluteAttentionLift - negativeDrag * 0.25,
-      0,
-      100
     )
   };
 }

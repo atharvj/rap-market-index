@@ -68,6 +68,7 @@ describe("Bluesky market source", () => {
     expect(result.warnings).toEqual([]);
     expect(result.observations.some((observation) => observation.metric === "post_count")).toBe(true);
     expect(result.signals[artist.id].stats.socialGrowth).toBeGreaterThan(0);
+    expect(result.signals[artist.id].stats.newsScore).toBeUndefined();
     expect(result.eventsByArtist[artist.id]?.[0]).toMatchObject({
       artistId: artist.id,
       eventType: "release",

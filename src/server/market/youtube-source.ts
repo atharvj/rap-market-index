@@ -331,15 +331,6 @@ function buildYoutubeSignal({
       stats.socialGrowth = clamp(socialGrowth, -35, 120);
     }
 
-    stats.newsScore = clamp(
-      50 +
-        (viewRateMomentum.value ?? 0) * 0.07 +
-        (subscriberRateMomentum.value ?? 0) * 0.05 +
-        (viewMomentum.value ?? 0) * 0.02 +
-        Math.max(0, uploadAudienceValidation.value ?? 0) * 0.04,
-      0,
-      100
-    );
   }
 
   const rawPayload = {

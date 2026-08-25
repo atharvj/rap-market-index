@@ -211,11 +211,9 @@ function buildWikimediaSignal({
   const stats: Partial<HypeStats> = {};
 
   if (typeof pageviewMomentum === "number") {
-    const attentionLift = clamp(Math.log10(pageviews7d + 1) * 1.15, 0, 12);
-
+    // Encyclopedia lookups measure discovery/attention, not fan approval or
+    // media coverage. Keep the observation in its one defensible channel.
     stats.searchGrowth = clamp(pageviewMomentum * 0.72 + candidate.confidence * 8, -30, 95);
-    stats.socialGrowth = clamp(pageviewMomentum * 0.3, -35, 90);
-    stats.newsScore = clamp(50 + pageviewMomentum * 0.13 + attentionLift, 0, 100);
   }
 
   const rawPayload = {
