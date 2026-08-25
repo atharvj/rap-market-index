@@ -24,6 +24,7 @@ type YoutubeCollectOptions = {
   apiKey?: string;
   externalIds?: Record<string, ArtistExternalIds>;
   baselines?: ObservationBaselines;
+  useCompletedIntervalFallback?: boolean;
   delayMs?: number;
   timeoutMs?: number;
   fetchImpl?: typeof fetch;
@@ -80,6 +81,7 @@ export async function collectYoutubeMarketSignals({
   apiKey,
   externalIds = {},
   baselines = {},
+  useCompletedIntervalFallback = false,
   delayMs = 250,
   timeoutMs = 10000,
   fetchImpl = fetch
@@ -189,7 +191,8 @@ export async function collectYoutubeMarketSignals({
         artist: item.artist,
         info,
         runDate,
-        baseline: baselines[item.artist.id] ?? {}
+        baseline: baselines[item.artist.id] ?? {},
+        useCompletedIntervalFallback
       });
 
       signals[item.artist.id] = signal.signal;
@@ -225,12 +228,14 @@ function buildYoutubeSignal({
   artist,
   info,
   runDate,
-  baseline
+  baseline,
+  useCompletedIntervalFallback
 }: {
   artist: MarketUpdateArtist;
   info: YoutubeChannelInfo;
   runDate: string;
   baseline: Record<string, number>;
+  useCompletedIntervalFallback: boolean;
 }): {
   signal: AdapterSignal;
   observations: MarketObservation[];
@@ -262,6 +267,8 @@ function buildYoutubeSignal({
     baselineAgeDays: viewBaselineAgeDays,
     recentDailyRate: baseline[`${CHANNEL_VIEWS}__recent_daily_rate`],
     recentRateSamples: baseline[`${CHANNEL_VIEWS}__recent_rate_samples`],
+    latestCompletedDailyRate: baseline[`${CHANNEL_VIEWS}__latest_completed_daily_rate`],
+    useCompletedIntervalFallback,
     yearAgoDailyRate: baseline[`${CHANNEL_VIEWS}__year_ago_daily_rate`],
     yearAgoRateSamples: baseline[`${CHANNEL_VIEWS}__year_ago_rate_samples`],
     multiplier: 0.18,
@@ -275,6 +282,8 @@ function buildYoutubeSignal({
     baselineAgeDays: subscriberBaselineAgeDays,
     recentDailyRate: baseline[`${SUBSCRIBERS}__recent_daily_rate`],
     recentRateSamples: baseline[`${SUBSCRIBERS}__recent_rate_samples`],
+    latestCompletedDailyRate: baseline[`${SUBSCRIBERS}__latest_completed_daily_rate`],
+    useCompletedIntervalFallback,
     yearAgoDailyRate: baseline[`${SUBSCRIBERS}__year_ago_daily_rate`],
     yearAgoRateSamples: baseline[`${SUBSCRIBERS}__year_ago_rate_samples`],
     multiplier: 0.14,

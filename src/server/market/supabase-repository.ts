@@ -595,8 +595,18 @@ function addRateBaselines(
         continue;
       }
 
-      baselines[artistId][`${metric}__${period}_daily_rate`] = median(rates);
-      baselines[artistId][`${metric}__${period}_rate_samples`] = rates.length;
+      const latestCompletedRate = rates[rates.length - 1];
+      const comparisonRates = rates.length > 1 ? rates.slice(0, -1) : [];
+
+      if (period === "recent" && typeof latestCompletedRate === "number") {
+        baselines[artistId][`${metric}__latest_completed_daily_rate`] = latestCompletedRate;
+      }
+
+      // Compare the latest completed interval with the intervals that preceded
+      // it. Including the latest value in its own baseline dampens real changes.
+      const referenceRates = comparisonRates.length ? comparisonRates : rates;
+      baselines[artistId][`${metric}__${period}_daily_rate`] = median(referenceRates);
+      baselines[artistId][`${metric}__${period}_rate_samples`] = comparisonRates.length;
     }
   }
 }

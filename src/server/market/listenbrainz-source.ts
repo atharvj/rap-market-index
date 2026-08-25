@@ -21,6 +21,7 @@ type ListenBrainzCollectOptions = {
   runDate: string;
   externalIds?: Record<string, ArtistExternalIds>;
   baselines?: ObservationBaselines;
+  useCompletedIntervalFallback?: boolean;
   authToken?: string;
   timeoutMs?: number;
   fetchImpl?: typeof fetch;
@@ -48,6 +49,7 @@ export async function collectListenBrainzMarketSignals({
   runDate,
   externalIds = {},
   baselines = {},
+  useCompletedIntervalFallback = false,
   authToken,
   timeoutMs = 10000,
   fetchImpl = fetch
@@ -140,6 +142,8 @@ export async function collectListenBrainzMarketSignals({
       baselineAgeDays: getBaselineAgeDays(baseline, LISTEN_COUNT),
       recentDailyRate: baseline[`${LISTEN_COUNT}__recent_daily_rate`],
       recentRateSamples: baseline[`${LISTEN_COUNT}__recent_rate_samples`],
+      latestCompletedDailyRate: baseline[`${LISTEN_COUNT}__latest_completed_daily_rate`],
+      useCompletedIntervalFallback,
       yearAgoDailyRate: baseline[`${LISTEN_COUNT}__year_ago_daily_rate`],
       yearAgoRateSamples: baseline[`${LISTEN_COUNT}__year_ago_rate_samples`],
       multiplier: 0.18,

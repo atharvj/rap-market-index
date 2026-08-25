@@ -145,14 +145,18 @@ export function getAudienceScaleAdjustment(rawPayload: Record<string, unknown>, 
     };
   }
 
-  const logarithmicGap = Math.log(targetPrice / currentPrice);
-  const adjustment = clamp(logarithmicGap * 0.085 * confidence, -0.04, 0.04);
-
   return {
-    adjustment,
+    // Audience size establishes the opening quote in the prelaunch/listing flow.
+    // Reapplying the same level gap as a daily catalyst creates a mechanical
+    // incline or decline even when the underlying audience is changing. Keep the
+    // calibration here for valuation diagnostics, but let post-listing quotes be
+    // driven by measured momentum, events, trading, and technical context.
+    adjustment: 0,
     targetPrice,
     coverage,
-    gapPercent: round(((targetPrice - currentPrice) / currentPrice) * 100)
+    confidence,
+    gapPercent: round(((targetPrice - currentPrice) / currentPrice) * 100),
+    application: "listing_anchor_only"
   };
 }
 

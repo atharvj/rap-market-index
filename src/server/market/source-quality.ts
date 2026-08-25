@@ -18,6 +18,7 @@ export type RateMomentumResult = SnapshotMomentumResult & {
   yearAgoRateSamples: number;
   recentRateChangePercent: number | undefined;
   annualRateChangePercent: number | undefined;
+  rateObservationSource: "current_interval" | "latest_completed_interval" | undefined;
 };
 
 export function calculateSnapshotMomentum({
@@ -138,6 +139,8 @@ export function calculateRateMomentum({
   baselineAgeDays,
   recentDailyRate,
   recentRateSamples = 0,
+  latestCompletedDailyRate,
+  useCompletedIntervalFallback = false,
   yearAgoDailyRate,
   yearAgoRateSamples = 0,
   multiplier,
@@ -150,6 +153,8 @@ export function calculateRateMomentum({
   baselineAgeDays: number | undefined;
   recentDailyRate: number | undefined;
   recentRateSamples?: number;
+  latestCompletedDailyRate?: number;
+  useCompletedIntervalFallback?: boolean;
   yearAgoDailyRate?: number;
   yearAgoRateSamples?: number;
   multiplier: number;
@@ -180,11 +185,23 @@ export function calculateRateMomentum({
       recentRateSamples,
       yearAgoRateSamples,
       recentRateChangePercent: undefined,
-      annualRateChangePercent: undefined
+      annualRateChangePercent: undefined,
+      rateObservationSource: undefined
     };
   }
 
-  const currentDailyRate = (current - baseline) / baselineAgeFactor;
+  const sampledCurrentDailyRate = (current - baseline) / baselineAgeFactor;
+  const canUseCompletedInterval =
+    useCompletedIntervalFallback &&
+    typeof latestCompletedDailyRate === "number" &&
+    Number.isFinite(latestCompletedDailyRate) &&
+    latestCompletedDailyRate >= 0 &&
+    recentRateSamples > 0 &&
+    ((baselineAgeDays ?? 1) < 0.5 || sampledCurrentDailyRate === 0);
+  const currentDailyRate = canUseCompletedInterval ? latestCompletedDailyRate : sampledCurrentDailyRate;
+  const rateObservationSource = canUseCompletedInterval
+    ? "latest_completed_interval" as const
+    : "current_interval" as const;
   const recentRateChangePercent = ((currentDailyRate - recentDailyRate) / recentDailyRate) * 100;
   const hasAnnualRate =
     typeof yearAgoDailyRate === "number" &&
@@ -213,7 +230,8 @@ export function calculateRateMomentum({
       recentRateSamples,
       yearAgoRateSamples,
       recentRateChangePercent,
-      annualRateChangePercent
+      annualRateChangePercent,
+      rateObservationSource
     };
   }
 
@@ -255,7 +273,8 @@ export function calculateRateMomentum({
     recentRateSamples,
     yearAgoRateSamples,
     recentRateChangePercent,
-    annualRateChangePercent
+    annualRateChangePercent,
+    rateObservationSource
   };
 }
 
@@ -351,7 +370,8 @@ export function buildRateMomentumQualityPayload(result: RateMomentumResult) {
     recentRateSamples: result.recentRateSamples,
     yearAgoRateSamples: result.yearAgoRateSamples,
     recentRateChangePercent: round(result.recentRateChangePercent),
-    annualRateChangePercent: round(result.annualRateChangePercent)
+    annualRateChangePercent: round(result.annualRateChangePercent),
+    rateObservationSource: result.rateObservationSource ?? null
   };
 }
 

@@ -48,4 +48,42 @@ describe("cumulative counter quality", () => {
     expect(result.value).toBeLessThan(0);
     expect(result.anomalyFlags).not.toContain("flat_counter_sample");
   });
+
+  it("uses the latest completed daily interval when a daily run follows a recent intraday refresh", () => {
+    const result = calculateRateMomentum({
+      current: 1_000_000,
+      baseline: 1_000_000,
+      baselineAgeDays: 0.08,
+      recentDailyRate: 25_000,
+      recentRateSamples: 4,
+      latestCompletedDailyRate: 18_000,
+      useCompletedIntervalFallback: true,
+      multiplier: 0.18,
+      min: -18,
+      max: 18
+    });
+
+    expect(result.value).toBeLessThan(0);
+    expect(result.currentDailyRate).toBe(18_000);
+    expect(result.rateObservationSource).toBe("latest_completed_interval");
+    expect(result.anomalyFlags).not.toContain("flat_counter_sample");
+  });
+
+  it("does not reuse completed daily momentum during intraday polling", () => {
+    const result = calculateRateMomentum({
+      current: 1_000_000,
+      baseline: 1_000_000,
+      baselineAgeDays: 0.08,
+      recentDailyRate: 25_000,
+      recentRateSamples: 4,
+      latestCompletedDailyRate: 18_000,
+      useCompletedIntervalFallback: false,
+      multiplier: 0.18,
+      min: -18,
+      max: 18
+    });
+
+    expect(result.value).toBeUndefined();
+    expect(result.anomalyFlags).toContain("flat_counter_sample");
+  });
 });

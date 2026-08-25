@@ -36,6 +36,7 @@ type LastfmCollectOptions = {
   apiKey?: string;
   externalIds?: Record<string, ArtistExternalIds>;
   baselines?: ObservationBaselines;
+  useCompletedIntervalFallback?: boolean;
   delayMs?: number;
   timeoutMs?: number;
   fetchImpl?: typeof fetch;
@@ -58,6 +59,7 @@ export async function collectLastfmMarketSignals({
   apiKey,
   externalIds = {},
   baselines = {},
+  useCompletedIntervalFallback = false,
   delayMs = 900,
   timeoutMs = 10000,
   fetchImpl = fetch
@@ -119,7 +121,8 @@ export async function collectLastfmMarketSignals({
       artist,
       info: result.info,
       runDate,
-      baseline: baselines[artist.id] ?? {}
+      baseline: baselines[artist.id] ?? {},
+      useCompletedIntervalFallback
     });
 
     signals[artist.id] = signal.signal;
@@ -137,12 +140,14 @@ function buildLastfmSignal({
   artist,
   info,
   runDate,
-  baseline
+  baseline,
+  useCompletedIntervalFallback
 }: {
   artist: MarketUpdateArtist;
   info: LastfmArtistInfo;
   runDate: string;
   baseline: Record<string, number>;
+  useCompletedIntervalFallback: boolean;
 }): {
   signal: AdapterSignal;
   observations: MarketObservation[];
@@ -184,6 +189,8 @@ function buildLastfmSignal({
     baselineAgeDays: playcountBaselineAgeDays,
     recentDailyRate: baseline[`${PLAYCOUNT}__recent_daily_rate`],
     recentRateSamples: baseline[`${PLAYCOUNT}__recent_rate_samples`],
+    latestCompletedDailyRate: baseline[`${PLAYCOUNT}__latest_completed_daily_rate`],
+    useCompletedIntervalFallback,
     yearAgoDailyRate: baseline[`${PLAYCOUNT}__year_ago_daily_rate`],
     yearAgoRateSamples: baseline[`${PLAYCOUNT}__year_ago_rate_samples`],
     multiplier: 0.18,

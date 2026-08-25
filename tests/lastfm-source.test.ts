@@ -128,4 +128,56 @@ describe("Last.fm listening velocity", () => {
     expect(signal.rawPayload.playcountRateMomentum).toBeLessThan(0);
     expect(signal.rawPayload.velocityMinimumTickEligible).toBe(true);
   });
+
+  it("uses completed daily velocity when a recent refresh consumed the live counter change", async () => {
+    const performer = artist("Artist", "ARTIST");
+    const result = await collectLastfmMarketSignals({
+      artists: [performer],
+      runDate: "2026-07-30",
+      apiKey: "test-key",
+      externalIds: {
+        [performer.id]: {
+          artistId: performer.id,
+          musicbrainzId: "164f0d73-1234-4e2c-8743-d77bf2191051"
+        }
+      },
+      baselines: {
+        [performer.id]: {
+          listeners: 1_000_000,
+          listeners__observed_at_ms: Date.now() - 2 * 60 * 60 * 1000,
+          playcount: 100_000_000,
+          playcount__observed_at_ms: Date.now() - 2 * 60 * 60 * 1000,
+          playcount__recent_daily_rate: 100_000,
+          playcount__recent_rate_samples: 4,
+          playcount__latest_completed_daily_rate: 70_000
+        }
+      },
+      useCompletedIntervalFallback: true,
+      delayMs: 0,
+      fetchImpl: async () =>
+        new Response(
+          JSON.stringify({
+            artist: {
+              name: "Artist",
+              stats: {
+                listeners: "1000000",
+                playcount: "100000000"
+              }
+            }
+          }),
+          { status: 200 }
+        )
+    });
+    const signal = result.signals[performer.id];
+    const quality = signal.rawPayload.playcountRateMomentumQuality as {
+      rateObservationSource: string;
+      currentDailyRate: number;
+    };
+
+    expect(signal.stats.streamingGrowth).toBeLessThan(0);
+    expect(quality).toMatchObject({
+      rateObservationSource: "latest_completed_interval",
+      currentDailyRate: 70_000
+    });
+  });
 });

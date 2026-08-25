@@ -842,6 +842,7 @@ async function collectRealSignals({
           apiKey: process.env.LASTFM_API_KEY,
           externalIds,
           baselines: lastfmBaselines,
+          useCompletedIntervalFallback: !intraday,
           delayMs: intraday
             ? getEnvInteger("MARKET_INTRADAY_LASTFM_DELAY_MS", 500, 250, 2000)
             : undefined
@@ -864,7 +865,8 @@ async function collectRealSignals({
           runDate,
           externalIds,
           authToken: process.env.LISTENBRAINZ_USER_TOKEN,
-          baselines: listenbrainzBaselines
+          baselines: listenbrainzBaselines,
+          useCompletedIntervalFallback: !intraday
         })
       );
 
@@ -907,7 +909,8 @@ async function collectRealSignals({
           runDate,
           apiKey: process.env.YOUTUBE_API_KEY,
           externalIds,
-          baselines: youtubeBaselines
+          baselines: youtubeBaselines,
+          useCompletedIntervalFallback: !intraday
         })
       );
 

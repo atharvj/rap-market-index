@@ -93,7 +93,7 @@ describe("audience-scale valuation", () => {
     expect(tana.confidence).toBeLessThan(feng.confidence);
   });
 
-  it("caps normal daily valuation pressure at four percent", () => {
+  it("keeps audience scale as a listing anchor instead of a repeated daily catalyst", () => {
     const result = getAudienceScaleAdjustment({
       audienceScaleCalibration: {
         status: "ok",
@@ -102,7 +102,11 @@ describe("audience-scale valuation", () => {
       }
     }, 5);
 
-    expect(result.adjustment).toBe(0.04);
+    expect(result).toMatchObject({
+      adjustment: 0,
+      targetPrice: 140,
+      application: "listing_anchor_only"
+    });
   });
 
   it("attaches the same valuation method without migration flags", () => {
