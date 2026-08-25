@@ -3,9 +3,9 @@ import type { MarketUpdateArtist } from "@/server/market/daily-update";
 import { collectYoutubeCommentMarketSignals } from "@/server/market/youtube-comments-source";
 
 const artist: MarketUpdateArtist = {
-  id: "nav",
-  name: "NAV",
-  ticker: "NAV",
+  id: "test-artist",
+  name: "Test Artist",
+  ticker: "TEST",
   currentPrice: 60,
   previousClose: 60,
   hypeScore: 50,
@@ -27,19 +27,21 @@ describe("YouTube comment reception", () => {
       artists: [artist],
       runDate: "2026-08-24",
       apiKey: "test-key",
-      externalIds: { nav: { artistId: "nav", youtubeChannelId: "UCnav" } },
+      externalIds: {
+        [artist.id]: { artistId: artist.id, youtubeChannelId: "UC-test-artist" }
+      },
       maxVideosPerArtist: 1,
       maxCommentsPerVideo: 25,
       delayMs: 0,
       fetchImpl: createYoutubeFetch(Array.from({ length: 15 }, (_, index) => ({
-        text: index % 2 ? "this is trash and terrible" : "worst song, NAV fell off",
+        text: index % 2 ? "this is trash and terrible" : "worst song, this artist fell off",
         likes: 10 + index
       })))
     });
 
-    expect(result.signals.nav.stats.socialGrowth).toBeLessThan(-10);
-    expect(result.signals.nav.stats.newsScore).toBeUndefined();
-    expect(result.signals.nav.rawPayload).toMatchObject({ status: "reception_baseline" });
+    expect(result.signals[artist.id].stats.socialGrowth).toBeLessThan(-10);
+    expect(result.signals[artist.id].stats.newsScore).toBeUndefined();
+    expect(result.signals[artist.id].rawPayload).toMatchObject({ status: "reception_baseline" });
   });
 });
 
@@ -49,7 +51,7 @@ function createYoutubeFetch(comments: Array<{ text: string; likes: number }>): t
 
     if (url.pathname.endsWith("/channels")) {
       return jsonResponse({
-        items: [{ id: "UCnav", contentDetails: { relatedPlaylists: { uploads: "UU-nav" } } }]
+        items: [{ id: "UC-test-artist", contentDetails: { relatedPlaylists: { uploads: "UU-test-artist" } } }]
       });
     }
 
@@ -57,7 +59,7 @@ function createYoutubeFetch(comments: Array<{ text: string; likes: number }>): t
       return jsonResponse({
         items: [{
           snippet: {
-            title: "NAV - New Song",
+            title: "Test Artist - New Song",
             publishedAt: "2026-08-21T00:00:00Z",
             resourceId: { videoId: "video-1" }
           },

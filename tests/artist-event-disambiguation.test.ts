@@ -5,11 +5,14 @@ import {
 } from "@/server/market/artist-event-disambiguation";
 
 describe("artist event ownership", () => {
-  it("does not treat another artist's album as Kendrick Lamar's release", () => {
-    const headline =
-      "The Game Responds to Allegations That He Takes Shots at Kendrick Lamar on New Album";
+  it.each([
+    ["Kendrick Lamar", "The Game"],
+    ["Future", "Metro Boomin"],
+    ["Nettspend", "OsamaSon"]
+  ])("does not treat another artist's album as %s's release", (artistName, subjectName) => {
+    const headline = `${subjectName} Responds to Allegations About Beef With ${artistName} on New Album`;
 
-    expect(hasArtistReleaseSubjectContext({ artistName: "Kendrick Lamar", text: headline })).toBe(false);
+    expect(hasArtistReleaseSubjectContext({ artistName, text: headline })).toBe(false);
   });
 
   it("does not treat conflict language as a feature credit", () => {
@@ -18,12 +21,15 @@ describe("artist event ownership", () => {
     expect(hasArtistFeatureCreditContext({ artistName: "Kendrick Lamar", text: headline })).toBe(false);
   });
 
-  it("still accepts direct release ownership and explicit features", () => {
-    expect(
-      hasArtistReleaseSubjectContext({ artistName: "Kendrick Lamar", text: "Kendrick Lamar releases new album" })
-    ).toBe(true);
-    expect(
-      hasArtistFeatureCreditContext({ artistName: "Kendrick Lamar", text: "New single featuring Kendrick Lamar" })
-    ).toBe(true);
-  });
+  it.each(["Kendrick Lamar", "Future", "Nettspend"])(
+    "still accepts direct release ownership and explicit features for %s",
+    (artistName) => {
+      expect(
+        hasArtistReleaseSubjectContext({ artistName, text: `${artistName} releases new album` })
+      ).toBe(true);
+      expect(
+        hasArtistFeatureCreditContext({ artistName, text: `New single featuring ${artistName}` })
+      ).toBe(true);
+    }
+  );
 });

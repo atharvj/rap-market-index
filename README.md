@@ -10,6 +10,13 @@ The product is built around a paper-money market for hip-hop fans: users can cre
 
 The market engine is designed to react to broad artist momentum, including audience growth, release activity, media movement, and market activity. Price history is stored from real market runs instead of generated as fake backfill.
 
+## Market rule invariants
+
+- Pricing, momentum, news classification, video handling, trading, and data-quality fixes must be implemented as shared rules. Shared behavior must never branch on an artist's ID, name, or ticker.
+- Artist-specific data is allowed only where the underlying fact is inherently artist-specific, such as verified provider IDs, safe aliases for ambiguous names, roster presentation, or a source-linked event record.
+- A reported artist may be used as a regression fixture, but coverage must also prove the rule across other names, market tiers, or categories when those dimensions could affect behavior.
+- Do not rewrite recorded quote history to make a chart look better. Correct the universal model and preserve an auditable boundary between old and corrected model versions.
+
 ## Status
 
 Rap Market Index is in active development.

@@ -162,33 +162,40 @@ describe("daily market valuation pressure", () => {
     });
   });
 
-  it("never treats a legacy rebase flag as an uncapped daily move", () => {
-    const result = calculateDailyMarketUpdates({
-      artists: [artist()],
-      runDate: "2026-07-12",
-      source: "core",
-      adapterSignals: {
-        artist: {
-          stats: {},
-          rawPayload: {
-            audienceScaleCalibration: {
-              status: "ok",
-              targetPrice: 140,
-              coverage: 1,
-              confidence: 0.98,
-              rebase: true
+  it.each(["superstar", "mainstream", "rising", "underground"] as const)(
+    "keeps audience scale out of ongoing %s listing moves",
+    (category) => {
+      const result = calculateDailyMarketUpdates({
+        artists: [{ ...artist(), category }],
+        runDate: "2026-07-12",
+        source: "core",
+        adapterSignals: {
+          artist: {
+            stats: {},
+            rawPayload: {
+              audienceScaleCalibration: {
+                status: "ok",
+                targetPrice: 140,
+                coverage: 1,
+                confidence: 0.98,
+                rebase: true
+              }
             }
           }
         }
-      }
-    });
-    const update = result.updates[0];
+      });
+      const update = result.updates[0];
 
-    expect(update.currentPrice).toBeLessThan(5.1);
-    expect(update.dailyChangePercent).toBeLessThan(2);
-    expect(update.explanation).not.toContain("rebased");
-    expect(update.rawPayload).not.toHaveProperty("audienceScaleRebaseApplied");
-  });
+      expect(update.currentPrice).toBe(5);
+      expect(update.dailyChangePercent).toBe(0);
+      expect(update.rawPayload.audienceScaleAdjustment).toMatchObject({
+        adjustment: 0,
+        application: "listing_anchor_only"
+      });
+      expect(update.explanation).not.toContain("rebased");
+      expect(update.rawPayload).not.toHaveProperty("audienceScaleRebaseApplied");
+    }
+  );
 
   it("restores a one-cent move when corroborated measured signals were lost to rounding", () => {
     const result = calculateDailyMarketUpdates({
