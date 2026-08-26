@@ -8,7 +8,6 @@ const COMMON_WORD_ARTIST_KEYS = new Set([
   "future",
   "ian",
   "nav",
-  "protect",
   "ye"
 ]);
 

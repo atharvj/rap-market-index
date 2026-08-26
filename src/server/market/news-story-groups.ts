@@ -264,7 +264,6 @@ const AMBIGUOUS_HEADLINE_ARTIST_NAMES = new Set([
   "future",
   "ian",
   "nav",
-  "protect",
   "tana",
   "ye"
 ]);

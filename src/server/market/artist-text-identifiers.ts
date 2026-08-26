@@ -9,7 +9,6 @@ const GDELT_QUERY_OVERRIDES: Record<string, string> = {
   ian: '"ian" rapper music OR "ian" rap artist',
   jayz: '"Jay-Z" rapper OR "Jay Z" music',
   "lucy-bedrouqe": '"Lucy Bedrouqe" rapper OR "Lucy Bedrouqe" music',
-  protect: '"Protect" rapper music OR "Protect" rap artist',
   tana: '"Tana" rapper OR "BabySantana" rapper OR "Tana" music',
   ye: '"Ye" rapper OR "Kanye West" music OR "Kanye West" album'
 };
@@ -20,7 +19,6 @@ const WIKIPEDIA_SEARCH_OVERRIDES: Record<string, string> = {
   future: '"Future" rapper musician',
   ian: '"ian" rapper musician',
   "jay-z": '"Jay-Z" rapper musician',
-  protect: '"Protect" rapper musician',
   tana: '"Tana" rapper BabySantana musician',
   ye: '"Ye" Kanye West rapper musician'
 };

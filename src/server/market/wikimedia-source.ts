@@ -665,4 +665,4 @@ const NEGATIVE_TERMS = [
   "video game"
 ];
 
-const COMMON_AMBIGUOUS_KEYS = new Set(["autumn", "che", "feng", "future", "ian", "protect", "tana", "ye"]);
+const COMMON_AMBIGUOUS_KEYS = new Set(["autumn", "che", "feng", "future", "ian", "tana", "ye"]);
