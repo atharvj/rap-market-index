@@ -1,6 +1,12 @@
 import { NextResponse } from "next/server";
 import { formatArtistDisplayName, getArtistTickerOverride } from "@/lib/artist-display-name";
 import { calculateHypeScore, getDailyChangePercent } from "@/lib/pricing";
+import {
+  calculateSpotifyStarterPrice,
+  calculateYoutubeStarterPrice,
+  getStarterCategory,
+  getStarterVolatility
+} from "@/lib/starter-valuation";
 import { createServiceRoleClient, getSupabaseConfigStatus } from "@/lib/supabase/server";
 import type { Database } from "@/lib/supabase/database.types";
 import type { ArtistCategory, HypeStats } from "@/lib/types";
@@ -359,8 +365,18 @@ function estimateStarterValuation(
   const spotify = candidates.spotify?.[0];
   const youtube = candidates.youtube?.[0];
   const prices = [
-    spotify && spotify.confidence >= 0.88 ? getSpotifyStarterPrice(spotify) : null,
-    youtube && youtube.confidence >= 0.88 ? getYoutubeStarterPrice(youtube) : null
+    spotify && spotify.confidence >= 0.88
+      ? calculateSpotifyStarterPrice({
+          popularity: getNumericMetadata(spotify, "popularity"),
+          followers: getNumericMetadata(spotify, "followers")
+        })
+      : null,
+    youtube && youtube.confidence >= 0.88
+      ? calculateYoutubeStarterPrice({
+          subscribers: getNumericMetadata(youtube, "subscribers"),
+          views: getNumericMetadata(youtube, "views")
+        })
+      : null
   ].filter((value): value is number => typeof value === "number" && Number.isFinite(value));
 
   if (!prices.length) {
@@ -368,43 +384,14 @@ function estimateStarterValuation(
   }
 
   const price = roundMoney(Math.max(...prices));
-  const category = getCategoryFromPrice(price);
+  const category = getStarterCategory(price);
 
   return {
     source: spotify && spotify.confidence >= 0.88 ? "spotify/youtube" : "youtube",
     price,
     category,
-    volatility: getVolatilityForCategory(category)
+    volatility: getStarterVolatility(category)
   };
-}
-
-function getSpotifyStarterPrice(candidate: SourceIdCandidate) {
-  const popularity = getNumericMetadata(candidate, "popularity");
-  const followers = getNumericMetadata(candidate, "followers");
-
-  if (popularity === null && followers === null) {
-    return null;
-  }
-
-  const popularityScore = popularity === null ? 0 : popularity;
-  const followerScore = followers === null ? 0 : clamp((Math.log10(followers + 1) - 3) / 5, 0, 1) * 100;
-
-  return clamp(8 + Math.max(popularityScore, followerScore) * 1.18, 6, 140);
-}
-
-function getYoutubeStarterPrice(candidate: SourceIdCandidate) {
-  const subscribers = getNumericMetadata(candidate, "subscribers");
-  const views = getNumericMetadata(candidate, "views");
-
-  if (subscribers === null && views === null) {
-    return null;
-  }
-
-  const subscriberScore = subscribers === null ? 0 : clamp((Math.log10(subscribers + 1) - 3) / 4, 0, 1) * 65;
-  const viewScore = views === null ? 0 : clamp((Math.log10(views + 1) - 5) / 5, 0, 1) * 55;
-  const audienceScore = subscriberScore * 0.58 + viewScore * 0.42;
-
-  return clamp(8 + audienceScore * 1.35, 6, 135);
 }
 
 function getNumericMetadata(candidate: SourceIdCandidate, key: string) {
@@ -415,38 +402,6 @@ function getNumericMetadata(candidate: SourceIdCandidate, key: string) {
   }
 
   return null;
-}
-
-function getCategoryFromPrice(price: number): ArtistCategory {
-  if (price >= 100) {
-    return "superstar";
-  }
-
-  if (price >= 55) {
-    return "mainstream";
-  }
-
-  if (price >= 22) {
-    return "rising";
-  }
-
-  return "underground";
-}
-
-function getVolatilityForCategory(category: ArtistCategory) {
-  if (category === "superstar") {
-    return 0.85;
-  }
-
-  if (category === "mainstream") {
-    return 1.15;
-  }
-
-  if (category === "rising") {
-    return 1.6;
-  }
-
-  return 1.95;
 }
 
 function getUniqueArtistId(baseId: string, existingRows: ArtistRow[]) {
@@ -578,10 +533,6 @@ function hashString(value: string) {
 
 function roundMoney(value: number) {
   return Math.max(1, Math.round(value * 100) / 100);
-}
-
-function clamp(value: number, min: number, max: number) {
-  return Math.min(max, Math.max(min, value));
 }
 
 function mapArtistRow(row: ArtistRow) {

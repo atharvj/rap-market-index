@@ -10,6 +10,7 @@ type RosterSeed = {
   volatility: number;
   category: Artist["category"];
   historyBias: number;
+  openingDate?: string;
 };
 
 const BASE_DATE = "2026-07-03";
@@ -87,7 +88,17 @@ const roster: RosterSeed[] = [
   { id: "nemzzz", name: "Nemzzz", ticker: "NEMZZZ", price: 47.42, previousClose: 47.42, volatility: 1.6, category: "rising", historyBias: 4 },
   { id: "luh-tyler", name: "Luh Tyler", ticker: "LUHT", price: 35.01, previousClose: 35.01, volatility: 1.6, category: "rising", historyBias: 4.5 },
   { id: "1900rugrat", name: "1900Rugrat", ticker: "RUGRAT", price: 30.2, previousClose: 30.2, volatility: 1.6, category: "rising", historyBias: 4.8 },
-  { id: "hurricane-wisdom", name: "Hurricane Wisdom", ticker: "WISDOM", price: 29.71, previousClose: 29.71, volatility: 1.6, category: "rising", historyBias: 5 }
+  { id: "hurricane-wisdom", name: "Hurricane Wisdom", ticker: "WISDOM", price: 29.71, previousClose: 29.71, volatility: 1.6, category: "rising", historyBias: 5 },
+  { id: "polo-g", name: "Polo G", ticker: "POLO", price: 85.58, previousClose: 85.58, volatility: 1.15, category: "mainstream", historyBias: 0, openingDate: "2026-08-26" },
+  { id: "lil-tjay", name: "Lil Tjay", ticker: "TJAY", price: 84.95, previousClose: 84.95, volatility: 1.15, category: "mainstream", historyBias: 0, openingDate: "2026-08-26" },
+  { id: "moneybagg-yo", name: "Moneybagg Yo", ticker: "BAGG", price: 83.13, previousClose: 83.13, volatility: 1.15, category: "mainstream", historyBias: 0, openingDate: "2026-08-26" },
+  { id: "young-nudy", name: "Young Nudy", ticker: "NUDY", price: 70.09, previousClose: 70.09, volatility: 1.15, category: "mainstream", historyBias: 0, openingDate: "2026-08-26" },
+  { id: "dc-the-don", name: "DC The Don", ticker: "DCTD", price: 57.12, previousClose: 57.12, volatility: 1.15, category: "mainstream", historyBias: 0, openingDate: "2026-08-26" },
+  { id: "anycia", name: "Anycia", ticker: "ANYCIA", price: 51.05, previousClose: 51.05, volatility: 1.6, category: "rising", historyBias: 0, openingDate: "2026-08-26" },
+  { id: "trap-dickey", name: "Trap Dickey", ticker: "TRAPD", price: 55.7, previousClose: 55.7, volatility: 1.15, category: "mainstream", historyBias: 0, openingDate: "2026-08-26" },
+  { id: "42-dugg", name: "42 Dugg", ticker: "DUGG", price: 71.17, previousClose: 71.17, volatility: 1.15, category: "mainstream", historyBias: 0, openingDate: "2026-08-26" },
+  { id: "babyface-ray", name: "Babyface Ray", ticker: "BFRAY", price: 65.34, previousClose: 65.34, volatility: 1.15, category: "mainstream", historyBias: 0, openingDate: "2026-08-26" },
+  { id: "loe-shimmy", name: "Loe Shimmy", ticker: "LOE", price: 61.89, previousClose: 61.89, volatility: 1.15, category: "mainstream", historyBias: 0, openingDate: "2026-08-26" }
 ];
 
 export function getInitialArtistIdentities() {
@@ -96,7 +107,7 @@ export function getInitialArtistIdentities() {
 
 export function createInitialArtists(): Artist[] {
   return roster.map((seed, index) => {
-    const stats = buildStats(index, seed.volatility);
+    const stats = seed.openingDate ? buildNeutralStats() : buildStats(index, seed.volatility);
 
     return {
       id: seed.id,
@@ -110,10 +121,25 @@ export function createInitialArtists(): Artist[] {
       category: seed.category,
       accent: accents[index % accents.length],
       stats,
-      priceHistory: buildHistory(seed.price, seed.historyBias, index),
-      lastMoveExplanation: `${seed.ticker} moved as audience momentum, media activity, and trading demand shifted.`
+      priceHistory: seed.openingDate
+        ? [{ date: seed.openingDate, price: seed.price }]
+        : buildHistory(seed.price, seed.historyBias, index),
+      lastMoveExplanation: seed.openingDate
+        ? `${seed.ticker} opened at a verified public-source audience baseline.`
+        : `${seed.ticker} moved as audience momentum, media activity, and trading demand shifted.`
     };
   });
+}
+
+function buildNeutralStats(): HypeStats {
+  return {
+    streamingGrowth: 0,
+    youtubeGrowth: 0,
+    searchGrowth: 0,
+    socialGrowth: 0,
+    newsScore: 50,
+    traderDemand: 0
+  };
 }
 
 function buildStats(index: number, volatility: number): HypeStats {

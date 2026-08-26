@@ -16,6 +16,8 @@ The market engine is designed to react to broad artist momentum, including audie
 - Artist-specific data is allowed only where the underlying fact is inherently artist-specific, such as verified provider IDs, safe aliases for ambiguous names, roster presentation, or a source-linked event record.
 - A reported artist may be used as a regression fixture, but coverage must also prove the rule across other names, market tiers, or categories when those dimensions could affect behavior.
 - Do not rewrite recorded quote history to make a chart look better. Correct the universal model and preserve an auditable boundary between old and corrected model versions.
+- Activate a new listing only after its official audience channel and independent artist identity resolve exactly, its configured sources return usable live data, and ambiguous text sources have been excluded or disambiguated.
+- A new listing starts with neutral momentum, verified opening observations, and one recorded opening quote. Never invent prelisting movement or positive/negative momentum to make its chart look active.
 
 ## Status
 
