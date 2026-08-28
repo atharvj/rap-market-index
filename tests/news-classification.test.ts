@@ -161,6 +161,12 @@ describe("market news classification", () => {
       text: "Quality Control founder hospitalized after helping launch Lil Baby",
       statusSubtype: "hospitalization"
     })).toBe(false);
+    expect(hasArtistStatusSubjectContext({
+      artistName: "Lil Baby",
+      text: "Founder of music label that helped launch Migos, Lil Baby hospitalized",
+      query: '"Lil Baby" (album OR song)',
+      statusSubtype: "hospitalization"
+    })).toBe(false);
     expect(hasArtistControversySubjectContext({
       artistName: "Lil Wayne",
       text: "Young Thug's lawyers seek dismissal in trial involving alleged plot against Lil Wayne"

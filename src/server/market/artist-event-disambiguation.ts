@@ -395,6 +395,11 @@ function hasDirectStatusSubject(
   const alias = toRegexPhrase(normalizedAlias);
   const terms = getStatusTerms(statusSubtype).map(escapeRegex).join("|");
   const nouns = getStatusNouns(statusSubtype).map(escapeRegex).join("|");
+
+  if (hasThirdPartyStatusSubjectContext(normalizedText, alias, terms)) {
+    return false;
+  }
+
   const qualifiers = "(?:is|was|has\\s+been|reportedly|allegedly|officially|just|now)";
   const personPrefix = "(?:rapper|rap\\s+artist|artist|music\\s+artist|singer|producer)";
   const patterns = [
@@ -402,6 +407,20 @@ function hasDirectStatusSubject(
     new RegExp(`\\b${personPrefix}\\s+${alias}\\b(?:\\s+${qualifiers}){0,2}\\s+(?:${terms})\\b`),
     new RegExp(`\\b(?:${nouns})\\s+(?:of|for)\\s+${alias}\\b`),
     new RegExp(`\\b${alias}(?:\\s+s|'s|’s)?\\s+(?:${nouns})\\b`)
+  ];
+
+  return patterns.some((pattern) => pattern.test(normalizedText));
+}
+
+function hasThirdPartyStatusSubjectContext(normalizedText: string, alias: string, statusTerms: string) {
+  const thirdParty =
+    "(?:associate|brother|crew\\s+member|executive|father|founder|friend|label\\s+head|manager|mother|parent|photographer|producer|relative|sister|staffer|team\\s+member|videographer)";
+  const relationship =
+    "(?:associated\\s+with|for|helped\\s+launch|known\\s+for|managed|manager\\s+of|of|signed|worked\\s+with)";
+  const patterns = [
+    new RegExp(`\\b${thirdParty}\\b.*\\b${relationship}\\b.*\\b${alias}\\b.*\\b(?:${statusTerms})\\b`),
+    new RegExp(`\\b${thirdParty}\\b.*\\b(?:${statusTerms})\\b.*\\b${relationship}\\b.*\\b${alias}\\b`),
+    new RegExp(`\\b${alias}(?:\\s+s|'s|’s)?\\s+${thirdParty}\\b.*\\b(?:${statusTerms})\\b`)
   ];
 
   return patterns.some((pattern) => pattern.test(normalizedText));
