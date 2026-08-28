@@ -312,6 +312,9 @@ export function isLowValueMarketArticleTitle(title: string) {
     /\b(?:calls?|clowns?|mocks?|roasts?)\b.*\b(?:little|short|ugly|washed)\b.*\b(?:after|amid|over)\b/.test(normalized) ||
     /\b(?:sneakers?|shoes?|air\s+jordans?)\b.*\b(?:auction|sale|sold)\b/.test(normalized) ||
     /\b(?:photographer|videographer|crew\s+member|staffer)\b.*\b(?:arrested|detained|charged)\b.*\b(?:music\s+video|video\s+shoot|shoot)\b/.test(normalized) ||
+    /\b(?:says?|claims?|argues?|insists?)\b.*\b(?:internet|social\s+media)\b.*\b(?:fame|famous|viral)\b/.test(normalized) ||
+    /\b(?:looks?\s+back|reflects?|revisits?)\b.*\b(?:co produced|co producing|produced|producing|making|recording|working\s+on)\b.*\b(?:at\s+age|years?\s+old|as\s+a\s+teen)\b/.test(normalized) ||
+    /^(?:is|are|will|could|might|can)\b.*\b(?:album|feature|release|tour)\b/.test(normalized) ||
     /\b(?:food|eating)\s+(?:rules?|habits?|preferences?)\b/.test(normalized) ||
     /\b(?:hates?|hating)\s+(?:mayo|mayonnaise|milk)\b/.test(normalized) ||
     /\b(?:mom|dad|mother|father|parent)\b.*\bviral\b.*\bcomparisons?\b/.test(normalized) ||

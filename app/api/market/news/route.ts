@@ -7,6 +7,7 @@ import { loadArtistImageUrls } from "@/server/market/artist-images";
 import {
   hasArtistControversySubjectContext,
   hasArtistReleaseSubjectContext,
+  hasArtistStatusSubjectContext,
   hasRequiredArtistEventDisambiguation,
   isLowValueMarketArticleTitle,
   isUncorroboratedLowTierMarketClaim
@@ -655,6 +656,15 @@ function isStoredMediaEventStillValid(
 
   const query = getRawString(rawPayload.searchQuery) || undefined;
 
+  if (classification.statusSubtype) {
+    return hasArtistStatusSubjectContext({
+      artistName: artist.name,
+      text: event.title,
+      query,
+      statusSubtype: classification.statusSubtype
+    });
+  }
+
   if (classification.reason === "release_terms") {
     return hasArtistReleaseSubjectContext({
       artistName: artist.name,
@@ -664,11 +674,14 @@ function isStoredMediaEventStillValid(
   }
 
   if (classification.eventType === "controversy") {
-    return hasArtistControversySubjectContext({
-      artistName: artist.name,
-      text: event.title,
-      query
-    });
+    return (
+      hasMaterialMarketImpact(classification.impactScore, 22) &&
+      hasArtistControversySubjectContext({
+        artistName: artist.name,
+        text: event.title,
+        query
+      })
+    );
   }
 
   return true;

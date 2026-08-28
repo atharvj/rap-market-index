@@ -167,6 +167,18 @@ describe("market news classification", () => {
     })).toBe(false);
   });
 
+  it("rejects opinion, retrospective, and speculative headlines without a demonstrated market event", () => {
+    expect(isLowValueMarketArticleTitle(
+      "Megan Thee Stallion Says Internet Made Fame Too Easy: You Can Go Viral and Have a Terrible Song"
+    )).toBe(true);
+    expect(isLowValueMarketArticleTitle(
+      "Producer Looks Back on Co-Producing Drake Track at 14 Years Old"
+    )).toBe(true);
+    expect(isLowValueMarketArticleTitle(
+      "Is Drake Going on a World Tour in 2026?"
+    )).toBe(true);
+  });
+
   it("does not score a family comparison just because it went viral", () => {
     const title = "Cardi B Says Her Mom Reacted to Viral Toni Braxton Comparisons";
 
