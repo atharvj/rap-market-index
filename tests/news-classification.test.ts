@@ -5,7 +5,7 @@ import {
   hasRequiredArtistEventDisambiguation,
   isLowValueMarketArticleTitle
 } from "@/server/market/artist-event-disambiguation";
-import { classifyArticleEvent } from "@/server/market/gdelt-source";
+import { classifyArticleEvent, mentionsArtist } from "@/server/market/gdelt-source";
 
 describe("market news classification", () => {
   it("classifies branded tour announcements with words between the action and tour", () => {
@@ -148,6 +148,11 @@ describe("market news classification", () => {
       text: "Oscars: South Korea Selects Possible Love for International Feature",
       sourceTier: 3
     })).toBe(false);
+    expect(mentionsArtist(
+      "South Korea picks Lee Chang-dong's Possible Love as Best International Feature",
+      "DC The Don",
+      '"DC The Don" rapper'
+    )).toBe(false);
   });
 
   it("does not assign another person's medical or legal story to an artist who is merely mentioned", () => {

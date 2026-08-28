@@ -1184,7 +1184,10 @@ export function mentionsArtist(title: string, artistName: string, query?: string
 
     const meaningfulParts = normalizedArtist.split(" ").filter((part) => part.length > 2);
 
-    if (meaningfulParts.length > 1 && meaningfulParts.every((part) => normalizedTitle.includes(part))) {
+    if (
+      meaningfulParts.length > 1 &&
+      meaningfulParts.every((part) => containsNormalizedPhrase(normalizedTitle, part))
+    ) {
       return true;
     }
   }

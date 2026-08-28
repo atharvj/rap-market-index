@@ -7,6 +7,7 @@ import { loadArtistImageUrls } from "@/server/market/artist-images";
 import {
   hasArtistControversySubjectContext,
   hasArtistReleaseSubjectContext,
+  hasRequiredArtistEventDisambiguation,
   isLowValueMarketArticleTitle,
   isUncorroboratedLowTierMarketClaim
 } from "@/server/market/artist-event-disambiguation";
@@ -616,6 +617,15 @@ function isStoredMediaEventStillValid(
   const isFeatureCredit =
     artistRole === "featured" || titleCreditsArtistAsFeature(event.title, artist.name);
 
+  if (!hasRequiredArtistEventDisambiguation({
+    artistName: artist.name,
+    text: event.title,
+    query: getRawString(rawPayload.searchQuery) || undefined,
+    sourceTier
+  })) {
+    return false;
+  }
+
   if (
     isFeatureCredit &&
     !getRawBoolean(rawPayload.musicDemandConfirmed) &&
@@ -643,7 +653,7 @@ function isStoredMediaEventStillValid(
     return false;
   }
 
-  const query = getRawString(rawPayload.searchQuery) ?? undefined;
+  const query = getRawString(rawPayload.searchQuery) || undefined;
 
   if (classification.reason === "release_terms") {
     return hasArtistReleaseSubjectContext({
