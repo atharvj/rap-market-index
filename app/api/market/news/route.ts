@@ -21,7 +21,11 @@ import {
   normalizeMarketNewsSort,
   sortMarketNewsEvents
 } from "@/lib/market-news-sort";
-import { selectPreferredNewsSourceEvent } from "@/lib/market-news-links";
+import {
+  isBlockedPublicNewsLink,
+  isBlockedPublicNewsSource,
+  selectPreferredNewsSourceEvent
+} from "@/lib/market-news-links";
 import { reportServerError } from "@/server/observability";
 import {
   getYoutubeVideoId,
@@ -349,7 +353,9 @@ function mapMarketEventToNewsItem(
   const rawPayload = toRawPayload(event.raw_payload);
   const sourceEvent = selectPreferredNewsSourceEvent(event, storyEvents);
   const sourceUrl =
-    sourceEvent.source_url && isSafeHttpUrl(sourceEvent.source_url)
+    sourceEvent.source_url &&
+    isSafeHttpUrl(sourceEvent.source_url) &&
+    !isBlockedPublicNewsLink(sourceEvent.source_url)
       ? sourceEvent.source_url
       : null;
   const sourceName = sourceEvent.source_name ?? null;
@@ -511,6 +517,18 @@ function isPublicMarketNewsEvent(
     return false;
   }
 
+  if (isBlockedPublicNewsSource({
+    source,
+    sourceName: event.source_name,
+    sourceUrl:
+      event.source_url ||
+      getRawText(rawPayload.sourceUrl) ||
+      getRawText(rawPayload.url) ||
+      getRawText(rawPayload.supportingMediaUrl)
+  })) {
+    return false;
+  }
+
   if (hasHighRiskEvidenceFlags(rawPayload)) {
     return false;
   }
@@ -635,7 +653,7 @@ function isStoredMediaEventStillValid(
     });
   }
 
-  if (classification.reason === "controversy_terms") {
+  if (classification.eventType === "controversy") {
     return hasArtistControversySubjectContext({
       artistName: artist.name,
       text: event.title,
@@ -1270,7 +1288,7 @@ function hasHighRiskEvidenceFlags(rawPayload: Record<string, unknown>) {
 function getSupportingMediaUrl(rawPayload: Record<string, unknown>) {
   const url = getRawText(rawPayload.supportingMediaUrl);
 
-  return isSafeHttpUrl(url) ? url : null;
+  return isSafeHttpUrl(url) && !isBlockedPublicNewsLink(url) ? url : null;
 }
 
 function getSupportingMediaType(rawPayload: Record<string, unknown>) {

@@ -208,7 +208,7 @@ function getPublicSignalLabel(label: string) {
     "audience momentum": "audience activity",
     "video momentum": "video activity",
     "public attention": "public interest",
-    "fan reception": "fan response",
+    "audience response": "audience response",
     "eligible trading demand": "eligible trading activity"
   };
 
@@ -220,7 +220,7 @@ function getMovementInputs(stats: HypeStats): MovementInput[] {
     createMovementInput("audience momentum", stats.streamingGrowth, 0.35, 0.25),
     createMovementInput("video momentum", stats.youtubeGrowth, 0.25, 0.25),
     createMovementInput("public attention", stats.searchGrowth, 0.075, 0.25),
-    createMovementInput("fan reception", stats.socialGrowth, 0.075, 0.25),
+    createMovementInput("audience response", stats.socialGrowth, 0.075, 0.25),
     createMovementInput("eligible trading demand", stats.traderDemand, 0.1, 0.1)
   ];
 }

@@ -4,7 +4,7 @@ const metrics: Array<{ key: keyof HypeStats; label: string; max: number }> = [
   { key: "streamingGrowth", label: "Streaming momentum", max: 60 },
   { key: "youtubeGrowth", label: "Video momentum", max: 60 },
   { key: "searchGrowth", label: "Discovery trend", max: 70 },
-  { key: "socialGrowth", label: "Fan sentiment", max: 90 },
+  { key: "socialGrowth", label: "Audience response", max: 90 },
   { key: "newsScore", label: "Media & reviews", max: 100 },
   { key: "traderDemand", label: "Trading demand", max: 40 }
 ];

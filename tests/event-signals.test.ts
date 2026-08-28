@@ -348,6 +348,78 @@ describe("event story deduplication", () => {
   });
 });
 
+describe("stored media revalidation", () => {
+  function storedMediaEvent({
+    title,
+    eventType = "controversy",
+    impactScore = -45
+  }: {
+    title: string;
+    eventType?: MarketEvent["eventType"];
+    impactScore?: number;
+  }): MarketEvent {
+    return {
+      artistId: artist.id,
+      eventDate: "2026-07-10",
+      eventType,
+      title,
+      sourceName: "Music publication",
+      sourceUrl: "https://billboard.com/example",
+      sentimentScore: impactScore,
+      impactScore,
+      confidence: 0.8,
+      rawPayload: {
+        source: "media_rss_item",
+        domain: "billboard.com",
+        sourceTier: 3,
+        searchQuery: "Young Thug"
+      }
+    };
+  }
+
+  function storedMediaSafety(event: MarketEvent) {
+    const signal = buildEventMarketSignals({
+      artists: [artist],
+      runDate: "2026-07-11",
+      eventsByArtist: { [artist.id]: [event] }
+    })[artist.id];
+    const events = signal.rawPayload.events as Array<{
+      evidenceSafetyLabel: string;
+      evidenceSafetyMultiplier: number;
+    }>;
+
+    return events[0];
+  }
+
+  it("zeroes an unrelated article that a broad search attached to the artist", () => {
+    expect(storedMediaSafety(storedMediaEvent({
+      title: "Oscars: South Korea Selects Possible Love for International Feature"
+    }))).toMatchObject({
+      evidenceSafetyLabel: "rejected_stale_media_artist_attribution",
+      evidenceSafetyMultiplier: 0
+    });
+  });
+
+  it("zeroes an old blanket controversy when it is now a tour disruption", () => {
+    expect(storedMediaSafety(storedMediaEvent({
+      title: "Young Thug Cancels Sacramento Concert After Crew Member's Death"
+    }))).toMatchObject({
+      evidenceSafetyLabel: "rejected_stale_media_classification",
+      evidenceSafetyMultiplier: 0
+    });
+  });
+
+  it("reduces old blanket controversy scores to their current materiality", () => {
+    const safety = storedMediaSafety(storedMediaEvent({
+      title: "Young Thug Faces Backlash After Controversial Interview"
+    }));
+
+    expect(safety.evidenceSafetyLabel).toBe("reweighted_to_current_media_materiality");
+    expect(safety.evidenceSafetyMultiplier).toBeGreaterThan(0);
+    expect(safety.evidenceSafetyMultiplier).toBeLessThan(0.6);
+  });
+});
+
 describe("project announcement classification", () => {
   function projectSignal(title: string) {
     const event: MarketEvent = {

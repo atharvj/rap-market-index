@@ -27,4 +27,22 @@ describe("market news tags", () => {
   it("rejects unknown filter values", () => {
     expect(normalizeMarketNewsTag("gossip")).toBeNull();
   });
+
+  it("does not label every song mention or procedural lawsuit as a release or controversy", () => {
+    expect(getMarketNewsTags({
+      eventType: "news",
+      title: "Artist says another rapper's song is terrible"
+    })).toEqual(["News"]);
+    expect(getMarketNewsTags({
+      eventType: "news",
+      title: "Artist's defamation lawsuit heads to appeals court"
+    })).toEqual(["News"]);
+  });
+
+  it("supports multiple material tags on one story", () => {
+    expect(getMarketNewsTags({
+      eventType: "tour",
+      title: "Artist faces backlash during tour after releasing a new single"
+    })).toEqual(["Tour", "Release", "Controversy"]);
+  });
 });

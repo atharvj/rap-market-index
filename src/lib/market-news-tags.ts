@@ -48,7 +48,11 @@ export function getMarketNewsTags(input: MarketNewsTagInput) {
     addUnique(tags, "Tour");
   }
 
-  if (/\b(album|ep|mixtape|single|song|track|music video|released?|drops?)\b/i.test(title)) {
+  if (
+    /\b(?:announces?|debuts?|drops?|releases?|released|shares?|unveils?)\b.{0,60}\b(?:album|ep|mixtape|single|song|track|music video)\b/i.test(title) ||
+    /\b(?:new|upcoming)\s+(?:album|ep|mixtape|single|song|track|music video)\b/i.test(title) ||
+    /\b(?:album|ep|mixtape|single|song|track|music video)\b.{0,30}\b(?:arrives?|out now)\b/i.test(title)
+  ) {
     addUnique(tags, "Release");
   }
 
@@ -56,7 +60,7 @@ export function getMarketNewsTags(input: MarketNewsTagInput) {
     addUnique(tags, "Award");
   }
 
-  if (/\b(arrest|charged|lawsuit|legal|controversy|backlash|feud|diss|allegation)\b/i.test(title)) {
+  if (/\b(arrested|backlash|charged|controversy|convicted|indicted|sentenced|under fire)\b/i.test(title)) {
     addUnique(tags, "Controversy");
   }
 

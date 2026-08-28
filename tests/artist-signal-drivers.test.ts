@@ -62,4 +62,17 @@ describe("artist signal drivers", () => {
     expect(formatArtistMomentumContribution(0)).toBe("Flat");
     expect(formatArtistMomentumContribution(-0.004)).toBe("Slight −");
   });
+
+  it("describes the social input as audience response rather than a full sentiment poll", () => {
+    const social = getArtistSignalDrivers({
+      streamingGrowth: 0,
+      youtubeGrowth: 0,
+      searchGrowth: 0,
+      socialGrowth: 4,
+      newsScore: 50,
+      traderDemand: 0
+    }).find((driver) => driver.key === "social");
+
+    expect(social?.label).toBe("Audience response");
+  });
 });

@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   areEquivalentNewsLinks,
+  isBlockedPublicNewsLink,
+  isBlockedPublicNewsSource,
   selectPreferredNewsSourceEvent,
   shouldShowNewsMediaAction,
   shouldShowNewsSourceAction
@@ -60,5 +62,22 @@ describe("market news actions", () => {
 
     expect(selectPreferredNewsSourceEvent(video, [video, article])).toBe(article);
     expect(areEquivalentNewsLinks(video.source_url, "https://youtu.be/VideoId123")).toBe(true);
+  });
+
+  it("removes Bluesky links and source variants from every public-news path", () => {
+    const bluesky = {
+      id: "bluesky",
+      source_url: "https://bsky.app/profile/example.test/post/123",
+      source_name: "Bluesky"
+    };
+    const article = {
+      id: "article",
+      source_url: "https://example.com/verified-story",
+      source_name: "Example Music"
+    };
+
+    expect(isBlockedPublicNewsLink(bluesky.source_url)).toBe(true);
+    expect(isBlockedPublicNewsSource({ source: "bluesky", sourceName: "Other", sourceUrl: null })).toBe(true);
+    expect(selectPreferredNewsSourceEvent(bluesky, [bluesky, article])).toBe(article);
   });
 });

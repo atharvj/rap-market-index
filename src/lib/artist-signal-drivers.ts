@@ -26,7 +26,7 @@ export function getArtistSignalDrivers(stats: HypeStats) {
     },
     {
       key: "social",
-      label: "Fan response",
+      label: "Audience response",
       contribution: stats.socialGrowth * SCORE_SIGNAL_WEIGHTS.fanResponse * SCORE_SIGNAL_MULTIPLIER
     },
     {

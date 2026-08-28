@@ -4,8 +4,15 @@ import type { AdapterSignals, MarketEvent, MarketSignalModifier } from "@/server
 import { getArtistStatusSubtype } from "@/server/market/status-events";
 import type { HypeStats } from "@/lib/types";
 import { areNewsStoryEventsEquivalent } from "@/server/market/news-story-groups";
-import { isLowValueMarketArticleTitle } from "@/server/market/artist-event-disambiguation";
+import {
+  hasArtistControversySubjectContext,
+  hasArtistReleaseSubjectContext,
+  hasArtistStatusSubjectContext,
+  hasRequiredArtistEventDisambiguation,
+  isLowValueMarketArticleTitle
+} from "@/server/market/artist-event-disambiguation";
 import { isMarketEventSourceIntegrityValid } from "@/server/market/event-integrity";
+import { classifyArticleEvent, normalizeDomain } from "@/server/market/gdelt-source";
 
 export type ManualMarketEventInput = {
   artistId?: string;
@@ -1195,6 +1202,12 @@ function getEvidenceSafetyAdjustment(event: ScoredMarketEvent, artist: MarketUpd
     };
   }
 
+  const storedMediaAdjustment = getStoredMediaEvidenceAdjustment(event, artist);
+
+  if (storedMediaAdjustment.multiplier < 1) {
+    return storedMediaAdjustment;
+  }
+
   if (marketConnection === "attention_only") {
     return musicDemandConfirmed
       ? {
@@ -1275,6 +1288,99 @@ function getEvidenceSafetyAdjustment(event: ScoredMarketEvent, artist: MarketUpd
 
   return {
     label: "social_evidence_confirmed",
+    multiplier: 1
+  };
+}
+
+function getStoredMediaEvidenceAdjustment(event: ScoredMarketEvent, artist: MarketUpdateArtist) {
+  const rawPayload = event.event.rawPayload;
+  const source = (getRawString(rawPayload.source) ?? "").toLowerCase();
+
+  if (source !== "gdelt_article" && source !== "media_rss_item") {
+    return {
+      label: "not_stored_media_evidence",
+      multiplier: 1
+    };
+  }
+
+  const domain = normalizeDomain(
+    getRawString(rawPayload.domain) ?? undefined,
+    event.event.sourceUrl
+  ) ?? "";
+  const query = getRawString(rawPayload.searchQuery) ?? undefined;
+  const sourceTier = getRawOptionalNumber(rawPayload.sourceTier) ?? 0;
+  const title = event.event.title;
+
+  if (!hasRequiredArtistEventDisambiguation({
+    artistName: artist.name,
+    text: title,
+    query,
+    sourceTier
+  })) {
+    return {
+      label: "rejected_stale_media_artist_attribution",
+      multiplier: 0
+    };
+  }
+
+  const classification = classifyArticleEvent(title, domain, rawPayload.tone, {
+    allowLowTierRelease: true
+  });
+
+  if (!classification || classification.eventType !== event.event.eventType) {
+    return {
+      label: "rejected_stale_media_classification",
+      multiplier: 0
+    };
+  }
+
+  if (
+    classification.statusSubtype &&
+    !hasArtistStatusSubjectContext({
+      artistName: artist.name,
+      text: title,
+      query,
+      statusSubtype: classification.statusSubtype
+    })
+  ) {
+    return {
+      label: "rejected_incidental_status_mention",
+      multiplier: 0
+    };
+  }
+
+  if (
+    classification.reason === "release_terms" &&
+    !hasArtistReleaseSubjectContext({ artistName: artist.name, text: title, query })
+  ) {
+    return {
+      label: "rejected_incidental_release_mention",
+      multiplier: 0
+    };
+  }
+
+  if (
+    classification.eventType === "controversy" &&
+    !hasArtistControversySubjectContext({ artistName: artist.name, text: title, query })
+  ) {
+    return {
+      label: "rejected_incidental_controversy_mention",
+      multiplier: 0
+    };
+  }
+
+  const storedImpact = Math.abs(event.event.impactScore);
+  const currentImpact = Math.abs(classification.impactScore);
+
+  if (storedImpact > 0 && currentImpact < storedImpact) {
+    return {
+      label: "reweighted_to_current_media_materiality",
+      multiplier: clamp(currentImpact / storedImpact, 0, 1)
+    };
+  }
+
+  return {
+    label: "stored_media_evidence_current",
     multiplier: 1
   };
 }

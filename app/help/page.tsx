@@ -339,7 +339,7 @@ export default function HelpPage() {
         </main>
       </div>
 
-      <section className="rmi-card mx-auto max-w-3xl overflow-hidden" aria-labelledby="feedback-title">
+      <section id="feedback" className="rmi-card mx-auto max-w-3xl scroll-mt-20 overflow-hidden" aria-labelledby="feedback-title">
         <div className="border-b border-line p-5 sm:p-7">
           <div className="flex items-center gap-2 text-cyan">
             <Send className="h-4 w-4" aria-hidden="true" />

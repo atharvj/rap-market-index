@@ -119,7 +119,11 @@ export function hasRequiredArtistEventDisambiguation({
   const isCommonWord = isCommonWordAlias(primaryAlias);
 
   if (!isAmbiguous && !isCommonWord) {
-    return true;
+    // A search result is not artist evidence by itself. Google News and other
+    // broad providers can return adjacent or completely unrelated results for
+    // even distinctive names. Require the artist to appear in the returned
+    // title/summary before the story can enter any artist's signal.
+    return false;
   }
 
   if (aliases.some((alias) => hasStrongArtistCatalystContext(normalizedText, alias))) {
@@ -201,7 +205,10 @@ export function hasArtistControversySubjectContext({
       return false;
     }
 
-    return !hasIncidentalControversyContext(normalizedText, alias);
+    return (
+      !hasIncidentalControversyContext(normalizedText, alias) &&
+      hasDirectControversySubjectContext(normalizedText, alias)
+    );
   });
 }
 
@@ -295,6 +302,16 @@ export function isLowValueMarketArticleTitle(title: string) {
     /\breal\s+reason\s+behind\b.*\b(?:beef|diss|feud)\b/.test(normalized) ||
     /\b(?:reveals?|explains?|claims?|weighs?\s+in|reacts?|laughs?)\b.*\b(?:beef|diss|feud)\b/.test(normalized) ||
     /\bcame\s+out\s+on\s+top\b.*\b(?:beef|diss|feud)\b/.test(normalized) ||
+    /\b(?:shows?\s+up|appears?|attends?|comes?|flies?)\b.*\b(?:support|supporting)\b.*\b(?:trial|court|hearing)\b/.test(normalized) ||
+    /\b(?:supports?|stands?\s+with)\b.*\b(?:at|during|outside)\b.*\b(?:trial|court|hearing)\b/.test(normalized) ||
+    /\b(?:says?|claims?|argues?|insists?)\b.*\b(?:arrest|trial|lawsuit)\b.*\b(?:proves?\s+(?:him|her|me|them)\s+right|told\s+you|smarter\s+than)\b/.test(normalized) ||
+    /\b(?:co signs?|cosigns?)\b.*\bcontroversial\s+(?:artist|rapper|figure)\b/.test(normalized) ||
+    /\b(?:defends?|supports?)\b.*\b(?:after|amid|over)\b.*\b(?:backlash|controversy)\b/.test(normalized) ||
+    /\b(?:old|unreleased|alleged)\b.*\b(?:leak|song|track)\b.*\b(?:supposed\s+to|meant\s+to|would\s+have)\b.*\b(?:feature|include)\b/.test(normalized) ||
+    /\b(?:alleged|private)\s+(?:text|texts|messages?)\b.*\b(?:leak|leaks|leaked)\b/.test(normalized) ||
+    /\b(?:calls?|clowns?|mocks?|roasts?)\b.*\b(?:little|short|ugly|washed)\b.*\b(?:after|amid|over)\b/.test(normalized) ||
+    /\b(?:sneakers?|shoes?|air\s+jordans?)\b.*\b(?:auction|sale|sold)\b/.test(normalized) ||
+    /\b(?:photographer|videographer|crew\s+member|staffer)\b.*\b(?:arrested|detained|charged)\b.*\b(?:music\s+video|video\s+shoot|shoot)\b/.test(normalized) ||
     /\b(?:food|eating)\s+(?:rules?|habits?|preferences?)\b/.test(normalized) ||
     /\b(?:hates?|hating)\s+(?:mayo|mayonnaise|milk)\b/.test(normalized) ||
     /\b(?:mom|dad|mother|father|parent)\b.*\bviral\b.*\bcomparisons?\b/.test(normalized) ||
@@ -452,6 +469,26 @@ function hasControversyActorContext(normalizedText: string, normalizedAlias: str
   return new RegExp(
     `\\b${alias}\\b(?:\\s+\\S+){0,3}\\s+(?:accuses|calls\\s+out|criticizes|denies|slams)\\b`
   ).test(normalizedText);
+}
+
+function hasDirectControversySubjectContext(normalizedText: string, normalizedAlias: string) {
+  const alias = toRegexPhrase(normalizedAlias);
+  const controversyNouns =
+    "(?:allegation|allegations|arrest|backlash|boycott|case|charge|charges|controversy|criticism|indictment|lawsuit|sentencing|trial)";
+  const controversyActions =
+    "(?:accused|arrested|booked|charged|criticized|faces|facing|indicted|sentenced|sued|under\\s+fire)";
+  const qualifier = "(?:civil|criminal|defamation|federal|legal|murder|rape|sexual\\s+assault)";
+  const patterns = [
+    new RegExp(`\\b${alias}\\b(?:\\s+(?:is|was|has\\s+been|reportedly|allegedly))?\\s+${controversyActions}\\b`),
+    new RegExp(`\\b${alias}(?:\\s+s|'s|’s)?(?:\\s+${qualifier}){0,2}\\s+${controversyNouns}\\b`),
+    new RegExp(`\\b${controversyNouns}\\s+(?:against|involving|of)\\s+${alias}\\b`),
+    new RegExp(`\\b${alias}\\b(?:\\s+\\S+){0,3}\\s+(?:must|will)\\s+face\\s+(?:a\\s+)?(?:lawsuit|trial)\\b`),
+    new RegExp(`\\b${alias}(?:\\s+s|'s|’s)?\\s+(?:attorneys?|lawyers?)\\b`),
+    new RegExp(`\\b(?:attorneys?|lawyers?)\\s+(?:for|representing)\\s+${alias}\\b`),
+    new RegExp(`\\b${alias}(?:\\s+s|'s|’s)?(?:\\s+\\S+){0,6}\\s+(?:criminal\\s+|murder(?:\\s+plot\\s+|\\s+for\\s+hire\\s+)?)?trial\\b`)
+  ];
+
+  return patterns.some((pattern) => pattern.test(normalizedText));
 }
 
 function getStatusTerms(statusSubtype?: ArtistStatusSubtype | null) {

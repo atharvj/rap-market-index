@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { isLowValueMarketArticleTitle } from "@/server/market/artist-event-disambiguation";
+import {
+  hasArtistControversySubjectContext,
+  hasArtistStatusSubjectContext,
+  hasRequiredArtistEventDisambiguation,
+  isLowValueMarketArticleTitle
+} from "@/server/market/artist-event-disambiguation";
 import { classifyArticleEvent } from "@/server/market/gdelt-source";
 
 describe("market news classification", () => {
@@ -95,6 +100,66 @@ describe("market news classification", () => {
 
     expect(result?.eventType).toBe("release");
     expect(result?.impactScore).toBeGreaterThan(0);
+  });
+
+  it("treats a concert cancellation after a crew death as a tour disruption", () => {
+    const result = classifyArticleEvent(
+      "J. Cole Cancels Sacramento Concert After Crew Member's Death",
+      "billboard.com"
+    );
+
+    expect(result?.eventType).toBe("tour");
+    expect(result?.impactScore).toBeLessThan(0);
+    expect(result?.impactScore).toBeGreaterThan(-31);
+  });
+
+  it("treats a plaintiff's procedural defamation appeal as legal news, not a blanket controversy", () => {
+    const result = classifyArticleEvent(
+      "Jay-Z's Defamation Lawsuit Against Lawyer Who Filed Rape Case Faces Skeptical Appeals Court",
+      "billboard.com"
+    );
+
+    expect(result?.eventType).toBe("news");
+    expect(Math.abs(result?.impactScore ?? 100)).toBeLessThan(18);
+  });
+
+  it("rejects trial attendance and secondhand arrest commentary as low-value market stories", () => {
+    const trialSupport = "Kanye West Shows Up to Support Lil Durk at Murder-for-Hire Trial";
+    const arrestCommentary = "6ix9ine Says Lil Durk's Arrest Proves Him Right: 'I'm Smarter Than Y'all'";
+
+    expect(isLowValueMarketArticleTitle(trialSupport)).toBe(true);
+    expect(isLowValueMarketArticleTitle(arrestCommentary)).toBe(true);
+  });
+
+  it("keeps a direct arrest materially negative", () => {
+    const result = classifyArticleEvent(
+      "BigXthaPlug Arrested and Charged After Traffic Stop",
+      "apnews.com"
+    );
+
+    expect(result?.eventType).toBe("controversy");
+    expect(result?.statusSubtype).toBe("legal_arrest");
+    expect(result?.impactScore).toBeLessThanOrEqual(-30);
+  });
+
+  it("requires returned coverage to name the artist even for distinctive artist names", () => {
+    expect(hasRequiredArtistEventDisambiguation({
+      artistName: "DC The Don",
+      text: "Oscars: South Korea Selects Possible Love for International Feature",
+      sourceTier: 3
+    })).toBe(false);
+  });
+
+  it("does not assign another person's medical or legal story to an artist who is merely mentioned", () => {
+    expect(hasArtistStatusSubjectContext({
+      artistName: "Lil Baby",
+      text: "Quality Control founder hospitalized after helping launch Lil Baby",
+      statusSubtype: "hospitalization"
+    })).toBe(false);
+    expect(hasArtistControversySubjectContext({
+      artistName: "Lil Wayne",
+      text: "Young Thug's lawyers seek dismissal in trial involving alleged plot against Lil Wayne"
+    })).toBe(false);
   });
 
   it("does not score a family comparison just because it went viral", () => {

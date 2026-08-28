@@ -277,7 +277,8 @@ async function buildArtistEvents({
       searchMatchedArtist: item.searchArtistId === artist.id && isGoogleNewsArticleUrl(item.url)
     }))
     .filter(({ titleMatchedArtist, textMatchedArtist, disambiguatedArtist, searchMatchedArtist }) =>
-      (titleMatchedArtist || textMatchedArtist || searchMatchedArtist) && disambiguatedArtist
+      (titleMatchedArtist || textMatchedArtist || searchMatchedArtist) &&
+      (disambiguatedArtist || searchMatchedArtist)
     );
 
   const preliminaryCandidateEvents = selectDiverseEventCandidates(matchedItems
@@ -634,7 +635,7 @@ function hasRequiredEventSubjectContext({
     });
   }
 
-  if (classification.reason === "controversy_terms") {
+  if (classification.eventType === "controversy") {
     return hasArtistControversySubjectContext({
       artistName: artist.name,
       text,

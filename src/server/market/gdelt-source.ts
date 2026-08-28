@@ -597,7 +597,7 @@ function hasRequiredGdeltEventSubjectContext({
     });
   }
 
-  if (classification.reason === "controversy_terms") {
+  if (classification.eventType === "controversy") {
     return hasArtistControversySubjectContext({
       artistName,
       text: title,
@@ -617,6 +617,12 @@ export function classifyArticleEvent(
   const lowerTitle = title.toLowerCase();
   const sourceTier = getSourceTier(domain);
   const toneScore = clamp((getNumber(tone) ?? 0) * 8, -45, 45);
+  const tourDisruption = classifyTourDisruption(lowerTitle, sourceTier, toneScore);
+
+  if (tourDisruption) {
+    return tourDisruption;
+  }
+
   const status = classifyArtistStatusText(lowerTitle, { toneScore });
 
   if (status) {
@@ -656,12 +662,35 @@ export function classifyArticleEvent(
     };
   }
 
+  const legalEvent = classifyLegalEvent(lowerTitle, sourceTier, toneScore);
+
+  if (legalEvent) {
+    return legalEvent;
+  }
+
   if (hasAny(lowerTitle, CONTROVERSY_TERMS)) {
+    const severe = hasAny(lowerTitle, [
+      "boycott",
+      "racist",
+      "sexual assault",
+      "under fire"
+    ]);
+    const broadButUnmeasured = hasAny(lowerTitle, [
+      "backlash",
+      "controversial",
+      "criticized",
+      "fans slam",
+      "problematic",
+      "slammed by"
+    ]);
+    const baseImpact = severe ? -32 : broadButUnmeasured ? -18 : -24;
+    const baseSentiment = severe ? -30 : broadButUnmeasured ? -16 : -22;
+
     return {
       eventType: "controversy" as const,
-      sentimentScore: clamp(Math.min(-35, toneScore - 25), -100, 20),
-      impactScore: clamp(Math.min(-45, toneScore - 35), -100, 10),
-      confidence: getArticleConfidence(sourceTier, 0.76),
+      sentimentScore: clamp(baseSentiment + toneScore * 0.3, -88, 8),
+      impactScore: clamp(baseImpact + toneScore * 0.25, -90, 6),
+      confidence: getArticleConfidence(sourceTier, severe ? 0.72 : broadButUnmeasured ? 0.6 : 0.66),
       reason: "controversy_terms"
     };
   }
@@ -853,6 +882,94 @@ export function classifyArticleEvent(
   }
 
   return null;
+}
+
+function classifyTourDisruption(
+  title: string,
+  sourceTier: number,
+  toneScore: number
+): ArticleMarketClassification | null {
+  const hasCancellation = /\b(?:cancel(?:s|ed|led|ing|ling)?|postpone(?:s|d)?|reschedule(?:s|d)?)\b/.test(title);
+  const hasLiveEvent = /\b(?:concert|festival|live show|performance|show|tour|tour date|tour stop|set)\b/.test(title);
+
+  if (!hasCancellation || !hasLiveEvent) {
+    return null;
+  }
+
+  const multiDateDisruption = /\b(?:entire|remaining|multiple|several|world|national)\b.*\b(?:shows?|tour|dates?)\b/.test(title) ||
+    /\b(?:tour|dates?)\b.*\b(?:cancel(?:led|ed)|postponed)\b/.test(title);
+  const isPostponement = /\b(?:postpone(?:s|d)?|reschedule(?:s|d)?)\b/.test(title);
+  const impactScore = isPostponement ? -14 : multiDateDisruption ? -30 : -20;
+  const sentimentScore = isPostponement ? -10 : multiDateDisruption ? -24 : -16;
+
+  return {
+    eventType: "tour",
+    sentimentScore: clamp(sentimentScore + toneScore * 0.2, -58, 2),
+    impactScore: clamp(impactScore + toneScore * 0.18, -62, -4),
+    confidence: getArticleConfidence(sourceTier, multiDateDisruption ? 0.74 : 0.68),
+    reason: "tour_disruption_terms"
+  };
+}
+
+function classifyLegalEvent(
+  title: string,
+  sourceTier: number,
+  toneScore: number
+): ArticleMarketClassification | null {
+  const hasCivilCase = /\b(?:appeals? court|arbitration|defamation|lawsuit|legal action|sued|sues|settlement)\b/.test(title);
+  const hasCriminalCase = /\b(?:criminal trial|murder(?:-for-hire| plot)? trial|prosecution|prosecutors|racketeering trial)\b/.test(title);
+
+  if (!hasCivilCase && !hasCriminalCase) {
+    return null;
+  }
+
+  const isPlaintiffOrProcedure = /\b(?:defamation lawsuit against|files? (?:a )?lawsuit|lawsuit (?:against|appeal)|appeals? court|arbitration|dismiss(?:al|ed)?|seek(?:s)? to dismiss|terminated|paused|in limbo)\b/.test(title);
+  const hasSeriousAllegation = /\b(?:abuse|assault|discrimination|fraud|harassment|rape|sexual assault|stream manipulation|wrongful termination)\b/.test(title);
+  const hasBusinessDispute = /\b(?:contract|copyright|payment|producer|royalt(?:y|ies)|sample|sampling)\b/.test(title);
+  const mustFaceCase = /\b(?:must|will) face (?:a )?(?:lawsuit|trial)|\blawsuit claims?\b|\baccused in (?:a )?lawsuit\b/.test(title);
+
+  const isDefamationPlaintiff = /\bdefamation lawsuit against\b/.test(title);
+
+  if (isPlaintiffOrProcedure && !mustFaceCase && (!hasSeriousAllegation || isDefamationPlaintiff)) {
+    return {
+      eventType: "news",
+      sentimentScore: clamp(-6 + toneScore * 0.2, -24, 8),
+      impactScore: clamp(-8 + toneScore * 0.16, -22, 4),
+      confidence: getArticleConfidence(sourceTier, 0.64),
+      reason: "civil_legal_procedure"
+    };
+  }
+
+  if (hasBusinessDispute && !hasSeriousAllegation) {
+    return {
+      eventType: "news",
+      sentimentScore: clamp(-9 + toneScore * 0.22, -30, 6),
+      impactScore: clamp(-12 + toneScore * 0.18, -28, 4),
+      confidence: getArticleConfidence(sourceTier, 0.64),
+      reason: "civil_business_dispute"
+    };
+  }
+
+  if (hasCriminalCase || mustFaceCase || hasSeriousAllegation) {
+    const impactScore = hasSeriousAllegation ? -34 : hasCriminalCase ? -30 : -26;
+    const sentimentScore = hasSeriousAllegation ? -32 : hasCriminalCase ? -28 : -24;
+
+    return {
+      eventType: "controversy",
+      sentimentScore: clamp(sentimentScore + toneScore * 0.24, -82, 4),
+      impactScore: clamp(impactScore + toneScore * 0.2, -86, -6),
+      confidence: getArticleConfidence(sourceTier, hasSeriousAllegation ? 0.72 : 0.68),
+      reason: "material_legal_case"
+    };
+  }
+
+  return {
+    eventType: "news",
+    sentimentScore: clamp(-12 + toneScore * 0.22, -36, 6),
+    impactScore: clamp(-16 + toneScore * 0.18, -34, 4),
+    confidence: getArticleConfidence(sourceTier, 0.62),
+    reason: "civil_legal_context"
+  };
 }
 
 function hasDeathRumorDebunkSignal(title: string) {

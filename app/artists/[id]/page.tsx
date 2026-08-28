@@ -199,7 +199,7 @@ function SignalBreakdown({
       <p className="mb-3 text-xs leading-5 text-paper/45">
         {buildingBaseline
           ? "Building the first source baseline. The quote stays at its verified opening value until later observations provide a real change to measure."
-          : "Weighted contributions to current RMI Momentum. Flat means the measured input has not materially changed from its baseline—not that its data is missing."}
+          : "Weighted contributions to current RMI Momentum. Audience response uses official-channel audience growth plus sampled public reaction when available; it is not a full-internet sentiment poll. Flat means the measured input has not materially changed from its baseline—not that its data is missing."}
       </p>
       <div className="grid gap-2 sm:grid-cols-2">
         {visibleDrivers.map((driver) => {

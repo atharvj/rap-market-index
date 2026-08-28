@@ -276,7 +276,7 @@ function explainDailyMove(stats: HypeStats, dailyChangePercent: number, ticker: 
     ["streaming momentum", stats.streamingGrowth],
     ["video momentum", stats.youtubeGrowth],
     ["discovery trend", stats.searchGrowth],
-    ["fan sentiment", stats.socialGrowth],
+    ["audience response", stats.socialGrowth],
     ["media and reviews", stats.newsScore - 50],
     ["trading demand", stats.traderDemand]
   ] as const;

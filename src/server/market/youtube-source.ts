@@ -291,6 +291,13 @@ function buildYoutubeSignal({
     max: 45,
     monotonic: true
   });
+  const validatedViewMomentum = rejectImplausibleYoutubeViewRestatement({
+    current: info.viewCount,
+    baseline: baseline[CHANNEL_VIEWS],
+    baselineAgeDays: viewBaselineAgeDays,
+    snapshotMomentum: viewMomentum,
+    rateMomentum: viewRateMomentum
+  });
   const uploadMomentum = calculatePointDeltaMomentum({
     current: info.videoCount,
     baseline: baseline[VIDEO_COUNT],
@@ -303,8 +310,8 @@ function buildYoutubeSignal({
   const uploadAudienceValidation = validateUploadMomentumAgainstAudience({
     uploadMomentum: uploadMomentum.value,
     viewMomentum: weightedAverage([
-      { value: viewRateMomentum.value, weight: 0.75 },
-      { value: viewMomentum.value, weight: 0.25 }
+      { value: validatedViewMomentum.rate.value, weight: 0.75 },
+      { value: validatedViewMomentum.snapshot.value, weight: 0.25 }
     ]),
     subscriberMomentum: weightedAverage([
       { value: subscriberRateMomentum.value, weight: 0.7 },
@@ -314,22 +321,20 @@ function buildYoutubeSignal({
   const stats: Partial<HypeStats> = {};
 
   if (
-    typeof viewMomentum.value === "number" ||
+    typeof validatedViewMomentum.snapshot.value === "number" ||
     typeof subscriberMomentum.value === "number" ||
     typeof uploadAudienceValidation.value === "number"
   ) {
     const youtubeGrowth = weightedAverage([
-      { value: viewRateMomentum.value, weight: 0.58 },
+      { value: validatedViewMomentum.rate.value, weight: 0.58 },
       { value: subscriberRateMomentum.value, weight: 0.14 },
-      { value: viewMomentum.value, weight: 0.18 },
+      { value: validatedViewMomentum.snapshot.value, weight: 0.18 },
       { value: subscriberMomentum.value, weight: 0.08 },
       { value: uploadAudienceValidation.value, weight: 0.02 }
     ]);
     const socialGrowth = weightedAverage([
-      { value: subscriberRateMomentum.value, weight: 0.48 },
-      { value: subscriberMomentum.value, weight: 0.27 },
-      { value: viewRateMomentum.value, weight: 0.18 },
-      { value: viewMomentum.value, weight: 0.07 }
+      { value: subscriberRateMomentum.value, weight: 0.64 },
+      { value: subscriberMomentum.value, weight: 0.36 }
     ]);
 
     if (typeof youtubeGrowth === "number") {
@@ -359,24 +364,26 @@ function buildYoutubeSignal({
     viewBaselineAgeDays,
     subscriberBaselineAgeDays,
     videoBaselineAgeDays,
-    viewMomentum: viewMomentum.value,
+    viewMomentum: validatedViewMomentum.snapshot.value,
+    unfilteredViewMomentum: viewMomentum.value,
     subscriberMomentum: subscriberMomentum.value,
-    viewRateMomentum: viewRateMomentum.value,
+    viewRateMomentum: validatedViewMomentum.rate.value,
+    unfilteredViewRateMomentum: viewRateMomentum.value,
     subscriberRateMomentum: subscriberRateMomentum.value,
     uploadMomentum: uploadMomentum.value,
     audienceValidatedUploadMomentum: uploadAudienceValidation.value,
     uploadMomentumValidation: uploadAudienceValidation.reason,
-    viewMomentumQuality: buildMomentumQualityPayload(viewMomentum),
+    viewMomentumQuality: buildMomentumQualityPayload(validatedViewMomentum.snapshot),
     subscriberMomentumQuality: buildMomentumQualityPayload(subscriberMomentum),
-    viewRateMomentumQuality: buildRateMomentumQualityPayload(viewRateMomentum),
+    viewRateMomentumQuality: buildRateMomentumQualityPayload(validatedViewMomentum.rate),
     subscriberRateMomentumQuality: buildRateMomentumQualityPayload(subscriberRateMomentum),
     uploadMomentumQuality: buildMomentumQualityPayload(uploadMomentum),
     velocityMinimumTickEligible:
-      typeof viewRateMomentum.value === "number" &&
-      Math.abs(viewRateMomentum.value) >= 1 &&
-      viewRateMomentum.recentRateSamples >= 2 &&
-      viewRateMomentum.confidenceMultiplier >= 0.75 &&
-      viewRateMomentum.anomalyFlags.length === 0,
+      typeof validatedViewMomentum.rate.value === "number" &&
+      Math.abs(validatedViewMomentum.rate.value) >= 1 &&
+      validatedViewMomentum.rate.recentRateSamples >= 2 &&
+      validatedViewMomentum.rate.confidenceMultiplier >= 0.75 &&
+      validatedViewMomentum.rate.anomalyFlags.length === 0,
     status: Object.keys(stats).length ? "ok" : "baseline_only"
   };
   const observations: MarketObservation[] = [];
@@ -399,9 +406,9 @@ function buildYoutubeSignal({
       confidence: clamp(
         0.84 *
           getCombinedConfidenceMultiplier([
-            viewMomentum,
+            validatedViewMomentum.snapshot,
             subscriberMomentum,
-            viewRateMomentum,
+            validatedViewMomentum.rate,
             subscriberRateMomentum,
             {
               ...uploadMomentum,
@@ -485,6 +492,71 @@ function validateUploadMomentumAgainstAudience({
     value: uploadMomentum,
     reason: "upload-count-strongly-confirmed-by-audience",
     confidenceMultiplier: 1
+  };
+}
+
+function rejectImplausibleYoutubeViewRestatement({
+  current,
+  baseline,
+  baselineAgeDays,
+  snapshotMomentum,
+  rateMomentum
+}: {
+  current: number | undefined;
+  baseline: number | undefined;
+  baselineAgeDays: number | undefined;
+  snapshotMomentum: ReturnType<typeof calculateSnapshotMomentum>;
+  rateMomentum: ReturnType<typeof calculateRateMomentum>;
+}) {
+  const sampledDailyIncrease =
+    typeof current === "number" &&
+    typeof baseline === "number" &&
+    typeof baselineAgeDays === "number" &&
+    baselineAgeDays > 0
+      ? (current - baseline) / baselineAgeDays
+      : undefined;
+  const recentDailyRate = rateMomentum.recentDailyRate;
+  const rawChangePercent = snapshotMomentum.rawChangePercent;
+  const rateMultiple =
+    typeof sampledDailyIncrease === "number" &&
+    typeof recentDailyRate === "number" &&
+    recentDailyRate > 0
+      ? sampledDailyIncrease / recentDailyRate
+      : undefined;
+  const isImplausibleRestatement =
+    typeof baseline === "number" &&
+    baseline >= 10_000_000 &&
+    typeof baselineAgeDays === "number" &&
+    baselineAgeDays > 0 &&
+    baselineAgeDays <= 2 &&
+    typeof rawChangePercent === "number" &&
+    rawChangePercent >= 12 &&
+    typeof sampledDailyIncrease === "number" &&
+    sampledDailyIncrease >= 5_000_000 &&
+    (typeof rateMultiple === "number" ? rateMultiple >= 250 : rawChangePercent >= 35);
+
+  if (!isImplausibleRestatement) {
+    return {
+      snapshot: snapshotMomentum,
+      rate: rateMomentum
+    };
+  }
+
+  const anomalyFlag = "implausible_counter_restatement";
+
+  return {
+    snapshot: {
+      ...snapshotMomentum,
+      value: undefined,
+      confidenceMultiplier: Math.min(snapshotMomentum.confidenceMultiplier, 0.22),
+      anomalyFlags: [...new Set([...snapshotMomentum.anomalyFlags, anomalyFlag])]
+    },
+    rate: {
+      ...rateMomentum,
+      value: undefined,
+      confidenceMultiplier: Math.min(rateMomentum.confidenceMultiplier, 0.22),
+      anomalyFlags: [...new Set([...rateMomentum.anomalyFlags, anomalyFlag])]
+    }
   };
 }
 

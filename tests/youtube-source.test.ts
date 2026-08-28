@@ -106,4 +106,43 @@ describe("YouTube audience velocity", () => {
       withoutAnnual.signals[testArtist.id].stats.youtubeGrowth ?? 0
     );
   });
+
+  it("quarantines an implausible cumulative-view counter restatement", async () => {
+    const result = await collectYoutubeMarketSignals({
+      artists: [testArtist],
+      runDate: "2026-07-30",
+      apiKey: "test-key",
+      externalIds: {
+        [testArtist.id]: { artistId: testArtist.id, youtubeChannelId: channelId }
+      },
+      baselines: {
+        [testArtist.id]: {
+          channel_views: 3_100_000_000,
+          channel_views__age_days: 0.75,
+          channel_views__recent_daily_rate: 1_500_000,
+          channel_views__recent_rate_samples: 5,
+          subscriber_count: 10_000,
+          subscriber_count__age_days: 0.75,
+          video_count: 100,
+          video_count__age_days: 0.75
+        }
+      },
+      delayMs: 0,
+      fetchImpl: youtubeResponse(4_100_000_000)
+    });
+    const signal = result.signals[testArtist.id];
+    const quality = signal.rawPayload.viewRateMomentumQuality as { anomalyFlags: string[] };
+
+    expect(signal.rawPayload.viewRateMomentum).toBeUndefined();
+    expect(quality.anomalyFlags).toContain("implausible_counter_restatement");
+    expect(signal.stats.youtubeGrowth ?? 0).toBe(0);
+    expect(signal.stats.socialGrowth ?? 0).toBe(0);
+  });
+
+  it("does not double-count channel views as audience response", async () => {
+    const result = await collect(1_015_000);
+
+    expect(result.signals[testArtist.id].stats.youtubeGrowth).toBeGreaterThan(0);
+    expect(result.signals[testArtist.id].stats.socialGrowth ?? 0).toBe(0);
+  });
 });

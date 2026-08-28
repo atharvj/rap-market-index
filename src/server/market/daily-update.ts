@@ -2206,7 +2206,7 @@ function explainMove(
     ["streaming momentum", stats.streamingGrowth],
     ["video momentum", stats.youtubeGrowth],
     ["discovery trend", stats.searchGrowth],
-    ["fan sentiment", stats.socialGrowth],
+    ["audience response", stats.socialGrowth],
     ["trading demand", stats.traderDemand]
   ] as const;
   const [signalName] = signals.reduce((best, current) =>

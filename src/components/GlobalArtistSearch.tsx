@@ -6,6 +6,7 @@ import { useGame } from "@/components/GameProvider";
 import { formatCurrency } from "@/lib/formatters";
 import clsx from "clsx";
 import { Search } from "lucide-react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 
@@ -126,7 +127,16 @@ export function GlobalArtistSearch({ className }: { className?: string }) {
               </button>
             ))
           ) : (
-            <p className="px-3 py-5 text-center text-sm text-paper/50">No matching artists.</p>
+            <div className="px-3 py-5 text-center text-sm text-paper/50">
+              <p>No matching artists.</p>
+              <Link
+                href="/help#feedback"
+                onClick={() => setOpen(false)}
+                className="mt-2 inline-flex font-semibold text-cyan hover:underline"
+              >
+                Request an artist
+              </Link>
+            </div>
           )}
         </div>
       ) : null}

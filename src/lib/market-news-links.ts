@@ -18,6 +18,15 @@ const DIRECT_MEDIA_HOSTS = new Set([
   "youtube.com",
   "youtu.be"
 ]);
+const BLOCKED_PUBLIC_NEWS_HOSTS = new Set([
+  "bsky.app",
+  "bsky.social"
+]);
+const BLOCKED_PUBLIC_NEWS_SOURCES = new Set([
+  "atproto",
+  "bluesky",
+  "bluesky_post"
+]);
 
 export function shouldShowNewsMediaAction(item: NewsLinkItem) {
   return item.eventType === "release" && Boolean(item.mediaUrl && item.mediaLabel);
@@ -38,9 +47,43 @@ export function selectPreferredNewsSourceEvent<T extends NewsSourceEvent>(
   const candidates = [
     primary,
     ...storyEvents.filter((event) => event !== primary)
-  ].filter((event) => isHttpNewsLink(event.source_url));
+  ].filter((event) => isHttpNewsLink(event.source_url) && !isBlockedPublicNewsLink(event.source_url));
 
   return candidates.find((event) => !isDirectMediaNewsLink(event.source_url)) ?? candidates[0] ?? primary;
+}
+
+export function isBlockedPublicNewsSource({
+  source,
+  sourceName,
+  sourceUrl
+}: {
+  source?: string | null;
+  sourceName?: string | null;
+  sourceUrl?: string | null;
+}) {
+  const normalizedSource = source?.trim().toLowerCase().replace(/[\s-]+/g, "_") ?? "";
+  const normalizedName = sourceName?.trim().toLowerCase() ?? "";
+
+  return (
+    BLOCKED_PUBLIC_NEWS_SOURCES.has(normalizedSource) ||
+    normalizedName.includes("bluesky") ||
+    isBlockedPublicNewsLink(sourceUrl)
+  );
+}
+
+export function isBlockedPublicNewsLink(value?: string | null) {
+  if (!value) {
+    return false;
+  }
+
+  try {
+    const hostname = normalizeHostname(new URL(value).hostname);
+    return [...BLOCKED_PUBLIC_NEWS_HOSTS].some(
+      (blockedHost) => hostname === blockedHost || hostname.endsWith(`.${blockedHost}`)
+    );
+  } catch {
+    return false;
+  }
 }
 
 export function areEquivalentNewsLinks(first?: string | null, second?: string | null) {
