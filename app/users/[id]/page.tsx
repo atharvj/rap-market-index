@@ -27,11 +27,25 @@ type PublicProfile = {
   createdAt: string;
   favoriteArtists: PublicFavoriteArtist[];
   holdings: PublicHolding[];
+  shortPositions: PublicShortPosition[];
   isPrivate: boolean;
   portfolioIsPublic: boolean;
   portfolioValue: number | null;
   cashBalance: number | null;
   gainPercent: number | null;
+};
+
+type PublicShortPosition = {
+  artistId: string;
+  name: string;
+  ticker: string;
+  accent: string;
+  imageUrl?: string | null;
+  shares: number;
+  currentPrice: number;
+  currentLiability: number;
+  profitLoss: number;
+  profitLossPercent: number;
 };
 
 type PublicHolding = {
@@ -148,7 +162,7 @@ export default function PublicUserProfilePage() {
             <h2 className="mt-1 text-xl font-semibold">Open Positions</h2>
           </div>
           <span className="rmi-status-chip border-cyan/30 bg-cyan/10 text-cyan">
-            {profile.portfolioIsPublic ? `${profile.holdings.length} Listed` : "Private"}
+            {profile.portfolioIsPublic ? `${profile.holdings.length + profile.shortPositions.length} Listed` : "Private"}
           </span>
         </div>
         <div className="divide-y divide-line">
@@ -159,8 +173,9 @@ export default function PublicUserProfilePage() {
                 <p className="mt-3 text-sm font-medium text-paper/50">This trader keeps their portfolio private.</p>
               </div>
             </div>
-          ) : profile.holdings.length ? (
-            profile.holdings.map((holding) => (
+          ) : profile.holdings.length || profile.shortPositions.length ? (
+            <>
+            {profile.holdings.map((holding) => (
               <Link
                 key={holding.artistId}
                 href={`/artists/${holding.artistId}`}
@@ -192,7 +207,31 @@ export default function PublicUserProfilePage() {
                   </span>
                 </span>
               </Link>
-            ))
+            ))}
+            {profile.shortPositions.map((position) => (
+              <Link
+                key={`short-${position.artistId}`}
+                href={`/artists/${position.artistId}`}
+                className="rmi-table-row grid gap-3 px-4 py-3 sm:grid-cols-[minmax(0,1fr)_120px_120px]"
+              >
+                <span className="flex items-center gap-3">
+                  <ProfileArtistImage name={position.name} ticker={position.ticker} imageUrl={position.imageUrl} />
+                  <span className="min-w-0">
+                    <span className="block truncate text-sm font-semibold">{position.name}</span>
+                    <span className="text-xs font-medium text-ember">Short · {formatShares(position.shares)} shares</span>
+                  </span>
+                </span>
+                <span className="text-sm font-semibold number-tabular sm:text-right">
+                  <span className="block">{formatCurrency(position.currentLiability)}</span>
+                  <span className="text-xs text-paper/45">{formatCurrency(position.currentPrice)}</span>
+                </span>
+                <span className="text-sm font-semibold number-tabular sm:text-right">
+                  <span className={position.profitLoss >= 0 ? "block text-mint" : "block text-ember"}>{formatCurrency(position.profitLoss)}</span>
+                  <span className={position.profitLossPercent >= 0 ? "text-xs text-mint" : "text-xs text-ember"}>{formatPercent(position.profitLossPercent)}</span>
+                </span>
+              </Link>
+            ))}
+            </>
           ) : (
             <p className="p-4 text-sm font-medium text-paper/50">No public holdings yet.</p>
           )}

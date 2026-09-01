@@ -1,9 +1,10 @@
 import type { PricePoint } from "@/lib/types";
 
-export const SHORTING_PLATFORM_ENABLED = false;
+export const SHORTING_PLATFORM_ENABLED = true;
 export const MIN_SHORTING_RECORDED_SESSIONS = 30;
 export const MIN_SHORTING_HISTORY_DAYS = 28;
 export const MIN_SHORTING_PRICE_CHANGES = 10;
+export const SHORTING_ACTIVITY_WINDOW_DAYS = 31;
 
 export type ShortingReadiness = {
   enabled: boolean;
@@ -14,13 +15,16 @@ export type ShortingReadiness = {
 };
 
 export function getShortingReadiness(priceHistory: PricePoint[]): ShortingReadiness {
-  const sessions = Array.from(
+  const allSessions = Array.from(
     new Map(
       priceHistory
         .filter((point) => /^\d{4}-\d{2}-\d{2}$/.test(point.date) && Number.isFinite(point.price) && point.price > 0)
         .map((point) => [point.date, point])
     ).values()
   ).sort((first, second) => first.date.localeCompare(second.date));
+  const latestSessionAt = allSessions.length ? Date.parse(allSessions.at(-1)!.date) : Number.NaN;
+  const activityCutoff = latestSessionAt - SHORTING_ACTIVITY_WINDOW_DAYS * 86_400_000;
+  const sessions = allSessions.filter((point) => Date.parse(point.date) >= activityCutoff);
   const recordedSessions = sessions.length;
   const historySpanDays = sessions.length > 1
     ? Math.floor((Date.parse(sessions.at(-1)!.date) - Date.parse(sessions[0].date)) / 86_400_000)
@@ -50,8 +54,6 @@ export function getShortingReadiness(priceHistory: PricePoint[]): ShortingReadin
     dataReady,
     recordedSessions,
     requiredSessions: MIN_SHORTING_RECORDED_SESSIONS,
-    reason: enabled
-      ? "Shorting is available for this artist."
-      : "Shorting data requirement met; market-wide risk and liquidation controls are still being validated."
+    reason: enabled ? "Short selling available." : "Short selling unavailable."
   };
 }

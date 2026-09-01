@@ -5,6 +5,7 @@ import { requireAdminRequest } from "@/server/admin-auth";
 import type { MarketUpdateSource } from "@/server/market/daily-update";
 import { getMarketDate } from "@/server/market/market-date";
 import { getMarketModelVersion } from "@/server/market/model-version";
+import { liquidateUnderMarginedShorts } from "@/server/short-risk";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
@@ -271,6 +272,20 @@ export async function POST(request: Request) {
     await persistBatchRunSummary(runDate, summary);
   }
 
+  let shortLiquidations = { inspected: 0, liquidated: 0, failures: 0 };
+
+  if (!dryRun) {
+    try {
+      shortLiquidations = await liquidateUnderMarginedShorts(createServiceRoleClient());
+    } catch {
+      shortLiquidations = { inspected: 0, liquidated: 0, failures: 1 };
+    }
+  }
+
+  if (shortLiquidations.failures > 0) {
+    warnings.add(`${shortLiquidations.failures} under-margined short position${shortLiquidations.failures === 1 ? "" : "s"} require review.`);
+  }
+
   return NextResponse.json({
     ok: true,
     dryRun,
@@ -283,6 +298,7 @@ export async function POST(request: Request) {
     eventCount: runs.reduce((total, run) => total + (run.eventCount ?? 0), 0),
     detectedEventCount: runs.reduce((total, run) => total + (run.detectedEventCount ?? 0), 0),
     warnings: Array.from(warnings),
+    shortLiquidations,
     nextOffset: lastRun?.batch?.nextOffset ?? null,
     hasMore: Boolean(lastRun?.batch?.hasMore),
     summary,

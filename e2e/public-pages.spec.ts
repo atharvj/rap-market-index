@@ -540,6 +540,19 @@ test("artist pages include related markets without repeating the current artist"
   await expect(page.getByText(/The chart shows market quotes, not individual order fills\./)).toBeVisible();
 });
 
+test("artist trade tickets expose short and cover without internal readiness copy", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto(`/artists/${marketState.artists[0].id}`);
+  await expect(page.locator('[aria-busy="true"]')).toHaveCount(0, { timeout: 15_000 });
+
+  const ticket = page.locator("#trade");
+  await expect(ticket.getByRole("button", { name: "Short", exact: true })).toBeVisible();
+  await expect(ticket.getByRole("button", { name: "Cover", exact: true })).toBeVisible();
+  await ticket.getByRole("button", { name: "Short", exact: true }).click();
+  await expect(ticket).toContainText("Shorting disabled until this artist has enough market data (8/30 recorded sessions).");
+  await expect(ticket).not.toContainText("risk and liquidation controls are still being validated");
+});
+
 test("public metrics do not use decorative colored side borders", async ({ page }) => {
   for (const path of ["/", "/markets", "/scout"]) {
     await page.goto(path);

@@ -7,6 +7,8 @@ export const MAX_TRADE_SHARES = 1_000_000;
 export const MIN_DAILY_ARTIST_BUY_VALUE = 1_000;
 export const MAX_DAILY_ARTIST_BUY_VALUE = 5_000;
 export const DAILY_ARTIST_BUY_PORTFOLIO_RATE = 0.4;
+export const SHORT_INITIAL_MARGIN_RATE = 0.5;
+export const SHORT_MAINTENANCE_MARGIN_PERCENT = 30;
 
 type RecentTrade = {
   artistId: string;
@@ -195,6 +197,88 @@ export function getRemainingDailyArtistBuyValue({
   }, 0);
 
   return Math.max(0, roundMoney(getDailyArtistBuyLimit(portfolioValue) - usedValue));
+}
+
+export function getRemainingDailyArtistShortValue({
+  artistId,
+  portfolioValue,
+  transactions,
+  now = Date.now()
+}: {
+  artistId: string;
+  portfolioValue: number;
+  transactions: RecentTrade[];
+  now?: number;
+}) {
+  const cutoff = now - 24 * 60 * 60 * 1000;
+  const usedValue = transactions.reduce((total, transaction) => {
+    const createdAt = new Date(transaction.createdAt).getTime();
+
+    if (
+      transaction.artistId !== artistId
+      || transaction.type !== "short"
+      || !Number.isFinite(createdAt)
+      || createdAt < cutoff
+    ) {
+      return total;
+    }
+
+    const recordedGrossValue = Number(transaction.grossValue);
+    const fallbackGrossValue = transaction.shares * transaction.price;
+    const grossValue = Number.isFinite(recordedGrossValue) && recordedGrossValue >= 0
+      ? recordedGrossValue
+      : fallbackGrossValue;
+
+    return total + (Number.isFinite(grossValue) && grossValue > 0 ? grossValue : 0);
+  }, 0);
+
+  return Math.max(0, roundMoney(getDailyArtistBuyLimit(portfolioValue) - usedValue));
+}
+
+export function getMaximumShortShares({
+  cashBalance,
+  remainingPositionValue,
+  remainingDailyShortValue = Number.POSITIVE_INFINITY,
+  midPrice,
+  volatility = 1
+}: {
+  cashBalance: number;
+  remainingPositionValue: number;
+  remainingDailyShortValue?: number;
+  midPrice: number;
+  volatility?: number;
+}) {
+  const availableCash = Math.max(0, Number.isFinite(cashBalance) ? cashBalance : 0);
+  const availablePositionValue = Math.max(0, Number.isFinite(remainingPositionValue) ? remainingPositionValue : 0);
+  const availableDailyShortValue = Number.isFinite(remainingDailyShortValue)
+    ? Math.max(0, remainingDailyShortValue)
+    : Number.POSITIVE_INFINITY;
+  const cleanMidPrice = Math.max(1, Number.isFinite(midPrice) ? midPrice : 1);
+  let lowerBound = 0;
+  let upperBound = Math.min(
+    MAX_TRADE_SHARES,
+    availablePositionValue / cleanMidPrice,
+    availableDailyShortValue / cleanMidPrice,
+    availableCash / (cleanMidPrice * SHORT_INITIAL_MARGIN_RATE)
+  );
+
+  for (let iteration = 0; iteration < 48; iteration += 1) {
+    const candidate = (lowerBound + upperBound) / 2;
+    const quote = estimateMarketMakerQuote({ side: "sell", midPrice: cleanMidPrice, shares: candidate, volatility });
+    const cashRequired = quote.orderValue * SHORT_INITIAL_MARGIN_RATE + quote.commission;
+
+    if (
+      cashRequired <= availableCash
+      && quote.orderValue <= availablePositionValue
+      && quote.orderValue <= availableDailyShortValue
+    ) {
+      lowerBound = candidate;
+    } else {
+      upperBound = candidate;
+    }
+  }
+
+  return roundShareQuantityDown(lowerBound);
 }
 
 export function roundShareQuantityDown(value: number) {

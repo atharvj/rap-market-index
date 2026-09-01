@@ -13,6 +13,7 @@ const PRIVATE_RESPONSE_HEADERS = {
 type ProfileRow = Database["public"]["Tables"]["profiles"]["Row"];
 type LeaderboardRow = Database["public"]["Views"]["market_leaderboard"]["Row"];
 type HoldingRow = Database["public"]["Tables"]["holdings"]["Row"];
+type ShortPositionRow = Database["public"]["Tables"]["short_positions"]["Row"];
 type ArtistRow = Pick<
   Database["public"]["Tables"]["artists"]["Row"],
   "id" | "name" | "ticker" | "current_price" | "daily_change_percent" | "hype_score" | "accent"
@@ -90,6 +91,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
           bio: "",
           favoriteArtists: [],
           holdings: [],
+          shortPositions: [],
           portfolioValue: null,
           cashBalance: null,
           gainPercent: null
@@ -103,14 +105,18 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
       ? profileRow.favorite_artist_ids.filter((artistId): artistId is string => typeof artistId === "string")
       : [];
     const favoriteArtists = favoriteArtistIds.length ? await loadFavoriteArtists(supabase, favoriteArtistIds) : [];
-    const publicHoldings = profileRow.portfolio_is_public ? await loadPublicHoldings(supabase, profileRow.id) : [];
+    const [publicHoldings, publicShortPositions] = profileRow.portfolio_is_public
+      ? await Promise.all([loadPublicHoldings(supabase, profileRow.id), loadPublicShortPositions(supabase, profileRow.id)])
+      : [[], []];
     const imageArtistIds = Array.from(new Set([
       ...favoriteArtists.map((artist) => artist.id),
-      ...publicHoldings.map((holding) => holding.artistId)
+      ...publicHoldings.map((holding) => holding.artistId),
+      ...publicShortPositions.map((position) => position.artistId)
     ]));
     const imageNames = Object.fromEntries([
       ...favoriteArtists.map((artist) => [artist.id, artist.name]),
-      ...publicHoldings.map((holding) => [holding.artistId, holding.name])
+      ...publicHoldings.map((holding) => [holding.artistId, holding.name]),
+      ...publicShortPositions.map((position) => [position.artistId, position.name])
     ]);
     const imageByArtistId = await loadArtistImageUrls(supabase, imageArtistIds, imageNames);
 
@@ -130,6 +136,10 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
         holdings: publicHoldings.map((holding) => ({
           ...holding,
           imageUrl: imageByArtistId.get(holding.artistId) ?? null
+        })),
+        shortPositions: publicShortPositions.map((position) => ({
+          ...position,
+          imageUrl: imageByArtistId.get(position.artistId) ?? null
         })),
         isPrivate: false,
         portfolioIsPublic: profileRow.portfolio_is_public,
@@ -158,6 +168,57 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
       { status: 500, headers: PRIVATE_RESPONSE_HEADERS }
     );
   }
+}
+
+async function loadPublicShortPositions(supabase: ReturnType<typeof createServiceRoleClient>, userId: string) {
+  const { data, error } = await supabase
+    .from("short_positions")
+    .select("artist_id,shares,average_short_price,collateral")
+    .eq("user_id", userId)
+    .gt("shares", 0);
+
+  if (error) {
+    throw new Error(`Could not load public short positions: ${error.message}`);
+  }
+
+  const rows = (data ?? []) as ShortPositionRow[];
+  const artistIds = rows.map((position) => position.artist_id);
+
+  if (!artistIds.length) return [];
+
+  const artistsResult = await supabase
+    .from("artists")
+    .select("id,name,ticker,current_price,daily_change_percent,hype_score,accent")
+    .in("id", artistIds)
+    .eq("is_active", true);
+
+  if (artistsResult.error) {
+    throw new Error(`Could not load short-position artists: ${artistsResult.error.message}`);
+  }
+
+  const artistsById = new Map(((artistsResult.data ?? []) as ArtistRow[]).map((artist) => [artist.id, artist]));
+
+  return rows.flatMap((position) => {
+    const artist = artistsById.get(position.artist_id);
+    if (!artist) return [];
+    const shares = Number(position.shares);
+    const currentPrice = Number(artist.current_price);
+    const averageShortPrice = Number(position.average_short_price);
+    const currentLiability = shares * currentPrice;
+    const profitLoss = shares * (averageShortPrice - currentPrice);
+
+    return [{
+      artistId: artist.id,
+      name: artist.name,
+      ticker: artist.ticker,
+      accent: artist.accent,
+      shares,
+      currentPrice,
+      currentLiability,
+      profitLoss,
+      profitLossPercent: Number(position.collateral) > 0 ? (profitLoss / Number(position.collateral)) * 100 : 0
+    }];
+  }).sort((a, b) => b.currentLiability - a.currentLiability).slice(0, 12);
 }
 
 async function loadPublicHoldings(supabase: ReturnType<typeof createServiceRoleClient>, userId: string) {

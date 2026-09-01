@@ -10,6 +10,8 @@ import { loadReleaseWindowStatus } from "@/server/market/release-window";
 import { isStoredMarketEventSourceIntegrityValid } from "@/server/market/event-integrity";
 import { reportServerError } from "@/server/observability";
 import { requireConfirmedUser } from "@/server/user-auth";
+import { liquidateUnderMarginedShorts } from "@/server/short-risk";
+import { loadArtistShortingEligibility } from "@/server/shorting-eligibility";
 
 export const dynamic = "force-dynamic";
 
@@ -186,6 +188,22 @@ export async function POST(request: Request) {
     );
   }
 
+  if (side === "short") {
+    try {
+      const readiness = await loadArtistShortingEligibility(serviceSupabase, artistId);
+
+      if (!readiness.enabled) {
+        return NextResponse.json({ ok: false, error: readiness.reason }, { status: 423 });
+      }
+    } catch (error) {
+      reportServerError(error, "trade.short-eligibility");
+      return NextResponse.json(
+        { ok: false, error: "Short selling is temporarily unavailable for this artist." },
+        { status: 503 }
+      );
+    }
+  }
+
   const { data, error } = await serviceSupabase.rpc("execute_artist_trade_as_user", {
     p_user_id: authUser.id,
     p_side: side,
@@ -203,6 +221,12 @@ export async function POST(request: Request) {
       },
       { status: 400 }
     );
+  }
+
+  try {
+    await liquidateUnderMarginedShorts(serviceSupabase);
+  } catch (riskError) {
+    reportServerError(riskError, "trade.short-risk");
   }
 
   return NextResponse.json({

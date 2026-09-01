@@ -22,6 +22,8 @@ export default function PortfolioPage() {
   const unrealizedProfitLoss = holdings.reduce((total, holding) => total + holding.profitLoss, 0) +
     shortPositions.reduce((total, position) => total + position.unrealizedProfitLoss, 0);
   const holdingsCost = holdings.reduce((total, holding) => total + holding.costBasis, 0);
+  const shortLiability = shortPositions.reduce((total, position) => total + position.currentLiability, 0);
+  const shortEquity = shortPositions.reduce((total, position) => total + position.shortEquity, 0);
   const totalReturn = portfolioValue - STARTING_CASH;
   const dayChangePercent = portfolioValue - portfolioDayChange > 0
     ? (portfolioDayChange / (portfolioValue - portfolioDayChange)) * 100
@@ -239,6 +241,39 @@ export default function PortfolioPage() {
         </div>
       </div>
 
+      {shortPositions.length ? (
+        <RmiSection
+          title="Short Positions"
+          subtitle={`${shortPositions.length} open short position${shortPositions.length === 1 ? "" : "s"} · ${formatCurrency(shortLiability)} current liability`}
+        >
+          <div className="divide-y divide-line">
+            {shortPositions.map((position) => (
+              <article key={position.artistId} className="grid gap-4 p-4 sm:grid-cols-[minmax(180px,1fr)_repeat(4,minmax(90px,auto))_80px] sm:items-center">
+                <Link href={`/artists/${position.artistId}`} className="flex min-w-0 items-center gap-3 hover:text-cyan">
+                  <ArtistAvatar artist={position.artist} size="sm" />
+                  <span className="min-w-0">
+                    <span className="block truncate text-sm font-semibold">{position.artist.name}</span>
+                    <span className="block text-xs text-paper/40">${position.artist.ticker}</span>
+                  </span>
+                </Link>
+                <HoldingDetail label="Shares short" value={formatShares(position.shares)} />
+                <HoldingDetail label="Avg. fill" value={formatCurrency(position.averageShortPrice)} />
+                <HoldingDetail label="Liability" value={formatCurrency(position.currentLiability)} />
+                <PositionReturn
+                  amount={position.unrealizedProfitLoss}
+                  percent={position.collateral > 0 ? (position.unrealizedProfitLoss / position.collateral) * 100 : 0}
+                />
+                <HoldingTradeLink artistId={position.artistId} artistName={position.artist.name} side="cover" />
+              </article>
+            ))}
+          </div>
+          <div className="flex flex-wrap gap-x-6 gap-y-1 border-t border-line px-4 py-3 text-xs font-medium text-paper/50">
+            <span>Collateral equity {formatCurrency(shortEquity)}</span>
+            <span>Automatic cover at 30% maintenance equity</span>
+          </div>
+        </RmiSection>
+      ) : null}
+
       <TransactionHistory artists={state.artists} initialTransactions={state.transactions} />
     </div>
   );
@@ -316,17 +351,17 @@ function HoldingTradeLink({
 }: {
   artistId: string;
   artistName: string;
-  side: "buy" | "sell";
+  side: "buy" | "sell" | "short" | "cover";
   compact?: boolean;
 }) {
-  const label = side === "buy" ? "Buy" : "Sell";
-  const colorClass = side === "buy"
+  const label = side.charAt(0).toUpperCase() + side.slice(1);
+  const colorClass = side === "buy" || side === "cover"
     ? "text-mint hover:bg-mint/10"
     : "text-ember hover:bg-ember/10";
   const layoutClass = compact
-    ? `px-2 py-1.5 ${side === "sell" ? "border-l border-line" : ""}`
+    ? `px-2 py-1.5 ${side !== "buy" ? "border-l border-line" : ""}`
     : `inline-flex min-h-9 items-center justify-center rounded-md border font-semibold ${
-        side === "buy" ? "border-mint/35" : "border-ember/35"
+        side === "buy" || side === "cover" ? "border-mint/35" : "border-ember/35"
       }`;
 
   return (

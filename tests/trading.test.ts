@@ -5,7 +5,9 @@ import {
   estimateMarketMakerQuote,
   getDailyArtistBuyLimit,
   getMaximumBuyShares,
+  getMaximumShortShares,
   getRemainingDailyArtistBuyValue,
+  getRemainingDailyArtistShortValue,
   roundShareQuantityDown
 } from "@/lib/trading";
 
@@ -162,6 +164,44 @@ describe("market-maker trading economics", () => {
         { artistId: "nemzzz", type: "buy", shares: 10, price: 50, grossValue: 500, createdAt: "2026-07-30T12:00:00Z" }
       ]
     })).toBe(4_000);
+  });
+
+  it("caps short orders by collateral, exposure, and the rolling artist allowance", () => {
+    const maxShares = getMaximumShortShares({
+      cashBalance: 1_000,
+      remainingPositionValue: 10_000,
+      remainingDailyShortValue: 10_000,
+      midPrice: 50,
+      volatility: 1
+    });
+    const quote = estimateMarketMakerQuote({ side: "sell", midPrice: 50, shares: maxShares, volatility: 1 });
+    const oversized = estimateMarketMakerQuote({ side: "sell", midPrice: 50, shares: maxShares + 1, volatility: 1 });
+
+    expect(quote.orderValue * 0.5 + quote.commission).toBeLessThanOrEqual(1_000);
+    expect(oversized.orderValue * 0.5 + oversized.commission).toBeGreaterThan(1_000);
+    expect(getMaximumShortShares({
+      cashBalance: 25_000,
+      remainingPositionValue: 900,
+      remainingDailyShortValue: 5_000,
+      midPrice: 50,
+      volatility: 1
+    })).toBeLessThanOrEqual(18);
+  });
+
+  it("subtracts only recent short openings from the short allowance", () => {
+    const now = Date.parse("2026-09-01T18:00:00Z");
+
+    expect(getRemainingDailyArtistShortValue({
+      artistId: "young-thug",
+      portfolioValue: 25_000,
+      now,
+      transactions: [
+        { artistId: "young-thug", type: "short", shares: 10, price: 90, grossValue: 900, createdAt: "2026-09-01T12:00:00Z" },
+        { artistId: "young-thug", type: "cover", shares: 5, price: 89, grossValue: 445, createdAt: "2026-09-01T13:00:00Z" },
+        { artistId: "nav", type: "short", shares: 10, price: 75, grossValue: 750, createdAt: "2026-09-01T14:00:00Z" },
+        { artistId: "young-thug", type: "short", shares: 5, price: 90, grossValue: 450, createdAt: "2026-08-30T12:00:00Z" }
+      ]
+    })).toBe(4_100);
   });
 
   it("rounds share caps down to whole shares without exceeding the available quantity", () => {

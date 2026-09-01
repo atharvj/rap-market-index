@@ -77,6 +77,8 @@ type GameContextValue = {
   onboardingCompleted: boolean;
   buyShares: (artistId: string, shares: number) => Promise<TradeResult>;
   sellShares: (artistId: string, shares: number) => Promise<TradeResult>;
+  shortShares: (artistId: string, shares: number) => Promise<TradeResult>;
+  coverShares: (artistId: string, shares: number) => Promise<TradeResult>;
   toggleWatchlist: (artistId: string) => Promise<TradeResult>;
   simulateDay: () => void;
   resetPortfolio: () => void;
@@ -524,6 +526,72 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     [getArtist, getHolding, refreshServerState, session, syncMode]
   );
 
+  const shortShares = useCallback(
+    async (artistId: string, shares: number) => {
+      const artist = getArtist(artistId);
+
+      if (!artist) {
+        return { ok: false, message: "Artist not found." };
+      }
+
+      if (!Number.isFinite(shares) || shares <= 0 || !Number.isInteger(shares)) {
+        return { ok: false, message: "Enter a positive whole-share amount." };
+      }
+
+      if (getHolding(artistId)) {
+        return { ok: false, message: "Sell your long position before opening a short." };
+      }
+
+      if (!session) {
+        return { ok: false, message: "Sign in to trade." };
+      }
+
+      if (syncMode !== "supabase") {
+        return { ok: false, message: "Wait for your cloud profile to sync before trading." };
+      }
+
+      const result = await submitServerTrade({ side: "short", artistId, shares, accessToken: session.access_token });
+
+      if (result.ok) {
+        await refreshServerState();
+      }
+
+      return result;
+    },
+    [getArtist, getHolding, refreshServerState, session, syncMode]
+  );
+
+  const coverShares = useCallback(
+    async (artistId: string, shares: number) => {
+      const position = getShortPosition(artistId);
+
+      if (!position) {
+        return { ok: false, message: "No short position available to cover." };
+      }
+
+      if (!Number.isFinite(shares) || shares <= 0 || !Number.isInteger(shares) || shares > position.shares) {
+        return { ok: false, message: "Enter a valid whole-share amount to cover." };
+      }
+
+      if (!session) {
+        return { ok: false, message: "Sign in to trade." };
+      }
+
+      if (syncMode !== "supabase") {
+        return { ok: false, message: "Wait for your cloud profile to sync before trading." };
+      }
+
+      const result = await submitServerTrade({ side: "cover", artistId, shares, accessToken: session.access_token });
+
+      if (result.ok) {
+        await refreshServerState();
+      }
+
+      return result;
+    },
+    [getShortPosition, refreshServerState, session, syncMode]
+  );
+
   const toggleWatchlist = useCallback(
     async (artistId: string) => {
       const artist = getArtist(artistId);
@@ -602,6 +670,8 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       onboardingCompleted,
       buyShares,
       sellShares,
+      shortShares,
+      coverShares,
       toggleWatchlist,
       simulateDay,
       resetPortfolio,
@@ -632,6 +702,8 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       onboardingCompleted,
       buyShares,
       sellShares,
+      shortShares,
+      coverShares,
       toggleWatchlist,
       simulateDay,
       resetPortfolio,

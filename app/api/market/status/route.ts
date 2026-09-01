@@ -100,7 +100,7 @@ function buildFallbackStatus({ artistId }: { artistId: string | null }) {
     artistHalted: false,
     artistId,
     dayChangeReset: "12:01 AM ET",
-    supportsShorting: false,
+    supportsShorting: true,
     statusNote: "Continuous virtual trading is open.",
     mechanics: {
       dailyAnchor: "Daily source-based repricing creates the previous-close anchor.",

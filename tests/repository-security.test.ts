@@ -192,7 +192,9 @@ describe("repository security boundaries", () => {
     const publicSelect = publicProfile.match(/\.select\("([^"]*profile_is_public[^"]*)"\)/)?.[1] ?? "";
 
     expect(publicSelect).not.toContain("email");
-    expect(publicProfile).toContain("profileRow.portfolio_is_public ? await loadPublicHoldings");
+    expect(publicProfile).toContain("profileRow.portfolio_is_public");
+    expect(publicProfile).toContain("loadPublicHoldings(supabase, profileRow.id)");
+    expect(publicProfile).toContain("loadPublicShortPositions(supabase, profileRow.id)");
   });
 
   it("keeps trade ownership inside the authenticated database session", () => {

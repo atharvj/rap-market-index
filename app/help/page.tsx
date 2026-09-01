@@ -50,7 +50,7 @@ const topics = [
       "Trading may pause briefly while the daily market update is verified, while a newly detected artist catalyst is incorporated into the quote, or when market integrity controls are active.",
       "Rapid duplicate orders and daily activity can be limited to protect the fantasy market. Wait for the message shown on the ticket before trying again.",
       "The final execution price can differ slightly from the displayed quote because of spread and slippage.",
-      "Shorting is disabled while market-wide risk and liquidation controls are validated. Each artist is tracked automatically and must first build at least 30 recorded, meaningfully changing market sessions.",
+      "Eligible artists can be sold short after at least 30 recorded sessions spanning 28 days with meaningful quote movement. Short positions require 50% collateral, are capped at 25% of portfolio value per artist, and are automatically covered if maintenance equity falls to 30%.",
       "A positive daily move describes what already happened since the previous close; buying a current gainer does not automatically earn that past return.",
       "Fantasy commission adds realistic trading friction and discourages rapid flipping; no real money is charged.",
       "Buying and immediately selling normally loses fantasy cash because buys execute above the midpoint, sells execute below it, and each side pays fantasy commission.",
@@ -77,7 +77,7 @@ const topics = [
     summary: "Holdings, cost basis, cash, returns, allocation, and global ranking.",
     icon: WalletCards,
     answers: [
-      "Portfolio value equals available cash plus the current marked value of open positions.",
+      "Portfolio value equals available cash plus long market value and the remaining equity in open short positions.",
       "Cost basis records the average amount paid per share; gain or loss compares that basis with the current quote.",
       "Rankings compare fantasy portfolio values using the same starting cash balance."
     ]

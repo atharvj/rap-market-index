@@ -16,16 +16,25 @@ describe("shorting readiness", () => {
     expect(readiness.reason).toContain(`12/${MIN_SHORTING_RECORDED_SESSIONS}`);
   });
 
-  it("automatically marks a mature moving quote as data-ready while the platform gate remains closed", () => {
+  it("automatically enables a mature moving quote", () => {
     const readiness = getShortingReadiness(buildHistory(MIN_SHORTING_RECORDED_SESSIONS));
 
     expect(readiness.dataReady).toBe(true);
-    expect(readiness.enabled).toBe(false);
-    expect(readiness.reason).toContain("risk and liquidation controls");
+    expect(readiness.enabled).toBe(true);
+    expect(readiness.reason).toBe("Short selling available.");
   });
 
   it("does not qualify a flat placeholder series", () => {
     const history = buildHistory(MIN_SHORTING_RECORDED_SESSIONS).map((point) => ({ ...point, price: 50 }));
+
+    expect(getShortingReadiness(history).dataReady).toBe(false);
+  });
+
+  it("does not use old movement to qualify a recently flat quote", () => {
+    const history = buildHistory(70).map((point, index) => ({
+      ...point,
+      price: index < 30 ? point.price : 55
+    }));
 
     expect(getShortingReadiness(history).dataReady).toBe(false);
   });

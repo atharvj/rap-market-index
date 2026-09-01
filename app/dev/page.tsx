@@ -737,7 +737,7 @@ const plannedPowers = [
   },
   {
     title: "Shorting readiness",
-    detail: "Short position storage and cover logic exist. Public short trading stays off until UX and liquidation checks are ready.",
+    detail: "Short and cover orders are live for listings that pass the universal history gate, with collateral, exposure limits, and maintenance-margin covers.",
     status: "Foundation",
     icon: SlidersHorizontal
   }
@@ -3113,7 +3113,7 @@ function buildLaunchReadinessChecks(data: MarketHealth): LaunchReadinessCheck[] 
       label: "Shorting base is installed",
       ok: data.shortingFoundation.ready,
       severity: "warning",
-      detail: data.shortingFoundation.error ?? "Short/cover storage exists; UI can stay disabled until you are ready."
+          detail: data.shortingFoundation.error ?? "Short/cover storage and maintenance-risk monitoring are active."
     }
   ];
 }

@@ -22,9 +22,12 @@ import type { ReactNode } from "react";
 export default function ArtistDetailPage() {
   const params = useParams<{ id: string }>();
   const searchParams = useSearchParams();
-  const { getArtist, getHolding, state } = useGame();
+  const { getArtist, getHolding, getShortPosition, state } = useGame();
   const artist = getArtist(params.id);
-  const defaultTradeSide = searchParams.get("side") === "sell" ? "sell" : "buy";
+  const requestedSide = searchParams.get("side");
+  const defaultTradeSide = requestedSide === "sell" || requestedSide === "short" || requestedSide === "cover"
+    ? requestedSide
+    : "buy";
 
   if (!artist) {
     return (
@@ -39,6 +42,7 @@ export default function ArtistDetailPage() {
 
   const activeArtist = artist;
   const holding = getHolding(activeArtist.id);
+  const shortPosition = getShortPosition(activeArtist.id);
   const signalDrivers = getArtistSignalDrivers(activeArtist.stats);
   const recordedPrices = [...activeArtist.priceHistory.map((point) => point.price), activeArtist.currentPrice];
   const recordedHigh = Math.max(...recordedPrices);
@@ -148,6 +152,17 @@ export default function ArtistDetailPage() {
                 label={<span className="inline-flex items-center gap-1">Average Fill <AverageFillInfo align="right" /></span>}
                 value={formatCurrency(holding.averageBuyPrice)}
               />
+            </div>
+          </RmiSection>
+        ) : null}
+        {shortPosition ? (
+          <RmiSection title="Your Short Position">
+            <div className="space-y-2 p-4 text-sm">
+              <PositionRow label="Shares short" value={formatShares(shortPosition.shares)} />
+              <PositionRow label="Current liability" value={formatCurrency(shortPosition.currentLiability)} />
+              <PositionRow label="Average short fill" value={formatCurrency(shortPosition.averageShortPrice)} />
+              <PositionRow label="Collateral" value={formatCurrency(shortPosition.collateral)} />
+              <PositionRow label="Unrealized P/L" value={`${shortPosition.unrealizedProfitLoss >= 0 ? "+" : "-"}${formatCurrency(Math.abs(shortPosition.unrealizedProfitLoss))}`} />
             </div>
           </RmiSection>
         ) : null}
