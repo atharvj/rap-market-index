@@ -4,6 +4,7 @@ import type { Database } from "@/lib/supabase/database.types";
 import type { MarketObservationSeries } from "@/lib/types";
 import { getMarketDate, shiftMarketDate } from "@/server/market/market-date";
 import { reportServerError } from "@/server/observability";
+import { loadAllPages } from "@/lib/pagination";
 
 export const dynamic = "force-dynamic";
 
@@ -269,21 +270,19 @@ async function loadObservationSeries({
   artistId: string;
   range: ObservationRange;
 }): Promise<MarketObservationSeries[]> {
-  let query = supabase
-    .from("market_observations")
-    .select("source, metric, observed_date, value, unit")
-    .eq("artist_id", artistId)
-    .order("observed_date", { ascending: true });
-
-  if (range !== "ALL") {
-    query = query.gte("observed_date", shiftMarketDate(getMarketDate(), -RANGE_DAYS[range]));
-  }
-
-  const { data, error } = await query;
-
-  if (error) {
-    throw new Error(`Could not load market observations: ${error.message}`);
-  }
+  const data = await loadAllPages(async (from, to) => {
+    let query = supabase
+      .from("market_observations")
+      .select("source, metric, observed_date, value, unit")
+      .eq("artist_id", artistId)
+      .order("observed_date", { ascending: true }).order("source").order("metric");
+    if (range !== "ALL") {
+      query = query.gte("observed_date", shiftMarketDate(getMarketDate(), -RANGE_DAYS[range]));
+    }
+    const result = await query.range(from, to);
+    if (result.error) throw new Error(`Could not load market observations: ${result.error.message}`);
+    return result.data ?? [];
+  });
 
   const grouped = ((data ?? []) as ObservationRow[]).reduce<Record<string, MarketObservationSeries>>((memo, row) => {
     const key = `${row.source}:${row.metric}`;
