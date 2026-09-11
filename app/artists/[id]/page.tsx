@@ -70,7 +70,7 @@ export default function ArtistDetailPage() {
   const relatedArtists = getRelatedArtists(activeArtist, state.artists, 4);
 
   return (
-    <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_300px] xl:grid-cols-[minmax(0,1fr)_340px]">
+    <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_300px] xl:grid-cols-[minmax(0,1fr)_340px]">
       <main className="min-w-0 space-y-5">
         <section className="rmi-card relative p-5 sm:p-6">
           <div className="relative flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
@@ -142,7 +142,7 @@ export default function ArtistDetailPage() {
         </RmiSection>
       </main>
 
-      <aside className="space-y-4 lg:sticky lg:top-4 lg:max-h-[calc(100vh-2rem)] lg:self-start lg:overflow-y-auto lg:pr-1 scrollbar-thin">
+      <aside className="min-w-0 space-y-4 lg:sticky lg:top-4 lg:max-h-[calc(100vh-2rem)] lg:self-start lg:overflow-y-auto lg:pr-1 scrollbar-thin">
         <TradeTicket artist={activeArtist} defaultSide={defaultTradeSide} />
         {holding ? (
           <RmiSection title="Your Position">

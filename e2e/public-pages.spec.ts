@@ -587,7 +587,11 @@ test("artist history preserves movement and lets users inspect original quotes",
   await expect(section.getByText("$10.00", { exact: true }).first()).toBeVisible();
   await page.setViewportSize({ width: 390, height: 844 });
   await expect(section.getByRole("button", { name: "Original quotes", exact: true })).toBeVisible();
-  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true);
+  // ResponsiveContainer updates through ResizeObserver after the viewport changes.
+  // Wait for the rendered layout, while still failing any persistent overflow.
+  await expect.poll(() => page.evaluate(() =>
+    document.documentElement.scrollWidth - document.documentElement.clientWidth
+  )).toBeLessThanOrEqual(1);
 });
 
 test("public metrics do not use decorative colored side borders", async ({ page }) => {
