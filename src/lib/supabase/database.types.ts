@@ -325,6 +325,46 @@ export type Database = {
         Update: Partial<Database["public"]["Tables"]["user_feedback"]["Insert"]>;
         Relationships: [];
       };
+      product_analytics_events: {
+        Row: {
+          id: number;
+          event_name: "session_start" | "page_view" | "artist_view" | "signup_started" | "signup_completed" | "first_trade";
+          dedupe_key: string;
+          visitor_hash: string | null;
+          session_hash: string | null;
+          user_id: string | null;
+          path: string | null;
+          artist_id: string | null;
+          auth_method: "email" | "google" | null;
+          action: "buy" | "sell" | "short" | "cover" | null;
+          campaign_source: string | null;
+          campaign_medium: string | null;
+          campaign_name: string | null;
+          referrer_host: string | null;
+          occurred_at: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: number;
+          event_name: "session_start" | "page_view" | "artist_view" | "signup_started" | "signup_completed" | "first_trade";
+          dedupe_key: string;
+          visitor_hash?: string | null;
+          session_hash?: string | null;
+          user_id?: string | null;
+          path?: string | null;
+          artist_id?: string | null;
+          auth_method?: "email" | "google" | null;
+          action?: "buy" | "sell" | "short" | "cover" | null;
+          campaign_source?: string | null;
+          campaign_medium?: string | null;
+          campaign_name?: string | null;
+          referrer_host?: string | null;
+          occurred_at?: string;
+          created_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["product_analytics_events"]["Insert"]>;
+        Relationships: [];
+      };
       profiles: {
         Row: {
           id: string;
@@ -604,6 +644,12 @@ export type Database = {
           remaining: number;
           retry_after_seconds: number;
         }>;
+      };
+      get_product_analytics_summary: {
+        Args: {
+          p_days?: number;
+        };
+        Returns: Json;
       };
       execute_artist_trade_as_user: {
         Args: {

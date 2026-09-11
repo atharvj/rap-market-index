@@ -1,9 +1,14 @@
+import { buildAudienceScaleCalibration } from "@/server/market/audience-scale";
+import { collectSpotifyPublicSignals } from "@/server/market/spotify-public-source";
+import { collectYoutubeMarketSignals } from "@/server/market/youtube-source";
+import { collectLastfmMarketSignals } from "@/server/market/lastfm-source";
+import { mergeAdapterSignals } from "@/server/market/daily-update";
+import { getMarketDate } from "@/server/market/market-date";
+import type { ArtistExternalIds } from "@/server/market/market-data";
 import { NextResponse } from "next/server";
 import { formatArtistDisplayName, getArtistTickerOverride } from "@/lib/artist-display-name";
 import { calculateHypeScore, getDailyChangePercent } from "@/lib/pricing";
 import {
-  calculateSpotifyStarterPrice,
-  calculateYoutubeStarterPrice,
   getStarterCategory,
   getStarterVolatility
 } from "@/lib/starter-valuation";
@@ -12,10 +17,12 @@ import type { Database } from "@/lib/supabase/database.types";
 import type { ArtistCategory, HypeStats } from "@/lib/types";
 import { requireAdminRequest } from "@/server/admin-auth";
 import type { MarketUpdateArtist } from "@/server/market/daily-update";
-import { resolveArtistSourceIds, type SourceIdCandidate } from "@/server/market/source-id-resolver";
-import { loadArtistExternalIds, upsertArtistExternalIds } from "@/server/market/supabase-repository";
+import { resolveArtistSourceIds } from "@/server/market/source-id-resolver";
+import { loadArtistExternalIds, persistMarketObservations, upsertArtistExternalIds } from "@/server/market/supabase-repository";
+import { getMarketModelVersion } from "@/server/market/model-version";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 120;
 
 type ArtistRow = Database["public"]["Tables"]["artists"]["Row"];
 
@@ -105,7 +112,7 @@ export async function POST(request: Request) {
     }
 
     const ticker = getUniqueTicker(name, existingRows);
-    const starter = getDefaultStarterListing(name);
+    const starter = getDefaultStarterListing();
     const artist = buildMarketArtist({
       id: artistId,
       name,
@@ -127,7 +134,25 @@ export async function POST(request: Request) {
       minConfidence: 0.88,
       delayMs: 0
     });
-    const valuation = estimateStarterValuation(resolverResult.suggestions[0]?.candidates ?? {}, starter);
+    const previewSourceIds = normalizePreviewSourceIds(body.sourceIds, artist.id);
+    const sourceRecords = previewSourceIds ? [previewSourceIds] : resolverResult.records;
+    const record = sourceRecords[0];
+    const verifiedIds: Record<string, ArtistExternalIds> = record ? { [artist.id]: {
+      artistId: artist.id, spotifyId: record.spotifyId ?? undefined,
+      youtubeChannelId: record.youtubeChannelId ?? undefined, musicbrainzId: record.musicbrainzId ?? undefined,
+      lastfmName: record.lastfmName ?? undefined
+    } } : {};
+    const audienceOptions = { artists: [artist], externalIds: verifiedIds, runDate: getMarketDate(), delayMs: 0 };
+    const [spotifyAudience, youtubeAudience, lastfmAudience] = await Promise.all([
+      collectSpotifyPublicSignals(audienceOptions),
+      collectYoutubeMarketSignals({ ...audienceOptions, apiKey: process.env.YOUTUBE_API_KEY }),
+      collectLastfmMarketSignals({ ...audienceOptions, apiKey: process.env.LASTFM_API_KEY })
+    ]);
+    const calibration = buildAudienceScaleCalibration(mergeAdapterSignals(spotifyAudience.signals, youtubeAudience.signals, lastfmAudience.signals)[artist.id] ?? { stats: {}, rawPayload: {} });
+    const price = calibration.targetPrice ?? starter.price;
+    const category = getStarterCategory(price);
+    const valuation = { price, category, volatility: getStarterVolatility(category), source: calibration.targetPrice ? "verified_audience" : "default" };
+    resolverResult.warnings.push(...spotifyAudience.warnings, ...youtubeAudience.warnings, ...lastfmAudience.warnings);
     const valuedArtist = {
       ...artist,
       currentPrice: valuation.price,
@@ -137,30 +162,38 @@ export async function POST(request: Request) {
     };
     let finalArtist = mapMarketArtist(valuedArtist);
     let savedSourceIds: Awaited<ReturnType<typeof upsertArtistExternalIds>> = {};
-    const previewSourceIds = dryRun ? null : normalizePreviewSourceIds(body.sourceIds, artist.id);
-    const sourceRecords = previewSourceIds ? [previewSourceIds] : resolverResult.records;
     const listingReadiness = getListingReadiness(sourceRecords[0]);
 
     if (!dryRun) {
-      if (!listingReadiness.ready) {
+      if (!listingReadiness.ready || calibration.directSourceCount < 2 || valuation.source === "default") {
         return NextResponse.json(
           {
             ok: false,
-            error: `${name} is not ready to list. Add a verified YouTube channel plus a Spotify or MusicBrainz ID so its daily inputs can build real baselines instead of a permanently flat quote.`,
+            error: `${name} is not ready to list. A verified YouTube channel, Spotify or MusicBrainz identity, and usable audience measurements from at least two platforms are required.`,
             listingReadiness
           },
           { status: 422 }
         );
       }
 
-      if (valuation.source === "default") {
-        finalArtist = mapArtistRow(await upsertArtist(supabase, valuedArtist));
-      } else {
-        await upsertArtist(supabase, valuedArtist);
-        finalArtist = mapArtistRow(await updateStarterValuation(supabase, valuedArtist));
-      }
-
+      // Keep incomplete listings off the market until their source records,
+      // measurements and honest opening history are all saved.
+      await upsertArtist(supabase, valuedArtist);
       savedSourceIds = sourceRecords.length ? await upsertArtistExternalIds(supabase, sourceRecords) : {};
+      await persistMarketObservations(supabase, [...spotifyAudience.observations, ...youtubeAudience.observations, ...lastfmAudience.observations]);
+      const modelVersion = getMarketModelVersion();
+      const opening = await supabase.from("price_history").insert({
+        artist_id: artist.id, price_date: audienceOptions.runDate, price: valuation.price,
+        hype_score: valuedArtist.hypeScore, model_version: modelVersion,
+        explanation: `${artist.ticker} opened using the shared verified audience valuation.`
+      });
+      if (opening.error) throw new Error(`Could not save opening history: ${opening.error.message}`);
+      const tick = await supabase.from("price_ticks").insert({
+        artist_id: artist.id, price: valuation.price, source: "market_run", model_version: modelVersion,
+        raw_payload: { source: "listing_open", runDate: audienceOptions.runDate }
+      });
+      if (tick.error) throw new Error(`Could not save opening quote: ${tick.error.message}`);
+      finalArtist = mapArtistRow(await updateStarterValuation(supabase, valuedArtist));
     }
 
     return NextResponse.json({
@@ -168,7 +201,7 @@ export async function POST(request: Request) {
       persisted: !dryRun,
       config,
       record: finalArtist,
-      sourceIds: dryRun ? resolverResult.records[0] ?? null : savedSourceIds[artist.id] ?? null,
+      sourceIds: dryRun ? sourceRecords[0] ?? null : savedSourceIds[artist.id] ?? null,
       resolver: {
         proposedRecordCount: resolverResult.records.length,
         warnings: resolverResult.warnings,
@@ -264,7 +297,7 @@ async function upsertArtist(supabase: ReturnType<typeof createServiceRoleClient>
     category: artist.category,
     accent: getAccent(artist.name),
     last_move_explanation: `${artist.ticker} was added to the market roster.`,
-    is_active: true
+    is_active: false
   };
   const { data, error } = await supabase.from("artists").insert(row).select("*").single();
 
@@ -304,7 +337,8 @@ async function updateStarterValuation(
       daily_change_percent: getDailyChangePercent(artist.currentPrice, artist.previousClose),
       volatility: artist.volatility,
       category: artist.category,
-      last_move_explanation: `${artist.ticker} was added with an estimated starting price from verified public source IDs.`
+      last_move_explanation: `${artist.ticker} opened using the shared verified audience valuation.`,
+      is_active: true
     })
     .eq("id", artist.id)
     .select("*")
@@ -345,9 +379,8 @@ function buildMarketArtist({
   };
 }
 
-function getDefaultStarterListing(name: string) {
-  const compactName = compactArtistName(name);
-  const price = compactName.length <= 5 ? 15 : 25;
+function getDefaultStarterListing() {
+  const price = 25;
   const category: ArtistCategory = price >= 22 ? "rising" : "underground";
 
   return {
@@ -356,52 +389,6 @@ function getDefaultStarterListing(name: string) {
     volatility: category === "rising" ? 1.6 : 1.9,
     source: "default"
   };
-}
-
-function estimateStarterValuation(
-  candidates: Partial<Record<"spotify" | "youtube" | "musicbrainz", SourceIdCandidate[]>>,
-  fallback: ReturnType<typeof getDefaultStarterListing>
-) {
-  const spotify = candidates.spotify?.[0];
-  const youtube = candidates.youtube?.[0];
-  const prices = [
-    spotify && spotify.confidence >= 0.88
-      ? calculateSpotifyStarterPrice({
-          popularity: getNumericMetadata(spotify, "popularity"),
-          followers: getNumericMetadata(spotify, "followers")
-        })
-      : null,
-    youtube && youtube.confidence >= 0.88
-      ? calculateYoutubeStarterPrice({
-          subscribers: getNumericMetadata(youtube, "subscribers"),
-          views: getNumericMetadata(youtube, "views")
-        })
-      : null
-  ].filter((value): value is number => typeof value === "number" && Number.isFinite(value));
-
-  if (!prices.length) {
-    return fallback;
-  }
-
-  const price = roundMoney(Math.max(...prices));
-  const category = getStarterCategory(price);
-
-  return {
-    source: spotify && spotify.confidence >= 0.88 ? "spotify/youtube" : "youtube",
-    price,
-    category,
-    volatility: getStarterVolatility(category)
-  };
-}
-
-function getNumericMetadata(candidate: SourceIdCandidate, key: string) {
-  const value = candidate.metadata[key];
-
-  if (typeof value === "number" && Number.isFinite(value)) {
-    return value;
-  }
-
-  return null;
 }
 
 function getUniqueArtistId(baseId: string, existingRows: ArtistRow[]) {

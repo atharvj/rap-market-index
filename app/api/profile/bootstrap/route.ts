@@ -12,6 +12,7 @@ import { STARTING_CASH } from "@/lib/trading";
 import { enforceRateLimit } from "@/server/rate-limit";
 import { requireConfirmedUser } from "@/server/user-auth";
 import { mapMarketTradeEvent, type MarketTradeEventRow } from "@/server/market-trade-events";
+import { recordServerProductEvent } from "@/server/product-analytics";
 
 export const dynamic = "force-dynamic";
 
@@ -88,6 +89,16 @@ export async function POST(request: Request) {
       loadShortPositions(profileSupabase, user.id),
       loadTransactions(profileSupabase, user.id)
     ]);
+
+    await recordServerProductEvent({
+      supabase: profileSupabase,
+      event: {
+        eventName: "signup_completed",
+        userId: user.id,
+        occurredAt: profile.created_at,
+        authMethod: user.app_metadata?.provider === "google" ? "google" : "email"
+      }
+    });
 
     return NextResponse.json(
       {

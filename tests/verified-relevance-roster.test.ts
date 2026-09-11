@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { createInitialArtists } from "@/data/mockArtists";
 import { formatArtistDisplayName, getArtistTickerOverride } from "@/lib/artist-display-name";
-import { calculateYoutubeStarterPrice, getStarterCategory, getStarterVolatility } from "@/lib/starter-valuation";
+import { getStarterCategory, getStarterVolatility } from "@/lib/starter-valuation";
 
 const VERIFIED_LISTINGS = [
   { id: "polo-g", price: 85.58, subscribers: 6_510_000, views: 4_557_756_498 },
@@ -17,18 +17,13 @@ const VERIFIED_LISTINGS = [
 ] as const;
 
 describe("verified relevance roster", () => {
-  it("derives every opening quote from the shared source-backed formula", () => {
+  it("preserves recorded historical openings across valuation model changes", () => {
     const artists = new Map(createInitialArtists().map((artist) => [artist.id, artist]));
 
     for (const listing of VERIFIED_LISTINGS) {
-      const calculatedPrice = calculateYoutubeStarterPrice({
-        subscribers: listing.subscribers,
-        views: listing.views
-      });
-      const price = Math.round((calculatedPrice ?? 0) * 100) / 100;
+      const price = listing.price;
       const artist = artists.get(listing.id);
 
-      expect(price).toBe(listing.price);
       expect(artist).toBeDefined();
       expect(artist?.currentPrice).toBe(price);
       expect(artist?.previousClose).toBe(price);

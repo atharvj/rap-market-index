@@ -332,6 +332,10 @@ function getMarketBootTitle(pathname: string) {
     "/about": "About Rap Market Index"
   };
 
+  if (pathname.startsWith("/dev/analytics")) {
+    return "Release Analytics";
+  }
+
   if (pathname.startsWith("/artists/")) {
     return "Artist Quote";
   }

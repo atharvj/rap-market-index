@@ -2,6 +2,10 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 const SHARED_RULE_FILES = [
+  "src/lib/audience-valuation.ts",
+  "src/lib/starter-valuation.ts",
+  "src/server/market/audience-revaluation.ts",
+  "src/server/market/spotify-public-source.ts",
   "src/server/market/audience-scale.ts",
   "src/server/market/daily-update.ts",
   "src/server/market/intraday-refresh.ts",

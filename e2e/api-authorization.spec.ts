@@ -17,10 +17,11 @@ test("private APIs reject anonymous callers", async ({ request }) => {
 });
 
 test("admin APIs reject anonymous callers", async ({ request }) => {
-  const response = await request.get("/api/admin/market-health");
-
-  expect([401, 403]).toContain(response.status());
-  await expect(response.json()).resolves.toMatchObject({ ok: false });
+  for (const path of ["/api/admin/market-health", "/api/admin/product-analytics"]) {
+    const response = await request.get(path);
+    expect([401, 403]).toContain(response.status());
+    await expect(response.json()).resolves.toMatchObject({ ok: false });
+  }
 });
 
 test("cross-site browser mutations are rejected before route handling", async ({ request }) => {

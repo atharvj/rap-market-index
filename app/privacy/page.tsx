@@ -17,6 +17,11 @@ const sections = [
     body: "RMI uses Supabase for authentication and database storage and Vercel for hosting. Artist images, supporting media, and credited news may load from their original publisher, YouTube, Wikimedia, or another identified source."
   },
   {
+    id: "analytics",
+    title: "Product Analytics",
+    body: "RMI records limited first-party usage events to understand whether the release experience works: browser sessions, page and artist views, signup starts and completions, first trades, return visits, and optional campaign tags in shared links. Random browser and session identifiers are one-way hashed before storage. This analytics record does not store raw IP addresses, email addresses, passwords, order amounts, or browsing activity outside RMI. Browser Do Not Track is respected, access is limited to authorized operators, and event rows are removed after 180 days."
+  },
+  {
     id: "controls",
     title: "Your Controls",
     body: "You can edit your display name, profile details, avatar, favorite artists, and public visibility. A non-administrator account can be deleted from Account Settings after password verification or recent Google authentication. Deletion removes the Supabase authentication user—including linked sign-in methods—and the associated profile, portfolio, watchlist, and trading records. It does not delete the user's Google account."
@@ -33,7 +38,7 @@ export default function PrivacyPage() {
     <PolicyDocument
       title="Privacy Policy"
       summary="This policy explains what account information RMI uses, what other traders can see, and the controls available to you."
-      effectiveDate="July 21, 2026"
+      effectiveDate="September 5, 2026"
       sections={sections}
       link={{ href: "/settings", label: "Open Account Settings" }}
     />

@@ -75,6 +75,13 @@ describe("trade-flow market source", () => {
     );
   });
 
+  it("includes eligible orders beyond the backend page cap", async () => {
+    const trades = Array.from({ length: 1_005 }, (_, index) => trade(`user-${index}`, "buy", 20));
+    const result = await collectTradeFlowMarketSignals({ supabase: createSupabaseMock({ trades }), artists: [artist], runDate: "2026-07-29" });
+    expect(result.signals.artist.rawPayload.tradeCount).toBe(1_005);
+    expect(result.signals.artist.rawPayload.uniqueTraderCount).toBe(1_005);
+  });
+
   it("fails closed when excluded-account status cannot be verified", async () => {
     const supabase = createSupabaseMock({
       trades: [trade("user-1", "buy", 1_000)],
@@ -124,7 +131,7 @@ function createSupabaseMock({
           gte: () => builder,
           lt: () => builder,
           order: () => builder,
-          limit: async () => ({ data: trades, error: null })
+          range: async (from: number, to: number) => ({ data: trades.slice(from, to + 1), error: null })
         };
 
         return builder;

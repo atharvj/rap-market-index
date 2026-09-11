@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import { AuthProvider } from "@/components/AuthProvider";
 import { GameProvider } from "@/components/GameProvider";
+import { ProductAnalytics } from "@/components/ProductAnalytics";
 import { Shell } from "@/components/Shell";
 import {
   getSiteUrl,
@@ -115,6 +116,7 @@ export default function RootLayout({
           dangerouslySetInnerHTML={{ __html: websiteStructuredData }}
         />
         <AuthProvider>
+          <ProductAnalytics />
           <GameProvider>
             <Shell>{children}</Shell>
           </GameProvider>

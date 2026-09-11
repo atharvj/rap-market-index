@@ -278,14 +278,14 @@ async function buildResetCalibration(
   const artists = (data ?? []) as ResetArtist[];
   const artistIds = artists.map((artist) => artist.id);
   const beforeDate = shiftMarketDate(getMarketDate(), 1);
-  const [lastfm, youtube, wikimedia] = await Promise.all([
+  const [lastfm, youtube, spotify] = await Promise.all([
     loadObservationBaselines({
       supabase,
       artistIds,
       source: "lastfm",
       metrics: ["listeners", "playcount"],
       beforeDate,
-      lookbackDays: 60,
+      lookbackDays: 7,
       strategy: "latest"
     }),
     loadObservationBaselines({
@@ -294,16 +294,16 @@ async function buildResetCalibration(
       source: "youtube",
       metrics: ["subscriber_count", "channel_views"],
       beforeDate,
-      lookbackDays: 60,
+      lookbackDays: 7,
       strategy: "latest"
     }),
     loadObservationBaselines({
       supabase,
       artistIds,
-      source: "wikimedia",
-      metrics: ["pageviews_7d"],
+      source: "spotify_public",
+      metrics: ["monthly_listeners"],
       beforeDate,
-      lookbackDays: 60,
+      lookbackDays: 7,
       strategy: "latest"
     })
   ]);
@@ -324,9 +324,7 @@ async function buildResetCalibration(
           subscriberCount: youtube[artist.id]?.subscriber_count,
           viewCount: youtube[artist.id]?.channel_views
         },
-        wikimedia: {
-          pageviews7d: wikimedia[artist.id]?.pageviews_7d
-        }
+        spotify_public: { monthlyListeners: spotify[artist.id]?.monthly_listeners }
       }
     });
 

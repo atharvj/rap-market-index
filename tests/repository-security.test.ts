@@ -235,6 +235,26 @@ describe("repository security boundaries", () => {
     expect(migration).not.toMatch(/create policy/i);
   });
 
+  it("keeps product analytics private, bounded, and server-authoritative", () => {
+    const publicRoute = readTrackedFile("app/api/analytics/events/route.ts");
+    const adminRoute = readTrackedFile("app/api/admin/product-analytics/route.ts");
+    const migration = readTrackedFile("supabase/migrations/044_product_analytics.sql");
+
+    expect(publicRoute).toContain('scope: "product-analytics-ip"');
+    expect(publicRoute).toContain("getRequestIp(request)");
+    expect(publicRoute).toContain("validateProductAnalyticsEvent(body)");
+    expect(publicRoute).not.toMatch(/request(?:Body|Data|Payload)?\.userId/);
+    expect(adminRoute).toContain("requireAdminRequest(request");
+    expect(adminRoute).toContain('rpc("get_product_analytics_summary"');
+    expect(migration).toContain("alter table public.product_analytics_events enable row level security");
+    expect(migration).toContain(
+      "revoke all on table public.product_analytics_events from public, anon, authenticated"
+    );
+    expect(migration).toContain("grant all on table public.product_analytics_events to service_role");
+    expect(migration).toContain("occurred_at < clock_timestamp() - interval '180 days'");
+    expect(migration).not.toMatch(/create policy/i);
+  });
+
   it("keeps paginated transaction history private to the authenticated account", () => {
     const route = readTrackedFile("app/api/profile/transactions/route.ts");
 

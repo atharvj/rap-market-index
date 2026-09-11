@@ -1,3 +1,4 @@
+import { loadAllPages } from "@/lib/pagination";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { clamp } from "@/lib/pricing";
 import type { Database } from "@/lib/supabase/database.types";
@@ -53,7 +54,6 @@ const LARGEST_TRADER_SHARE = "largest_trader_share";
 const BREADTH_MULTIPLIER = "breadth_multiplier";
 const CONCENTRATION_PENALTY = "concentration_penalty";
 const SIGNAL_ELIGIBILITY = "signal_eligibility";
-const MAX_TRADE_ROWS = 10000;
 const MIN_SIGNAL_TRADERS = 3;
 const MIN_SIGNAL_GROSS_ORDER_VALUE = 1000;
 const MAX_SIGNAL_LARGEST_TRADER_SHARE = 0.7;
@@ -79,23 +79,15 @@ export async function collectTradeFlowMarketSignals({
     lookbackDays,
     through
   });
-  const { data, error } = await supabase
-    .from("market_trade_events")
-    .select("artist_id,user_id,type,shares,price,cash_delta,gross_value,market_eligible,created_at")
-    .in("artist_id", artistIds)
-    .eq("market_eligible", true)
-    .gte("created_at", windowStart)
-    .lt("created_at", windowEnd)
-    .order("created_at", { ascending: false })
-    .limit(MAX_TRADE_ROWS);
-
-  if (error) {
-    if (error.message.includes("market_trade_events")) {
-      throw new Error("Could not load trade flow: run supabase/migrations/018_short_selling_foundation.sql.");
-    }
-
-    throw new Error(`Could not load trade flow: ${error.message}`);
-  }
+  const data = await loadAllPages(async (from, to) => {
+    const { data, error } = await supabase.from("market_trade_events")
+      .select("artist_id,user_id,type,shares,price,cash_delta,gross_value,market_eligible,created_at")
+      .in("artist_id", artistIds).eq("market_eligible", true)
+      .gte("created_at", windowStart).lt("created_at", windowEnd)
+      .order("created_at", { ascending: false }).order("id").range(from, to);
+    if (error) throw new Error(`Could not load complete trade flow: ${error.message}`);
+    return data ?? [];
+  }, { maxPages: 100 });
 
   const { data: excludedProfiles, error: excludedProfilesError } = await supabase
     .from("profiles")
@@ -137,10 +129,6 @@ export async function collectTradeFlowMarketSignals({
   }
 
   const warnings: string[] = [];
-
-  if ((data?.length ?? 0) >= MAX_TRADE_ROWS) {
-    warnings.push("Trade-flow signal hit the row cap; add a SQL aggregate before scaling trading volume further.");
-  }
 
   if (suppressedSignalCount > 0) {
     warnings.push(

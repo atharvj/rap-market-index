@@ -1,3 +1,4 @@
+import { pruneProductAnalyticsEvents } from "@/server/product-analytics";
 import { NextResponse } from "next/server";
 import { createServiceRoleClient, getSupabaseConfigStatus } from "@/lib/supabase/server";
 import { getMarketDate } from "@/server/market/market-date";
@@ -49,6 +50,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ ok: false, error: "MARKET_UPDATE_SECRET is not configured." }, { status: 500 });
   }
 
+  await pruneProductAnalyticsEvents();
   const current = await loadReleaseWindowStatus(createServiceRoleClient());
 
   if (current.ready && !force) {

@@ -12,6 +12,7 @@ import { reportServerError } from "@/server/observability";
 import { requireConfirmedUser } from "@/server/user-auth";
 import { liquidateUnderMarginedShorts } from "@/server/short-risk";
 import { loadArtistShortingEligibility } from "@/server/shorting-eligibility";
+import { recordServerProductEvent } from "@/server/product-analytics";
 
 export const dynamic = "force-dynamic";
 
@@ -228,6 +229,16 @@ export async function POST(request: Request) {
   } catch (riskError) {
     reportServerError(riskError, "trade.short-risk");
   }
+
+  await recordServerProductEvent({
+    supabase: serviceSupabase,
+    event: {
+      eventName: "first_trade",
+      userId: authUser.id,
+      artistId,
+      action: side
+    }
+  });
 
   return NextResponse.json({
     ok: true,

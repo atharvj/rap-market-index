@@ -1,3 +1,6 @@
+import { VERIFIED_SPOTIFY_ARTISTS } from "@/data/spotifyArtistIds";
+import { priceForTrendAnalysis, readAudienceRevaluation, type AudienceRevaluation } from "@/server/market/audience-revaluation";
+import { loadAllPages } from "@/lib/pagination";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database, Json } from "@/lib/supabase/database.types";
 import type {
@@ -264,16 +267,27 @@ export async function loadPriceTrendContexts({
   }
 
   const startDate = shiftDate(runDate, -lookbackDays);
-  const { data, error } = await supabase
-    .from("price_history")
-    .select("artist_id,price,price_date")
-    .in("artist_id", artistIds)
-    .gte("price_date", startDate)
-    .lt("price_date", runDate)
-    .order("price_date", { ascending: true });
-
-  if (error) {
-    throw new Error(`Could not load price trend contexts: ${error.message}`);
+  const [data, boundaries] = await Promise.all([
+    loadAllPages(async (from, to) => {
+      const result = await supabase.from("price_history").select("artist_id,price,price_date")
+        .in("artist_id", artistIds).gte("price_date", startDate).lt("price_date", runDate)
+        .order("price_date").order("artist_id").range(from, to);
+      if (result.error) throw new Error(`Could not load price trend contexts: ${result.error.message}`);
+      return result.data ?? [];
+    }),
+    loadAllPages(async (from, to) => {
+      const result = await supabase.from("market_signal_snapshots").select("artist_id,source_date,raw_payload")
+        .in("artist_id", artistIds).gte("source_date", startDate).lt("source_date", runDate)
+        .not("raw_payload->audienceRevaluation", "is", null).order("source_date").order("artist_id").range(from, to);
+      if (result.error) throw new Error(`Could not load valuation history: ${result.error.message}`);
+      return result.data ?? [];
+    })
+  ]);
+  const adjustments: Record<string, AudienceRevaluation[]> = {};
+  for (const row of boundaries) {
+    const raw = row.raw_payload as Record<string, unknown> | null;
+    const record = readAudienceRevaluation(raw?.audienceRevaluation, row.source_date);
+    if (record) (adjustments[row.artist_id] ??= []).push(record);
   }
 
   const grouped = ((data ?? []) as Pick<
@@ -282,7 +296,7 @@ export async function loadPriceTrendContexts({
   >[]).reduce<Record<string, Array<{ price: number; priceDate: string }>>>((memo, row) => {
     memo[row.artist_id] ??= [];
     memo[row.artist_id].push({
-      price: Number(row.price),
+      price: priceForTrendAnalysis(Number(row.price), row.price_date, adjustments[row.artist_id] ?? []),
       priceDate: row.price_date
     });
     return memo;
@@ -396,7 +410,7 @@ export async function loadArtistExternalIds(
   return ((data ?? []) as ArtistExternalIdsRow[]).reduce<Record<string, ArtistExternalIds>>((grouped, row) => {
     grouped[row.artist_id] = {
       artistId: row.artist_id,
-      spotifyId: row.spotify_id ?? undefined,
+      spotifyId: row.spotify_id ?? (VERIFIED_SPOTIFY_ARTISTS[row.artist_id]?.musicbrainzId === row.musicbrainz_id ? VERIFIED_SPOTIFY_ARTISTS[row.artist_id].spotifyId : undefined),
       youtubeChannelId: row.youtube_channel_id ?? undefined,
       musicbrainzId: row.musicbrainz_id ?? undefined,
       wikipediaArticleTitle: row.wikipedia_article_title ?? undefined,
@@ -483,48 +497,20 @@ export async function loadObservationBaselines({
   const startDate = shiftDate(beforeDate, -lookbackDays);
   const annualStartDate = shiftDate(beforeDate, -372);
   const annualEndDate = shiftDate(beforeDate, -358);
-  const [recentResult, annualResult] = await Promise.all([
-    supabase
-      .from("market_observations")
+  const loadWindow = (start: string, end: string, inclusive: boolean) => loadAllPages(async (from, to) => {
+    let query = supabase.from("market_observations")
       .select("artist_id,metric,value,observed_date,observed_at")
-      .in("artist_id", artistIds)
-      .eq("source", source)
-      .in("metric", metrics)
-      .gte("observed_date", startDate)
-      .lt("observed_date", beforeDate)
-      .order("observed_date", { ascending: false })
-      .limit(10000),
-    annualComparison
-      ? supabase
-          .from("market_observations")
-          .select("artist_id,metric,value,observed_date,observed_at")
-          .in("artist_id", artistIds)
-          .eq("source", source)
-          .in("metric", metrics)
-          .gte("observed_date", annualStartDate)
-          .lte("observed_date", annualEndDate)
-          .order("observed_date", { ascending: false })
-          .limit(10000)
-      : Promise.resolve({ data: [], error: null })
+      .in("artist_id", artistIds).eq("source", source).in("metric", metrics).gte("observed_date", start);
+    query = inclusive ? query.lte("observed_date", end) : query.lt("observed_date", end);
+    const { data, error } = await query.order("observed_date", { ascending: false })
+      .order("artist_id").order("metric").range(from, to);
+    if (error) throw new Error(`Could not load observation baselines: ${error.message}`);
+    return data ?? [];
+  });
+  const [rows, annualRows] = await Promise.all([
+    loadWindow(startDate, beforeDate, false),
+    annualComparison ? loadWindow(annualStartDate, annualEndDate, true) : Promise.resolve([])
   ]);
-  const { data, error } = recentResult;
-
-  if (error) {
-    throw new Error(`Could not load observation baselines: ${error.message}`);
-  }
-
-  if (annualResult.error) {
-    throw new Error(`Could not load annual observation baselines: ${annualResult.error.message}`);
-  }
-
-  const rows = (data ?? []) as Pick<
-    MarketObservationRow,
-    "artist_id" | "metric" | "value" | "observed_date" | "observed_at"
-  >[];
-  const annualRows = (annualResult.data ?? []) as Pick<
-    MarketObservationRow,
-    "artist_id" | "metric" | "value" | "observed_date" | "observed_at"
-  >[];
 
   if (strategy === "latest") {
     const baselines = rows.reduce<ObservationBaselines>((memo, row) => {

@@ -31,6 +31,7 @@ const SERIES_DEFINITIONS: Record<string, { label: string; unit: string }> = {
     label: "Last.fm plays",
     unit: "plays"
   },
+  "spotify_public:monthly_listeners": { label: "Spotify monthly listeners", unit: "listeners" },
   "spotify:popularity": {
     label: "Spotify popularity",
     unit: "score"

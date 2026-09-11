@@ -1,3 +1,4 @@
+import { pruneProductAnalyticsEvents } from "@/server/product-analytics";
 import { NextResponse } from "next/server";
 import { createServiceRoleClient, getSupabaseConfigStatus } from "@/lib/supabase/server";
 import { deleteExpiredAccountRecreationCooldowns } from "@/server/account-recreation";
@@ -171,6 +172,7 @@ export async function GET(request: Request) {
 
 async function runAccountCooldownCleanup() {
   try {
+    await pruneProductAnalyticsEvents();
     const removedCount = await deleteExpiredAccountRecreationCooldowns({
       supabase: createServiceRoleClient()
     });

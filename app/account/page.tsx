@@ -12,6 +12,7 @@ import { formatAuthErrorMessage } from "@/lib/auth-errors";
 import { getEmailDomainWarning } from "@/lib/email-address";
 import { getUsernameValidationError, normalizeUsernameInput, USERNAME_REQUIREMENTS } from "@/lib/username";
 import { getBrowserSupabaseClient } from "@/lib/supabase/client";
+import { trackProductEvent } from "@/lib/product-analytics";
 import { Camera, CalendarDays, Eye, EyeOff, ImagePlus, LogOut, Plus, Search, Star, Trash2, WalletCards, X } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -29,6 +30,7 @@ type ProfileDetailsResponse = {
 };
 
 const turnstileSiteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY?.trim() ?? "";
+const emailSignupEnabled = process.env.NEXT_PUBLIC_EMAIL_SIGNUP_ENABLED === "true";
 
 export default function AccountPage() {
   return (
@@ -197,6 +199,13 @@ function AccountPageContent() {
     }
 
     setUsernameMessage("");
+    if (mode === "signup") {
+      trackProductEvent({
+        eventName: "signup_started",
+        path: "/account",
+        authMethod: "email"
+      });
+    }
     const result =
       mode === "signin"
         ? await signIn(normalizedEmail, password, captchaToken ?? undefined)
@@ -283,6 +292,13 @@ function AccountPageContent() {
 
   async function continueWithGoogle() {
     setSubmitting(true);
+    if (mode === "signup") {
+      trackProductEvent({
+        eventName: "signup_started",
+        path: "/account",
+        authMethod: "google"
+      });
+    }
     const result = await signInWithGoogle();
     setMessage(result.message);
     setMessageTone(result.ok ? "info" : "error");
@@ -482,89 +498,10 @@ function AccountPageContent() {
           </p>
         </header>
 
-        {mode === "signup" ? (
-          <div className="rounded-[var(--radius-panel)] border border-brass/35 bg-brass/10 px-4 py-3 text-sm leading-6 text-paper/75">
-            <p className="font-bold text-paper">Testing RMI? Continue with Google.</p>
-            <p>
-              Email confirmation delivery is limited during the testing period. Google sign-in is the reliable way to join right now.
-            </p>
-          </div>
-        ) : null}
-
         <form onSubmit={submitAuth} className="rmi-auth-surface grid gap-3 p-5 sm:p-7">
           <div className="mb-2 border-b border-line/70 pb-4">
             <p className="rmi-data-label">Account</p>
             <p className="mt-1 text-sm font-semibold">{mode === "signup" ? "Create account" : "Sign in"}</p>
-          </div>
-          {mode === "signup" ? (
-            <>
-              <input
-                value={username}
-                onChange={(event) => {
-                  setUsername(event.target.value);
-                  setUsernameMessage("");
-                }}
-                className="rmi-terminal-input h-11 px-3 text-sm font-bold"
-                placeholder="Username"
-                autoComplete="username"
-                pattern="[A-Za-z0-9_.-]+( [A-Za-z0-9_.-]+)*"
-                title={USERNAME_REQUIREMENTS}
-                minLength={2}
-                maxLength={32}
-                required
-              />
-              {usernameMessage ? (
-                <p className="-mt-1 text-xs font-semibold text-ember" aria-live="polite">{usernameMessage}</p>
-              ) : null}
-            </>
-          ) : null}
-          <input
-            value={email}
-            onChange={(event) => setEmail(event.target.value)}
-            type="email"
-            className="rmi-terminal-input h-11 px-3 text-sm font-bold"
-            placeholder="Email"
-            autoComplete="email"
-            required
-          />
-          {emailDomainWarning ? (
-            <p className="-mt-1 text-xs font-bold text-brass">{emailDomainWarning}</p>
-          ) : null}
-          <div className="relative">
-            <input
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
-              type={showPassword ? "text" : "password"}
-              className="rmi-terminal-input h-11 w-full px-3 pr-11 text-sm font-bold"
-              placeholder="Password"
-              autoComplete={mode === "signup" ? "new-password" : "current-password"}
-              minLength={mode === "signup" ? 8 : undefined}
-              required
-            />
-            <button
-              type="button"
-              onClick={() => setShowPassword((visible) => !visible)}
-              className="absolute right-1 top-1 grid h-9 w-9 place-items-center rounded-md text-paper/45 hover:bg-panel hover:text-paper"
-              aria-label={showPassword ? "Hide password" : "Show password"}
-              title={showPassword ? "Hide password" : "Show password"}
-            >
-              {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-            </button>
-          </div>
-          {message ? <RmiNotice tone={messageTone}>{message}</RmiNotice> : null}
-          <TurnstileWidget
-            siteKey={turnstileSiteKey}
-            onTokenChange={setCaptchaToken}
-            resetKey={captchaResetKey}
-            action={mode === "signup" ? "rmi_signup" : "rmi_login"}
-          />
-          <button type="submit" disabled={submitting} className="rmi-button-primary h-11 text-sm disabled:opacity-60">
-            {mode === "signup" ? "Sign up" : "Log in"}
-          </button>
-          <div className="flex items-center gap-3 text-xs font-semibold text-paper/35" aria-hidden="true">
-            <span className="h-px flex-1 bg-line" />
-            or
-            <span className="h-px flex-1 bg-line" />
           </div>
           <button
             type="button"
@@ -573,8 +510,87 @@ function AccountPageContent() {
             className="inline-flex h-11 items-center justify-center gap-3 rounded-md border border-[#747775] bg-white px-4 text-sm font-semibold text-[#1f1f1f] shadow-sm transition-colors hover:border-[#5f6368] hover:bg-[#f8faff] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan focus-visible:ring-offset-2 focus-visible:ring-offset-ink disabled:cursor-not-allowed disabled:opacity-60"
           >
             <GoogleLogo />
-            Continue with Google
+            {mode === "signup" ? "Create account with Google" : "Continue with Google"}
           </button>
+          {mode === "signup" && !emailSignupEnabled ? (
+            <p className="text-center text-xs leading-5 text-paper/45">
+              Public-beta signup uses Google for reliable account verification. RMI requests only basic profile information.
+            </p>
+          ) : (
+            <>
+              <div className="flex items-center gap-3 text-xs font-semibold text-paper/35" aria-hidden="true">
+                <span className="h-px flex-1 bg-line" />
+                or use email
+                <span className="h-px flex-1 bg-line" />
+              </div>
+              {mode === "signup" ? (
+                <>
+                  <input
+                    value={username}
+                    onChange={(event) => {
+                      setUsername(event.target.value);
+                      setUsernameMessage("");
+                    }}
+                    className="rmi-terminal-input h-11 px-3 text-sm font-bold"
+                    placeholder="Username"
+                    autoComplete="username"
+                    pattern="[A-Za-z0-9_.-]+( [A-Za-z0-9_.-]+)*"
+                    title={USERNAME_REQUIREMENTS}
+                    minLength={2}
+                    maxLength={32}
+                    required
+                  />
+                  {usernameMessage ? (
+                    <p className="-mt-1 text-xs font-semibold text-ember" aria-live="polite">{usernameMessage}</p>
+                  ) : null}
+                </>
+              ) : null}
+              <input
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+                type="email"
+                className="rmi-terminal-input h-11 px-3 text-sm font-bold"
+                placeholder="Email"
+                autoComplete="email"
+                required
+              />
+              {emailDomainWarning ? (
+                <p className="-mt-1 text-xs font-bold text-brass">{emailDomainWarning}</p>
+              ) : null}
+              <div className="relative">
+                <input
+                  value={password}
+                  onChange={(event) => setPassword(event.target.value)}
+                  type={showPassword ? "text" : "password"}
+                  className="rmi-terminal-input h-11 w-full px-3 pr-11 text-sm font-bold"
+                  placeholder="Password"
+                  autoComplete={mode === "signup" ? "new-password" : "current-password"}
+                  minLength={mode === "signup" ? 8 : undefined}
+                  required
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((visible) => !visible)}
+                  className="absolute right-1 top-1 grid h-9 w-9 place-items-center rounded-md text-paper/45 hover:bg-panel hover:text-paper"
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                  title={showPassword ? "Hide password" : "Show password"}
+                >
+                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
+              {message ? <RmiNotice tone={messageTone}>{message}</RmiNotice> : null}
+              <TurnstileWidget
+                siteKey={turnstileSiteKey}
+                onTokenChange={setCaptchaToken}
+                resetKey={captchaResetKey}
+                action={mode === "signup" ? "rmi_signup" : "rmi_login"}
+              />
+              <button type="submit" disabled={submitting} className="rmi-button-primary h-11 text-sm disabled:opacity-60">
+                {mode === "signup" ? "Sign up" : "Log in"}
+              </button>
+            </>
+          )}
+          {message && mode === "signup" && !emailSignupEnabled ? <RmiNotice tone={messageTone}>{message}</RmiNotice> : null}
           {mode === "signin" ? (
             <button type="button" onClick={sendPasswordReset} className="text-sm text-paper/60 hover:text-cyan">
               Forgot your password?

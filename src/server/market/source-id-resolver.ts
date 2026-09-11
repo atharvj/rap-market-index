@@ -1,3 +1,4 @@
+import { resolveSpotifyPublicIdentity } from "@/server/market/spotify-public-source";
 import type { MarketUpdateArtist } from "@/server/market/daily-update";
 import { buildDefaultGdeltQuery, buildDefaultLastfmName } from "@/server/market/artist-text-identifiers";
 import type { ArtistExternalIds } from "@/server/market/market-data";
@@ -227,6 +228,18 @@ export async function resolveArtistSourceIds({
       candidates,
       minConfidence
     });
+
+    if (cleanSources.includes("spotify") && !proposedRecord?.spotifyId && proposedRecord?.musicbrainzId) {
+      try {
+        const linked = await resolveSpotifyPublicIdentity({ musicbrainzId: proposedRecord.musicbrainzId, artistName: artist.name, timeoutMs, fetchImpl });
+        if (linked) {
+          proposedRecord.spotifyId = linked.spotifyId;
+          candidates.spotify = [{ source: "spotify", externalId: linked.spotifyId, label: linked.name,
+            url: linked.url, confidence: 0.99, reason: "Verified active MusicBrainz-linked Spotify artist page",
+            metadata: { monthlyListeners: linked.monthlyListeners } }];
+        }
+      } catch { errors.push("Spotify public identity could not be verified."); }
+    }
 
     if (proposedRecord) {
       records.push(proposedRecord);

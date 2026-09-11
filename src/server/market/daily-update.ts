@@ -1,3 +1,4 @@
+import { applyAudienceRevaluation, prepareRevaluedArtist, type AudienceRevaluation } from "@/server/market/audience-revaluation";
 import { calculateHypeScore, calculateSignalDelta, clamp, getDailyChangePercent, roundPrice } from "@/lib/pricing";
 import type { AdapterSignal, AdapterSignals, MarketSignalModifier } from "@/server/market/market-data";
 import { getMarketModelVersion } from "@/server/market/model-version";
@@ -112,6 +113,7 @@ export type MarketUpdateInput = {
   adapterSignals?: AdapterSignals;
   marketCoverageRatio?: number;
   intraday?: boolean;
+  audienceRevaluations?: Record<string, AudienceRevaluation>;
 };
 
 export type ArtistMarketUpdate = {
@@ -179,6 +181,7 @@ export type MarketUpdateSummary = {
 };
 
 export function calculateDailyMarketUpdates(input: MarketUpdateInput) {
+  input = { ...input, artists: input.artists.map(artist => prepareRevaluedArtist(artist, input.audienceRevaluations?.[artist.id])) };
   const modelVersion = input.modelVersion ?? getMarketModelVersion();
   const persistedCalibration = calibratePersistedMarketStats(input.artists);
   const standaloneUpdates = persistedCalibration.artists.map((artist, index) =>
@@ -198,7 +201,8 @@ export function calculateDailyMarketUpdates(input: MarketUpdateInput) {
     : applyMarketRelativePricing(standaloneUpdates, input.marketCoverageRatio);
   const updates = pricedUpdates
     .map(applyMeasuredMinimumTick)
-    .map((update, index) => holdOpeningBaseline(update, input.artists[index]));
+    .map((update, index) => holdOpeningBaseline(update, input.artists[index]))
+    .map(update => applyAudienceRevaluation(update, input.audienceRevaluations?.[update.artistId]));
 
   const averageMovePercent =
     updates.reduce((total, update) => total + update.dailyChangePercent, 0) / Math.max(1, updates.length);
@@ -1652,6 +1656,7 @@ function getDefaultSignalConfidence(sourceName: string) {
     reddit: 0.64,
     bluesky: 0.28,
     spotify: 0.7,
+    spotify_public: 0.8,
     gdelt: 0.58,
     wikimedia: 0.62,
     market_events: 0.78,
@@ -1675,6 +1680,7 @@ function getStatSourceWeight(key: keyof HypeStats, sourceName: string) {
       streamingGrowth: 0.42,
       socialGrowth: 0.12
     },
+    spotify_public: { streamingGrowth: 1.2 },
     spotify: {
       streamingGrowth: 0.75,
       searchGrowth: 0.55
@@ -2025,6 +2031,7 @@ function getSourceAttributionLabel(source: string) {
     lastfm: "audience listening",
     listenbrainz: "independent listening sample",
     spotify: "streaming platform",
+    spotify_public: "Spotify audience",
     youtube: "video platform",
     youtube_comments: "video comment sentiment",
     youtube_uploads: "official upload activity",

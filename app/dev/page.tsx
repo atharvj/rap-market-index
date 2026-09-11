@@ -20,6 +20,7 @@ import {
   XCircle
 } from "lucide-react";
 import { Children, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 
 type AsyncState<T> =
   | {
@@ -1944,12 +1945,18 @@ export default function DevPage() {
             operator actions.
           </p>
         </div>
-        <div className="rounded-md border border-mint/35 bg-mint/10 p-4 text-sm font-bold leading-6 text-mint">
-          <div className="flex items-center gap-2">
-            <ShieldCheck className="h-4 w-4" />
-            Admin-only access
+        <div className="grid gap-2">
+          <div className="rounded-md border border-mint/35 bg-mint/10 p-4 text-sm font-bold leading-6 text-mint">
+            <div className="flex items-center gap-2">
+              <ShieldCheck className="h-4 w-4" />
+              Admin-only access
+            </div>
+            <p className="mt-1 text-mint/80">{adminAccess.email ?? "Verified admin session"}</p>
           </div>
-          <p className="mt-1 text-mint/80">{adminAccess.email ?? "Verified admin session"}</p>
+          <Link href="/dev/analytics" className="rmi-button-secondary inline-flex min-h-10 items-center justify-center gap-2 px-4 text-sm font-bold">
+            <BarChart3 className="h-4 w-4" aria-hidden="true" />
+            Release analytics
+          </Link>
         </div>
       </div>
 

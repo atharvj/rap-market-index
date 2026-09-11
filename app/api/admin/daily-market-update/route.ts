@@ -1,3 +1,5 @@
+import { getBaselineAgeDays } from "@/server/market/source-quality";
+import { createAudienceRevaluation, readAudienceRevaluation, type AudienceRevaluation } from "@/server/market/audience-revaluation";
 import { NextResponse } from "next/server";
 import { createServiceRoleClient, getSupabaseConfigStatus } from "@/lib/supabase/server";
 import type { HypeStats } from "@/lib/types";
@@ -12,6 +14,7 @@ import {
 import { collectBlueskyMarketSignals } from "@/server/market/bluesky-source";
 import {
   attachAudienceScaleCalibration,
+  buildAudienceScaleCalibration,
   type AudienceScaleSnapshots
 } from "@/server/market/audience-scale";
 import {
@@ -37,6 +40,7 @@ import { collectListenBrainzMarketSignals } from "@/server/market/listenbrainz-s
 import { collectMusicbrainzReleaseEvents } from "@/server/market/musicbrainz-releases";
 import { collectPolymarketMarketSignals } from "@/server/market/polymarket-source";
 import { collectRedditMarketSignals } from "@/server/market/reddit-source";
+import { collectSpotifyPublicSignals } from "@/server/market/spotify-public-source";
 import { collectSpotifyMarketSignals } from "@/server/market/spotify-source";
 import { collectTradeFlowMarketSignals } from "@/server/market/trade-flow-source";
 import { collectWikimediaMarketSignals } from "@/server/market/wikimedia-source";
@@ -89,6 +93,7 @@ type DailyUpdateBody = {
   artistIds?: string[];
   forceTickArtistIds?: string[];
   intraday?: boolean;
+  revalueAudience?: boolean;
 };
 
 type ArtistBatch = {
@@ -206,11 +211,33 @@ export async function POST(request: Request) {
       ...realSignals.warnings,
       ...eventSignals.warnings
     ];
+    const audienceRevaluations: Record<string, AudienceRevaluation> = {};
+    if (supabase && isRealExternalSource(source)) {
+      const { data, error } = await supabase.from("market_signal_snapshots")
+        .select("artist_id,raw_payload").in("artist_id", artists.map(artist => artist.id)).eq("source_date", runDate);
+      if (error) throw new Error(`Could not load valuation boundaries: ${error.message}`);
+      for (const row of data ?? []) {
+        const payload = row.raw_payload as Record<string, unknown> | null;
+        const record = readAudienceRevaluation(payload?.audienceRevaluation, runDate);
+        if (record) audienceRevaluations[row.artist_id] = record;
+      }
+    }
+    if (body.revalueAudience === true) {
+      if (body.intraday || !["core", "blended"].includes(source) || runDate !== getMarketDate()) {
+        throw new Error("Audience repricing requires a current-date daily core or blended run.");
+      }
+      for (const artist of artists) {
+        audienceRevaluations[artist.id] ??= createAudienceRevaluation(
+          artist, buildAudienceScaleCalibration(mergeAdapterSignals(...realSignals.adapterSignalSources)[artist.id] ?? { stats: {}, rawPayload: {} }), runDate
+        );
+      }
+    }
     const result = calculateDailyMarketUpdates({
       artists,
       runDate,
       source,
       modelVersion,
+      audienceRevaluations,
       manualSignals: sanitizeManualSignals(body.manualSignals),
       adapterSignals,
       marketCoverageRatio: getMarketCoverageRatio(batch),
@@ -613,6 +640,7 @@ async function collectRealSignals({
     (source === "lastfm" || source === "core" || source === "blended");
   const useSpotify =
     !intraday && (source === "spotify" || ((source === "core" || source === "blended") && hasSpotifyCredentials()));
+  const useSpotifyPublic = !intraday && (source === "spotify" || source === "core" || source === "blended");
   const useYoutube = intraday || source === "youtube" || source === "core" || source === "blended";
   const useWikimedia = shouldCollectWikimediaSource(source, intraday);
   const useReddit = !intraday && (source === "reddit" || ((source === "core" || source === "blended") && hasRedditCredentials()));
@@ -631,6 +659,7 @@ async function collectRealSignals({
     !useLastfm &&
     !useListenBrainz &&
     !useSpotify &&
+    !useSpotifyPublic &&
     !useYoutube &&
     !useWikimedia &&
     !useReddit &&
@@ -654,6 +683,7 @@ async function collectRealSignals({
   let lastfmBaselines: ObservationBaselines = {};
   let listenbrainzBaselines: ObservationBaselines = {};
   let spotifyBaselines: ObservationBaselines = {};
+  let spotifyPublicBaselines: ObservationBaselines = {};
   let youtubeBaselines: ObservationBaselines = {};
   let youtubeCommentBaselines: ObservationBaselines = {};
   let wikimediaBaselines: ObservationBaselines = {};
@@ -669,6 +699,7 @@ async function collectRealSignals({
         lastfmBaselines,
         listenbrainzBaselines,
         spotifyBaselines,
+        spotifyPublicBaselines,
         youtubeBaselines,
         youtubeCommentBaselines,
         wikimediaBaselines,
@@ -722,6 +753,9 @@ async function collectRealSignals({
               strategy: "latest",
               annualComparison: true
             })
+          : Promise.resolve({}),
+        useSpotifyPublic
+          ? loadObservationBaselines({ supabase, artistIds, source: "spotify_public", metrics: ["monthly_listeners"], beforeDate: runDate, lookbackDays: 7, strategy: "latest" })
           : Promise.resolve({}),
         useYoutube
           ? loadObservationBaselines({
@@ -793,18 +827,7 @@ async function collectRealSignals({
           : Promise.resolve({})
       ]);
     } catch (error) {
-      warnings.push(`Market baseline lookup skipped: ${getErrorMessage(error)}`);
-      externalIds = {};
-      gdeltBaselines = {};
-      lastfmBaselines = {};
-      listenbrainzBaselines = {};
-      spotifyBaselines = {};
-      youtubeBaselines = {};
-      youtubeCommentBaselines = {};
-      wikimediaBaselines = {};
-      redditBaselines = {};
-      blueskyBaselines = {};
-      polymarketPreviousPayloads = {};
+      throw new Error(`Market source baselines could not be verified: ${getErrorMessage(error)}`);
     }
   }
 
@@ -874,6 +897,19 @@ async function collectRealSignals({
         sources.push(listenbrainz.signals);
         observations.push(...listenbrainz.observations);
         warnings.push(...listenbrainz.warnings);
+      }
+    })());
+  }
+
+  if (useSpotifyPublic) {
+    sourceTasks.push((async () => {
+      const result = await collectExternalSource("Spotify public audience", warnings, () =>
+        collectSpotifyPublicSignals({ artists, runDate, externalIds, baselines: spotifyPublicBaselines })
+      );
+      if (result) {
+        sources.push(result.signals);
+        observations.push(...result.observations);
+        warnings.push(...result.warnings);
       }
     })());
   }
@@ -1111,6 +1147,7 @@ async function collectRealSignals({
     audienceScaleSnapshots: buildAudienceScaleSnapshots({
       artists,
       lastfmBaselines,
+      spotifyPublicBaselines,
       youtubeBaselines,
       wikimediaBaselines
     })
@@ -1119,6 +1156,7 @@ async function collectRealSignals({
 
 function buildAudienceScaleSnapshots({
   artists,
+  spotifyPublicBaselines,
   lastfmBaselines,
   youtubeBaselines,
   wikimediaBaselines
@@ -1127,6 +1165,7 @@ function buildAudienceScaleSnapshots({
   lastfmBaselines: ObservationBaselines;
   youtubeBaselines: ObservationBaselines;
   wikimediaBaselines: ObservationBaselines;
+  spotifyPublicBaselines: ObservationBaselines;
 }): AudienceScaleSnapshots {
   return Object.fromEntries(
     artists.map((artist) => {
@@ -1137,13 +1176,14 @@ function buildAudienceScaleSnapshots({
       return [
         artist.id,
         {
+          spotify: { monthlyListeners: getFreshAudienceBaseline(spotifyPublicBaselines[artist.id] ?? {}, "monthly_listeners") },
           lastfm: {
-            listeners: getPositiveBaseline(lastfm.listeners),
-            playcount: getPositiveBaseline(lastfm.playcount)
+            listeners: getFreshAudienceBaseline(lastfm, "listeners"),
+            playcount: getFreshAudienceBaseline(lastfm, "playcount")
           },
           youtube: {
-            subscriberCount: getPositiveBaseline(youtube.subscriber_count),
-            viewCount: getPositiveBaseline(youtube.channel_views)
+            subscriberCount: getFreshAudienceBaseline(youtube, "subscriber_count"),
+            viewCount: getFreshAudienceBaseline(youtube, "channel_views")
           },
           wikimedia: {
             pageviews7d: getPositiveBaseline(wikimedia.pageviews_7d)
@@ -1152,6 +1192,11 @@ function buildAudienceScaleSnapshots({
       ];
     })
   );
+}
+
+function getFreshAudienceBaseline(baseline: Record<string, number>, metric: string) {
+  const age = getBaselineAgeDays(baseline, metric);
+  return age !== undefined && age <= 7 ? getPositiveBaseline(baseline[metric]) : undefined;
 }
 
 function getPositiveBaseline(value: number | undefined) {

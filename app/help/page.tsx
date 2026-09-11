@@ -65,8 +65,9 @@ const topics = [
     icon: CandlestickChart,
     answers: [
       "A quote is a fantasy index value, not an artist's income, net worth, or literal market capitalization.",
-      "Audience momentum, durable reach, verified catalysts, reception, and eligible market demand can affect a quote.",
-      "Source-backed quotes refresh each morning; eligible orders can also record price movement during the day.",
+      "Opening valuations combine verified Spotify monthly listeners, Last.fm listening, and YouTube audience data using the same rule for every artist. Measured momentum, verified catalysts, reception, and eligible trading then affect the quote.",
+      "A documented valuation-model correction can change quotes and portfolio values. Historical quotes and executed trade prices remain recorded, and the correction is identified in the artist’s move explanation.",
+      "Source-backed quotes refresh each morning and through scheduled intraday checks; eligible orders can also record price movement during the day.",
       "Top Gainer means the largest realized current-session increase. Momentum Leader means the highest 1–100 reading of current cross-source evidence, so they can be different artists."
     ]
   },

@@ -11,6 +11,7 @@ type ObservationsResponse = {
 };
 
 const preferredSeries = [
+  { key: "spotify_public:monthly_listeners", label: "Spotify Monthly Listeners" },
   { key: "youtube:subscriber_count", label: "YouTube Subscribers · Total" },
   { key: "youtube:channel_views", label: "YouTube Views · Lifetime" },
   { key: "wikimedia:pageviews_7d", label: "Wikipedia Attention · 7D" },

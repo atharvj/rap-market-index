@@ -10,7 +10,7 @@ const sections = [
   {
     id: "price-movement",
     title: "How prices move",
-    body: "Artist prices are updated by a market engine that looks for meaningful changes in audience momentum, video activity, public attention, releases, reviews, major events, and eligible trading demand. Durable listener, play, subscriber, and view scale also keeps long-term quote levels comparable. The exact weights are kept internal so the game is harder to manipulate."
+    body: "Artist prices are updated by a market engine that looks for meaningful changes in audience momentum, video activity, public attention, releases, reviews, major events, and eligible trading demand. Opening valuations use one shared audience scale across verified Spotify monthly listeners, Last.fm listening, and YouTube subscribers and views. The exact weights are kept internal so the game is harder to manipulate."
   },
   {
     id: "quote-meaning",
@@ -25,7 +25,7 @@ const sections = [
   {
     id: "audience-size",
     title: "Why audience size is not the whole price",
-    body: "Monthly reach can jump temporarily after a feature or playlist placement. RMI treats that as momentum first and waits for durable listening, direct-channel growth, and broader attention before allowing it to become a permanent valuation change."
+    body: "Spotify monthly listeners measure recent reach, while Last.fm and YouTube provide additional audience context. The same valuation rule applies to every artist. After the opening valuation, measured changes, verified events, and eligible trading drive returns; an unchanged audience size does not produce the same gain every day."
   },
   {
     id: "catalysts",
