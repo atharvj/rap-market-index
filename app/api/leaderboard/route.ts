@@ -8,6 +8,7 @@ import type { Database } from "@/lib/supabase/database.types";
 import type { LeaderboardEntry } from "@/lib/types";
 import { reportServerError } from "@/server/observability";
 import { STARTING_CASH } from "@/lib/trading";
+import { loadAllPages } from "@/lib/pagination";
 
 export const dynamic = "force-dynamic";
 
@@ -38,10 +39,22 @@ export async function GET(request: Request) {
     const responseHeaders = requesterId
       ? { "Cache-Control": "private, no-store", Vary: "Authorization" }
       : CACHE_HEADERS;
-    const { data, error } = await supabase
+    // Role checks stay server-side. Exclude admins before limiting rows or
+    // counting ranks, and never serialize the role lookup into the response.
+    const admins = await loadAllPages(async (from, to) => {
+      const result = await supabase.from("profiles").select("id")
+        .eq("is_admin", true).order("id").range(from, to);
+      if (result.error) throw new Error(`Could not verify ranking eligibility: ${result.error.message}`);
+      return result.data ?? [];
+    });
+    const excludedIds = `(${admins.map(profile => profile.id).join(",")})`;
+    let rankingQuery = supabase
       .from("market_leaderboard")
-      .select("*")
+      .select("*");
+    if (admins.length) rankingQuery = rankingQuery.not("user_id", "in", excludedIds);
+    const { data, error } = await rankingQuery
       .order("portfolio_value", { ascending: false })
+      .order("user_id")
       .limit(250);
 
     if (error) {
@@ -75,17 +88,20 @@ export async function GET(request: Request) {
       rank: index + 1
     }));
 
-    if (requesterId && !visibleLeaderboard.some((entry) => entry.id === requesterId)) {
+    if (requesterId && !admins.some(profile => profile.id === requesterId) && !visibleLeaderboard.some((entry) => entry.id === requesterId)) {
       const [{ data: requesterRow }, { data: requesterProfile }] = await Promise.all([
         supabase.from("market_leaderboard").select("*").eq("user_id", requesterId).maybeSingle(),
         supabase.from("profiles").select("id,avatar_url,portfolio_is_public").eq("id", requesterId).maybeSingle()
       ]);
 
       if (requesterRow && requesterProfile) {
-        const { count } = await supabase
+        let countQuery = supabase
           .from("market_leaderboard")
           .select("user_id", { count: "exact", head: true })
           .gt("portfolio_value", requesterRow.portfolio_value);
+        if (admins.length) countQuery = countQuery.not("user_id", "in", excludedIds);
+        const { count, error: countError } = await countQuery;
+        if (countError) throw new Error(`Could not calculate rank: ${countError.message}`);
 
         visibleLeaderboard.push({
           ...mapLeaderboardEntry(requesterRow as LeaderboardRow, {
