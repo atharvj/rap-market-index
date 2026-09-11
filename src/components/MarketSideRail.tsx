@@ -3,6 +3,7 @@
 import { ArtistAvatar } from "@/components/ArtistAvatar";
 import { useGame } from "@/components/GameProvider";
 import { MiniSparkline } from "@/components/MiniSparkline";
+import { getSeriesChangePercent } from "@/lib/market-analytics";
 import { formatCurrency, formatPercent } from "@/lib/formatters";
 import type { Artist } from "@/lib/types";
 import { Activity, Star, TrendingDown, TrendingUp } from "lucide-react";
@@ -38,6 +39,7 @@ export function MarketSideRail({
 
   return (
     <aside className="rmi-card overflow-hidden">
+      <p className="border-b border-line px-3 py-2 text-[10px] text-paper/50">1M charts · percentages show today’s change</p>
       <MarketList title="Trending Tickers" artists={marketLists.movers} href="/markets" tone="cyan" icon="activity" />
       {includeWatchlist && watchlistArtists.length ? (
         <MarketList title="Your Watchlist" artists={watchlistArtists.slice(0, listSize)} href="/watchlist" tone="brass" icon="star" />
@@ -105,10 +107,10 @@ function MarketList({
               </span>
               <MiniSparkline
                 data={recentHistory}
-                positive={artist.dailyChangePercent >= 0}
+                positive={getSeriesChangePercent(recentHistory) >= 0}
                 width={64}
                 height={24}
-                label={`Recent recorded price history for ${artist.name}; color follows the 24-hour move`}
+                label={`Recent price history for ${artist.name}; one-month trend; color follows the displayed trend`}
               />
               <span className="text-right number-tabular">
                 <span className="block text-xs font-semibold">{formatCurrency(artist.currentPrice)}</span>

@@ -14,13 +14,15 @@ export function MiniSparkline({
   label?: string;
 }) {
   const points = data;
+  const chartLabel = data.some(point => point.recordedPrice !== undefined)
+    ? `${label}; adjusted for valuation changes, original quotes available on the artist page` : label;
 
   if (points.length < 2) {
     return (
       <div
         className="relative overflow-hidden rounded-sm border border-line/60 bg-panelSoft/70"
         style={{ width, height }}
-        aria-label={`${label}; price history is still building`}
+        aria-label={`${chartLabel}; price history is still building`}
       >
         <span className="absolute inset-x-2 top-1/2 h-px bg-paper/12" />
       </div>
@@ -50,9 +52,9 @@ export function MiniSparkline({
       viewBox={`0 0 ${width} ${height}`}
       className={positive ? "overflow-visible text-mint" : "overflow-visible text-ember"}
       role="img"
-      aria-label={label}
+      aria-label={chartLabel}
     >
-      <title>{label}</title>
+      <title>{chartLabel}</title>
       <path d={path} fill="none" stroke="currentColor" strokeOpacity="0.16" strokeWidth="6" />
       <path d={path} fill="none" stroke="currentColor" strokeWidth="2.1" />
       <circle cx={last.x} cy={last.y} r="2.6" fill="currentColor" />

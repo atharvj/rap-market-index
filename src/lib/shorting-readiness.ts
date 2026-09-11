@@ -1,4 +1,5 @@
 import type { PricePoint } from "@/lib/types";
+import { originalPriceHistory } from "@/lib/adjusted-price-history";
 
 export const SHORTING_PLATFORM_ENABLED = true;
 export const MIN_SHORTING_RECORDED_SESSIONS = 30;
@@ -17,7 +18,7 @@ export type ShortingReadiness = {
 export function getShortingReadiness(priceHistory: PricePoint[]): ShortingReadiness {
   const allSessions = Array.from(
     new Map(
-      priceHistory
+      originalPriceHistory(priceHistory)
         .filter((point) => /^\d{4}-\d{2}-\d{2}$/.test(point.date) && Number.isFinite(point.price) && point.price > 0)
         .map((point) => [point.date, point])
     ).values()

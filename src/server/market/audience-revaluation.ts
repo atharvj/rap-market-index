@@ -5,6 +5,7 @@ import type { AudienceScaleCalibration } from "@/server/market/audience-scale";
 export type AudienceRevaluation = {
   version: 2;
   effectiveDate: string;
+  effectiveAt?: string;
   referencePrice: number;
   anchorPrice: number;
   factor: number;
@@ -15,6 +16,7 @@ export function readAudienceRevaluation(value: unknown, runDate: string): Audien
   if (!value || typeof value !== "object") return null;
   const record = value as AudienceRevaluation;
   if (record.version !== 2 || record.effectiveDate !== runDate) return null;
+  if (record.effectiveAt !== undefined && !Number.isFinite(Date.parse(record.effectiveAt))) return null;
   if (![record.referencePrice, record.anchorPrice, record.factor].every(number => Number.isFinite(number) && number > 0)) return null;
   if (Math.abs(record.factor - record.anchorPrice / record.referencePrice) > 0.000001) return null;
   return record;

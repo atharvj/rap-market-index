@@ -371,7 +371,7 @@ test("homepage visual contract", async ({ page }) => {
   await expect(page.getByText("Top Market Story", { exact: true })).toBeVisible();
 
   const railSparkline = page.getByRole("img", {
-    name: new RegExp(`Recent recorded price history for ${marketState.artists[0].name}`)
+    name: new RegExp(`Recent price history for ${marketState.artists[0].name}`)
   }).first();
   const railPath = await railSparkline.locator("path").last().getAttribute("d");
   expect((railPath?.match(/L/g) ?? []).length).toBeGreaterThan(2);
@@ -551,6 +551,43 @@ test("artist trade tickets expose short and cover without internal readiness cop
   await ticket.getByRole("button", { name: "Short", exact: true }).click();
   await expect(ticket).toContainText("Shorting disabled until this artist has enough market data (8/30 recorded sessions).");
   await expect(ticket).not.toContainText("risk and liquidation controls are still being validated");
+});
+
+test("artist history preserves movement and lets users inspect original quotes", async ({ page }) => {
+  const artist = marketState.artists[0];
+  const points = [
+    { date: "2026-09-07", price: 30, recordedPrice: 10 },
+    { date: "2026-09-08", price: 33, recordedPrice: 11 },
+    { date: "2026-09-09", price: 30, recordedPrice: 10 },
+    { date: "2026-09-10", price: 30 },
+    { date: "2026-09-11", price: 33 }
+  ];
+  await page.route("**/api/market/history/**", route => route.fulfill({
+    contentType: "application/json",
+    body: JSON.stringify({ ok: true, points, hasRealHistory: true, recordedCloseCount: 5, hasMovement: true, granularity: "daily" })
+  }));
+  await page.goto(`/artists/${artist.id}`);
+  const section = page.locator("section").filter({ has: page.getByRole("heading", { name: "Price History", exact: true }) });
+  await expect(section.getByRole("button", { name: "Adjusted", exact: true })).toHaveAttribute("aria-pressed", "true");
+  await expect(section.getByText("Adjusted history", { exact: true })).toBeVisible();
+  await expect(section).toContainText("5 recorded daily closes");
+  const line = section.locator("path.recharts-area-curve");
+  await expect(line).toHaveAttribute("d", /L/);
+  const adjustedPath = await line.getAttribute("d");
+  await section.getByRole("button", { name: "Original quotes", exact: true }).click();
+  await expect(section.getByText("Recorded quotes", { exact: true })).toBeVisible();
+  await expect.poll(() => line.getAttribute("d")).not.toBe(adjustedPath);
+  await section.getByRole("button", { name: "Adjusted", exact: true }).click();
+  await expect.poll(() => line.getAttribute("d")).toBe(adjustedPath);
+  await section.locator(".recharts-wrapper").hover({ position: { x: 100, y: 100 } });
+  await expect(section.getByText("$30.00", { exact: true }).first()).toBeVisible();
+  await page.mouse.move(1, 1);
+  await section.getByRole("button", { name: "Original quotes", exact: true }).click();
+  // The selected historical date must update to its raw quote when the basis changes.
+  await expect(section.getByText("$10.00", { exact: true }).first()).toBeVisible();
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(section.getByRole("button", { name: "Original quotes", exact: true })).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true);
 });
 
 test("public metrics do not use decorative colored side borders", async ({ page }) => {

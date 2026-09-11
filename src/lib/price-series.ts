@@ -3,31 +3,6 @@ import type { PricePoint } from "@/lib/types";
 const PRICE_SCALE = 100;
 export const ONE_MONTH_HISTORY_DAYS = 31;
 
-export type TimestampedPriceTick = PricePoint & {
-  source?: string;
-  marketDate?: string;
-};
-
-export function keepLatestMarketRunPerDate(ticks: TimestampedPriceTick[]) {
-  const latestMarketRunIndex = new Map<string, number>();
-
-  ticks.forEach((tick, index) => {
-    if (tick.source === "market_run" && tick.marketDate) {
-      latestMarketRunIndex.set(tick.marketDate, index);
-    }
-  });
-
-  return ticks
-    .filter((tick, index) => {
-      if (tick.source !== "market_run" || !tick.marketDate) {
-        return true;
-      }
-
-      return latestMarketRunIndex.get(tick.marketDate) === index;
-    })
-    .map(({ date, price }) => ({ date, price }));
-}
-
 export function buildIntradayPriceSeries({
   ticks,
   currentPrice,

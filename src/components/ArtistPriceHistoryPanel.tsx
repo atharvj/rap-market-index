@@ -4,6 +4,8 @@ import { PriceChart } from "@/components/PriceChart";
 import { formatDate } from "@/lib/formatters";
 import { MARKET_CONTENT_REFRESH_MS } from "@/lib/refresh-policy";
 import type { PricePoint } from "@/lib/types";
+import { hasPriceMovement } from "@/lib/price-series";
+import { originalPriceHistory } from "@/lib/adjusted-price-history";
 import clsx from "clsx";
 import { Activity, Crosshair } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
@@ -37,8 +39,11 @@ export function ArtistPriceHistoryPanel({
   const [history, setHistory] = useState<PricePoint[]>(fallbackData);
   const [hasRealHistory, setHasRealHistory] = useState(fallbackData.length > 0);
   const [recordedCloseCount, setRecordedCloseCount] = useState(fallbackData.length);
-  const [hasMovement, setHasMovement] = useState(false);
   const [granularity, setGranularity] = useState<"intraday" | "daily">("daily");
+  const [originalQuotes, setOriginalQuotes] = useState(false);
+  const hasAdjustment = history.some(point => point.recordedPrice !== undefined);
+  const displayedHistory = originalQuotes ? originalPriceHistory(history) : history;
+  const hasMovement = hasPriceMovement(displayedHistory);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -57,7 +62,6 @@ export function ArtistPriceHistoryPanel({
         setHistory(payload.points);
         setHasRealHistory(Boolean(payload.hasRealHistory));
         setRecordedCloseCount(payload.recordedCloseCount ?? payload.points.length);
-        setHasMovement(Boolean(payload.hasMovement));
         setGranularity(payload.granularity === "intraday" ? "intraday" : "daily");
         setStatus("ready");
       })
@@ -69,7 +73,6 @@ export function ArtistPriceHistoryPanel({
         setHistory(fallbackData);
         setHasRealHistory(false);
         setRecordedCloseCount(fallbackData.length);
-        setHasMovement(false);
         setGranularity("daily");
         setStatus(error instanceof Error ? "error" : "error");
       });
@@ -116,7 +119,7 @@ export function ArtistPriceHistoryPanel({
           <div className="flex flex-wrap items-center gap-2">
             <Activity className="h-4 w-4 text-cyan" aria-hidden="true" />
             <h2 className="text-lg font-semibold">Price History</h2>
-            <span className="rmi-status-chip"><Crosshair className="h-3 w-3" /> Recorded quotes</span>
+            <span className="rmi-status-chip"><Crosshair className="h-3 w-3" /> {hasAdjustment && !originalQuotes ? "Adjusted history" : "Recorded quotes"}</span>
           </div>
           <p className="mt-1 text-sm text-paper/50">{subtitle}</p>
         </div>
@@ -140,7 +143,17 @@ export function ArtistPriceHistoryPanel({
         </div>
       </div>
       <div className="p-4 sm:p-5">
-        <div className="rmi-chart-shell p-2 sm:p-3"><PriceChart data={history} height={290} timeScale={granularity} /></div>
+        {hasAdjustment ? <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+          <p className="max-w-xl text-xs text-paper/55">{originalQuotes ? "Showing original recorded prices, including the valuation change." : "Earlier prices are shown on today’s price scale so the valuation change does not hide their movement. Original quotes are preserved."}</p>
+          <div className="flex gap-1 rounded-[var(--radius-control)] border border-line p-1">
+            {[{ original: false, label: "Adjusted" }, { original: true, label: "Original quotes" }].map(option => <button
+              key={option.label} type="button" aria-pressed={originalQuotes === option.original}
+              onClick={() => setOriginalQuotes(option.original)}
+              className={clsx("rounded px-2 py-1 text-xs font-semibold", originalQuotes === option.original ? "bg-cyan text-ink" : "text-paper/60 hover:text-cyan")}
+            >{option.label}</button>)}
+          </div>
+        </div> : null}
+        <div className="rmi-chart-shell p-2 sm:p-3"><PriceChart data={displayedHistory} height={290} timeScale={granularity} quoteLabel={hasAdjustment && !originalQuotes ? "Adjusted quote" : "Recorded quote"} /></div>
         <p className="mt-3 text-xs text-paper/42">
           {status === "loading"
             ? "Loading recorded market quotes."

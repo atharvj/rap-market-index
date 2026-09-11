@@ -15,10 +15,7 @@ import {
 
 type ChartInteraction = {
   activeLabel?: string | number;
-  activePayload?: Array<{
-    value?: number | string;
-    payload?: ChartPoint;
-  }>;
+  activeTooltipIndex?: string | number;
 };
 
 type ChartPoint = PricePoint & {
@@ -39,12 +36,14 @@ export function PriceChart({
   data,
   height = 270,
   compact = false,
-  timeScale = "auto"
+  timeScale = "auto",
+  quoteLabel = "RMI quote"
 }: {
   data: PricePoint[];
   height?: number;
   compact?: boolean;
   timeScale?: "auto" | "intraday" | "daily";
+  quoteLabel?: string;
 }) {
   const normalized = useMemo<ChartPoint[]>(
     () => data
@@ -55,7 +54,8 @@ export function PriceChart({
     [data]
   );
   const positive = normalized.length < 2 || normalized[normalized.length - 1].price >= normalized[0].price;
-  const [selected, setSelected] = useState<PricePoint | null>(null);
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const selected = normalized.find(point => point.date === selectedDate);
   const color = positive ? "rgb(var(--color-mint))" : "rgb(var(--color-ember))";
   const chartId = useId().replace(/:/g, "");
   const gradientId = `quote-${chartId}-${positive ? "up" : "down"}`;
@@ -108,13 +108,11 @@ export function PriceChart({
   }
 
   function selectPoint(state: ChartInteraction | null) {
-    const point = state?.activePayload?.[0]?.payload;
-    const rawPrice = state?.activePayload?.[0]?.value;
-    const price = typeof rawPrice === "number" ? rawPrice : Number(rawPrice);
-
-    if (point && Number.isFinite(price)) {
-      setSelected({ date: point.date, price });
-    }
+    const index = state?.activeTooltipIndex;
+    const point = index !== undefined && index !== null
+      ? normalized[Number(index)]
+      : normalized.find(candidate => candidate.timestamp === Number(state?.activeLabel));
+    if (point) setSelectedDate(point.date);
   }
 
   if (!normalized.length) {
@@ -179,7 +177,7 @@ export function PriceChart({
                 fontSize: 12
               }}
               labelFormatter={(value) => formatChartDate(Number(value), true)}
-              formatter={(value) => [formatCurrency(Number(value)), "RMI quote"]}
+              formatter={(value) => [formatCurrency(Number(value)), quoteLabel]}
             />
             <Area
               type={intraday ? "stepAfter" : "linear"}

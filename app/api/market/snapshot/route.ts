@@ -9,6 +9,8 @@ import type { Artist, GameState, HypeStats, PricePoint } from "@/lib/types";
 import { loadArtistImageUrls } from "@/server/market/artist-images";
 import { getMarketDate, shiftMarketDate } from "@/server/market/market-date";
 import { reportServerError } from "@/server/observability";
+import { adjustPriceHistory } from "@/lib/adjusted-price-history";
+import { loadChartAdjustments } from "@/server/market/chart-adjustments";
 
 export const dynamic = "force-dynamic";
 
@@ -143,7 +145,9 @@ async function loadHistoryByArtist(
     return (data ?? []) as PriceHistoryPoint[];
   });
 
-  return rows.reduce<Record<string, PricePoint[]>>((grouped, point) => {
+  const adjustments = await loadChartAdjustments({ supabase, artistIds,
+    earliestDate: shiftMarketDate(getMarketDate(), -ONE_MONTH_HISTORY_DAYS) });
+  const grouped = rows.reduce<Record<string, PricePoint[]>>((grouped, point) => {
     grouped[point.artist_id] ??= [];
     grouped[point.artist_id].push({
       date: point.price_date,
@@ -151,6 +155,7 @@ async function loadHistoryByArtist(
     });
     return grouped;
   }, {});
+  return Object.fromEntries(Object.entries(grouped).map(([id, points]) => [id, adjustPriceHistory(points, adjustments[id] ?? [])]));
 }
 
 function mapArtist(row: ArtistRow, stats: ArtistStatsRow | null, history: PricePoint[], imageUrl?: string): Artist {

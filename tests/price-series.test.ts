@@ -2,8 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildDailyPriceSeries,
   buildIntradayPriceSeries,
-  hasPriceMovement,
-  keepLatestMarketRunPerDate
+  hasPriceMovement
 } from "@/lib/price-series";
 
 describe("price series", () => {
@@ -74,38 +73,4 @@ describe("price series", () => {
     ]);
   });
 
-  it("removes superseded same-day market runs while preserving trade ticks", () => {
-    expect(
-      keepLatestMarketRunPerDate([
-        {
-          date: "2026-07-10T13:00:00.000Z",
-          price: 12,
-          source: "market_run",
-          marketDate: "2026-07-10"
-        },
-        {
-          date: "2026-07-10T16:00:00.000Z",
-          price: 12.1,
-          source: "trade",
-          marketDate: "2026-07-10"
-        },
-        {
-          date: "2026-07-10T18:00:00.000Z",
-          price: 12.25,
-          source: "market_run",
-          marketDate: "2026-07-10"
-        },
-        {
-          date: "2026-07-11T13:00:00.000Z",
-          price: 12.4,
-          source: "market_run",
-          marketDate: "2026-07-11"
-        }
-      ])
-    ).toEqual([
-      { date: "2026-07-10T16:00:00.000Z", price: 12.1 },
-      { date: "2026-07-10T18:00:00.000Z", price: 12.25 },
-      { date: "2026-07-11T13:00:00.000Z", price: 12.4 }
-    ]);
-  });
 });

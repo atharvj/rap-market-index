@@ -12,6 +12,8 @@ export type HypeStats = {
 export type PricePoint = {
   date: string;
   price: number;
+  /** Original recorded market quote when price is displayed on an adjusted basis. */
+  recordedPrice?: number;
 };
 
 export type MarketObservationPoint = {

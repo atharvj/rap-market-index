@@ -56,7 +56,7 @@ export default function ScoutPage() {
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_340px]">
         <RmiSection
           title="Scout Market Trend"
-          subtitle="Average quote movement for the emerging artists currently surfaced by Scout."
+          subtitle="Average quote movement for these emerging artists, adjusted for valuation changes."
           action={<TrendingUp className="h-4 w-4 text-cyan" aria-hidden="true" />}
         >
           <div className="p-4">

@@ -4,7 +4,6 @@ import {
   buildDailyPriceSeries,
   buildIntradayPriceSeries,
   hasPriceMovement,
-  keepLatestMarketRunPerDate,
   ONE_MONTH_HISTORY_DAYS
 } from "@/lib/price-series";
 import { createServiceRoleClient, getSupabaseConfigStatus } from "@/lib/supabase/server";
@@ -12,6 +11,9 @@ import type { Database } from "@/lib/supabase/database.types";
 import type { PricePoint } from "@/lib/types";
 import { getMarketDate, shiftMarketDate } from "@/server/market/market-date";
 import { reportServerError } from "@/server/observability";
+import { loadAllPages } from "@/lib/pagination";
+import { adjustPriceHistory } from "@/lib/adjusted-price-history";
+import { loadChartAdjustments } from "@/server/market/chart-adjustments";
 
 export const dynamic = "force-dynamic";
 
@@ -82,7 +84,7 @@ export async function GET(request: Request, context: { params: Promise<{ artistI
       ? await loadArtistTicksIfAvailable({ supabase, artistId })
       : [];
     const currentPrice = Number((artist as ArtistRow).current_price);
-    const points = range === "1D"
+    const recordedPoints = range === "1D"
       ? buildIntradayPriceSeries({ ticks, currentPrice })
       : buildDailyPriceSeries({
           dailyHistory: history,
@@ -90,6 +92,9 @@ export async function GET(request: Request, context: { params: Promise<{ artistI
           marketDate: getMarketDate(),
           includeCurrentQuote: false
         });
+    const adjustments = await loadChartAdjustments({ supabase, artistIds: [artistId],
+      earliestDate: range === "ALL" ? undefined : shiftMarketDate(getMarketDate(), -RANGE_DAYS[range]), intraday: range === "1D" });
+    const points = adjustPriceHistory(recordedPoints, adjustments[artistId] ?? [], range === "1D" ? "intraday" : "daily");
 
     return NextResponse.json({
       ok: true,
@@ -98,6 +103,7 @@ export async function GET(request: Request, context: { params: Promise<{ artistI
       range,
       granularity: range === "1D" ? "intraday" : "daily",
       points,
+      priceBasis: points.some(point => point.recordedPrice !== undefined) ? "adjusted" : "recorded",
       hasRealHistory: range === "1D" ? ticks.length > 0 : history.length > 0,
       recordedCloseCount: range === "1D" ? 0 : history.length,
       hasMovement: hasPriceMovement(points),
@@ -126,21 +132,14 @@ async function loadArtistHistory({
   artistId: string;
   range: HistoryRange;
 }): Promise<PricePoint[]> {
-  let query = supabase
-    .from("price_history")
-    .select("price_date, price")
-    .eq("artist_id", artistId)
-    .order("price_date", { ascending: true });
-
-  if (range !== "ALL") {
-    query = query.gte("price_date", shiftMarketDate(getMarketDate(), -RANGE_DAYS[range]));
-  }
-
-  const { data, error } = await query;
-
-  if (error) {
-    throw new Error(`Could not load price history: ${error.message}`);
-  }
+  const data = await loadAllPages(async (from, to) => {
+    let query = supabase.from("price_history").select("price_date, price")
+      .eq("artist_id", artistId).order("price_date", { ascending: true });
+    if (range !== "ALL") query = query.gte("price_date", shiftMarketDate(getMarketDate(), -RANGE_DAYS[range]));
+    const result = await query.range(from, to);
+    if (result.error) throw new Error(`Could not load price history: ${result.error.message}`);
+    return result.data ?? [];
+  });
 
   return ((data ?? []) as PriceHistoryRow[]).map((point) => ({
     date: point.price_date,
@@ -156,51 +155,25 @@ async function loadArtistTicksIfAvailable({
   artistId: string;
 }): Promise<PricePoint[]> {
   const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-  const { data, error } = await supabase
-    .from("price_ticks")
-    .select("observed_at, price, source, raw_payload")
-    .eq("artist_id", artistId)
-    .neq("source", "migration")
-    .gte("observed_at", cutoff)
-    .order("observed_at", { ascending: false })
-    .limit(900);
-
-  if (error) {
-    if (isMissingPriceTicksError(error.message)) {
-      return [];
+  const data = await loadAllPages(async (from, to) => {
+    const result = await supabase.from("price_ticks").select("observed_at, price, source, raw_payload")
+      .eq("artist_id", artistId).neq("source", "migration").gte("observed_at", cutoff)
+      .order("observed_at", { ascending: true }).order("id", { ascending: true }).range(from, to);
+    if (result.error) {
+      if (isMissingPriceTicksError(result.error.message)) return [];
+      throw new Error(`Could not load price ticks: ${result.error.message}`);
     }
-
-    throw new Error(`Could not load price ticks: ${error.message}`);
-  }
-
-  const ticks = ((data ?? []) as PriceTickRow[])
-    .reverse()
-    .map((point) => ({
-      date: point.observed_at,
-      price: Number(point.price),
-      source: point.source,
-      marketDate: getTickMarketDate(point)
-    }));
-
-  return keepLatestMarketRunPerDate(ticks);
-}
-
-function getTickMarketDate(point: PriceTickRow) {
-  if (point.raw_payload && typeof point.raw_payload === "object" && !Array.isArray(point.raw_payload)) {
-    const runDate = point.raw_payload.runDate;
-
-    if (typeof runDate === "string" && /^\d{4}-\d{2}-\d{2}$/.test(runDate)) {
-      return runDate;
-    }
-  }
-
-  return getMarketDate(new Date(point.observed_at));
+    return result.data ?? [];
+  });
+  // Every recorded market update matters intraday, including earlier runs on
+  // the same date. The series builder only compresses consecutive equal prices.
+  return (data as PriceTickRow[]).map(point => ({ date: point.observed_at, price: Number(point.price) }));
 }
 
 function isMissingPriceTicksError(message: string) {
   const normalized = message.toLowerCase();
 
-  return normalized.includes("price_ticks") || normalized.includes("schema cache");
+  return normalized.includes("could not find the table") || normalized.includes("does not exist");
 }
 
 function getMockHistoryResponse(artistId: string, range: HistoryRange) {
