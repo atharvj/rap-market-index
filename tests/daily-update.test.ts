@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { calculateDailyMarketUpdates, type MarketUpdateArtist } from "@/server/market/daily-update";
+import { calculateDailyMarketUpdates, mergeAdapterSignals, type MarketUpdateArtist } from "@/server/market/daily-update";
 
 const neutralStats = {
   streamingGrowth: 0,
@@ -25,6 +25,36 @@ function artist(): MarketUpdateArtist {
 }
 
 describe("daily market valuation pressure", () => {
+  it("lets corroborated listening and video growth move the quote without requiring a headline", () => {
+    const moves = [1, -1].map(direction => {
+      const adapterSignals = mergeAdapterSignals(
+        { artist: { stats: { streamingGrowth: 12 * direction }, confidence: 0.9, rawPayload: { source: "lastfm", status: "ok" } } },
+        { artist: { stats: { youtubeGrowth: 12 * direction }, confidence: 0.9, rawPayload: { source: "youtube", status: "ok" } } }
+      );
+      return calculateDailyMarketUpdates({
+        artists: [{ ...artist(), currentPrice: 100, previousClose: 100 }],
+        source: "core", runDate: "2026-09-12", adapterSignals
+      }).updates[0];
+    });
+    expect(moves[0].dailyChangePercent).toBeGreaterThan(0.2);
+    expect(moves[1].dailyChangePercent).toBeLessThan(-0.2);
+    expect(moves[0].dailyChangePercent).toBeCloseTo(-moves[1].dailyChangePercent, 2);
+  });
+  it("does not push an artist down solely because other artists have stronger signals", () => {
+    const artists = Array.from({ length: 5 }, (_, i) => ({ ...artist(), id: String(i), currentPrice: 100, previousClose: 100 }));
+    const adapterSignals = mergeAdapterSignals(Object.fromEntries(artists.map((a, i) => [a.id, {
+      stats: { searchGrowth: i === 0 ? 0 : 50, streamingGrowth: i === 0 ? 0 : 20 },
+      confidence: 0.9, rawPayload: { source: "wikimedia" }
+    }])));
+    const input = { artists, source: "core" as const, runDate: "2026-09-12", adapterSignals };
+    const daily = calculateDailyMarketUpdates(input);
+    const intraday = calculateDailyMarketUpdates({ ...input, intraday: true });
+    expect(daily.updates[0].currentPrice).toBe(100);
+    expect(daily.updates.slice(1).every(update => update.currentPrice > 100)).toBe(true);
+    expect(intraday.updates.map(update => update.currentPrice)).toEqual(daily.updates.map(update => update.currentPrice));
+    const alone = calculateDailyMarketUpdates({ ...input, artists: [artists[1]] });
+    expect(alone.updates[0].currentPrice).toBe(daily.updates[1].currentPrice);
+  });
   it("holds a new listing at its verified opening quote while sources establish baselines", () => {
     const current = {
       ...artist(),

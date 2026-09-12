@@ -66,7 +66,7 @@ const topics = [
     answers: [
       "A quote is a fantasy index value, not an artist's income, net worth, or literal market capitalization.",
       "Opening valuations combine verified Spotify monthly listeners, Last.fm listening, and YouTube audience data using the same rule for every artist. Measured momentum, verified catalysts, reception, and eligible trading then affect the quote.",
-      "A documented valuation-model correction can change quotes and portfolio values. Historical quotes and executed trade prices remain recorded, and the correction is identified in the artist’s move explanation. Charts adjust earlier prices to the current valuation scale to keep historical movement readable. Choose Original quotes on an artist chart to inspect the prices actually recorded.",
+      "A documented valuation-model correction can change quotes and portfolio values. Historical quotes and executed trade prices remain recorded, and the correction is identified in the artist’s move explanation. Charts adjust earlier prices to the current valuation scale to keep historical movement readable. There is one continuous chart; the underlying original quotes remain preserved for audit.",
       "Source-backed quotes refresh each morning and through scheduled intraday checks; eligible orders can also record price movement during the day.",
       "Top Gainer means the largest realized current-session increase. Momentum Leader means the highest 1–100 reading of current cross-source evidence, so they can be different artists."
     ]

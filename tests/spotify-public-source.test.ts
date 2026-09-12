@@ -7,6 +7,23 @@ const page = (name = "Example", count = "821,786") => `<meta content="${name}" p
 const artist: MarketUpdateArtist = { id: "example", name: "Example", ticker: "TEST", currentPrice: 20, previousClose: 20, category: "rising", hypeScore: 50, volatility: 1, stats: { streamingGrowth: 0, youtubeGrowth: 0, searchGrowth: 0, socialGrowth: 0, newsScore: 50, traderDemand: 0 } };
 
 describe("verified public Spotify audience", () => {
+  it("collects the full artist batch with bounded concurrency even when a page is slow", async () => {
+    const artists = Array.from({ length: 8 }, (_, i) => ({ ...artist, id: String(i) }));
+    let active = 0;
+    let maximum = 0;
+    const result = await collectSpotifyPublicSignals({
+      artists, runDate: "2026-09-12", delayMs: 0,
+      externalIds: Object.fromEntries(artists.map(a => [a.id, { artistId: a.id, spotifyId: id }])),
+      fetchImpl: async () => {
+        active++; maximum = Math.max(maximum, active);
+        await new Promise(resolve => setTimeout(resolve, 5));
+        active--;
+        return new Response(page());
+      }
+    });
+    expect(result.observations).toHaveLength(8);
+    expect(maximum).toBe(2);
+  });
   it("reads exact displayed counts and verifies the canonical ID and name", () => {
     expect(parseSpotifyMonthlyListeners(page(), id, ["Example"])?.monthlyListeners).toBe(821786);
     expect(parseSpotifyMonthlyListeners(page("Artist's Name"), id, ["Artist's Name"])?.name).toBe("Artist's Name");

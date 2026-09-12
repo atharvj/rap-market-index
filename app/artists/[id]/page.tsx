@@ -44,7 +44,6 @@ export default function ArtistDetailPage() {
   const holding = getHolding(activeArtist.id);
   const shortPosition = getShortPosition(activeArtist.id);
   const signalDrivers = getArtistSignalDrivers(activeArtist.stats);
-  const hasAdjustedHistory = activeArtist.priceHistory.some(point => point.recordedPrice !== undefined);
   const recordedPrices = [...activeArtist.priceHistory.map((point) => point.price), activeArtist.currentPrice];
   const recordedHigh = Math.max(...recordedPrices);
   const recordedLow = Math.min(...recordedPrices);
@@ -113,8 +112,8 @@ export default function ArtistDetailPage() {
           />
           <QuoteStat label="Bid" value={formatCurrency(sellQuote.executionPrice)} />
           <QuoteStat label="Ask" value={formatCurrency(buyQuote.executionPrice)} />
-          <QuoteStat label={hasAdjustedHistory ? "Adjusted Low" : "Recorded Low"} value={formatCurrency(recordedLow)} />
-          <QuoteStat label={hasAdjustedHistory ? "Adjusted High" : "Recorded High"} value={formatCurrency(recordedHigh)} />
+          <QuoteStat label="Chart Low" value={formatCurrency(recordedLow)} />
+          <QuoteStat label="Chart High" value={formatCurrency(recordedHigh)} />
           <QuoteStat label="24h Rank" value={`#${moveRank}`} />
           <QuoteStat label="Momentum Rank" value={`#${momentumRank}`} />
         </section>

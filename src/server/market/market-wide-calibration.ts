@@ -95,6 +95,9 @@ export function calibratePersistedMarketStats<T extends { id: string; stats: Hyp
 }
 
 function calibrateSourceSignals(signals: AdapterSignals, marketArtistCount: number): AdapterSignals {
+  if (Object.values(signals).every(signal => typeof signal.rawPayload.dailySourceAsOf === "string")) {
+    return signals;
+  }
   const sourceName = getDominantSourceName(signals);
 
   if (!sourceName || !CALIBRATABLE_SOURCES.has(sourceName)) {

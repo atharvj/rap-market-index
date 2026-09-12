@@ -553,7 +553,7 @@ test("artist trade tickets expose short and cover without internal readiness cop
   await expect(ticket).not.toContainText("risk and liquidation controls are still being validated");
 });
 
-test("artist history preserves movement and lets users inspect original quotes", async ({ page }) => {
+test("artist history shows one continuous graph with inspectable market quotes", async ({ page }) => {
   const artist = marketState.artists[0];
   const points = [
     { date: "2026-09-07", price: 30, recordedPrice: 10 },
@@ -568,25 +568,17 @@ test("artist history preserves movement and lets users inspect original quotes",
   }));
   await page.goto(`/artists/${artist.id}`);
   const section = page.locator("section").filter({ has: page.getByRole("heading", { name: "Price History", exact: true }) });
-  await expect(section.getByRole("button", { name: "Adjusted", exact: true })).toHaveAttribute("aria-pressed", "true");
-  await expect(section.getByText("Adjusted history", { exact: true })).toBeVisible();
+  await expect(section.getByRole("button", { name: "Adjusted", exact: true })).toHaveCount(0);
+  await expect(section.getByRole("button", { name: "Original quotes", exact: true })).toHaveCount(0);
   await expect(section).toContainText("5 recorded daily closes");
   const line = section.locator("path.recharts-area-curve");
+  await expect(line).toHaveCount(1);
   await expect(line).toHaveAttribute("d", /L/);
-  const adjustedPath = await line.getAttribute("d");
-  await section.getByRole("button", { name: "Original quotes", exact: true }).click();
-  await expect(section.getByText("Recorded quotes", { exact: true })).toBeVisible();
-  await expect.poll(() => line.getAttribute("d")).not.toBe(adjustedPath);
-  await section.getByRole("button", { name: "Adjusted", exact: true }).click();
-  await expect.poll(() => line.getAttribute("d")).toBe(adjustedPath);
   await section.locator(".recharts-wrapper").hover({ position: { x: 100, y: 100 } });
   await expect(section.getByText("$30.00", { exact: true }).first()).toBeVisible();
-  await page.mouse.move(1, 1);
-  await section.getByRole("button", { name: "Original quotes", exact: true }).click();
-  // The selected historical date must update to its raw quote when the basis changes.
-  await expect(section.getByText("$10.00", { exact: true }).first()).toBeVisible();
+  await expect(section.getByText("$10.00", { exact: true })).toHaveCount(0);
   await page.setViewportSize({ width: 390, height: 844 });
-  await expect(section.getByRole("button", { name: "Original quotes", exact: true })).toBeVisible();
+  await expect(line).toBeVisible();
   // ResponsiveContainer updates through ResizeObserver after the viewport changes.
   // Wait for the rendered layout, while still failing any persistent overflow.
   await expect.poll(() => page.evaluate(() =>

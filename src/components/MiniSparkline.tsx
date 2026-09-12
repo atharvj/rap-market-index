@@ -14,8 +14,7 @@ export function MiniSparkline({
   label?: string;
 }) {
   const points = data;
-  const chartLabel = data.some(point => point.recordedPrice !== undefined)
-    ? `${label}; adjusted for valuation changes, original quotes available on the artist page` : label;
+  const chartLabel = label;
 
   if (points.length < 2) {
     return (

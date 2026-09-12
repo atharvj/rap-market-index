@@ -26,14 +26,25 @@ const WIKIPEDIA_SEARCH_OVERRIDES: Record<string, string> = {
 const WIKIPEDIA_TITLE_OVERRIDES: Record<string, string[]> = {
   "asap-rocky": ["ASAP Rocky", "A$AP Rocky"],
   autumn: ["Autumn!"],
+  che: ["Che (rapper)"],
+  drake: ["Drake (musician)"],
+  feng: ["Feng (rapper)"],
   future: ["Future (rapper)", "Future"],
+  ian: ["Ian (rapper)"],
   "jay-z": ["Jay-Z"],
+  nav: ["Nav (rapper)"],
   tana: ["Tana (rapper)", "BabySantana"],
   ye: ["Kanye West", "Ye"]
 };
 
 export function buildDefaultLastfmName(artistName: string) {
-  return artistName.trim();
+  // Provider identity, not a pricing exception: Last.fm's "Ye" autocorrects
+  // to the unrelated band Yes. His listening catalogue remains Kanye West.
+  return getArtistTextKey(artistName) === "ye" ? "Kanye West" : artistName.trim();
+}
+
+export function getVerifiedWikipediaTitle(artistName: string) {
+  return WIKIPEDIA_TITLE_OVERRIDES[getArtistTextKey(artistName)]?.[0];
 }
 
 export function buildDefaultGdeltQuery(artistName: string) {

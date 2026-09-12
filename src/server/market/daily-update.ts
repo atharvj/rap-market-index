@@ -1,3 +1,4 @@
+import { captureDailySources } from "@/server/market/daily-source-cache";
 import { applyAudienceRevaluation, prepareRevaluedArtist, type AudienceRevaluation } from "@/server/market/audience-revaluation";
 import { calculateHypeScore, calculateSignalDelta, clamp, getDailyChangePercent, roundPrice } from "@/lib/pricing";
 import type { AdapterSignal, AdapterSignals, MarketSignalModifier } from "@/server/market/market-data";
@@ -198,7 +199,7 @@ export function calculateDailyMarketUpdates(input: MarketUpdateInput) {
   );
   const pricedUpdates = input.intraday
     ? standaloneUpdates.map((update, index) => holdUnchangedIntradayQuote(update, input.artists[index]))
-    : applyMarketRelativePricing(standaloneUpdates, input.marketCoverageRatio);
+    : standaloneUpdates;
   const updates = pricedUpdates
     .map(applyMeasuredMinimumTick)
     .map((update, index) => holdOpeningBaseline(update, input.artists[index]))
@@ -340,177 +341,6 @@ function holdUnchangedIntradayQuote(
         quotedPrice
       }
     }
-  };
-}
-
-function applyMarketRelativePricing(updates: ArtistMarketUpdate[], marketCoverageRatio = 1): ArtistMarketUpdate[] {
-  if (updates.length < 2 || !updates.some((update) => update.rawPayload.hasMomentumSignal === true)) {
-    return updates;
-  }
-
-  const marketContextConfidence = getMarketContextConfidence(marketCoverageRatio);
-  const sortedSignalDeltas = updates.map((update) => update.signalDelta).sort((left, right) => left - right);
-  const marketAverageSignalDelta =
-    updates.reduce((total, update) => total + update.signalDelta, 0) / Math.max(1, updates.length);
-  const marketMedianSignalDelta = getMedian(sortedSignalDeltas);
-  const marketSignalBreadth =
-    updates.filter((update) => update.signalDelta > 0).length / Math.max(1, updates.length);
-
-  if (Math.abs(marketAverageSignalDelta) < 0.0001 && Math.abs(marketMedianSignalDelta) < 0.0001) {
-    return updates;
-  }
-
-  return updates.map((update) =>
-    applyRelativePressure({
-      update,
-      marketAverageSignalDelta,
-      marketMedianSignalDelta,
-      marketSignalBreadth,
-      signalStrengthRank: getPercentileRank(update.signalDelta, sortedSignalDeltas),
-      marketContextConfidence,
-      marketCoverageRatio
-    })
-  );
-}
-
-function applyRelativePressure({
-  update,
-  marketAverageSignalDelta,
-  marketMedianSignalDelta,
-  marketSignalBreadth,
-  signalStrengthRank,
-  marketContextConfidence,
-  marketCoverageRatio
-}: {
-  update: ArtistMarketUpdate;
-  marketAverageSignalDelta: number;
-  marketMedianSignalDelta: number;
-  marketSignalBreadth: number;
-  signalStrengthRank: number;
-  marketContextConfidence: number;
-  marketCoverageRatio: number;
-}): ArtistMarketUpdate {
-  const relativeSignalDelta = update.signalDelta - marketMedianSignalDelta;
-  const marketRelativeAdjustment = clamp(relativeSignalDelta * 0.55 * marketContextConfidence, -0.02, 0.02);
-  const broadMarketDampener =
-    marketAverageSignalDelta > 0 && marketSignalBreadth >= 0.75
-      ? -clamp(marketAverageSignalDelta * 0.08 * marketContextConfidence, 0, 0.003)
-      : 0;
-  const crowdedPositiveMarketPressure =
-    marketAverageSignalDelta > 0 &&
-    marketMedianSignalDelta > 0 &&
-    marketSignalBreadth >= 0.72
-      ? -clamp(
-          (marketAverageSignalDelta * 0.1 + marketMedianSignalDelta * 0.08) * marketContextConfidence,
-          0.0005,
-          signalStrengthRank <= 0.4 ? 0.006 : 0.003
-        )
-      : 0;
-  const laggardRotationDrift =
-    marketAverageSignalDelta > 0 &&
-    marketMedianSignalDelta > 0 &&
-    marketSignalBreadth >= 0.35 &&
-    signalStrengthRank <= 0.35
-      ? -clamp(
-          (marketMedianSignalDelta - update.signalDelta + marketAverageSignalDelta * 0.5) *
-            0.35 *
-            marketContextConfidence,
-          0.001,
-          0.01
-        )
-      : 0;
-  const relativeOpportunityCostDrift =
-    marketAverageSignalDelta > 0 &&
-    marketMedianSignalDelta > 0 &&
-    marketSignalBreadth >= 0.55 &&
-    signalStrengthRank <= 0.25 &&
-    !hasPositiveHighPriorityCatalyst(update)
-      ? -clamp(
-          (marketMedianSignalDelta - update.signalDelta + marketAverageSignalDelta * 0.65) *
-            0.42 *
-            marketContextConfidence,
-          0.0015,
-          0.012
-        )
-      : 0;
-  const noSignalLiquidityDrift =
-    update.rawPayload.hasMomentumSignal === true || marketAverageSignalDelta <= 0
-      ? 0
-      : -clamp(marketAverageSignalDelta * 0.3 * marketContextConfidence, 0.001, 0.007);
-  const adjustedSignalDelta =
-    update.signalDelta +
-    marketRelativeAdjustment +
-    broadMarketDampener +
-    crowdedPositiveMarketPressure +
-    laggardRotationDrift +
-    relativeOpportunityCostDrift +
-    noSignalLiquidityDrift;
-  const repriced = priceFromSignalDelta(update, adjustedSignalDelta);
-  const audienceScaleDominant = update.rawPayload.audienceScaleDominant === true;
-  const shouldExplainRelativeMove =
-    !audienceScaleDominant && (
-      repriced.dailyChangePercent < 0 ||
-      (update.rawPayload.hasMomentumSignal !== true && Math.abs(repriced.dailyChangePercent) >= 0.01)
-    );
-
-  return {
-    ...update,
-    currentPrice: repriced.currentPrice,
-    dailyChangePercent: repriced.dailyChangePercent,
-    signalDelta: adjustedSignalDelta,
-    explanation: shouldExplainRelativeMove
-      ? explainRelativeMove(update.ticker, repriced.dailyChangePercent, update.rawPayload.hasMomentumSignal === true)
-      : update.explanation,
-    rawPayload: {
-      ...(update.rawPayload as Record<string, unknown>),
-      standaloneSignalDelta: update.signalDelta,
-      marketAverageSignalDelta,
-      marketMedianSignalDelta,
-      marketSignalBreadth,
-      signalStrengthRank,
-      marketCoverageRatio,
-      marketContextConfidence,
-      marketRelativeAdjustment,
-      broadMarketDampener,
-      crowdedPositiveMarketPressure,
-      laggardRotationDrift,
-      relativeOpportunityCostDrift,
-      noSignalLiquidityDrift,
-      adjustedSignalDelta
-    }
-  } satisfies ArtistMarketUpdate;
-}
-
-function hasPositiveHighPriorityCatalyst(update: ArtistMarketUpdate) {
-  const diagnostics = getObjectRecord(update.rawPayload.catalystDiagnostics);
-  const catalysts = diagnostics.topCatalysts;
-
-  if (!Array.isArray(catalysts)) {
-    return false;
-  }
-
-  return catalysts.some((value) => {
-    const catalyst = getObjectRecord(value);
-
-    return (
-      catalyst.direction === "positive" &&
-      getNumber(catalyst.reasonPriority, 0) >= 8 &&
-      getNumber(catalyst.priceShock, 0) >= 0.004
-    );
-  });
-}
-
-function priceFromSignalDelta(update: ArtistMarketUpdate, signalDelta: number) {
-  const previousClose = getValidPrice(update.previousClose, update.oldPrice);
-  const dailyCap = getNumber(update.rawPayload.dailyCap, 0.18);
-  const targetPrice = update.oldPrice * (1 + signalDelta);
-  const blendedPrice = update.oldPrice * 0.8 + targetPrice * 0.2;
-  const cappedPrice = clamp(blendedPrice, previousClose * (1 - dailyCap), previousClose * (1 + dailyCap));
-  const currentPrice = roundPrice(cappedPrice);
-
-  return {
-    currentPrice,
-    dailyChangePercent: getDailyChangePercent(currentPrice, previousClose)
   };
 }
 
@@ -915,13 +745,10 @@ function calculateArtistUpdate({
   const measuredSignalDelta = signals.hasMomentumSignal
     ? calculateSignalDelta(signals.stats) * artist.volatility
     : 0;
-  const evidenceAdjustedRawSignalDelta = getEvidenceAdjustedRawSignalDelta({
-    rawSignalDelta,
-    credibleEventSupport,
-    reliability: signals.reliability,
-    reliabilityDetails: signals.reliabilityDetails,
-    source
-  });
+  // Primary audience measurements can move in either direction without a news
+  // headline. Identity checks, source quality, reliability and daily caps apply
+  // equally; a separate positive-only ceiling suppressed legitimate growth.
+  const evidenceAdjustedRawSignalDelta = rawSignalDelta;
   const reliabilityMultiplier = signals.hasMomentumSignal ? getReliabilityPriceMultiplier(signals.reliability) : 0;
   const reliabilityAdjustedDelta = evidenceAdjustedRawSignalDelta * reliabilityMultiplier;
   const modifierImpact = signals.hasMomentumSignal
@@ -1357,37 +1184,6 @@ function hasCredibleEventSupport(rawPayload: Record<string, unknown>, modifiers:
   return hasCredibleEvent || (totalSignal >= 12 && sourceConfirmedEventCount > 0);
 }
 
-function getEvidenceAdjustedRawSignalDelta({
-  rawSignalDelta,
-  credibleEventSupport,
-  reliability,
-  reliabilityDetails,
-  source
-}: {
-  rawSignalDelta: number;
-  credibleEventSupport: boolean;
-  reliability: number;
-  reliabilityDetails: Record<string, unknown>;
-  source: MarketUpdateSource;
-}) {
-  if (rawSignalDelta <= 0 || credibleEventSupport || !isRealExternalSource(source)) {
-    return rawSignalDelta;
-  }
-
-  const sourceCount = getNumber(reliabilityDetails.sourceCount, 1);
-  const statCount = getNumber(reliabilityDetails.statCount, 1);
-
-  if (reliability >= 0.74 && sourceCount >= 3 && statCount >= 3) {
-    return Math.min(rawSignalDelta, 0.012);
-  }
-
-  if (reliability >= 0.62 && sourceCount >= 2 && statCount >= 2) {
-    return Math.min(rawSignalDelta, 0.006);
-  }
-
-  return Math.min(rawSignalDelta, 0.0025);
-}
-
 function getStaleMomentumDecayDelta(stats: HypeStats, source: MarketUpdateSource) {
   if (!isRealExternalSource(source)) {
     return 0;
@@ -1513,6 +1309,8 @@ function buildModifierAudits(modifiers: MarketSignalModifier[]): ModifierAudit[]
 }
 
 export function mergeAdapterSignals(...sources: Array<AdapterSignals | undefined>) {
+  const calibratedSources = calibrateMarketWideAdapterSignals(sources);
+  const dailySourceInputs = captureDailySources(calibratedSources);
   const buckets: Record<
     string,
     {
@@ -1524,7 +1322,7 @@ export function mergeAdapterSignals(...sources: Array<AdapterSignals | undefined
     }
   > = {};
 
-  for (const source of calibrateMarketWideAdapterSignals(sources)) {
+  for (const source of calibratedSources) {
     for (const [artistId, signal] of Object.entries(source)) {
       const sourceName = getSignalSourceName(signal);
       const confidence = getSignalConfidence(signal, sourceName);
@@ -1580,6 +1378,7 @@ export function mergeAdapterSignals(...sources: Array<AdapterSignals | undefined
         ),
         rawPayload: {
           ...bucket.rawPayload,
+          dailySourceInputs: dailySourceInputs[artistId] ?? {},
           sourceWeights: bucket.sourceWeights,
           sourceValues: bucket.sourceValues,
           sourceDirectionalScores: buildSourceDirectionalScores(bucket.sourceValues, bucket.sourceWeights)
@@ -2364,18 +2163,6 @@ function explainNoSignalMove(
   return `${ticker} held flat with no confirmed daily momentum signal.`;
 }
 
-function explainRelativeMove(ticker: string, dailyChangePercent: number, hasMomentumSignal: boolean) {
-  if (dailyChangePercent < 0 && hasMomentumSignal) {
-    return `${ticker} pulled back as its signals lagged the day's market momentum.`;
-  }
-
-  if (dailyChangePercent < 0) {
-    return `${ticker} drifted lower as stronger momentum elsewhere created relative market pressure.`;
-  }
-
-  return `${ticker} moved as the market repriced relative momentum across active artists.`;
-}
-
 function explainAudienceScaleMove(ticker: string, dailyChangePercent: number) {
   if (dailyChangePercent > 0.01) {
     return `${ticker} moved higher as its quote converged toward longer-term audience scale.`;
@@ -2405,39 +2192,6 @@ function pickLeaderboardMove(update: ArtistMarketUpdate) {
     ticker: update.ticker,
     dailyChangePercent: update.dailyChangePercent
   };
-}
-
-function getMedian(sortedValues: number[]) {
-  if (!sortedValues.length) {
-    return 0;
-  }
-
-  const midpoint = Math.floor(sortedValues.length / 2);
-
-  if (sortedValues.length % 2 === 1) {
-    return sortedValues[midpoint] ?? 0;
-  }
-
-  return ((sortedValues[midpoint - 1] ?? 0) + (sortedValues[midpoint] ?? 0)) / 2;
-}
-
-function getPercentileRank(value: number, sortedValues: number[]) {
-  if (sortedValues.length <= 1) {
-    return 0.5;
-  }
-
-  const lowerCount = sortedValues.filter((item) => item < value).length;
-  const equalCount = sortedValues.filter((item) => item === value).length;
-
-  return clamp((lowerCount + equalCount / 2) / sortedValues.length, 0, 1);
-}
-
-function getMarketContextConfidence(marketCoverageRatio: number) {
-  if (!Number.isFinite(marketCoverageRatio) || marketCoverageRatio <= 0) {
-    return 0.2;
-  }
-
-  return clamp(marketCoverageRatio, 0.2, 1);
 }
 
 function hashToUnit(input: string) {

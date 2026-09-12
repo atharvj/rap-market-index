@@ -3,6 +3,7 @@ import type { MarketUpdateArtist } from "@/server/market/daily-update";
 import {
   buildWikipediaSearchQuery,
   buildWikipediaTitleCandidates,
+  getVerifiedWikipediaTitle,
   getArtistTextKey
 } from "@/server/market/artist-text-identifiers";
 import type {
@@ -19,6 +20,7 @@ type WikimediaCollectOptions = {
   externalIds?: Record<string, ArtistExternalIds>;
   runDate: string;
   baselines?: ObservationBaselines;
+  previousArticles?: Record<string, Record<string, unknown>>;
   delayMs?: number;
   timeoutMs?: number;
   fetchImpl?: typeof fetch;
@@ -47,6 +49,7 @@ type WikipediaPageQueryResponse = {
         title?: string;
         missing?: string;
         extract?: string;
+        pageprops?: { disambiguation?: string };
       }
     >;
   };
@@ -88,6 +91,7 @@ export async function collectWikimediaMarketSignals({
   externalIds = {},
   runDate,
   baselines = {},
+  previousArticles = {},
   delayMs = 250,
   timeoutMs = 10000,
   fetchImpl = fetch
@@ -95,23 +99,40 @@ export async function collectWikimediaMarketSignals({
   const signals: AdapterSignals = {};
   const observations: MarketObservation[] = [];
   const warnings: string[] = [];
+  let sourceRateLimited = false;
 
   for (const [index, artist] of artists.entries()) {
+    if (sourceRateLimited) {
+      signals[artist.id] = { stats: {}, rawPayload: {
+        source: SOURCE, runDate, status: "rate_limited", error: "Remaining requests paused after provider rate limiting."
+      } };
+      continue;
+    }
     if (index > 0 && delayMs > 0) {
       await sleep(delayMs);
     }
 
     const query = buildWikipediaSearchQuery(artist.name);
-    const exactTitle = externalIds[artist.id]?.wikipediaArticleTitle?.trim();
+    const previous = previousArticles[artist.id];
+    const cachedTitle = typeof previous?.title === "string" &&
+      typeof previous.matchConfidence === "number" && previous.matchConfidence >= 0.55
+      ? previous.title : undefined;
+    const verifiedTitle = externalIds[artist.id]?.wikipediaArticleTitle?.trim() || getVerifiedWikipediaTitle(artist.name);
+    const exactTitle = verifiedTitle || cachedTitle;
     const article = await resolveWikipediaArticle({
       artist,
       query,
       exactTitle,
+      exactConfidence: verifiedTitle ? 0.95 : previous?.matchConfidence as number | undefined,
       timeoutMs,
       fetchImpl
     });
 
     if (!article.ok) {
+      if (article.error.includes("429") && !sourceRateLimited) {
+        sourceRateLimited = true;
+        warnings.push("Wikimedia requests paused after rate limiting; existing observations are preserved.");
+      }
       signals[artist.id] = {
         stats: {},
         rawPayload: {
@@ -140,6 +161,10 @@ export async function collectWikimediaMarketSignals({
     });
 
     if (!pageviews.ok) {
+      if (pageviews.error.includes("429") || pageviews.error.includes("503")) {
+        sourceRateLimited = true;
+        warnings.push("Wikimedia requests paused after rate limiting; existing observations are preserved.");
+      }
       signals[artist.id] = {
         stats: {},
         rawPayload: {
@@ -205,15 +230,21 @@ function buildWikimediaSignal({
   observations: MarketObservation[];
 } {
   const cleanPageviews = pageviews ?? [];
-  const pageviews7d = cleanPageviews.reduce((total, item) => total + getNumber(item.views), 0);
+  const pageviews7d = cleanPageviews.slice(-7).reduce((total, item) => total + getNumber(item.views), 0);
   const pageviews1d = cleanPageviews.at(-1)?.views ?? 0;
-  const pageviewMomentum = calculatePageviewMomentum(pageviews7d, baseline[PAGEVIEWS_7D]);
+  const previousWeekViews = cleanPageviews.slice(0, 7).reduce((total, item) => total + getNumber(item.views), 0);
+  const previousDailyMean = cleanPageviews.slice(-8, -1).reduce((total, item) => total + getNumber(item.views), 0) / 7;
+  // Compare complete provider days, including on the first collection. Daily
+  // attention can rise or fall independently of the slower weekly trend.
+  const dailyMomentum = calculatePageviewMomentum(pageviews1d, previousDailyMean, 20);
+  const weeklyMomentum = calculatePageviewMomentum(pageviews7d, previousWeekViews, 140);
+  const pageviewMomentum = dailyMomentum * 0.6 + weeklyMomentum * 0.4;
   const stats: Partial<HypeStats> = {};
 
   if (typeof pageviewMomentum === "number") {
     // Encyclopedia lookups measure discovery/attention, not fan approval or
     // media coverage. Keep the observation in its one defensible channel.
-    stats.searchGrowth = clamp(pageviewMomentum * 0.72 + candidate.confidence * 8, -30, 95);
+    stats.searchGrowth = clamp(pageviewMomentum * 0.72, -30, 95);
   }
 
   const rawPayload = {
@@ -226,6 +257,10 @@ function buildWikimediaSignal({
     matchReason: candidate.reason,
     pageviews7d,
     pageviews1d,
+    previousWeekViews,
+    previousDailyMean,
+    dailyMomentum,
+    weeklyMomentum,
     baselinePageviews7d: baseline[PAGEVIEWS_7D] ?? null,
     pageviewMomentum,
     status: Object.keys(stats).length ? "ok" : "baseline_only"
@@ -249,15 +284,24 @@ async function resolveWikipediaArticle({
   artist,
   query,
   exactTitle,
+  exactConfidence = 0.95,
   timeoutMs,
   fetchImpl
 }: {
   artist: MarketUpdateArtist;
   query: string;
   exactTitle?: string;
+  exactConfidence?: number;
   timeoutMs: number;
   fetchImpl: typeof fetch;
 }): Promise<{ ok: true; candidate: WikipediaCandidate } | { ok: false; error: string }> {
+  if (exactTitle) {
+    // These identities have already been verified. Repeating article discovery
+    // for every artist every day exhausts the search API's rate limit.
+    return { ok: true, candidate: {
+      title: exactTitle, confidence: clamp(exactConfidence, 0.55, 0.95), reason: "Previously verified Wikipedia article."
+    } };
+  }
   const titleCandidate = await resolveWikipediaTitleCandidate({
     artist,
     titleCandidates: exactTitle ? [exactTitle] : undefined,
@@ -271,7 +315,7 @@ async function resolveWikipediaArticle({
     return titleCandidate;
   }
 
-  if (exactTitle) {
+  if (exactTitle || titleCandidate.error.includes("429")) {
     return titleCandidate;
   }
 
@@ -289,7 +333,7 @@ async function resolveWikipediaArticle({
     timeoutMs,
     fetchImpl,
     headers: {
-      "user-agent": "rap-market-index/0.1 market research"
+      "user-agent": "RapMarketIndex/1.0 (https://rap-market-index.vercel.app)"
     }
   });
 
@@ -362,7 +406,7 @@ async function resolveWikipediaTitleCandidate({
     url.searchParams.set("action", "query");
     url.searchParams.set("titles", title);
     url.searchParams.set("redirects", "1");
-    url.searchParams.set("prop", "extracts");
+    url.searchParams.set("prop", "extracts|pageprops");
     url.searchParams.set("exintro", "1");
     url.searchParams.set("explaintext", "1");
     url.searchParams.set("format", "json");
@@ -373,11 +417,12 @@ async function resolveWikipediaTitleCandidate({
       timeoutMs,
       fetchImpl,
       headers: {
-        "user-agent": "rap-market-index/0.1 market research"
+        "user-agent": "RapMarketIndex/1.0 (https://rap-market-index.vercel.app)"
       }
     });
 
     if (!result.ok) {
+      if (result.error.includes("429")) return result;
       errors.push(result.error);
       continue;
     }
@@ -389,7 +434,9 @@ async function resolveWikipediaTitleCandidate({
       continue;
     }
 
-    const page = Object.values(parsed.query?.pages ?? {}).find((candidate) => candidate && !candidate.missing);
+    const page = Object.values(parsed.query?.pages ?? {}).find((candidate) =>
+      candidate && !("missing" in candidate) && !("disambiguation" in (candidate.pageprops ?? {}))
+    );
 
     if (!page?.title) {
       errors.push(`No Wikipedia page found for ${title}.`);
@@ -437,7 +484,7 @@ async function fetchArticlePageviews({
   fetchImpl: typeof fetch;
 }): Promise<{ ok: true; items: NonNullable<WikimediaPageviewsResponse["items"]> } | { ok: false; error: string }> {
   const endDate = shiftDate(runDate, -1);
-  const startDate = shiftDate(runDate, -7);
+  const startDate = shiftDate(runDate, -14);
   const article = encodeURIComponent(title.replace(/ /g, "_"));
   const url = `https://wikimedia.org/api/rest_v1/metrics/pageviews/per-article/en.wikipedia/all-access/user/${article}/daily/${toWikimediaDate(startDate)}/${toWikimediaDate(endDate)}`;
   const result = await fetchJson({
@@ -445,7 +492,7 @@ async function fetchArticlePageviews({
     timeoutMs,
     fetchImpl,
     headers: {
-      "user-agent": "rap-market-index/0.1 market research"
+      "user-agent": "RapMarketIndex/1.0 (https://rap-market-index.vercel.app)"
     }
   });
 
@@ -454,10 +501,20 @@ async function fetchArticlePageviews({
   }
 
   const parsed = result.value as WikimediaPageviewsResponse;
+  const items = Array.isArray(parsed.items)
+    ? [...parsed.items].sort((a, b) => (a.timestamp ?? "").localeCompare(b.timestamp ?? "")) : [];
+  const complete = items.length === 14 && items.every((item, index) =>
+    item.timestamp === toWikimediaDate(shiftDate(startDate, index)) &&
+    typeof item.views === "number" && Number.isFinite(item.views) && item.views >= 0
+  );
+
+  if (!complete) {
+    return { ok: false, error: "Wikimedia did not return 14 complete, consecutive daily observations." };
+  }
 
   return {
     ok: true,
-    items: Array.isArray(parsed.items) ? parsed.items : []
+    items
   };
 }
 
@@ -465,12 +522,14 @@ async function fetchJson({
   url,
   timeoutMs,
   fetchImpl,
-  headers
+  headers,
+  retry = true
 }: {
   url: string;
   timeoutMs: number;
   fetchImpl: typeof fetch;
   headers?: Record<string, string>;
+  retry?: boolean;
 }): Promise<{ ok: true; value: unknown } | { ok: false; error: string }> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
@@ -481,6 +540,18 @@ async function fetchJson({
       headers
     });
     const text = await response.text();
+    if ((response.status === 429 || response.status === 503) && retry) {
+      const header = response.headers.get("retry-after");
+      const seconds = header && /^\d+$/.test(header) ? Number(header) : undefined;
+      const retryAt = header && seconds === undefined ? Date.parse(header) : NaN;
+      const delay = seconds !== undefined ? seconds * 1000 : Number.isFinite(retryAt) ? Math.max(0, retryAt - Date.now()) : 5000;
+      // Bound server execution; long outages remain unavailable, never zero.
+      if (delay <= 30_000) {
+        clearTimeout(timeout);
+        await sleep(delay);
+        return fetchJson({ url, timeoutMs, fetchImpl, headers, retry: false });
+      }
+    }
 
     if (!response.ok) {
       return {
@@ -555,7 +626,8 @@ function scoreWikipediaCandidate({
     reason = "Ambiguous artist name without enough rap context.";
   }
 
-  if (titleText.includes("disambiguation") || titleText.endsWith(" discography")) {
+  if (titleText.includes("disambiguation") || titleText.endsWith(" discography") ||
+    /\b(?:may refer to|given name|name list|surname)\b/.test(snippetText)) {
     score = Math.min(score, 0.45);
   }
 
@@ -584,12 +656,8 @@ function createObservation(
   };
 }
 
-function calculatePageviewMomentum(current: number, baseline?: number) {
-  if (typeof baseline !== "number" || baseline <= 0) {
-    return undefined;
-  }
-
-  return clamp(((current - baseline) / baseline) * 100 * 1.6, -40, 120);
+function calculatePageviewMomentum(current: number, baseline: number, minimumBaseline: number) {
+  return clamp(((current - baseline) / Math.max(minimumBaseline, baseline)) * 100 * 1.6, -40, 120);
 }
 
 function getTermScore(value: string, terms: string[], max: number) {

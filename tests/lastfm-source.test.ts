@@ -24,6 +24,21 @@ function artist(name: string, ticker: string): MarketUpdateArtist {
 }
 
 describe("Last.fm identity fallback", () => {
+  it("uses the provider's canonical catalogue when a renamed artist's external ID fails", async () => {
+    const ye = artist("Ye", "YE");
+    const result = await collectLastfmMarketSignals({
+      artists: [ye], runDate: "2026-09-12", apiKey: "test-key", delayMs: 0,
+      externalIds: { ye: { artistId: "ye", musicbrainzId: "missing-id", lastfmName: "Ye" } },
+      fetchImpl: async input => {
+        const url = new URL(String(input));
+        if (url.searchParams.has("mbid")) return Response.json({ error: 6 });
+        expect(url.searchParams.get("artist")).toBe("Kanye West");
+        return Response.json({ artist: { name: "Kanye West", stats: { listeners: "8000000", playcount: "1600000000" } } });
+      }
+    });
+    expect(result.signals.ye.rawPayload.status).not.toBe("name_mismatch");
+    expect(result.observations.find(o => o.metric === "listeners")?.value).toBe(8_000_000);
+  });
   it("falls back from a failed MusicBrainz lookup to a safe artist-name match", async () => {
     const jayZ = artist("Jay-Z", "JAYZ");
     let requestCount = 0;

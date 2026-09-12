@@ -48,9 +48,9 @@ export async function collectSpotifyPublicSignals({
   const warnings: string[] = [];
   const eligible = artists.filter(artist => ID_PATTERN.test(externalIds[artist.id]?.spotifyId ?? "")).slice(0, 100);
   const deadline = Date.now() + 120_000;
-  for (const [index, artist] of eligible.entries()) {
-    if (Date.now() >= deadline) { warnings.push("Spotify public audience collection reached its time budget; remaining observations were preserved."); break; }
-    if (index && delayMs > 0) await new Promise(resolve => setTimeout(resolve, delayMs));
+  let stopped = false;
+  let nextIndex = 0;
+  async function collectArtist(artist: MarketUpdateArtist) {
     const ids = externalIds[artist.id];
     try {
       const response = await fetchImpl(`https://open.spotify.com/artist/${ids.spotifyId}`, {
@@ -60,7 +60,8 @@ export async function collectSpotifyPublicSignals({
       });
       if (response.status === 429 || response.status === 403) {
         warnings.push(`Spotify public audience collection stopped after HTTP ${response.status}; existing observations were preserved.`);
-        break;
+        stopped = true;
+        return;
       }
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const info = parseSpotifyMonthlyListeners(await response.text(), ids.spotifyId!, [...buildWikipediaTitleCandidates(artist.name), ids.lastfmName ?? ""]);
@@ -89,6 +90,20 @@ export async function collectSpotifyPublicSignals({
     } catch (error) {
       warnings.push(`Spotify audience skipped for ${artist.ticker}: ${error instanceof Error ? error.message : "request failed"}.`);
     }
+  }
+  // Probe once before opening the bounded worker pool. A provider rejection
+  // stops queued work, while two workers prevent slow pages starving the tail.
+  if (eligible.length) {
+    await collectArtist(eligible[nextIndex++]);
+    const worker = async () => {
+      while (!stopped && nextIndex < eligible.length) {
+        if (Date.now() >= deadline) { stopped = true; warnings.push("Spotify public audience collection reached its time budget; remaining observations were preserved."); return; }
+        const artist = eligible[nextIndex++];
+        if (delayMs > 0) await new Promise(resolve => setTimeout(resolve, delayMs));
+        if (!stopped) await collectArtist(artist);
+      }
+    };
+    await Promise.all([worker(), worker()]);
   }
   if (eligible.length < artists.length) warnings.push(`${artists.length - eligible.length} listings have no verified Spotify artist ID in this batch.`);
   return { signals, observations, warnings };

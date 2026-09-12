@@ -678,21 +678,22 @@ export async function loadLatestObservationPayloads({
   }
 
   const startDate = shiftDate(beforeDate, -lookbackDays);
-  const { data, error } = await supabase
-    .from("market_observations")
-    .select("artist_id,observed_date,raw_payload")
-    .in("artist_id", artistIds)
-    .eq("source", source)
-    .eq("metric", metric)
-    .gte("observed_date", startDate)
-    .lt("observed_date", beforeDate)
-    .order("observed_date", { ascending: false });
+  const rows = await loadAllPages(async (from, to) => {
+    const { data, error } = await supabase
+      .from("market_observations")
+      .select("artist_id,observed_date,raw_payload")
+      .in("artist_id", artistIds)
+      .eq("source", source)
+      .eq("metric", metric)
+      .gte("observed_date", startDate)
+      .lt("observed_date", beforeDate)
+      .order("observed_date", { ascending: false })
+      .order("artist_id").range(from, to);
+    if (error) throw new Error(`Could not load observation payloads: ${error.message}`);
+    return data ?? [];
+  });
 
-  if (error) {
-    throw new Error(`Could not load observation payloads: ${error.message}`);
-  }
-
-  return ((data ?? []) as Pick<MarketObservationRow, "artist_id" | "observed_date" | "raw_payload">[])
+  return (rows as Pick<MarketObservationRow, "artist_id" | "observed_date" | "raw_payload">[])
     .reduce<Record<string, Record<string, unknown>>>((memo, row) => {
       if (!memo[row.artist_id] && row.raw_payload && typeof row.raw_payload === "object" && !Array.isArray(row.raw_payload)) {
         memo[row.artist_id] = row.raw_payload as Record<string, unknown>;

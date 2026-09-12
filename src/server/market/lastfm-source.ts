@@ -1,5 +1,6 @@
 import { clamp } from "@/lib/pricing";
 import { scoreArtistNameMatch } from "@/server/market/artist-name-match";
+import { buildDefaultLastfmName } from "@/server/market/artist-text-identifiers";
 import type { MarketUpdateArtist } from "@/server/market/daily-update";
 import type {
   AdapterSignal,
@@ -83,7 +84,7 @@ export async function collectLastfmMarketSignals({
     }
 
     const external = externalIds[artist.id];
-    const requestedName = external?.lastfmName?.trim() || artist.name;
+    const requestedName = buildDefaultLastfmName(external?.lastfmName?.trim() || artist.name);
     const result = await fetchLastfmArtistInfo({
       apiKey: cleanApiKey,
       artistName: requestedName,

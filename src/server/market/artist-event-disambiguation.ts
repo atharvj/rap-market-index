@@ -367,6 +367,10 @@ function hasStrongArtistCatalystContext(normalizedText: string, normalizedAlias:
   const catalystAlternation = CATALYST_TERMS.map(escapeRegex).join("|");
   const alias = escapeRegex(normalizedAlias);
   const patterns = [
+    // A performer can be the subject without a catalyst immediately following
+    // their name. Keep this bounded to performance verbs and concert context;
+    // mere co-occurrence of a common-word name and "tour" is insufficient.
+    new RegExp(`^${alias}\\s+(?:brings? out|brought out|surpasses?|welcomes?)\\b(?:\\s+\\w+){0,16}\\s+(?:show|concert|tour|festival|stage)\\b`),
     new RegExp(`\\b${alias}\\s+(?:${catalystAlternation})\\b`),
     new RegExp(`\\b(?:${catalystAlternation})\\s+(?:from|by|with|for|to|against)\\s+${alias}\\b`),
     new RegExp(`\\b(?:rapper|rap artist|hip hop artist|artist)\\s+${alias}\\b`),

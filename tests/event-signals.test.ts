@@ -68,6 +68,23 @@ function evidenceMultiplier(event: MarketEvent) {
 }
 
 describe("feature evidence safeguards", () => {
+  it("keeps verified homecoming-performance coverage eligible when stored news is rescored", () => {
+    const performer = { ...artist, id: "ye", name: "Ye", ticker: "YE" };
+    const title = "Ye Brings Out Big Sean, 2 Chainz & Twista During Homecoming Show In Chicago";
+    const event: MarketEvent = {
+      artistId: "ye", eventDate: "2026-09-04", eventType: "viral", title,
+      sourceName: "iHeart", sourceUrl: "https://www.iheart.com/content/2026-09-04-ye-brings-out-guests/",
+      sentimentScore: 24, impactScore: 42, confidence: 0.77,
+      rawPayload: { source: "media_rss_item", domain: "iheart.com", sourceTier: 2,
+        searchQuery: '"Ye" (album OR song OR performance)', classificationReason: "performance_terms",
+        publisherArticleVerified: true, publisherDateVerified: true, publisherHeadlineVerified: true,
+        publisherPublishedDate: "2026-09-04", publisherHeadline: title }
+    };
+    const signal = buildEventMarketSignals({ artists: [performer], runDate: "2026-09-12", eventsByArtist: { ye: [event] } }).ye;
+    const scored = signal.rawPayload.events as Array<{ evidenceSafetyMultiplier: number }>;
+    expect(scored[0].evidenceSafetyMultiplier).toBeGreaterThan(0);
+    expect(signal.stats.newsScore).toBeGreaterThan(50);
+  });
   it("drops a legacy AI event that has no publisher provenance", () => {
     const event = featureEvent({
       publisherArticleVerified: false,

@@ -1,3 +1,4 @@
+import { restoreDailySources } from "@/server/market/daily-source-cache";
 import { getBaselineAgeDays } from "@/server/market/source-quality";
 import { createAudienceRevaluation, readAudienceRevaluation, type AudienceRevaluation } from "@/server/market/audience-revaluation";
 import { NextResponse } from "next/server";
@@ -66,7 +67,6 @@ import {
   loadActiveArtistCount,
   loadActiveArtistsPage,
   loadArtistExternalIds,
-  loadCurrentSignalStats,
   loadExistingPriceHistoryArtistIds,
   loadLatestObservationPayloads,
   loadObservationBaselines,
@@ -177,8 +177,7 @@ export async function POST(request: Request) {
       artists = await applyMarketHistoryBaselines({
         supabase,
         artists,
-        runDate,
-        intraday: body.intraday === true
+        runDate
       });
     }
 
@@ -544,16 +543,14 @@ function getMarketCoverageRatio(batch: NonNullable<MarketUpdateSummary["batch"]>
 async function applyMarketHistoryBaselines({
   supabase,
   artists,
-  runDate,
-  intraday
+  runDate
 }: {
   supabase: ReturnType<typeof createServiceRoleClient>;
   artists: ReturnType<typeof getMockMarketArtists>;
   runDate: string;
-  intraday: boolean;
 }) {
   const artistIds = artists.map((artist) => artist.id);
-  const [previousCloses, priceTrends, existingPriceHistoryArtistIds, previousSignalStats, currentSignalStats] = await Promise.all([
+  const [previousCloses, priceTrends, existingPriceHistoryArtistIds, previousSignalStats] = await Promise.all([
     loadPreviousClosePrices({
       supabase,
       artistIds,
@@ -573,10 +570,7 @@ async function applyMarketHistoryBaselines({
       supabase,
       artistIds,
       runDate
-    }),
-    intraday
-      ? loadCurrentSignalStats({ supabase, artistIds, runDate })
-      : Promise.resolve<Record<string, HypeStats>>({})
+    })
   ]);
 
   return artists.map((artist) => {
@@ -599,9 +593,9 @@ async function applyMarketHistoryBaselines({
       previousClose,
       previousCloseSource: "price_history" as const,
       quotedPrice: artist.currentPrice,
-      stats: isSameDayRecalculation
-        ? currentSignalStats[artist.id] ?? previousSignalStats[artist.id] ?? artist.stats
-        : artist.stats,
+      // Reuse the same opening evidence for daily and intraday calculations;
+      // blending a previous refresh's result again compounds unchanged inputs.
+      stats: previousSignalStats[artist.id] ?? artist.stats,
       priceTrend
     };
   });
@@ -689,6 +683,7 @@ async function collectRealSignals({
   let wikimediaBaselines: ObservationBaselines = {};
   let redditBaselines: ObservationBaselines = {};
   let blueskyBaselines: ObservationBaselines = {};
+  let wikimediaPreviousArticles: Record<string, Record<string, unknown>> = {};
   let polymarketPreviousPayloads: Record<string, Record<string, unknown>> = {};
 
   if (supabase) {
@@ -705,7 +700,8 @@ async function collectRealSignals({
         wikimediaBaselines,
         redditBaselines,
         blueskyBaselines,
-        polymarketPreviousPayloads
+        polymarketPreviousPayloads,
+        wikimediaPreviousArticles
       ] = await Promise.all([
         loadArtistExternalIds(supabase, artistIds),
         useGdelt
@@ -824,6 +820,10 @@ async function collectRealSignals({
               beforeDate: runDate,
               lookbackDays: 14
             })
+          : Promise.resolve({}),
+        useWikimedia
+          ? loadLatestObservationPayloads({ supabase, artistIds, source: "wikimedia",
+              metric: "pageviews_7d", beforeDate: runDate, lookbackDays: 90 })
           : Promise.resolve({})
       ]);
     } catch (error) {
@@ -865,7 +865,7 @@ async function collectRealSignals({
           apiKey: process.env.LASTFM_API_KEY,
           externalIds,
           baselines: lastfmBaselines,
-          useCompletedIntervalFallback: !intraday,
+          useCompletedIntervalFallback: true,
           delayMs: intraday
             ? getEnvInteger("MARKET_INTRADAY_LASTFM_DELAY_MS", 500, 250, 2000)
             : undefined
@@ -889,7 +889,7 @@ async function collectRealSignals({
           externalIds,
           authToken: process.env.LISTENBRAINZ_USER_TOKEN,
           baselines: listenbrainzBaselines,
-          useCompletedIntervalFallback: !intraday
+          useCompletedIntervalFallback: true
         })
       );
 
@@ -946,7 +946,7 @@ async function collectRealSignals({
           apiKey: process.env.YOUTUBE_API_KEY,
           externalIds,
           baselines: youtubeBaselines,
-          useCompletedIntervalFallback: !intraday
+          useCompletedIntervalFallback: true
         })
       );
 
@@ -1034,7 +1034,8 @@ async function collectRealSignals({
           artists,
           runDate,
           externalIds,
-          baselines: wikimediaBaselines
+          baselines: wikimediaBaselines,
+          previousArticles: wikimediaPreviousArticles
         })
       );
 
@@ -1132,6 +1133,15 @@ async function collectRealSignals({
         observations.push(...tradeFlow.observations);
         warnings.push(...tradeFlow.warnings);
       }
+    })());
+  }
+
+  if (intraday && supabase) {
+    sourceTasks.push((async () => {
+      const { data, error } = await supabase.from("market_signal_snapshots")
+        .select("artist_id,source_date,raw_payload").eq("source_date", runDate).in("artist_id", artistIds);
+      if (error) throw new Error(`Daily source context could not be loaded: ${error.message}`);
+      sources.push(...restoreDailySources(data ?? [], runDate));
     })());
   }
 
