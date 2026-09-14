@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { isHistoricalRetrospective } from "@/server/market/article-timeliness";
 import { createServiceRoleClient, getSupabaseConfigStatus } from "@/lib/supabase/server";
 import type { Database } from "@/lib/supabase/database.types";
 import { getMarketDate, shiftMarketDate } from "@/server/market/market-date";
@@ -514,6 +515,10 @@ function isPublicMarketNewsEvent(
   const impactScore = Number(event.impact_score);
   const confidence = Number(event.confidence);
   const hasStatusSubtype = Boolean(getArtistStatusSubtype(rawPayload.statusSubtype));
+
+  if (["media_rss_item", "gdelt_article", "ai_research_event"].includes(source) && isHistoricalRetrospective(event.title)) {
+    return false;
+  }
 
   if (!Number.isFinite(impactScore) || !Number.isFinite(confidence)) {
     return false;

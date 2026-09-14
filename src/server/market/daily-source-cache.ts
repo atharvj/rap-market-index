@@ -2,7 +2,7 @@ import type { AdapterSignal, AdapterSignals } from "@/server/market/market-data"
 
 const DAILY_SOURCES = new Set([
   "gdelt", "listenbrainz", "spotify", "spotify_public", "wikimedia",
-  "reddit", "bluesky", "youtube_comments"
+  "reddit", "bluesky", "youtube_comments", "apple_charts"
 ]);
 
 // Save each source independently, including confidence and its market-wide

@@ -25,6 +25,14 @@ function artist(): MarketUpdateArtist {
 }
 
 describe("daily market valuation pressure", () => {
+  it("counts YouTube metrics as one provider when estimating independent coverage", () => {
+    const youtube = ["youtube", "youtube_tracks", "youtube_comments"].map(source => ({
+      artist: { stats: { youtubeGrowth: 12 }, confidence: 0.9, rawPayload: { source, status: "ok" } }
+    }));
+    const update = (sources: typeof youtube) => calculateDailyMarketUpdates({ artists: [artist()], source: "core", runDate: "2026-09-14", adapterSignals: mergeAdapterSignals(...sources) }).updates[0];
+    expect((update(youtube).rawPayload.reliabilityDetails as Record<string, unknown>).sourceCount).toBe(1);
+    expect((update([...youtube, { artist: { stats: { youtubeGrowth: 12 }, confidence: 0.82, rawPayload: { source: "apple_charts", status: "ok" } } }]).rawPayload.reliabilityDetails as Record<string, unknown>).sourceCount).toBe(2);
+  });
   it("lets corroborated listening and video growth move the quote without requiring a headline", () => {
     const moves = [1, -1].map(direction => {
       const adapterSignals = mergeAdapterSignals(

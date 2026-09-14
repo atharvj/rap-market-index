@@ -86,6 +86,7 @@ export async function collectYoutubeEditorialEvents({
     };
   }
 
+  let checkedPublishers = 0;
   for (const [index, publisher] of TRUSTED_YOUTUBE_EDITORIAL_CHANNELS.entries()) {
     if (index > 0 && delayMs > 0) {
       await sleep(delayMs);
@@ -104,6 +105,7 @@ export async function collectYoutubeEditorialEvents({
       continue;
     }
 
+    checkedPublishers += 1;
     const freshVideos = result.videos.filter((video) => isWithinLookback(video.publishedAt, runDate, lookbackDays));
     const publisherEvents = buildYoutubeEditorialEvents({ artists, runDate, publisher, videos: freshVideos });
 
@@ -115,7 +117,7 @@ export async function collectYoutubeEditorialEvents({
   for (const artist of artists) {
     const events = eventsByArtist[artist.id] ?? [];
 
-    if (!events.length) {
+    if (!checkedPublishers) {
       continue;
     }
 
@@ -129,6 +131,7 @@ export async function collectYoutubeEditorialEvents({
       rawPayload: {
         source: SOURCE,
         lookbackDays,
+        checkedPublishers,
         publisherCount: new Set(events.map((event) => event.sourceName)).size,
         videoIds: events.map((event) => event.rawPayload.videoId)
       }

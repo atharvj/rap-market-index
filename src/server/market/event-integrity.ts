@@ -1,4 +1,5 @@
 import type { MarketEvent } from "@/server/market/market-data";
+import { isHistoricalRetrospective } from "@/server/market/article-timeliness";
 
 type EventIdentity = {
   eventDate: string;
@@ -19,6 +20,7 @@ export function isStoredMarketEventSourceIntegrityValid(
   event: EventIdentity
 ) {
   const source = getString(rawPayload.source)?.toLowerCase();
+  if (["media_rss_item", "gdelt_article", "ai_research_event"].includes(source ?? "") && isHistoricalRetrospective(event.title)) return false;
 
   if (source !== "ai_research_event") {
     return true;

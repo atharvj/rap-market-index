@@ -1,3 +1,5 @@
+import { isOfficialRecordingSource, resolveRecordingArtists } from "@/server/market/recording-credits";
+
 export type NewsStoryEvent = {
   id: string;
   artist_id: string;
@@ -131,6 +133,14 @@ export function resolveNewsStoryArtists<T extends NewsStoryEvent>({
     selected.push(artist);
   };
   const orderedEvents = [primary, ...events.filter((event) => event.id !== primary.id)];
+
+  if (isOfficialRecordingSource(toRecord(primary.raw_payload))) {
+    const raw = toRecord(primary.raw_payload);
+    return resolveRecordingArtists({ title: typeof raw.recordingTitle === "string" ? raw.recordingTitle : primary.title,
+      description: typeof raw.performerCreditText === "string" ? raw.performerCreditText : undefined,
+      primaryArtistId: typeof raw.recordingPrimaryArtistId === "string" ? raw.recordingPrimaryArtistId : primary.artist_id,
+      artists });
+  }
 
   for (const event of orderedEvents) {
     addArtist(artistById.get(event.artist_id));

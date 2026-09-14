@@ -1,3 +1,6 @@
+import { collectAppleChartSignals } from "@/server/market/apple-charts-source";
+import { collectYoutubeTrackSignals, getTrackedVideoMetrics, selectTrackedVideos } from "@/server/market/youtube-tracks-source";
+import { expandRecordingEvents } from "@/server/market/recording-credits";
 import { restoreDailySources } from "@/server/market/daily-source-cache";
 import { getBaselineAgeDays } from "@/server/market/source-quality";
 import { createAudienceRevaluation, readAudienceRevaluation, type AudienceRevaluation } from "@/server/market/audience-revaluation";
@@ -52,7 +55,7 @@ import { collectYoutubeEditorialEvents } from "@/server/market/youtube-editorial
 import { getMarketDate } from "@/server/market/market-date";
 import { getMarketModelVersion } from "@/server/market/model-version";
 import { shouldRecordIntradayPriceTick } from "@/server/market/intraday-refresh";
-import { shouldCollectWikimediaSource } from "@/server/market/source-refresh-policy";
+import { isVideoDiscoveryDue, shouldCollectWikimediaSource } from "@/server/market/source-refresh-policy";
 import { getMockMarketArtists } from "@/server/market/mock-source";
 import type {
   AdapterSignals,
@@ -69,6 +72,7 @@ import {
   loadArtistExternalIds,
   loadExistingPriceHistoryArtistIds,
   loadLatestObservationPayloads,
+  loadLatestSourceObservationTimes,
   loadObservationBaselines,
   loadPreviousClosePrices,
   loadPreviousSignalStats,
@@ -956,14 +960,14 @@ async function collectRealSignals({
         warnings.push(...youtube.warnings);
       }
 
-      const maxUploadEventVideos = intraday
-        ? 0
-        : getEnvInteger("MARKET_YOUTUBE_UPLOAD_EVENT_VIDEOS", 12, 0, 12);
+      const uploadTimes = intraday && supabase ? await loadLatestSourceObservationTimes({ supabase, artistIds, source: "youtube_uploads", runDate, lookbackDays: 3 }) : {};
+      const uploadArtists = artists.filter(artist => !intraday || isVideoDiscoveryDue(uploadTimes[artist.id]));
+      const maxUploadEventVideos = uploadArtists.length ? getEnvInteger("MARKET_YOUTUBE_UPLOAD_EVENT_VIDEOS", 12, 0, 12) : 0;
 
       if (maxUploadEventVideos > 0) {
         const youtubeUploadEvents = await collectExternalSource("YouTube upload events", warnings, () =>
           collectYoutubeUploadEvents({
-            artists,
+            artists: uploadArtists,
             runDate,
             apiKey: process.env.YOUTUBE_API_KEY,
             externalIds,
@@ -979,18 +983,18 @@ async function collectRealSignals({
         }
       }
 
-      const maxEditorialVideos = intraday
-        ? 0
-        : getEnvInteger("MARKET_YOUTUBE_EDITORIAL_EVENT_VIDEOS", 12, 0, 20);
+      const editorialTimes = intraday && supabase ? await loadLatestSourceObservationTimes({ supabase, artistIds, source: "youtube_editorial", runDate, lookbackDays: 3 }) : {};
+      const editorialArtists = artists.filter(artist => !intraday || isVideoDiscoveryDue(editorialTimes[artist.id]));
+      const maxEditorialVideos = editorialArtists.length ? getEnvInteger("MARKET_YOUTUBE_EDITORIAL_EVENT_VIDEOS", 20, 0, 20) : 0;
 
       if (maxEditorialVideos > 0) {
         const youtubeEditorialEvents = await collectExternalSource("YouTube editorial videos", warnings, () =>
           collectYoutubeEditorialEvents({
-            artists,
+            artists: editorialArtists,
             runDate,
             apiKey: process.env.YOUTUBE_API_KEY,
             maxVideosPerChannel: maxEditorialVideos,
-            lookbackDays: getEnvInteger("MARKET_YOUTUBE_EDITORIAL_EVENT_DAYS", 7, 1, 30)
+            lookbackDays: getEnvInteger("MARKET_YOUTUBE_EDITORIAL_EVENT_DAYS", 30, 1, 30)
           })
         );
 
@@ -1136,6 +1140,14 @@ async function collectRealSignals({
     })());
   }
 
+  if (!intraday && supabase && ["core", "blended"].includes(source)) {
+    sourceTasks.push((async () => {
+      const previous = await loadLatestObservationPayloads({ supabase, artistIds, source: "apple_charts", metric: "chart_points", beforeDate: runDate, lookbackDays: 7 });
+      const charts = await collectAppleChartSignals({ artists, runDate, previous });
+      sources.push(charts.signals); observations.push(...charts.observations); warnings.push(...charts.warnings);
+    })());
+  }
+
   if (intraday && supabase) {
     sourceTasks.push((async () => {
       const { data, error } = await supabase.from("market_signal_snapshots")
@@ -1146,6 +1158,25 @@ async function collectRealSignals({
   }
 
   await Promise.all(sourceTasks);
+
+  if (useYoutube && supabase) {
+    const roster = await loadActiveArtists(supabase);
+    const stored = await loadRecentMarketEvents({ supabase, artistIds: roster.map(artist => artist.id), runDate, lookbackDays: 30 });
+    // News and video coverage of the same release may share a catalyst, but
+    // the recording must remain available for its own viewing observations.
+    const candidates = Object.fromEntries(roster.map(artist => [artist.id, [...(stored[artist.id] ?? []), ...(detectedEventsByArtist[artist.id] ?? [])]]));
+    const allTracked = selectTrackedVideos(candidates, roster);
+    const tracked = Object.fromEntries(artists.map(artist => [artist.id, allTracked[artist.id] ?? []]));
+    const metrics = getTrackedVideoMetrics(tracked);
+    let baselines: ObservationBaselines = {};
+    // Keep query URLs bounded even when hundreds of recordings are tracked.
+    for (let offset = 0; offset < metrics.length; offset += 60) {
+      const chunk = await loadObservationBaselines({ supabase, artistIds, source: "youtube_tracks", metrics: metrics.slice(offset, offset + 60), beforeDate: runDate, lookbackDays: 30, strategy: "latest" });
+      for (const [id, values] of Object.entries(chunk)) baselines[id] = { ...baselines[id], ...values };
+    }
+    const tracks = await collectYoutubeTrackSignals({ artists, events: tracked, runDate, apiKey: process.env.YOUTUBE_API_KEY, baselines });
+    sources.push(tracks.signals); observations.push(...tracks.observations); warnings.push(...tracks.warnings);
+  }
 
   return {
     adapterSignals: mergeAdapterSignals(...sources),
@@ -1304,7 +1335,8 @@ async function collectEventSignals({
   manualEvents?: ManualMarketEvents;
   intraday: boolean;
 }) {
-  const artistIds = artists.map((artist) => artist.id);
+  const creditRoster = supabase ? await loadActiveArtists(supabase) : artists;
+  const artistIds = creditRoster.map((artist) => artist.id);
   let storedEvents = {};
   let detectedEventsByArtist = seedDetectedEventsByArtist;
   const warnings: string[] = [];
@@ -1317,7 +1349,7 @@ async function collectEventSignals({
         runDate,
         lookbackDays: 30
       });
-      storedEvents = filterStoredEventsForSourcePolicy(storedEvents, source, artists);
+      storedEvents = expandRecordingEvents(filterStoredEventsForSourcePolicy(storedEvents, source, creditRoster), creditRoster);
     } catch (error) {
       if (!dryRun) {
         throw error;
@@ -1346,6 +1378,7 @@ async function collectEventSignals({
     artists,
     runDate
   });
+  detectedEventsByArtist = expandRecordingEvents(detectedEventsByArtist ?? {}, creditRoster);
   const eventsByArtist = mergeEvents(mergeEvents(storedEvents, detectedEventsByArtist), submittedEventsByArtist);
   const eventCount = Object.values(eventsByArtist).reduce((total, events) => total + events.length, 0);
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { shouldCollectWikimediaSource } from "@/server/market/source-refresh-policy";
+import { isVideoDiscoveryDue, shouldCollectWikimediaSource } from "@/server/market/source-refresh-policy";
 
 describe("market source refresh policy", () => {
   it("collects daily Wikimedia attention during scheduled source runs", () => {
@@ -12,4 +12,11 @@ describe("market source refresh policy", () => {
     expect(shouldCollectWikimediaSource("wikimedia", true)).toBe(false);
     expect(shouldCollectWikimediaSource("core", true)).toBe(false);
   });
+});
+it("discovers new official/editorial videos hourly without repeating every quote refresh", () => {
+  const now = Date.parse("2026-09-14T12:00:00Z");
+  expect(isVideoDiscoveryDue(undefined, now)).toBe(true);
+  expect(isVideoDiscoveryDue("invalid", now)).toBe(true);
+  expect(isVideoDiscoveryDue("2026-09-14T11:00:00Z", now)).toBe(true);
+  expect(isVideoDiscoveryDue("2026-09-14T11:45:00Z", now)).toBe(false);
 });

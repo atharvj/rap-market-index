@@ -1,3 +1,4 @@
+import { isHistoricalRetrospective } from "@/server/market/article-timeliness";
 import { clamp } from "@/lib/pricing";
 import type { MarketUpdateArtist } from "@/server/market/daily-update";
 import {
@@ -614,6 +615,7 @@ export function classifyArticleEvent(
   tone: unknown = undefined,
   options: { allowLowTierRelease?: boolean } = {}
 ): ArticleMarketClassification | null {
+  if (isHistoricalRetrospective(title)) return null;
   const lowerTitle = title.toLowerCase();
   const sourceTier = getSourceTier(domain);
   const toneScore = clamp((getNumber(tone) ?? 0) * 8, -45, 45);
@@ -789,6 +791,16 @@ export function classifyArticleEvent(
 
   if (musicRelease) {
     return musicRelease;
+  }
+
+  if (/\breunit(?:e|es|ed|ing)\b/.test(lowerTitle) && /\b(?:onstage|on stage|at\b.{0,45}\b(?:show|concert)|with (?:a )?performance)\b/.test(lowerTitle)) {
+    return {
+      eventType: "viral" as const,
+      sentimentScore: clamp(24 + toneScore * 0.55, -35, 80),
+      impactScore: clamp(42 + Math.max(0, toneScore), -20, 88),
+      confidence: getArticleConfidence(sourceTier, 0.66),
+      reason: "performance_terms"
+    };
   }
 
   if (hasAny(lowerTitle, PUBLIC_CONFLICT_TERMS)) {

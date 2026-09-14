@@ -404,6 +404,21 @@ test("homepage leads with one top story and does not repeat it below", async ({ 
   ).toHaveText("View artist market");
 });
 
+test("Watch Now links every credited performer under the video", async ({ page }) => {
+  const participants = [marketState.artists[1], marketState.artists[2]].map(artist => ({ artistId: artist.id, artistName: artist.name, ticker: artist.ticker }));
+  await page.route("**/api/market/news**", route => {
+    if (new URL(route.request().url()).searchParams.get("feed") !== "watch") return route.fallback();
+    return route.fulfill({ contentType: "application/json", body: JSON.stringify({ ok: true, news: [{ ...marketVideos[0], relatedArtists: participants }] }) });
+  });
+  await page.goto("/");
+  const section = page.locator('section[aria-labelledby="watch-now-title"]');
+  await section.scrollIntoViewIfNeeded();
+  for (const artist of participants) await expect(section.getByRole("link", { name: `${artist.artistName} artist page` })).toHaveAttribute("href", `/artists/${artist.artistId}`);
+  await expect(section.getByRole("link", { name: /artist page$/ })).toHaveCount(2);
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+});
+
 test("Watch Now starts in view and stays inside the RMI player", async ({ page }) => {
   await page.goto("/");
   await expect(page.locator('[aria-busy="true"]')).toHaveCount(0, { timeout: 15_000 });

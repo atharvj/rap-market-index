@@ -765,19 +765,15 @@ export async function loadLatestSourceObservationTimes({
     return {};
   }
 
-  const { data, error } = await supabase
-    .from("market_observations")
-    .select("artist_id,observed_date,observed_at")
-    .in("artist_id", artistIds)
-    .eq("source", source)
-    .gte("observed_date", shiftDate(runDate, -lookbackDays))
-    .lte("observed_date", runDate)
-    .order("observed_at", { ascending: false })
-    .limit(Math.min(10000, Math.max(artistIds.length * lookbackDays, artistIds.length)));
-
-  if (error) {
-    throw new Error(`Could not load latest ${source} observation times: ${error.message}`);
-  }
+  const data = await loadAllPages(async (from, to) => {
+    const { data, error } = await supabase.from("market_observations")
+      .select("artist_id,observed_date,observed_at")
+      .in("artist_id", artistIds).eq("source", source)
+      .gte("observed_date", shiftDate(runDate, -lookbackDays)).lte("observed_date", runDate)
+      .order("observed_at", { ascending: false }).order("artist_id").order("metric").range(from, to);
+    if (error) throw new Error(`Could not load latest ${source} observation times: ${error.message}`);
+    return data ?? [];
+  });
 
   return ((data ?? []) as Pick<MarketObservationRow, "artist_id" | "observed_date" | "observed_at">[]).reduce<
     Record<string, string>
@@ -920,17 +916,13 @@ export async function loadRecentMarketEvents({
   }
 
   const startDate = shiftDate(runDate, -lookbackDays);
-  const { data, error } = await supabase
-    .from("market_events")
-    .select("*")
-    .in("artist_id", artistIds)
-    .gte("event_date", startDate)
-    .lte("event_date", runDate)
-    .order("event_date", { ascending: false });
-
-  if (error) {
-    throw new Error(`Could not load market events: ${error.message}`);
-  }
+  const data = await loadAllPages(async (from, to) => {
+    const result = await supabase.from("market_events").select("*")
+      .in("artist_id", artistIds).gte("event_date", startDate).lte("event_date", runDate)
+      .order("event_date", { ascending: false }).order("id").range(from, to);
+    if (result.error) throw new Error(`Could not load market events: ${result.error.message}`);
+    return result.data ?? [];
+  });
 
   return ((data ?? []) as MarketEventRow[]).reduce<Record<string, MarketEvent[]>>((grouped, row) => {
     const event: MarketEvent = {

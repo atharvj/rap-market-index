@@ -7,6 +7,7 @@ import {
 
 describe("artist event ownership", () => {
   it.each([
+    ["Ye", "Ye & Big Sean Squash Beef & Reunite at Chicago Show With Performance"],
     ["Ye", "Ye Brings Out Big Sean, 2 Chainz & Twista During Homecoming Show In Chicago"],
     ["Ye", "Ye Surpasses One Million Fans on 2026 World Tour With Historic New Orleans Return"],
     ["Future", "Future Brings Out Guests During Atlanta Concert"]

@@ -1480,6 +1480,8 @@ function getStatSourceWeight(key: keyof HypeStats, sourceName: string) {
       socialGrowth: 0.12
     },
     spotify_public: { streamingGrowth: 1.2 },
+    apple_charts: { streamingGrowth: 0.65 },
+    youtube_tracks: { youtubeGrowth: 0.85 },
     spotify: {
       streamingGrowth: 0.75,
       searchGrowth: 0.55
@@ -1582,13 +1584,16 @@ function calculateSignalReliability(
   const statCount = getHypeStatKeys().filter((key) => typeof incoming[key] === "number").length;
   const sourceWeights = getSourceWeights(rawPayload);
   const sourceNames = sourceWeights ? Object.keys(sourceWeights) : [getPayloadSourceName(rawPayload)].filter(Boolean);
+  const sourceCount = new Set(sourceNames.map(name =>
+    name.startsWith("youtube") ? "youtube" : name.startsWith("spotify") ? "spotify" : name
+  )).size;
   const flattenedWeights = sourceWeights
     ? Object.values(sourceWeights).flatMap((weights) => Object.values(weights).filter(isFiniteNumber))
     : [];
   const averageSourceWeight = flattenedWeights.length
     ? flattenedWeights.reduce((total, value) => total + value, 0) / flattenedWeights.length
     : getDefaultSignalConfidence(sourceNames[0] ?? "adapter");
-  const sourceBreadthScore = clamp(sourceNames.length / 4, 0.2, 1);
+  const sourceBreadthScore = clamp(sourceCount / 4, 0.2, 1);
   const statCoverageScore = clamp(statCount / 4, 0.2, 1);
   const eventSupportScore = modifiers.length > 0 ? 0.16 : 0;
   const sourceConflict = getSourceConflictDiagnostics(rawPayload);
@@ -1599,7 +1604,7 @@ function calculateSignalReliability(
     1
   );
   const consensusCap = getConsensusReliabilityCap({
-    sourceCount: sourceNames.length,
+    sourceCount: sourceCount,
     statCount,
     hasEventSupport: modifiers.length > 0
   });
@@ -1609,7 +1614,7 @@ function calculateSignalReliability(
   return {
     score,
     details: {
-      sourceCount: sourceNames.length,
+      sourceCount: sourceCount,
       statCount,
       averageSourceWeight,
       sourceBreadthScore,
@@ -1828,6 +1833,8 @@ function buildSourceAttribution(
 function getSourceAttributionLabel(source: string) {
   const labels: Record<string, string> = {
     lastfm: "audience listening",
+    apple_charts: "Apple Music chart movement",
+    youtube_tracks: "song and performance viewing activity",
     listenbrainz: "independent listening sample",
     spotify: "streaming platform",
     spotify_public: "Spotify audience",

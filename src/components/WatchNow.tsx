@@ -593,13 +593,13 @@ export function WatchNow() {
             </div>
 
             <div className="p-4 sm:p-5">
-              <Link
-                href={`/artists/${currentVideo.artistId}`}
-                className="block w-fit text-xs font-semibold text-cyan hover:text-cyan/75"
-                aria-label={`${currentVideo.artistName} artist page`}
-              >
-                {currentVideo.artistName} · {currentVideo.ticker}
-              </Link>
+              <div className="flex flex-wrap gap-2">
+                {(currentVideo.relatedArtists?.length ? currentVideo.relatedArtists : [currentVideo]).map(artist => <Link
+                  key={artist.artistId} href={`/artists/${artist.artistId}`}
+                  className="rounded bg-cyan/10 px-2 py-1 text-xs font-semibold text-cyan hover:bg-cyan/20"
+                  aria-label={`${artist.artistName} artist page`}
+                >{artist.artistName} · {artist.ticker}</Link>)}
+              </div>
               <h3 className="mt-2 text-xl font-bold leading-tight text-paper">{currentVideo.title}</h3>
               <div className="mt-3 flex flex-wrap items-center gap-3 text-xs font-medium text-paper/45">
                 <span>{formatDate(getNewsDisplayDate(currentVideo))}</span>

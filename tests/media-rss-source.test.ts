@@ -28,6 +28,11 @@ const googleUrl = "https://news.google.com/rss/articles/CBMiTestArticle?oc=5";
 const canonicalUrl = "https://www.billboard.com/music/rb-hip-hop/baby-keem-casino-123/";
 
 describe("media RSS publisher-date verification", () => {
+  it("discovers news under both Ye and Kanye West", () => {
+    const queries = buildArtistNewsQueries({ ...artist, id: "ye", name: "Ye", ticker: "YE" });
+    expect(queries).toHaveLength(2);
+    for (const query of queries) { expect(query).toContain('"Ye"'); expect(query).toContain('"Kanye West"'); }
+  });
   it("uses separate focused searches so major live announcements are not buried by general coverage", () => {
     const queries = buildArtistNewsQueries({ ...artist, name: "Young Thug" });
 

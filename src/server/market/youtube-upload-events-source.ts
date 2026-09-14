@@ -53,6 +53,7 @@ type YoutubeVideosListResponse = {
   items?: Array<{
     id?: string;
     snippet?: {
+      channelId?: string;
       title?: string;
       description?: string;
       publishedAt?: string;
@@ -81,6 +82,7 @@ type YoutubeThumbnails = Record<string, { url?: string; width?: number; height?:
 
 type YoutubeVideo = {
   id: string;
+  channelId?: string;
   title: string;
   description?: string | null;
   thumbnailUrl?: string | null;
@@ -312,7 +314,12 @@ function buildYoutubeUploadEvents({
       confidence: classification.confidence,
       rawPayload: {
         source: "youtube_upload_event",
+        recordingTitle: video.title.slice(0, 1000),
+        // Retain only explicit performer credit lines, not incidental prose.
+        performerCreditText: (video.description ?? "").split(/\r?\n/)
+          .filter(line => /^\s*(?:artists?|performers?|performed by|vocals(?: by)?)\s*:/i.test(line)).join("\n").slice(0, 1000),
         channelId,
+        videoChannelId: video.channelId ?? null,
         videoId: video.id,
         publishedAt: video.publishedAt ?? null,
         durationSeconds: video.durationSeconds ?? null,
@@ -1322,6 +1329,7 @@ async function hydrateYoutubeVideoDetails({
       .map((item) => [
         item.id as string,
         {
+          channelId: item.snippet?.channelId,
           title: item.snippet?.title?.trim() || undefined,
           description: item.snippet?.description ?? null,
           thumbnailUrl: getYoutubeThumbnailUrl(item.snippet?.thumbnails),

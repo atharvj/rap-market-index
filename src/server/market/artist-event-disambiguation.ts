@@ -1,3 +1,4 @@
+import { isHistoricalRetrospective } from "@/server/market/article-timeliness";
 import { getArtistTextKey } from "@/server/market/artist-text-identifiers";
 import type { ArtistStatusSubtype } from "@/server/market/status-events";
 
@@ -254,6 +255,7 @@ export function isGenericMusicListicleTitle(title: string) {
 }
 
 export function isLowValueMarketArticleTitle(title: string) {
+  if (isHistoricalRetrospective(title)) return true;
   const normalized = normalizeEventSearchText(title);
   const hasExplicitMusicDemandContext =
     /\b(?:album|chart|concert|festival|listening|music|performance|release|single|song|spotify|stream|streaming|ticket|tour|track)\b/.test(
@@ -367,6 +369,7 @@ function hasStrongArtistCatalystContext(normalizedText: string, normalizedAlias:
   const catalystAlternation = CATALYST_TERMS.map(escapeRegex).join("|");
   const alias = escapeRegex(normalizedAlias);
   const patterns = [
+    new RegExp(`^${alias}\\s+and(?:\\s+\\w+){1,8}\\s+reunit(?:e|es|ed|ing)\\b.{0,60}\\b(?:show|concert|onstage|performance)\\b`),
     // A performer can be the subject without a catalyst immediately following
     // their name. Keep this bounded to performance verbs and concert context;
     // mere co-occurrence of a common-word name and "tour" is insufficient.
