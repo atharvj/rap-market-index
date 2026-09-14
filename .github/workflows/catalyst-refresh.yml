@@ -3,7 +3,9 @@ name: Refresh verified catalysts
 on:
   schedule:
     # Scan at most 100 least-recently-covered artists per run, so larger rosters rotate fairly.
-    - cron: "*/15 * * * *"
+    # Avoid the hourly rush and the deep news scan at :15. GitHub scheduling
+    # remains best-effort; inspect actual run timestamps when auditing freshness.
+    - cron: "7,22,37,52 * * * *"
   workflow_dispatch:
 
 permissions:
