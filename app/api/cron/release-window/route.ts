@@ -1,3 +1,4 @@
+import { readAutomationResponse, automationFailureStatus } from "@/server/market/automation-response";
 import { pruneProductAnalyticsEvents } from "@/server/product-analytics";
 import { NextResponse } from "next/server";
 import { createServiceRoleClient, getSupabaseConfigStatus } from "@/lib/supabase/server";
@@ -8,12 +9,6 @@ import { secureCompare } from "@/server/secrets";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
-
-type AutomationResponse = {
-  ok?: boolean;
-  error?: string;
-  [key: string]: unknown;
-};
 
 export async function GET(request: Request) {
   if (!isAuthorized(request)) {
@@ -77,9 +72,9 @@ export async function GET(request: Request) {
       includeAiResearch: false
     })
   });
-  const eventScan = await readJson(eventScanResponse);
+  const eventScan = await readAutomationResponse(eventScanResponse);
 
-  if (!eventScanResponse.ok || eventScan.ok === false) {
+  if (!eventScanResponse.ok || eventScan.ok !== true) {
     return NextResponse.json(
       {
         ok: false,
@@ -88,16 +83,16 @@ export async function GET(request: Request) {
         error: eventScan.error ?? "The release scan failed; trading remains paused.",
         eventScan
       },
-      { status: eventScanResponse.status || 500 }
+      { status: automationFailureStatus(eventScanResponse) }
     );
   }
 
   const marketUpdateResponse = await fetch(new URL("/api/cron/daily-market-update", request.url), {
     headers: { "x-market-update-secret": secret }
   });
-  const marketUpdate = await readJson(marketUpdateResponse);
+  const marketUpdate = await readAutomationResponse(marketUpdateResponse);
 
-  if (!marketUpdateResponse.ok || marketUpdate.ok === false) {
+  if (!marketUpdateResponse.ok || marketUpdate.ok !== true) {
     return NextResponse.json(
       {
         ok: false,
@@ -107,7 +102,7 @@ export async function GET(request: Request) {
         eventScan,
         marketUpdate
       },
-      { status: marketUpdateResponse.status || 500 }
+      { status: automationFailureStatus(marketUpdateResponse) }
     );
   }
 
@@ -140,12 +135,4 @@ function isAuthorized(request: Request) {
     || secureCompare(request.headers.get("x-market-update-secret"), marketSecret)
     || secureCompare(authorization, marketSecret ? `Bearer ${marketSecret}` : null)
   );
-}
-
-async function readJson(response: Response): Promise<AutomationResponse> {
-  try {
-    return await response.json() as AutomationResponse;
-  } catch {
-    return { ok: false, error: `Automation endpoint returned HTTP ${response.status}.` };
-  }
 }

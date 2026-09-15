@@ -1,3 +1,4 @@
+import { readAutomationResponse, automationFailureStatus } from "@/server/market/automation-response";
 import { pruneProductAnalyticsEvents } from "@/server/product-analytics";
 import { NextResponse } from "next/server";
 import { createServiceRoleClient, getSupabaseConfigStatus } from "@/lib/supabase/server";
@@ -139,9 +140,9 @@ export async function GET(request: Request) {
       maxBatches
     })
   });
-  const payload = (await response.json()) as MarketBatchRunResponse;
+  const payload = await readAutomationResponse<MarketBatchRunResponse>(response);
 
-  if (!response.ok || !payload.ok) {
+  if (!response.ok || payload.ok !== true) {
     return NextResponse.json(
       {
         ok: false,
@@ -153,7 +154,7 @@ export async function GET(request: Request) {
         error: payload.error ?? "Scheduled market update failed.",
         payload
       },
-      { status: response.status || 500 }
+      { status: automationFailureStatus(response) }
     );
   }
 

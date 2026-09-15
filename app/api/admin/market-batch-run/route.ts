@@ -1,3 +1,4 @@
+import { readAutomationResponse, automationFailureStatus } from "@/server/market/automation-response";
 import { NextResponse } from "next/server";
 import { createServiceRoleClient, getSupabaseConfigStatus } from "@/lib/supabase/server";
 import type { Json } from "@/lib/supabase/database.types";
@@ -190,12 +191,12 @@ export async function POST(request: Request) {
         artistOffset
       })
     });
-    const payload = (await response.json()) as DailyUpdateResponse;
+    const payload = await readAutomationResponse<DailyUpdateResponse>(response);
 
     runs.push(payload);
     payload.warnings?.forEach((warning) => warnings.add(warning));
 
-    if (!response.ok || !payload.ok) {
+    if (!response.ok || payload.ok !== true) {
       if (!dryRun) {
         await persistBatchRunFailure({
           runDate,
@@ -214,7 +215,7 @@ export async function POST(request: Request) {
           completedBatchCount: runs.length - 1,
           runs
         },
-        { status: response.status || 500 }
+        { status: automationFailureStatus(response) }
       );
     }
 

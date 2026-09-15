@@ -1,3 +1,4 @@
+import { readAutomationResponse, automationFailureStatus } from "@/server/market/automation-response";
 import { NextResponse } from "next/server";
 import { createServiceRoleClient, getSupabaseConfigStatus } from "@/lib/supabase/server";
 import { getMarketDate } from "@/server/market/market-date";
@@ -88,9 +89,9 @@ export async function GET(request: Request) {
       timeoutMs: 12_000
     })
   });
-  const eventScan = await readJson(eventScanResponse);
+  const eventScan = await readAutomationResponse(eventScanResponse);
 
-  if (!eventScanResponse.ok || eventScan.ok === false) {
+  if (!eventScanResponse.ok || eventScan.ok !== true) {
     return NextResponse.json(
       {
         ok: false,
@@ -99,7 +100,7 @@ export async function GET(request: Request) {
         error: eventScan.error ?? "Fast catalyst discovery failed.",
         eventScan
       },
-      { status: eventScanResponse.status || 500 }
+      { status: automationFailureStatus(eventScanResponse) }
     );
   }
 
@@ -138,9 +139,9 @@ export async function GET(request: Request) {
       intraday: true
     })
   });
-  const marketUpdate = await readJson(marketUpdateResponse);
+  const marketUpdate = await readAutomationResponse(marketUpdateResponse);
 
-  if (!marketUpdateResponse.ok || marketUpdate.ok === false) {
+  if (!marketUpdateResponse.ok || marketUpdate.ok !== true) {
     return NextResponse.json(
       {
         ok: false,
@@ -151,7 +152,7 @@ export async function GET(request: Request) {
         eventScan,
         marketUpdate
       },
-      { status: marketUpdateResponse.status || 500 }
+      { status: automationFailureStatus(marketUpdateResponse) }
     );
   }
 
@@ -278,12 +279,4 @@ function isAuthorized(request: Request) {
     || secureCompare(request.headers.get("x-market-update-secret"), marketSecret)
     || secureCompare(authorization, marketSecret ? `Bearer ${marketSecret}` : null)
   );
-}
-
-async function readJson(response: Response): Promise<AutomationResponse> {
-  try {
-    return await response.json() as AutomationResponse;
-  } catch {
-    return { ok: false, error: `Automation endpoint returned HTTP ${response.status}.` };
-  }
 }

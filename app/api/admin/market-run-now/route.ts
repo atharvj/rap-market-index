@@ -1,3 +1,4 @@
+import { readAutomationResponse, automationFailureStatus } from "@/server/market/automation-response";
 import { NextResponse } from "next/server";
 import { createServiceRoleClient, getSupabaseConfigStatus } from "@/lib/supabase/server";
 import { requireAdminRequest } from "@/server/admin-auth";
@@ -176,9 +177,9 @@ export async function POST(request: Request) {
       maxBatches
     })
   });
-  const payload = await readJsonResponse<MarketBatchRunResponse>(response);
+  const payload = await readAutomationResponse<MarketBatchRunResponse>(response);
 
-  if (!response.ok || !payload.ok) {
+  if (!response.ok || payload.ok !== true) {
     return NextResponse.json(
       {
         ok: false,
@@ -186,7 +187,7 @@ export async function POST(request: Request) {
         eventScan,
         payload
       },
-      { status: response.status || 500 }
+      { status: automationFailureStatus(response) }
     );
   }
 
@@ -252,11 +253,11 @@ async function runEventScan({
       maxRecords
     })
   });
-  const payload = await readJsonResponse<MarketEventScanResponse>(response);
+  const payload = await readAutomationResponse<MarketEventScanResponse>(response);
 
   return {
-    ok: response.ok && payload.ok,
-    error: response.ok && payload.ok ? undefined : payload.error ?? "Market event scan failed.",
+    ok: response.ok && payload.ok === true,
+    error: response.ok && payload.ok === true ? undefined : payload.error ?? "Market event scan failed.",
     payload
   };
 }
@@ -266,26 +267,6 @@ async function parseBody(request: Request): Promise<MarketRunNowBody> {
     return (await request.json()) as MarketRunNowBody;
   } catch {
     return {};
-  }
-}
-
-async function readJsonResponse<T extends { ok?: boolean; error?: string }>(response: Response): Promise<T> {
-  const text = await response.text();
-
-  if (!text.trim()) {
-    return {
-      ok: false,
-      error: `Market batch returned an empty response with HTTP ${response.status}.`
-    } as T;
-  }
-
-  try {
-    return JSON.parse(text) as T;
-  } catch {
-    return {
-      ok: false,
-      error: text.slice(0, 240) || `Market batch returned non-JSON with HTTP ${response.status}.`
-    } as T;
   }
 }
 

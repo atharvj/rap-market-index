@@ -61,3 +61,16 @@ The admin health report pages through observations, closes, ticks and events ins
 Every successful quote persistence now records a `market_refresh:completed` observation for each updated artist, including unchanged quotes. The last-hour coverage warning measures actual refresh completion independently of daily closes and price movement. Failed stats, history, artist or tick writes do not record completion. A failed completion write fails the refresh; this does not make the preceding separate database writes transactional. Existing scheduler delays remain possible and are now visible in this metric.
 
 Malformed Apple chart identities and non-numeric YouTube counters cannot seed observations. A chart older than the saved provider timestamp is ignored. These checks do not change the v36 formula or reset price history. Trading status must contain one valid control record; public status and all order types fail closed when it is missing or malformed.
+
+Automation responses require an explicit boolean success flag. The release-window,
+catalyst, daily-update, batch-run and manual-run paths return an HTTP failure when
+an upstream operation fails, including failures incorrectly wrapped in HTTP 200.
+Scheduled workflows independently check the JSON success flag and print concise
+completion counts instead of the full source payload. This makes execution failures
+visible in Actions; it does not fix delayed or missing scheduler invocations.
+
+The catalyst workflow first checks the idempotent daily release-window endpoint.
+If midnight scheduling was missed, it completes and verifies the daily opening
+and ends that invocation; otherwise it continues the normal intraday scan. This
+uses the existing free workflow and does not add scheduled jobs. A delayed catalyst
+invocation can still delay recovery; no constant scheduling cadence is guaranteed.

@@ -30,9 +30,21 @@ jobs:
         env:
           MARKET_UPDATE_SECRET: ${{ secrets.MARKET_UPDATE_SECRET }}
         run: |
-          curl --fail-with-body --silent --show-error --max-time 295 \
+          rmi_response_file="$(mktemp)"
+          trap 'rm -f "$rmi_response_file"' EXIT
+
+          curl --output "$rmi_response_file" --fail-with-body --silent --show-error --max-time 295 \
             --request POST \
             --header "content-type: application/json" \
             --header "x-market-update-secret: $MARKET_UPDATE_SECRET" \
             --data '{"dryRun":false,"artistLimit":100,"includeGdelt":false,"includeMediaRss":true,"includeAiResearch":true,"aiResearchArtistLimit":6}' \
             https://rap-market-index.vercel.app/api/admin/market-event-scan
+
+          if ! jq -e 'type == "object" and .ok == true' "$rmi_response_file" > /dev/null; then
+            echo "Automation did not return a verified success response."
+            exit 1
+          fi
+          jq '{ok, runDate, skipped, recalculatedArtistCount, scannedArtistCount, persisted,
+            quoteChangeCount: .marketUpdate.quoteChangeCount,
+            priceTickCount: .marketUpdate.priceTickCount,
+            error, warningCount: ((.warnings // .marketUpdate.warnings // []) | length)}' "$rmi_response_file"
