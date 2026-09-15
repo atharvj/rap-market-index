@@ -1329,23 +1329,27 @@ async function persistUpdateBatch(
     );
   }
 
-  if (!tickRows.length) {
-    return 0;
+  if (tickRows.length) {
+    const tickInsert = await supabase.from("price_ticks").insert(tickRows);
+    if (tickInsert.error) {
+      throw new Error(`Could not save market price ticks: ${tickInsert.error.message}`);
+    }
   }
 
-  const tickInsert = await supabase.from("price_ticks").insert(tickRows);
-
-  if (tickInsert.error && !isMissingPriceTicksError(tickInsert.error.message)) {
-    throw new Error(`Could not save market price ticks: ${tickInsert.error.message}`);
-  }
-
+  // Completion is independent of movement. Record only after every quote write succeeds.
+  const completedAt = new Date().toISOString();
+  const completion = await supabase.from("market_observations").upsert(updates.map(update => ({
+    artist_id: update.artistId,
+    source: "market_refresh",
+    metric: "completed",
+    observed_date: runDate,
+    observed_at: completedAt,
+    value: 1,
+    unit: "refresh",
+    raw_payload: { modelVersion: update.modelVersion, intraday: options.intraday === true }
+  })), { onConflict: "artist_id,source,metric,observed_date" });
+  if (completion.error) throw new Error(`Could not record quote refresh completion: ${completion.error.message}`);
   return tickRows.length;
-}
-
-function isMissingPriceTicksError(message: string) {
-  const normalized = message.toLowerCase();
-
-  return normalized.includes("price_ticks") || normalized.includes("schema cache");
 }
 
 function mapStats(stats: ArtistStatsRow | null): HypeStats {

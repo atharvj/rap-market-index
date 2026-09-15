@@ -1,3 +1,4 @@
+import { parseTradingStatus, type TradingStatusRow } from "@/server/market/trading-status";
 import { NextResponse } from "next/server";
 import { createAnonServerClient, createServiceRoleClient, getSupabaseConfigStatus } from "@/lib/supabase/server";
 import { enforceRateLimit } from "@/server/rate-limit";
@@ -22,13 +23,7 @@ type TradeBody = {
   shares?: number;
 };
 
-type TradingStatusRow = {
-  trading_mode: string;
-  market_open: boolean;
-  market_impact_enabled: boolean;
-  artist_halted: boolean;
-  reason: string;
-};
+
 
 type PendingCatalyst = {
   title: string;
@@ -135,7 +130,11 @@ export async function POST(request: Request) {
   }
   const tradingStatus = await loadTradingStatus(supabase, artistId);
 
-  if (tradingStatus && !tradingStatus.market_open) {
+  if (!tradingStatus) {
+    return NextResponse.json({ ok: false, error: "Trading is temporarily paused while market status is unavailable." }, { status: 503 });
+  }
+
+  if (!tradingStatus.market_open || tradingStatus.artist_halted) {
     return NextResponse.json(
       {
         ok: false,
@@ -378,7 +377,7 @@ async function loadTradingStatus(supabase: ReturnType<typeof createAnonServerCli
     return null;
   }
 
-  return (data?.[0] ?? null) as TradingStatusRow | null;
+  return parseTradingStatus(data);
 }
 
 function mapTradingStatus(status: TradingStatusRow) {

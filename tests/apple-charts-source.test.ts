@@ -52,3 +52,16 @@ describe("Apple Music chart observations", () => {
     expect(result.signals.Skrilla.rawPayload.scores).toEqual({ us: 100 });
   });
 });
+
+it("rejects malformed performer names instead of reporting chart exits", async () => {
+  const malformed = chart();
+  Object.assign(malformed.feed.results[9], { artistName: { name: "Skrilla" } });
+  expect((await collect(malformed)).observations).toHaveLength(0);
+});
+it("does not replace a newer saved chart with an older provider snapshot", async () => {
+  const result = await collect(chart(101), { Skrilla: { ...prior.Skrilla, chartUpdatedAt: {
+    us: "2026-09-14T10:00:00Z", gb: "2026-09-14T10:00:00Z", ca: "2026-09-14T10:00:00Z"
+  } } });
+  expect(result.signals.Skrilla).toBeUndefined();
+  expect(result.observations.some(row => row.artistId === "Skrilla")).toBe(false);
+});

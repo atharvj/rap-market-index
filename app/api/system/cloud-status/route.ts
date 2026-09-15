@@ -1,3 +1,4 @@
+import { parseTradingStatus } from "@/server/market/trading-status";
 import { NextResponse } from "next/server";
 import {
   createAnonServerClient,
@@ -364,13 +365,17 @@ async function probeMarketOperationsStorage(supabase: ReturnType<typeof createSe
   const rpc = supabase.rpc.bind(supabase) as unknown as (
     fn: string,
     args: Record<string, unknown>
-  ) => Promise<{ error: { message: string } | null }>;
+  ) => Promise<{ data: unknown; error: { message: string } | null }>;
   const status = await rpc("get_market_trading_status", {
     p_artist_id: null
   });
 
   if (status.error) {
     return formatMarketEngineProbeError(status.error.message);
+  }
+
+  if (!parseTradingStatus(status.data)) {
+    return { ok: false, detail: "Trading controls returned an invalid status." };
   }
 
   const halts = await supabase.from("artist_trading_halts").select("artist_id", { count: "exact", head: true });

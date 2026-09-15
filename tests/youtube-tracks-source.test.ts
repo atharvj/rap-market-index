@@ -61,3 +61,10 @@ describe("recording-level audience velocity", () => {
     expect(result.signals).toEqual({}); expect(result.observations).toHaveLength(0);
   });
 });
+
+it.each([null, "", " ", false, "NaN", "-1", "1.5"])("rejects malformed view counter %j", async viewCount => {
+  const result = await collectYoutubeTrackSignals({ artists, events, runDate: "2026-09-14", apiKey: "test",
+    fetchImpl: async () => Response.json({ items: [{ id: "abcdefghijk", snippet: { channelId: "UCofficial" }, statistics: { viewCount } }] }) });
+  expect(result.observations).toHaveLength(0);
+  expect(result.signals).toEqual({});
+});

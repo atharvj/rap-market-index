@@ -45,8 +45,8 @@ export async function collectYoutubeTrackSignals({ artists, events, runDate, api
       const id = getYoutubeVideoId(event.rawPayload, event.sourceUrl ?? null);
       if (!id) continue;
       const video = videos.get(id);
-      const views = Number(video?.statistics?.viewCount);
-      if (!video || !Number.isSafeInteger(views) || views < 0 || !video.snippet?.channelId || video.snippet.channelId !== (event.rawPayload.videoChannelId || event.rawPayload.channelId)) continue;
+      const views = readCounter(video?.statistics?.viewCount);
+      if (!video || views === null || !video.snippet?.channelId || video.snippet.channelId !== (event.rawPayload.videoChannelId || event.rawPayload.channelId)) continue;
       const metric = `views_${id}`, baseline = baselines[artist.id] ?? {};
       const old = baseline[metric];
       // A reset/deletion is not audience rejection. A first observation cannot
@@ -74,8 +74,8 @@ export async function collectYoutubeTrackSignals({ artists, events, runDate, api
   return { signals, observations, warnings };
 }
 
-function readCounter(value: string | undefined) {
-  if (value === undefined) return null;
+function readCounter(value: unknown) {
+  if (typeof value !== "string" || !/^\d+$/.test(value)) return null;
   const counter = Number(value);
   return Number.isSafeInteger(counter) && counter >= 0 ? counter : null;
 }

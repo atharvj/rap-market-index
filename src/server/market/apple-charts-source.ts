@@ -39,6 +39,11 @@ export async function collectAppleChartSignals({ artists, runDate, previous = {}
     const tracks: Array<{ storefront: string; id: string; title: string; rank: number; url: string }> = [];
     const priorScores = previous[artist.id]?.scores as Record<string, number> | undefined;
     for (const [country, entries] of Object.entries(credits)) {
+      const previousUpdated = (previous[artist.id]?.chartUpdatedAt as Record<string, string> | undefined)?.[country];
+      if (previousUpdated && Date.parse(charts[country].updated) < Date.parse(previousUpdated)) {
+        warnings.push(`Apple Music ${country} chart predates the saved observation for ${artist.ticker}.`);
+        continue;
+      }
       const matching = entries.filter(entry => entry.artists.some(a => a.id === artist.id));
       // Rank points measure chart presence, not stream counts. An unchanged
       // chart is neutral; absence counts only when the full chart was fetched.
@@ -51,7 +56,7 @@ export async function collectAppleChartSignals({ artists, runDate, previous = {}
     }
     if (!Object.keys(current).length) continue;
     const rawPayload = { source: "apple_charts", runDate, status: deltas.length ? "ok" : "baseline_only", scores: current,
-      tracks, chartUpdatedAt: Object.fromEntries(Object.entries(charts).map(([country, chart]) => [country, chart.updated])) };
+      tracks, chartUpdatedAt: Object.fromEntries(Object.keys(current).map(country => [country, charts[country].updated])) };
     signals[artist.id] = { stats: deltas.length ? { streamingGrowth: deltas.reduce((a, b) => a + b, 0) / deltas.length } : {}, confidence: 0.82, rawPayload };
     observations.push({ artistId: artist.id, source: "apple_charts", metric: "chart_points", observedDate: runDate,
       value: Object.values(current).reduce((a, b) => a + b, 0), unit: "rank_points", rawPayload });
@@ -60,7 +65,9 @@ export async function collectAppleChartSignals({ artists, runDate, previous = {}
 }
 
 function validEntry(entry: ChartEntry) {
-  if (!entry || !/^\d+$/.test(entry.id) || !/^\d+$/.test(entry.artistId) || !entry.name || !entry.artistName) return false;
+  if (!entry || ![entry.id, entry.artistId, entry.name, entry.artistName, entry.url, entry.artistUrl].every(value => typeof value === "string" && value.trim().length > 0) ||
+    (entry.genres !== undefined && (!Array.isArray(entry.genres) || !entry.genres.every(genre => genre && typeof genre.genreId === "string"))) ||
+    !/^\d+$/.test(entry.id) || !/^\d+$/.test(entry.artistId) || !entry.name || !entry.artistName) return false;
   try {
     const track = new URL(entry.url), artist = new URL(entry.artistUrl);
     return track.hostname === "music.apple.com" && artist.hostname === "music.apple.com" &&

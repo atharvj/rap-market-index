@@ -1,3 +1,4 @@
+import { parseTradingStatus, type TradingStatusRow } from "@/server/market/trading-status";
 import { NextResponse } from "next/server";
 import { createAnonServerClient, createServiceRoleClient, getSupabaseConfigStatus } from "@/lib/supabase/server";
 import { getMarketDate } from "@/server/market/market-date";
@@ -6,13 +7,7 @@ import { reportServerError } from "@/server/observability";
 
 export const dynamic = "force-dynamic";
 
-type TradingStatusRow = {
-  trading_mode: string;
-  market_open: boolean;
-  market_impact_enabled: boolean;
-  artist_halted: boolean;
-  reason: string;
-};
+
 const CACHE_HEADERS = { "Cache-Control": "public, max-age=5, s-maxage=15, stale-while-revalidate=30" };
 
 export async function GET(request: Request) {
@@ -38,7 +33,8 @@ export async function GET(request: Request) {
       throw new Error(error.message);
     }
 
-    const row = (data?.[0] ?? null) as TradingStatusRow | null;
+    const row = parseTradingStatus(data);
+    if (!row) throw new Error("Trading controls returned an invalid status.");
 
     const status = buildStatus(row, { artistId });
 
@@ -78,16 +74,16 @@ function buildUnavailableStatus({ artistId }: { artistId: string | null }) {
   };
 }
 
-function buildStatus(row: TradingStatusRow | null, { artistId }: { artistId: string | null }) {
+function buildStatus(row: TradingStatusRow, { artistId }: { artistId: string | null }) {
   const fallback = buildFallbackStatus({ artistId });
 
   return {
     ...fallback,
-    tradingMode: row?.trading_mode ?? fallback.tradingMode,
-    isOpen: row?.market_open ?? fallback.isOpen,
-    marketImpactEnabled: row?.market_impact_enabled ?? fallback.marketImpactEnabled,
-    artistHalted: row?.artist_halted ?? fallback.artistHalted,
-    statusNote: row?.reason ?? fallback.statusNote
+    tradingMode: row.trading_mode,
+    isOpen: row.market_open && !row.artist_halted,
+    marketImpactEnabled: row.market_impact_enabled,
+    artistHalted: row.artist_halted,
+    statusNote: row.reason
   };
 }
 

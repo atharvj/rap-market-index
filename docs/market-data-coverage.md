@@ -53,3 +53,11 @@ The next substantial gap is comprehensive song-level streams, playlist additions
 MusicBrainz recording/release artist credits can supplement explicit upload credits when matching recordings unambiguously; the existing release collector remains disabled by default. A title-only match is insufficient. Unverified social posts and unavailable sources do not become price evidence.
 
 Primary provider references: [YouTube video metadata/statistics](https://developers.google.com/youtube/v3/docs/videos), [batched video retrieval](https://developers.google.com/youtube/v3/docs/videos/list), [Apple chart feeds](https://rss.marketingtools.apple.com/), [MusicBrainz API](https://musicbrainz.org/doc/MusicBrainz_API), [MusicBrainz artist credits](https://musicbrainz.org/doc/Artist_Credits).
+
+## Refresh and source health
+
+The admin health report pages through observations, closes, ticks and events instead of silently stopping at the database's 1,000-row response limit. Requests exceeding the pager's 100,000-row safety bound fail explicitly. Coverage includes Spotify monthly listeners, Apple charts, recording-level YouTube views and editorial discovery, with the latest observation timestamp.
+
+Every successful quote persistence now records a `market_refresh:completed` observation for each updated artist, including unchanged quotes. The last-hour coverage warning measures actual refresh completion independently of daily closes and price movement. Failed stats, history, artist or tick writes do not record completion. A failed completion write fails the refresh; this does not make the preceding separate database writes transactional. Existing scheduler delays remain possible and are now visible in this metric.
+
+Malformed Apple chart identities and non-numeric YouTube counters cannot seed observations. A chart older than the saved provider timestamp is ignored. These checks do not change the v36 formula or reset price history. Trading status must contain one valid control record; public status and all order types fail closed when it is missing or malformed.

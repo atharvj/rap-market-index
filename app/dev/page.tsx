@@ -482,6 +482,7 @@ type MarketHealth = {
     source: string;
     metric: string;
     latestDate: string | null;
+    latestAt: string | null;
     freshArtistCount: number;
     missingArtistCount: number;
     freshCoveragePercent: number;
@@ -2729,7 +2730,7 @@ function MarketHealthPanel({ data }: { data: MarketHealth }) {
         label: item.label,
         value: formatCoveragePercent(item.freshCoveragePercent),
         detail: item.latestDate
-          ? `${item.freshArtistCount} of ${data.activeArtistCount} artists fresh · Latest ${formatDate(item.latestDate)}`
+          ? `${item.freshArtistCount} of ${data.activeArtistCount} artists fresh · Latest ${item.latestAt ? new Date(item.latestAt).toLocaleString() : formatDate(item.latestDate)}`
           : "No observations"
       }))} />
 

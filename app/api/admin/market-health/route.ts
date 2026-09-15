@@ -1,3 +1,5 @@
+import { loadAllPages } from "@/lib/pagination";
+import { parseTradingStatus } from "@/server/market/trading-status";
 import { NextResponse } from "next/server";
 import { createServiceRoleClient, getSupabaseConfigStatus } from "@/lib/supabase/server";
 import type { Database } from "@/lib/supabase/database.types";
@@ -14,7 +16,7 @@ export const dynamic = "force-dynamic";
 
 type ObservationRow = Pick<
   Database["public"]["Tables"]["market_observations"]["Row"],
-  "artist_id" | "source" | "metric" | "observed_date"
+  "artist_id" | "source" | "metric" | "observed_date" | "observed_at"
 >;
 
 type PriceHistoryRow = Pick<Database["public"]["Tables"]["price_history"]["Row"], "artist_id" | "price_date">;
@@ -46,6 +48,7 @@ type ObservationHealth = {
   metric: string;
   warningThreshold: number | null;
   latestDate: string | null;
+  latestAt: string | null;
   observedArtistCount: number;
   freshArtistCount: number;
   staleArtistCount: number;
@@ -116,6 +119,11 @@ const SOURCE_ID_FIELDS = [
 ] as const;
 
 const OBSERVATION_SERIES = [
+  { source: "market_refresh", metric: "completed", label: "Quote refreshes (last hour)", warningThreshold: 100 },
+  { source: "spotify_public", metric: "monthly_listeners", label: "Spotify monthly listeners", warningThreshold: null },
+  { source: "apple_charts", metric: "chart_points", label: "Apple Music charts", warningThreshold: null },
+  { source: "youtube_tracks", metric: "views_*", label: "Official song views", warningThreshold: null },
+  { source: "youtube_editorial", metric: "music_editorial_video_count", label: "Music editorial videos", warningThreshold: null },
   { source: "lastfm", metric: "listeners", label: "Audience listeners", warningThreshold: 80 },
   { source: "lastfm", metric: "playcount", label: "Audience plays", warningThreshold: 80 },
   { source: "listenbrainz", metric: "listener_count", label: "Independent listeners", warningThreshold: 70 },
@@ -150,8 +158,6 @@ const OBSERVATION_SERIES = [
   { source: "trade_flow", metric: "trade_count", label: "Trade-flow trades", warningThreshold: null },
   { source: "trade_flow", metric: "unique_trader_count", label: "Trade-flow traders", warningThreshold: null }
 ] as const;
-
-const MAX_OBSERVATION_ROWS = 20000;
 
 export async function GET(request: Request) {
   const auth = await requireAdminRequest(request);
@@ -264,8 +270,7 @@ export async function GET(request: Request) {
       marketOperations,
       shortingFoundation,
       configuredModelVersion,
-      defaultModelVersion: DEFAULT_MARKET_MODEL_VERSION,
-      observationRowsTruncated: observations.length >= MAX_OBSERVATION_ROWS
+      defaultModelVersion: DEFAULT_MARKET_MODEL_VERSION
     });
 
     return NextResponse.json({
@@ -390,17 +395,18 @@ async function checkMarketOperations(
       throw new Error(halts.error.message);
     }
 
-    const row = status.data?.[0] ?? null;
+    const row = parseTradingStatus(status.data);
+    if (!row) throw new Error("Trading controls returned an invalid status.");
 
     return {
       ready: true,
       checkedAt,
       error: null,
-      tradingMode: row?.trading_mode ?? "continuous",
-      marketOpen: Boolean(row?.market_open ?? true),
-      marketImpactEnabled: Boolean(row?.market_impact_enabled ?? true),
+      tradingMode: row.trading_mode,
+      marketOpen: row.market_open && !row.artist_halted,
+      marketImpactEnabled: row.market_impact_enabled,
       activeHaltCount: halts.count ?? 0,
-      statusNote: row?.reason ?? null
+      statusNote: row.reason
     };
   } catch (error) {
     return {
@@ -451,24 +457,25 @@ async function loadRecentObservations({
     return [];
   }
 
-  const { data, error } = await supabase
-    .from("market_observations")
-    .select("artist_id, source, metric, observed_date")
-    .in("artist_id", artistIds)
-    .in("source", Array.from(new Set(OBSERVATION_SERIES.map((series) => series.source))))
-    .in("metric", Array.from(new Set(OBSERVATION_SERIES.map((series) => series.metric))))
-    .gte("observed_date", shiftDate(runDate, -lookbackDays))
-    .lte("observed_date", runDate)
-    .order("observed_date", { ascending: false })
-    .limit(MAX_OBSERVATION_ROWS);
+  const rows = await loadAllPages<ObservationRow>(async (from, to) => {
+    const { data, error } = await supabase
+      .from("market_observations")
+      .select("artist_id, source, metric, observed_date, observed_at")
+      .in("artist_id", artistIds)
+      .in("source", Array.from(new Set(OBSERVATION_SERIES.map((series) => series.source))))
+      .gte("observed_date", shiftDate(runDate, -lookbackDays))
+      .lte("observed_date", runDate)
+      .order("observed_date", { ascending: false })
+      .order("id", { ascending: true })
+      .range(from, to);
 
-  if (error) {
-    throw new Error(`Could not load market observations: ${error.message}`);
-  }
+    if (error) {
+      throw new Error(`Could not load market observations: ${error.message}`);
+    }
 
-  return ((data ?? []) as ObservationRow[]).filter((row) =>
-    OBSERVATION_SERIES.some((series) => series.source === row.source && series.metric === row.metric)
-  );
+    return (data ?? []) as ObservationRow[];
+  });
+  return rows;
 }
 
 async function loadRecentPriceHistory({
@@ -486,20 +493,24 @@ async function loadRecentPriceHistory({
     return [];
   }
 
-  const { data, error } = await supabase
-    .from("price_history")
-    .select("artist_id, price_date")
-    .in("artist_id", artistIds)
-    .gte("price_date", shiftDate(runDate, -lookbackDays))
-    .lte("price_date", runDate)
-    .order("price_date", { ascending: false })
-    .limit(MAX_OBSERVATION_ROWS);
+  const rows = await loadAllPages<PriceHistoryRow>(async (from, to) => {
+    const { data, error } = await supabase
+      .from("price_history")
+      .select("artist_id, price_date")
+      .in("artist_id", artistIds)
+      .gte("price_date", shiftDate(runDate, -lookbackDays))
+      .lte("price_date", runDate)
+      .order("price_date", { ascending: false })
+      .order("id", { ascending: true })
+      .range(from, to);
 
-  if (error) {
-    throw new Error(`Could not load price history health: ${error.message}`);
-  }
+    if (error) {
+      throw new Error(`Could not load price history health: ${error.message}`);
+    }
 
-  return (data ?? []) as PriceHistoryRow[];
+    return (data ?? []) as PriceHistoryRow[];
+  });
+  return rows;
 }
 
 async function loadRecentPriceTicks({
@@ -518,20 +529,24 @@ async function loadRecentPriceTicks({
   }
 
   const { start, end } = getMarketLookbackBoundsUtc(shiftDate(runDate, 1), lookbackDays + 1);
-  const { data, error } = await supabase
-    .from("price_ticks")
-    .select("artist_id, observed_at, source")
-    .in("artist_id", artistIds)
-    .gte("observed_at", start)
-    .lt("observed_at", end)
-    .order("observed_at", { ascending: false })
-    .limit(MAX_OBSERVATION_ROWS);
+  const rows = await loadAllPages<PriceTickRow>(async (from, to) => {
+    const { data, error } = await supabase
+      .from("price_ticks")
+      .select("artist_id, observed_at, source")
+      .in("artist_id", artistIds)
+      .gte("observed_at", start)
+      .lt("observed_at", end)
+      .order("observed_at", { ascending: false })
+      .order("id", { ascending: true })
+      .range(from, to);
 
-  if (error) {
-    throw new Error(`Could not load price tick health: ${error.message}`);
-  }
+    if (error) {
+      throw new Error(`Could not load price tick health: ${error.message}`);
+    }
 
-  return (data ?? []) as PriceTickRow[];
+    return (data ?? []) as PriceTickRow[];
+  });
+  return rows;
 }
 
 async function loadRecentEvents({
@@ -549,20 +564,24 @@ async function loadRecentEvents({
     return [];
   }
 
-  const { data, error } = await supabase
-    .from("market_events")
-    .select("artist_id,event_date,event_type")
-    .in("artist_id", artistIds)
-    .gte("event_date", shiftDate(runDate, -lookbackDays))
-    .lte("event_date", runDate)
-    .order("event_date", { ascending: false })
-    .limit(MAX_OBSERVATION_ROWS);
+  const rows = await loadAllPages<MarketEventRow>(async (from, to) => {
+    const { data, error } = await supabase
+      .from("market_events")
+      .select("artist_id,event_date,event_type")
+      .in("artist_id", artistIds)
+      .gte("event_date", shiftDate(runDate, -lookbackDays))
+      .lte("event_date", runDate)
+      .order("event_date", { ascending: false })
+      .order("id", { ascending: true })
+      .range(from, to);
 
-  if (error) {
-    throw new Error(`Could not load market event health: ${error.message}`);
-  }
+    if (error) {
+      throw new Error(`Could not load market event health: ${error.message}`);
+    }
 
-  return (data ?? []) as MarketEventRow[];
+    return (data ?? []) as MarketEventRow[];
+  });
+  return rows;
 }
 
 function buildSourceCoverage({
@@ -601,21 +620,26 @@ function buildObservationHealth({
 
   return OBSERVATION_SERIES.map((series) => {
     const latestByArtist = new Map<string, string>();
+    let latestAt: string | null = null;
 
     for (const row of observations) {
-      if (row.source !== series.source || row.metric !== series.metric) {
+      if (row.source !== series.source || !(series.metric.endsWith("*") ? row.metric.startsWith(series.metric.slice(0, -1)) : row.metric === series.metric)) {
         continue;
       }
 
+      if (!latestAt || row.observed_at > latestAt) latestAt = row.observed_at;
+      const value = series.source === "market_refresh" ? row.observed_at : row.observed_date;
       const current = latestByArtist.get(row.artist_id);
 
-      if (!current || row.observed_date > current) {
-        latestByArtist.set(row.artist_id, row.observed_date);
+      if (!current || value > current) {
+        latestByArtist.set(row.artist_id, value);
       }
     }
 
     const latestDates = Array.from(latestByArtist.values());
-    const freshArtistCount = latestDates.filter((date) => date >= freshDate).length;
+    const freshArtistCount = latestDates.filter((date) => series.source === "market_refresh"
+      ? Date.parse(date) >= Date.now() - 3600000 && Date.parse(date) <= Date.now()
+      : date >= freshDate).length;
     const observedArtistCount = latestByArtist.size;
 
     return {
@@ -624,7 +648,8 @@ function buildObservationHealth({
       source: series.source,
       metric: series.metric,
       warningThreshold: series.warningThreshold,
-      latestDate: latestDates.sort().at(-1) ?? null,
+      latestDate: latestDates.sort().at(-1)?.slice(0, 10) ?? null,
+      latestAt,
       observedArtistCount,
       freshArtistCount,
       staleArtistCount: Math.max(0, observedArtistCount - freshArtistCount),
@@ -772,8 +797,7 @@ function buildWarnings({
   marketOperations,
   shortingFoundation,
   configuredModelVersion,
-  defaultModelVersion,
-  observationRowsTruncated
+  defaultModelVersion
 }: {
   config: ReturnType<typeof getSupabaseConfigStatus>;
   recentRuns: MarketRunRow[];
@@ -787,7 +811,6 @@ function buildWarnings({
   shortingFoundation: ShortingFoundationHealth;
   configuredModelVersion: string;
   defaultModelVersion: string;
-  observationRowsTruncated: boolean;
 }) {
   const warnings: string[] = [];
   const latestSucceededRun = recentRuns.find((run) => run.status === "succeeded");
@@ -912,7 +935,7 @@ function buildWarnings({
   }
 
   if (!marketOperations.ready) {
-    warnings.push("Market operation controls are missing. Run supabase/migrations/017_market_operation_controls.sql.");
+    warnings.push("Trading controls are unavailable. Check the status RPC response and database configuration.");
   } else {
     if (!marketOperations.marketOpen) {
       warnings.push(`Trading is currently paused: ${marketOperations.statusNote ?? "No status note."}`);
@@ -925,10 +948,6 @@ function buildWarnings({
 
   if (!shortingFoundation.ready) {
     warnings.push("Shorting foundation is missing. Run supabase/migrations/018_short_selling_foundation.sql before enabling short/cover UI.");
-  }
-
-  if (observationRowsTruncated) {
-    warnings.push("Observation health reached the row cap; add an aggregate SQL view before scaling much further.");
   }
 
   return warnings;
