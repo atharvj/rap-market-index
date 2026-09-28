@@ -1,3 +1,4 @@
+import { DEFAULT_HISTORY_RANGE, DEFAULT_HISTORY_DAYS } from "@/lib/price-series";
 import { NextResponse } from "next/server";
 import { createInitialGameState } from "@/lib/market";
 import {
@@ -30,7 +31,7 @@ const RANGE_DAYS: Record<Exclude<HistoryRange, "ALL">, number> = {
   "1D": 1,
   "7D": 7,
   "1M": ONE_MONTH_HISTORY_DAYS,
-  "3M": 93,
+  "3M": DEFAULT_HISTORY_DAYS,
   "6M": 186,
   "1Y": 365
 };
@@ -230,5 +231,5 @@ function normalizeRange(value: string | null): HistoryRange {
     return value;
   }
 
-  return "1M";
+  return DEFAULT_HISTORY_RANGE;
 }

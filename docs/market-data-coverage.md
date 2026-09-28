@@ -74,3 +74,20 @@ If midnight scheduling was missed, it completes and verifies the daily opening
 and ends that invocation; otherwise it continues the normal intraday scan. This
 uses the existing free workflow and does not add scheduled jobs. A delayed catalyst
 invocation can still delay recovery; no constant scheduling cadence is guaranteed.
+
+## September 27 chart display window
+
+Artist price and observation charts default to 3M (93 days); explicit shorter ranges
+remain available. The shared public snapshot now supplies the same window to home,
+market-board and sidebar sparklines. Market Pulse, Scout and current-holdings trend
+builders retain up to 94 inclusive daily points instead of cutting them to 28.
+Only existing recorded sessions are displayed: a new listing need not have a full
+three months. No price model, stored quote or historical adjustment was changed.
+
+An unavailable artist-history request no longer substitutes another range's daily
+snapshot into the selected chart. Loading and failure states are explicit, aborted
+requests cannot overwrite a newer selection, and unrelated snapshot refreshes no
+longer restart the history request. Unchanged quotes are described as unchanged,
+not missing closes. The reusable Market Inputs component also exposes every returned
+metric instead of limiting its selector to six (it is not currently mounted on the
+public artist page, which uses the Audience Snapshot).

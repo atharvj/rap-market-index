@@ -44,3 +44,8 @@ describe("public audience history", () => {
     expect((await response.json()).ok).toBe(false);
   });
 });
+
+it("defaults source history to the same three-month window", async () => {
+  const result = await (await GET(new Request("http://localhost/api/market/observations/example"), { params: Promise.resolve({ artistId: "example" }) })).json();
+  expect(result.range).toBe("3M");
+});

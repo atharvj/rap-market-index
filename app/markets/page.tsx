@@ -89,7 +89,7 @@ export default function MarketsPage() {
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_340px]">
         <RmiSection
           title={<span className="flex items-center gap-2"><Signal className="h-4 w-4 text-cyan" /> RMI Market Pulse</span>}
-          subtitle="Equal-weight quote movement across active artists, adjusted for valuation changes."
+          subtitle="Up to three months of equal-weight quote movement across active artists."
           action={
             <span className={marketIndexChange >= 0 ? "text-sm font-semibold text-mint number-tabular" : "text-sm font-semibold text-ember number-tabular"}>
               {formatPercent(marketIndexChange)}
@@ -148,13 +148,13 @@ export default function MarketsPage() {
           <div>
             <h2 className="text-sm font-semibold">Market board</h2>
             <p className="mt-1 max-w-3xl text-xs leading-5 text-paper/50">
-              Charts show one month, adjusted for valuation changes. 24h compares the current quote with the previous close.
+              Charts show up to three months, adjusted for valuation changes. 24h compares the current quote with the previous close.
             </p>
           </div>
         </div>
         <div className="rmi-table-head grid grid-cols-[minmax(0,1fr)_72px_60px_32px] gap-x-1 px-2 py-3 sm:grid-cols-[minmax(0,1fr)_104px_84px_36px] sm:gap-x-3 sm:px-4 lg:grid-cols-[minmax(220px,1fr)_140px_124px_104px_84px_44px] lg:gap-x-4">
           <span>Artist</span>
-          <span className="hidden text-right lg:block">1M trend</span>
+          <span className="hidden text-right lg:block">3M trend</span>
           <span className="hidden items-center justify-end gap-1.5 text-right lg:flex">
             Momentum <MomentumInfo />
           </span>
@@ -185,7 +185,7 @@ export default function MarketsPage() {
                 positive={getSeriesChangePercent(artist.priceHistory) >= 0}
                 width={116}
                 height={30}
-                label={`One-month price trend over ${artist.priceHistory.length} recorded sessions`}
+                label={`Three-month price trend over ${artist.priceHistory.length} recorded sessions`}
               />
             </div>
             <MomentumCell value={artist.hypeScore} />

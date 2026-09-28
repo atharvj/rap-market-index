@@ -1,5 +1,6 @@
 "use client";
 
+import { DEFAULT_HISTORY_RANGE } from "@/lib/price-series";
 import { formatCompact, formatDate } from "@/lib/formatters";
 import type { MarketObservationSeries } from "@/lib/types";
 import clsx from "clsx";
@@ -28,7 +29,7 @@ type ObservationsResponse = {
 const ranges: ObservationRange[] = ["1M", "3M", "6M", "1Y"];
 
 export function ArtistMarketInputsPanel({ artistId }: { artistId: string }) {
-  const [range, setRange] = useState<ObservationRange>("1M");
+  const [range, setRange] = useState<ObservationRange>(DEFAULT_HISTORY_RANGE);
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
   const [series, setSeries] = useState<MarketObservationSeries[]>([]);
   const [selectedKey, setSelectedKey] = useState("");
@@ -43,6 +44,7 @@ export function ArtistMarketInputsPanel({ artistId }: { artistId: string }) {
     })
       .then((response) => response.json() as Promise<ObservationsResponse>)
       .then((payload) => {
+        if (controller.signal.aborted) return;
         if (!payload.ok || !payload.series) {
           throw new Error(payload.error ?? "Could not load market inputs.");
         }
@@ -109,6 +111,7 @@ export function ArtistMarketInputsPanel({ artistId }: { artistId: string }) {
               key={candidate}
               type="button"
               onClick={() => setRange(candidate)}
+              aria-pressed={range === candidate}
               className={clsx(
                 "h-8 min-w-11 rounded px-2 text-xs font-semibold transition-colors",
                 range === candidate
@@ -125,11 +128,12 @@ export function ArtistMarketInputsPanel({ artistId }: { artistId: string }) {
       {series.length ? (
         <>
           <div className="mb-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
-            {series.slice(0, 6).map((item) => (
+            {series.map((item) => (
               <button
                 key={item.key}
                 type="button"
                 onClick={() => setSelectedKey(item.key)}
+                aria-pressed={selectedSeries?.key === item.key}
                 className={clsx(
                   "min-h-16 rounded-md border px-3 py-2 text-left transition-colors",
                   selectedSeries?.key === item.key

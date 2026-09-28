@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { createInitialGameState } from "@/lib/market";
 import { sanitizeMoveExplanation } from "@/lib/artist-explanations";
 import { loadAllPages } from "@/lib/pagination";
-import { ONE_MONTH_HISTORY_DAYS } from "@/lib/price-series";
+import { DEFAULT_HISTORY_DAYS } from "@/lib/price-series";
 import { createServiceRoleClient, getSupabaseConfigStatus } from "@/lib/supabase/server";
 import type { Database } from "@/lib/supabase/database.types";
 import type { Artist, GameState, HypeStats, PricePoint } from "@/lib/types";
@@ -133,7 +133,7 @@ async function loadHistoryByArtist(
       .from("price_history")
       .select("artist_id, price_date, price")
       .in("artist_id", artistIds)
-      .gte("price_date", shiftMarketDate(getMarketDate(), -ONE_MONTH_HISTORY_DAYS))
+      .gte("price_date", shiftMarketDate(getMarketDate(), -DEFAULT_HISTORY_DAYS))
       .order("price_date", { ascending: true })
       .order("artist_id", { ascending: true })
       .range(from, to);
@@ -146,7 +146,7 @@ async function loadHistoryByArtist(
   });
 
   const adjustments = await loadChartAdjustments({ supabase, artistIds,
-    earliestDate: shiftMarketDate(getMarketDate(), -ONE_MONTH_HISTORY_DAYS) });
+    earliestDate: shiftMarketDate(getMarketDate(), -DEFAULT_HISTORY_DAYS) });
   const grouped = rows.reduce<Record<string, PricePoint[]>>((grouped, point) => {
     grouped[point.artist_id] ??= [];
     grouped[point.artist_id].push({

@@ -83,7 +83,7 @@ export default function HomePage() {
                   positive={getSeriesChangePercent(artist.priceHistory) >= 0}
                   width={118}
                   height={38}
-                  label={`One-month price trend over ${artist.priceHistory.length} recorded sessions`}
+                  label={`Three-month price trend over ${artist.priceHistory.length} recorded sessions`}
                 />
               </div>
               <div className="mt-3 flex items-center justify-between border-t border-line/60 pt-2">

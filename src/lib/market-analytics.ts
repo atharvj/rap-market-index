@@ -1,8 +1,9 @@
+import { DEFAULT_HISTORY_DAYS } from "@/lib/price-series";
 import type { Artist, HoldingView, PricePoint, ShortPositionView } from "@/lib/types";
 
 type HistoricalAsset = Pick<Artist, "currentPrice" | "priceHistory">;
 
-export function buildMarketIndexSeries(artists: Artist[], maxPoints = 28): PricePoint[] {
+export function buildMarketIndexSeries(artists: Artist[], maxPoints = DEFAULT_HISTORY_DAYS + 1): PricePoint[] {
   const histories = artists
     .map((artist) => normalizeHistory(artist))
     .filter((history) => history.length > 0);
@@ -32,7 +33,7 @@ export function buildPortfolioQuoteSeries({
   holdings,
   shortPositions,
   cashBalance,
-  maxPoints = 28
+  maxPoints = DEFAULT_HISTORY_DAYS + 1
 }: {
   holdings: HoldingView[];
   shortPositions: ShortPositionView[];

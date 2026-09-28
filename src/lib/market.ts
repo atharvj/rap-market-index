@@ -1,3 +1,4 @@
+import { DEFAULT_HISTORY_DAYS } from "@/lib/price-series";
 import { createInitialArtists } from "@/data/mockArtists";
 import {
   calculateHypeScore,
@@ -252,7 +253,7 @@ function updateArtistForDay(artist: Artist, index: number): Artist {
     dailyChangePercent,
     hypeScore: calculateHypeScore(nextStats),
     stats: nextStats,
-    priceHistory: [...artist.priceHistory.slice(-27), { date: historyDate, price: currentPrice }],
+    priceHistory: [...artist.priceHistory.slice(-DEFAULT_HISTORY_DAYS), { date: historyDate, price: currentPrice }],
     lastMoveExplanation: explainDailyMove(nextStats, dailyChangePercent, artist.ticker)
   };
 }

@@ -4,7 +4,7 @@ import { PriceChart } from "@/components/PriceChart";
 import { formatDate } from "@/lib/formatters";
 import { MARKET_CONTENT_REFRESH_MS } from "@/lib/refresh-policy";
 import type { PricePoint } from "@/lib/types";
-import { hasPriceMovement } from "@/lib/price-series";
+import { DEFAULT_HISTORY_RANGE, hasPriceMovement } from "@/lib/price-series";
 import clsx from "clsx";
 import { Activity } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
@@ -33,7 +33,7 @@ export function ArtistPriceHistoryPanel({
   artistId: string;
   fallbackData: PricePoint[];
 }) {
-  const [range, setRange] = useState<HistoryRange>("1M");
+  const [range, setRange] = useState<HistoryRange>(DEFAULT_HISTORY_RANGE);
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
   const [history, setHistory] = useState<PricePoint[]>(fallbackData);
   const [hasRealHistory, setHasRealHistory] = useState(fallbackData.length > 0);
@@ -51,6 +51,7 @@ export function ArtistPriceHistoryPanel({
     })
       .then((response) => response.json() as Promise<HistoryResponse>)
       .then((payload) => {
+        if (controller.signal.aborted) return;
         if (!payload.ok || !payload.points) {
           throw new Error(payload.error ?? "Could not load price history.");
         }
@@ -61,16 +62,16 @@ export function ArtistPriceHistoryPanel({
         setGranularity(payload.granularity === "intraday" ? "intraday" : "daily");
         setStatus("ready");
       })
-      .catch((error) => {
+      .catch(() => {
         if (controller.signal.aborted) {
           return;
         }
 
-        setHistory(fallbackData);
+        setHistory([]);
         setHasRealHistory(false);
-        setRecordedCloseCount(fallbackData.length);
+        setRecordedCloseCount(0);
         setGranularity("daily");
-        setStatus(error instanceof Error ? "error" : "error");
+        setStatus("error");
       });
 
     void loadHistory();
@@ -94,12 +95,14 @@ export function ArtistPriceHistoryPanel({
       window.removeEventListener("focus", refreshVisibleHistory);
       document.removeEventListener("visibilitychange", refreshVisibleHistory);
     };
-  }, [artistId, fallbackData, range]);
+  }, [artistId, range]);
 
   const subtitle = useMemo(() => {
     if (status === "loading") {
       return "Loading";
     }
+
+    if (status === "error") return "Unavailable";
 
     if (history.length <= 1 || !hasRealHistory) {
       return "Since listing";
@@ -138,21 +141,24 @@ export function ArtistPriceHistoryPanel({
         </div>
       </div>
       <div className="p-4 sm:p-5">
-        <div className="rmi-chart-shell p-2 sm:p-3"><PriceChart data={history} height={290} timeScale={granularity} quoteLabel="Market quote" /></div>
-        <p className="mt-3 text-xs text-paper/42">
+        <div className="rmi-chart-shell p-2 sm:p-3">
+          {status === "ready" ? <PriceChart data={history} height={290} timeScale={granularity} quoteLabel="Market quote" /> : (
+            <div className="grid h-[290px] place-items-center text-sm text-paper/50" role="status">
+              {status === "loading" ? "Loading recorded market quotes…" : "Price history unavailable. Try another range or refresh the page."}
+            </div>
+          )}
+        </div>
+        {status !== "error" ? <p className="mt-3 text-xs text-paper/42">
           {status === "loading"
             ? "Loading recorded market quotes."
             : status === "ready" && !hasMovement
             ? range === "1D"
               ? "No intraday market-quote movement yet. Individual order fills are not charted."
-              : "No additional recorded close or eligible trade quote in this range."
+              : "Recorded market quotes were unchanged in this range."
             : range === "1D"
               ? "The 1D view shows recorded market quotes, not individual order fills. Hover, tap, or click to inspect one."
               : `${recordedCloseCount} recorded daily close${recordedCloseCount === 1 ? "" : "s"} in this range. The chart shows market quotes, not individual order fills.`}
-        </p>
-        {status === "error" ? (
-          <p className="mt-3 text-xs font-bold text-ember">Price history unavailable.</p>
-        ) : null}
+        </p> : null}
       </div>
     </section>
   );

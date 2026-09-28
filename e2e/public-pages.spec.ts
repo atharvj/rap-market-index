@@ -189,6 +189,15 @@ async function installPublicFixtures(page: Page) {
       body: JSON.stringify({ ok: true, source: "supabase", state: marketState })
     })
   );
+  await page.route("**/api/market/history/**", (route) => {
+    const requestUrl = new URL(route.request().url());
+    const artist = marketState.artists.find(item => item.id === requestUrl.pathname.split("/").at(-1));
+    const points = artist?.priceHistory ?? [];
+    return route.fulfill({ contentType: "application/json", body: JSON.stringify({
+      ok: true, range: requestUrl.searchParams.get("range") ?? "3M", points,
+      hasRealHistory: points.length > 0, recordedCloseCount: points.length, granularity: "daily"
+    }) });
+  });
   await page.route("**/api/market/news**", (route) => {
     const requestUrl = new URL(route.request().url());
     const news = requestUrl.searchParams.get("feed") === "watch" ? marketVideos : marketNews;
@@ -551,7 +560,7 @@ test("artist pages include related markets without repeating the current artist"
   const section = page.locator("section").filter({ has: heading }).first();
   await expect(section.locator('a[href^="/artists/"]')).toHaveCount(4);
   await expect(section.locator(`a[href="/artists/${currentArtist.id}"]`)).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "1M" })).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByRole("button", { name: "3M", exact: true })).toHaveAttribute("aria-pressed", "true");
   await expect(page.getByText(/The chart shows market quotes, not individual order fills\./)).toBeVisible();
 });
 
@@ -583,6 +592,7 @@ test("artist history shows one continuous graph with inspectable market quotes",
   }));
   await page.goto(`/artists/${artist.id}`);
   const section = page.locator("section").filter({ has: page.getByRole("heading", { name: "Price History", exact: true }) });
+  await expect(section.getByRole("button", { name: "3M", exact: true })).toHaveAttribute("aria-pressed", "true");
   await expect(section.getByRole("button", { name: "Adjusted", exact: true })).toHaveCount(0);
   await expect(section.getByRole("button", { name: "Original quotes", exact: true })).toHaveCount(0);
   await expect(section).toContainText("5 recorded daily closes");
@@ -599,6 +609,30 @@ test("artist history shows one continuous graph with inspectable market quotes",
   await expect.poll(() => page.evaluate(() =>
     document.documentElement.scrollWidth - document.documentElement.clientWidth
   )).toBeLessThanOrEqual(1);
+});
+
+test("failed history range never displays another range's prices", async ({ page }) => {
+  const artist = marketState.artists[0];
+  const requests: string[] = [];
+  await page.route("**/api/market/history/**", route => {
+    const range = new URL(route.request().url()).searchParams.get("range");
+    requests.push(range ?? "");
+    return route.fulfill({ status: range === "1D" ? 503 : 200, contentType: "application/json",
+      body: JSON.stringify(range === "1D" ? { ok: false, error: "Unavailable" } : {
+        ok: true, points: [{ date: "2026-07-22", price: 20 }, { date: "2026-09-11", price: 25 }],
+        hasRealHistory: true, recordedCloseCount: 2, granularity: "daily"
+      }) });
+  });
+  await page.goto(`/artists/${artist.id}`);
+  const section = page.locator("section").filter({ has: page.getByRole("heading", { name: "Price History", exact: true }) });
+  await expect(section.locator("path.recharts-area-curve")).toHaveCount(1);
+  expect(requests[0]).toBe("3M");
+  await section.getByRole("button", { name: "1D", exact: true }).click();
+  await expect(section).toContainText("Price history unavailable");
+  await expect(section.locator("path.recharts-area-curve")).toHaveCount(0);
+  await expect(section).not.toContainText("recorded daily closes");
+  await section.getByRole("button", { name: "3M", exact: true }).click();
+  await expect(section.locator("path.recharts-area-curve")).toHaveCount(1);
 });
 
 test("public metrics do not use decorative colored side borders", async ({ page }) => {

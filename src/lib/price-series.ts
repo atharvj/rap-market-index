@@ -2,6 +2,8 @@ import type { PricePoint } from "@/lib/types";
 
 const PRICE_SCALE = 100;
 export const ONE_MONTH_HISTORY_DAYS = 31;
+export const DEFAULT_HISTORY_RANGE = "3M" as const;
+export const DEFAULT_HISTORY_DAYS = 93;
 
 export function buildIntradayPriceSeries({
   ticks,

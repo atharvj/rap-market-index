@@ -1,3 +1,4 @@
+import { DEFAULT_HISTORY_RANGE, DEFAULT_HISTORY_DAYS } from "@/lib/price-series";
 import { NextResponse } from "next/server";
 import { createServiceRoleClient, getSupabaseConfigStatus } from "@/lib/supabase/server";
 import type { Database } from "@/lib/supabase/database.types";
@@ -17,7 +18,7 @@ type ObservationRow = Pick<
 
 const RANGE_DAYS: Record<Exclude<ObservationRange, "ALL">, number> = {
   "1M": 31,
-  "3M": 93,
+  "3M": DEFAULT_HISTORY_DAYS,
   "6M": 186,
   "1Y": 365
 };
@@ -319,5 +320,5 @@ function normalizeRange(value: string | null): ObservationRange {
     return value;
   }
 
-  return "1M";
+  return DEFAULT_HISTORY_RANGE;
 }

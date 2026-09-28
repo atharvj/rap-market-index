@@ -83,7 +83,7 @@ export default function PortfolioPage() {
 
       <RmiSection
         title="Current Holdings Trend"
-        subtitle="Your current positions and cash valued across past closes, adjusted for valuation changes. This is not your account balance history."
+        subtitle="Your current positions and cash valued across up to three months of past closes. This is not your account balance history."
         action={chartData.length ? (
           <span className={quoteHistoryChange >= 0 ? "text-sm font-semibold text-mint number-tabular" : "text-sm font-semibold text-ember number-tabular"}>
             {formatPercent(quoteHistoryChange)}
