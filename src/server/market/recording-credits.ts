@@ -1,5 +1,6 @@
 import { buildDefaultLastfmName } from "@/server/market/artist-text-identifiers";
 import type { MarketEvent } from "@/server/market/market-data";
+import { getTrackingAliases } from "@/server/market/artist-tracking";
 
 export type RecordingArtist = { id: string; name: string; ticker: string; category?: string; currentPrice?: number; hypeScore?: number };
 
@@ -18,7 +19,7 @@ export function resolveRecordingArtists<T extends RecordingArtist>({
   }
   const explicit = new Set(names.map(normalize));
   return artists.filter(artist => artist.id === primaryArtistId ||
-    [artist.name, buildDefaultLastfmName(artist.name)].some(name => explicit.has(normalize(name))))
+    [...getTrackingAliases(artist), buildDefaultLastfmName(artist.name)].some(name => explicit.has(normalize(name))))
     .sort((a, b) => Number(b.id === primaryArtistId) - Number(a.id === primaryArtistId));
 }
 
@@ -52,7 +53,7 @@ export function expandRecordingEvents(eventsByArtist: Record<string, MarketEvent
         if (primaryArtistId !== event.artistId && participant.id !== event.artistId) continue;
         const primary = participant.id === primaryArtistId;
         const prefixNames = splitCredits(recordingTitle.split(/\s+[-–—]\s+/)[0]).map(normalize);
-        const coArtist = prefixNames.includes(normalize(participant.name));
+        const coArtist = getTrackingAliases(participant).some(name => prefixNames.includes(normalize(name)));
         const updated = isOfficialRecordingSource(raw) ? {
           ...event, artistId: participant.id,
           rawPayload: { ...raw, recordingPrimaryArtistId: primaryArtistId,

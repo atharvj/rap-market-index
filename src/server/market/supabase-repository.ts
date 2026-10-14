@@ -1,4 +1,5 @@
 import { VERIFIED_SPOTIFY_ARTISTS } from "@/data/spotifyArtistIds";
+import { applyTrackingExternalIds } from "@/server/market/artist-tracking";
 import { priceForTrendAnalysis, readAudienceRevaluation, type AudienceRevaluation } from "@/server/market/audience-revaluation";
 import { loadAllPages } from "@/lib/pagination";
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -408,7 +409,7 @@ export async function loadArtistExternalIds(
   }
 
   return ((data ?? []) as ArtistExternalIdsRow[]).reduce<Record<string, ArtistExternalIds>>((grouped, row) => {
-    grouped[row.artist_id] = {
+    grouped[row.artist_id] = applyTrackingExternalIds({
       artistId: row.artist_id,
       spotifyId: row.spotify_id ?? (VERIFIED_SPOTIFY_ARTISTS[row.artist_id]?.musicbrainzId === row.musicbrainz_id ? VERIFIED_SPOTIFY_ARTISTS[row.artist_id].spotifyId : undefined),
       youtubeChannelId: row.youtube_channel_id ?? undefined,
@@ -416,7 +417,7 @@ export async function loadArtistExternalIds(
       wikipediaArticleTitle: row.wikipedia_article_title ?? undefined,
       lastfmName: row.lastfm_name ?? undefined,
       gdeltQuery: row.gdelt_query ?? undefined
-    };
+    });
     return grouped;
   }, {});
 }

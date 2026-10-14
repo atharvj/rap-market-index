@@ -1,6 +1,7 @@
 import type { MarketUpdateArtist } from "@/server/market/daily-update";
 import { decodeHtmlEntities } from "@/lib/html-entities";
 import { buildDefaultLastfmName } from "@/server/market/artist-text-identifiers";
+import { getTrackingAliases } from "@/server/market/artist-tracking";
 import {
   createArticleMetadataVerifier,
   isGoogleNewsArticleUrl
@@ -942,7 +943,7 @@ function parseFeedItem({
 }
 
 export function buildArtistNewsQueries(artist: MarketUpdateArtist, externalIds?: ArtistExternalIds) {
-  const aliases = [...new Set([artist.name, externalIds?.lastfmName, buildDefaultLastfmName(artist.name)]
+  const aliases = [...new Set([...getTrackingAliases(artist, externalIds), externalIds?.lastfmName, buildDefaultLastfmName(artist.name)]
     .filter((name): name is string => Boolean(name)).map(name => name.trim()))];
   const primaryName = aliases.length === 1 ? quoteSearchPhrase(aliases[0]) : `(${aliases.map(quoteSearchPhrase).join(" OR ")})`;
   const releaseTerms = [

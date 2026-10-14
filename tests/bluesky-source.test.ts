@@ -22,6 +22,51 @@ const artist: MarketUpdateArtist = {
 };
 
 describe("Bluesky market source", () => {
+  it("reduces confidence and seeds a new comparison when a contextual query fails", async () => {
+    const thug = { ...artist, id: "young-thug", name: "Young Thug" };
+    const posts = Array.from({ length: 4 }, (_, i) => ({ uri: `at://did:plc:fan${i}/app.bsky.feed.post/review`, author: { handle: `fan${i}.bsky.social` },
+      record: { text: "Young Thug album is trash and boring", createdAt: "2026-10-13T12:00:00Z" }, likeCount: 10 }));
+    const full = await collectBlueskyMarketSignals({ artists: [thug], runDate: "2026-10-14", delayMs: 0, fetchImpl: async () => Response.json({ posts }) });
+    const baseline = Object.fromEntries(full.observations.map(o => [o.metric, o.value]));
+    const partial = await collectBlueskyMarketSignals({ artists: [thug], runDate: "2026-10-14", delayMs: 0, baselines: { [thug.id]: baseline },
+      fetchImpl: async input => new URL(String(input)).searchParams.get("q")?.includes("UY SCUTI") ? Response.json({ error: "Unavailable" }, { status: 503 }) : Response.json({ posts }) });
+    expect(partial.signals[thug.id].confidence).toBeLessThan(full.signals[thug.id].confidence!);
+    expect(partial.signals[thug.id].rawPayload.baselinePostCount).toBeNull();
+    expect(partial.signals[thug.id].stats.socialGrowth).toBeLessThan(0);
+    expect(partial.warnings.length).toBeGreaterThan(0);
+  });
+  it("finds criticism of a verified old album without pretending it was newly released", async () => {
+    const thug = { ...artist, id: "young-thug", name: "Young Thug", ticker: "THUG" };
+    const queries: string[] = [];
+    const result = await collectBlueskyMarketSignals({ artists: [thug], runDate: "2026-10-14", delayMs: 0,
+      fetchImpl: async input => {
+        const query = new URL(String(input)).searchParams.get("q") ?? ""; queries.push(query);
+        return Response.json({ posts: query.includes("UY SCUTI") ? Array.from({ length: 5 }, (_, i) => ({
+          uri: `at://did:plc:fan${i}/app.bsky.feed.post/review`, author: { handle: `fan${i}.bsky.social` },
+          record: { text: "UY SCUTI album is trash and disappointing", createdAt: "2026-10-13T12:00:00Z" }, likeCount: 20
+        })) : [] });
+      } });
+    expect(queries).toContain('"UY SCUTI" album');
+    expect(queries).toContain('"Slime Language 3" album');
+    expect(result.signals[thug.id].stats.socialGrowth).toBeLessThan(0);
+    expect(result.signals[thug.id].rawPayload.releaseMatchedPostCount).toBe(5);
+    expect(result.eventsByArtist[thug.id]).toBeUndefined();
+  });
+  it("keeps neutral album announcements out of fan approval while retaining catalyst evidence", async () => {
+    const result = await collectBlueskyMarketSignals({ artists: [artist], runDate: "2026-10-14", delayMs: 0,
+      fetchImpl: async () => Response.json({ posts: [{ uri: "at://did:plc:label/app.bsky.feed.post/new", author: { handle: "label.bsky.social" },
+        record: { text: "Lil Tecca announces a new album dropping Friday", createdAt: "2026-10-14T12:00:00Z" }, likeCount: 150 }] }) });
+    expect(result.signals[artist.id].stats.socialGrowth).toBeUndefined();
+    expect(result.signals[artist.id].rawPayload.classifiedReactionCount).toBe(0);
+    expect(result.observations.some(o => o.metric === "reaction_sentiment")).toBe(false);
+    expect(result.eventsByArtist[artist.id]?.[0].eventType).toBe("release");
+  });
+  it("does not count the same post multiple times across contextual searches", async () => {
+    const result = await collectBlueskyMarketSignals({ artists: [{ ...artist, id: "young-thug", name: "Young Thug" }], runDate: "2026-10-14", delayMs: 0,
+      fetchImpl: async () => Response.json({ posts: [{ uri: "at://did:plc:one/app.bsky.feed.post/one", author: { handle: "one.bsky.social" },
+        record: { text: "Young Thug album is trash", createdAt: "2026-10-14T12:00:00Z" }, likeCount: 30 }] }) });
+    expect(result.signals["young-thug"].rawPayload.postCount).toBe(1);
+  });
   it.each(["Lil Tecca new album is bad and boring", "Lil Tecca performance was bad with an empty crowd", "Lil Tecca new album isn't fire", "Lil Tecca new album: I don't like it", "crazy how Lil Tecca new album is trash"])("does not classify criticism as release/performance hype: %s", async text => {
     const result = await collectBlueskyMarketSignals({ artists: [artist], runDate: "2026-08-10", delayMs: 0,
       fetchImpl: async () => Response.json({ posts: [{ uri: "at://did:plc:fan/app.bsky.feed.post/negative", author: { handle: "fan.bsky.social" },
@@ -57,19 +102,19 @@ describe("Bluesky market source", () => {
     expect(result.warnings.length).toBeGreaterThan(0);
   });
   it("disambiguates short artist names without excluding adjacent public attention", async () => {
-    let requestedQuery = "";
+    const requestedQueries: string[] = [];
     await collectBlueskyMarketSignals({
       artists: [{ ...artist, id: "drake", name: "Drake", ticker: "DRAKE" }],
       runDate: "2026-08-10",
       delayMs: 0,
       fetchImpl: async (input) => {
-        requestedQuery = new URL(String(input)).searchParams.get("q") ?? "";
+        requestedQueries.push(new URL(String(input)).searchParams.get("q") ?? "");
         return new Response(JSON.stringify({ posts: [] }), { status: 200 });
       }
     });
 
-    expect(requestedQuery).toContain('"Drake"');
-    expect(requestedQuery).toBe('"Drake" rapper');
+    expect(requestedQueries).toContain('"Drake" rapper');
+    expect(requestedQueries.every(query => query.includes('"Drake"'))).toBe(true);
   });
 
   it("collects a music-specific social catalyst without credentials", async () => {

@@ -1,3 +1,5 @@
+import { getTrackingAliasesByName } from "@/server/market/artist-tracking";
+
 const GDELT_QUERY_OVERRIDES: Record<string, string> = {
   "1oneam": '"1oneam" rapper OR "1oneam" music',
   "2hollis": '"2hollis" rapper OR "2hollis" music',
@@ -48,6 +50,8 @@ export function getVerifiedWikipediaTitle(artistName: string) {
 }
 
 export function buildDefaultGdeltQuery(artistName: string) {
+  const aliases = getTrackingAliasesByName(artistName);
+  if (aliases.length > 1) return `(${aliases.map(name => `"${quoteSearchPhrase(name)}"`).join(" OR ")}) AND (rapper OR music OR album)`;
   const key = getArtistTextKey(artistName);
   const override = GDELT_QUERY_OVERRIDES[key];
 

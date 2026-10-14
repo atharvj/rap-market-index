@@ -7,7 +7,7 @@ describe("same-day source continuity", () => {
   it("does not replay reception calculated before the sampling repair", () => {
     const row = { artist_id: "artist", source_date: "2026-10-14", raw_payload: { dailySourceInputs: {
       bluesky: { stats: { socialGrowth: 130 }, rawPayload: { source: "bluesky" } },
-      youtube_comments: { stats: { socialGrowth: 90 }, rawPayload: { source: "youtube_comments", samplingVersion: 2 } }
+      youtube_comments: { stats: { socialGrowth: 90 }, rawPayload: { source: "youtube_comments", samplingVersion: 3 } }
     } } };
     const sources = restoreDailySources([row], row.source_date);
     expect(sources).toHaveLength(1);

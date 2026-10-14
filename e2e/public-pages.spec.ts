@@ -684,6 +684,20 @@ test("artist indicators show bounded negative reception even while the quote ris
   await expect(indicators).toContainText("not all fans");
 });
 
+test("artist indicators distinguish sampled reactions from legacy social classifications", async ({ page }) => {
+  const artist = marketState.artists[0];
+  await page.route("**/api/market/observations/**", route => route.fulfill({ contentType: "application/json", body: JSON.stringify({ ok: true,
+    series: [["average_sentiment", 95], ["reaction_sentiment", -35], ["reaction_count", 8]].map(([metric, value]) => ({
+      key: `bluesky:${metric}`, source: "bluesky", metric, points: [], latestValue: value, latestDate: "2026-10-14"
+    })) }) }));
+  await page.goto(`/artists/${artist.id}`);
+  const indicators = page.locator("section").filter({ has: page.getByRole("heading", { name: "Public Market Indicators", exact: true }) });
+  await expect(indicators).toContainText("Sampled Social Sentiment");
+  await expect(indicators).toContainText("-35.0 / 100");
+  await expect(indicators).not.toContainText("95");
+  await expect(indicators).toContainText("Announcements without an opinion do not count as approval");
+});
+
 test("public metrics do not use decorative colored side borders", async ({ page }) => {
   for (const path of ["/", "/markets", "/scout"]) {
     await page.goto(path);

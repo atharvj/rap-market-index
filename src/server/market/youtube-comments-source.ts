@@ -1,4 +1,6 @@
 import { clamp } from "@/lib/pricing";
+import { scoreMusicReception as scoreCommentSentiment } from "@/server/market/music-reception";
+export { scoreMusicReception as scoreCommentSentiment } from "@/server/market/music-reception";
 import type { MarketUpdateArtist } from "@/server/market/daily-update";
 import type {
   AdapterSignal,
@@ -123,7 +125,7 @@ const DEFAULT_VIDEOS_PER_ARTIST = 2;
 const DEFAULT_COMMENTS_PER_VIDEO = 50;
 const MIN_COMMENTS_FOR_SIGNAL = 12;
 const CLASSIFICATION_THRESHOLD = 12;
-const SAMPLING_VERSION = 2;
+const SAMPLING_VERSION = 3;
 
 export async function collectYoutubeCommentMarketSignals({
   artists,
@@ -562,7 +564,7 @@ async function fetchBalancedVideoComments(options: Parameters<typeof fetchVideoC
   const limit = clampInteger(options.maxResults, 1, 100);
   const results = await Promise.all(["time", "relevance"].map(order => fetchVideoComments({ ...options, maxResults: Math.max(1, Math.ceil(limit / 2)), order: order as "time" | "relevance" })));
   const successful = results.filter((result): result is { ok: true; comments: YoutubeComment[] } => result.ok);
-  if (!successful.length) return { ok: false as const, error: results.find(result => !result.ok)?.error ?? "Comments unavailable." };
+  if (successful.length !== results.length) return { ok: false as const, error: results.find(result => !result.ok)?.error ?? "Comments unavailable." };
   return { ok: true as const, comments: successful.flatMap(result => result.comments) };
 }
 
@@ -730,42 +732,6 @@ async function fetchJson({
   } finally {
     clearTimeout(timeout);
   }
-}
-
-export function scoreCommentSentiment(text: string) {
-  let normalized = normalizeCommentText(text);
-  let score = 0;
-  // Consume negated phrases first so their constituent praise/criticism is not
-  // counted again with the opposite sign. Unrecognized text stays unknown.
-  normalized = normalized.replace(/\b(?:not|isnt|isn t|aint|ain t)\s+(?:bad|trash|mid|boring|terrible|ass)\b/g, () => { score += 1.1; return " "; });
-  normalized = normalized.replace(/\b(?:not|isnt|isn t|aint|ain t)\s+(?:good|fire|hard|great|it)\b|\b(?:don t|dont|do not|didn t|didnt)\s+(?:like|love|enjoy)\b/g, () => { score -= 1.2; return " "; });
-  normalized = normalized.replace(/\bno skips?\b/g, () => { score += 1.45; return " "; });
-  normalized = normalized.replace(/\b(?:hard to listen(?: to)?|not feeling (?:it|this)|cant listen|couldnt get into (?:it|this))\b/g, () => { score -= 1.2; return " "; });
-  score += countMatches(normalized, /\b(no skips?|10\/10|aoty|album of the year|instant classic)\b/g) * 1.45;
-  score += countMatches(normalized, /\b(fire|heat|banger|classic|masterpiece|goat|legendary|slaps|elite)\b/g) * 1.15;
-  score += countMatches(normalized, /\b(love|amazing|great|good|hard|beautiful|underrated|perfect|tough|cold|gas)\b/g) * 0.7;
-  score += countMatches(normalized, /\b(better than expected)\b/g) * 0.8;
-  score -= countMatches(normalized, /\b(fell off|trash|garbage|mid|flop|boring|washed|terrible|worst|overrated|disappointing|disappointed|skip|weak|cringe|corny|hate|hated|awful|unlistenable)\b/g) * 1.1;
-  score -= countMatches(normalized, /\b(ass|bad)\b/g) * 0.7;
-  score -= Math.min(2, Array.from(text.matchAll(/👎|🤮|💩/gu)).length) * 0.8;
-  if (score >= 0) score += Math.min(2, Array.from(text.matchAll(/🔥|💯/gu)).length) * 0.8;
-
-  return clamp(score / 4 * 100, -100, 100);
-}
-
-function normalizeCommentText(text: string) {
-  return text
-    .toLowerCase()
-    .replace(/https?:\/\/\S+/g, " ")
-    .replace(/[’']/g, "")
-    .replace(/([a-z])\1{2,}/g, "$1$1")
-    .replace(/[^\w\s/]+/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
-function countMatches(text: string, pattern: RegExp) {
-  return Array.from(text.matchAll(pattern)).length;
 }
 
 function calculateRelativeMomentum(

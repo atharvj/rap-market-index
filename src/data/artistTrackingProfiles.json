@@ -1,0 +1,3023 @@
+{
+  "1900rugrat": {
+    "name": "1900Rugrat",
+    "searchName": "1900Rugrat",
+    "aliases": [],
+    "verifiedAt": "2026-10-14",
+    "sources": [
+      "https://musicbrainz.org/artist/e9ef6e2b-3117-4c09-938e-21b79527306b",
+      "https://www.youtube.com/channel/UCfiRrH6OkNSi7jZ15HQXNlA"
+    ],
+    "externalIds": {
+      "spotifyId": "6HHAJjAD9nZ2GftcwEf8r5",
+      "youtubeChannelId": "UCfiRrH6OkNSi7jZ15HQXNlA",
+      "musicbrainzId": "e9ef6e2b-3117-4c09-938e-21b79527306b"
+    },
+    "releases": [
+      {
+        "id": "99637105-d2bb-4fb2-9b61-4e195d324870",
+        "title": "Fireman",
+        "releaseDate": "2026-06-26",
+        "sourceUrl": "https://musicbrainz.org/release-group/99637105-d2bb-4fb2-9b61-4e195d324870",
+        "officialReleaseVerified": true
+      },
+      {
+        "id": "c7a0f93c-5485-4043-a79d-faa8ff2f48f3",
+        "title": "Free(Style) Game",
+        "releaseDate": "2026-01-28",
+        "sourceUrl": "https://musicbrainz.org/release-group/c7a0f93c-5485-4043-a79d-faa8ff2f48f3",
+        "officialReleaseVerified": true
+      }
+    ],
+    "catalogueComplete": true
+  },
+  "1oneam": {
+    "name": "1oneam",
+    "searchName": "1oneam",
+    "aliases": [],
+    "verifiedAt": "2026-10-14",
+    "sources": [
+      "https://musicbrainz.org/artist/0075e2ed-858d-4310-a79e-bdc9848a2ae9",
+      "https://www.youtube.com/channel/UCcxw8Vzg9M39bjGrR_MVADg"
+    ],
+    "externalIds": {
+      "spotifyId": "089ASSwOW4Cih3frNuDtUv",
+      "youtubeChannelId": "UCcxw8Vzg9M39bjGrR_MVADg",
+      "musicbrainzId": "0075e2ed-858d-4310-a79e-bdc9848a2ae9"
+    },
+    "releases": [
+      {
+        "id": "6ddfd3f7-9a6b-4254-a053-2609fe97844e",
+        "title": "Sin Ever After",
+        "releaseDate": "2025-10-24",
+        "sourceUrl": "https://musicbrainz.org/release-group/6ddfd3f7-9a6b-4254-a053-2609fe97844e",
+        "officialReleaseVerified": true
+      },
+      {
+        "id": "11be33a1-4e10-4c90-a197-24ad3d922999",
+        "title": "One Death",
+        "releaseDate": "2024-10-11",
+        "sourceUrl": "https://musicbrainz.org/release-group/11be33a1-4e10-4c90-a197-24ad3d922999",
+        "officialReleaseVerified": true
+      }
+    ],
+    "catalogueComplete": true
+  },
+  "21-savage": {
+    "name": "21 Savage",
+    "searchName": "21 Savage",
+    "aliases": [],
+    "verifiedAt": "2026-10-14",
+    "sources": [
+      "https://musicbrainz.org/artist/37b2cb82-ef79-4d46-a184-a549450aa231",
+      "https://www.youtube.com/channel/UCOjEHmBKwdS7joWpW0VrXkg",
+      "https://www.wikidata.org/wiki/Q25095399"
+    ],
+    "externalIds": {
+      "spotifyId": "1URnnhqYAYcrqrcwql10ft",
+      "youtubeChannelId": "UCOjEHmBKwdS7joWpW0VrXkg",
+      "musicbrainzId": "37b2cb82-ef79-4d46-a184-a549450aa231",
+      "wikipediaArticleTitle": "21 Savage"
+    },
+    "releases": [
+      {
+        "id": "5f6c5f5d-acaf-45dc-83a2-31c2523fdd2b",
+        "title": "WHAT HAPPENED TO THE STREETS?",
+        "releaseDate": "2025-12-12",
+        "sourceUrl": "https://musicbrainz.org/release-group/5f6c5f5d-acaf-45dc-83a2-31c2523fdd2b",
+        "officialReleaseVerified": true
+      },
+      {
+        "id": "17a64abf-6d31-473f-a740-38ffa548f225",
+        "title": "american dream",
+        "releaseDate": "2024-01-12",
+        "sourceUrl": "https://musicbrainz.org/release-group/17a64abf-6d31-473f-a740-38ffa548f225",
+        "officialReleaseVerified": true
+      }
+    ],
+    "catalogueComplete": true
+  },
+  "2hollis": {
+    "name": "2hollis",
+    "searchName": "2hollis",
+    "aliases": [],
+    "verifiedAt": "2026-10-14",
+    "sources": [
+      "https://musicbrainz.org/artist/8bd5a8fb-4c25-401d-a597-2c24affdd5c5",
+      "https://www.youtube.com/channel/UCFSjUwWd_1ro9p9ZlTr7Z4A",
+      "https://www.wikidata.org/wiki/Q127977668"
+    ],
+    "externalIds": {
+      "spotifyId": "72NhFAGG5Pt91VbheJeEPG",
+      "youtubeChannelId": "UCFSjUwWd_1ro9p9ZlTr7Z4A",
+      "musicbrainzId": "8bd5a8fb-4c25-401d-a597-2c24affdd5c5",
+      "wikipediaArticleTitle": "2hollis"
+    },
+    "releases": [
+      {
+        "id": "63201d91-1628-4fb7-855e-70f3564457d0",
+        "title": "star",
+        "releaseDate": "2025-04-04",
+        "sourceUrl": "https://musicbrainz.org/release-group/63201d91-1628-4fb7-855e-70f3564457d0",
+        "officialReleaseVerified": true
+      },
+      {
+        "id": "f0ed33a3-8097-4f92-b98d-97a70bd9e6b3",
+        "title": "boy",
+        "releaseDate": "2024-06-07",
+        "sourceUrl": "https://musicbrainz.org/release-group/f0ed33a3-8097-4f92-b98d-97a70bd9e6b3",
+        "officialReleaseVerified": true
+      }
+    ],
+    "catalogueComplete": true
+  },
+  "2slimey": {
+    "name": "2slimey",
+    "searchName": "2slimey",
+    "aliases": [
+      "2Slimey"
+    ],
+    "verifiedAt": "2026-10-14",
+    "sources": [
+      "https://musicbrainz.org/artist/dfbf8c6d-d4f9-44b5-8390-a6f38e09b647",
+      "https://www.youtube.com/channel/UCTXkV1wE4J8vr8kpUNBxZ-g",
+      "https://www.wikidata.org/wiki/Q138580882"
+    ],
+    "externalIds": {
+      "spotifyId": "0ZXbQLu4a7sk3iQ8tlgFy4",
+      "youtubeChannelId": "UCTXkV1wE4J8vr8kpUNBxZ-g",
+      "musicbrainzId": "dfbf8c6d-d4f9-44b5-8390-a6f38e09b647",
+      "wikipediaArticleTitle": "2Slimey"
+    },
+    "releases": [
+      {
+        "id": "a0177ec7-e3a3-43b3-bee9-a7b3731c730f",
+        "title": "Totalbass",
+        "releaseDate": "2026-06-26",
+        "sourceUrl": "https://musicbrainz.org/release-group/a0177ec7-e3a3-43b3-bee9-a7b3731c730f",
+        "officialReleaseVerified": true
+      },
+      {
+        "id": "0858c818-6390-4ac1-9fb1-cca7c7109f7b",
+        "title": "More Anxiety",
+        "releaseDate": "2026-02-06",
+        "sourceUrl": "https://musicbrainz.org/release-group/0858c818-6390-4ac1-9fb1-cca7c7109f7b",
+        "officialReleaseVerified": true
+      }
+    ],
+    "catalogueComplete": true
+  },
+  "42-dugg": {
+    "name": "42 Dugg",
+    "searchName": "42 Dugg",
+    "aliases": [],
+    "verifiedAt": "2026-10-14",
+    "sources": [
+      "https://musicbrainz.org/artist/4214aa04-64b0-442a-982b-0560e6d3a5bd",
+      "https://www.youtube.com/channel/UChFLDvWugOtrzxmUCAjfnGg",
+      "https://www.wikidata.org/wiki/Q95694810"
+    ],
+    "externalIds": {
+      "spotifyId": "45gHcnDnMC15sgx3VL7ROG",
+      "youtubeChannelId": "UChFLDvWugOtrzxmUCAjfnGg",
+      "musicbrainzId": "4214aa04-64b0-442a-982b-0560e6d3a5bd",
+      "wikipediaArticleTitle": "42 Dugg"
+    },
+    "releases": [
+      {
+        "id": "a589e760-69ea-4fb1-84a7-b448fdcb2c0d",
+        "title": "Part 3",
+        "releaseDate": "2026-01-23",
+        "sourceUrl": "https://musicbrainz.org/release-group/a589e760-69ea-4fb1-84a7-b448fdcb2c0d",
+        "officialReleaseVerified": true
+      },
+      {
+        "id": "d209cf80-1fc4-4bd7-9217-4245d20411fa",
+        "title": "4eva Us Neva Them",
+        "releaseDate": "2024-07-04",
+        "sourceUrl": "https://musicbrainz.org/release-group/d209cf80-1fc4-4bd7-9217-4245d20411fa",
+        "officialReleaseVerified": true
+      }
+    ],
+    "catalogueComplete": true
+  },
+  "anycia": {
+    "name": "Anycia",
+    "searchName": "Anycia",
+    "aliases": [],
+    "verifiedAt": "2026-10-14",
+    "sources": [
+      "https://musicbrainz.org/artist/8e504b01-438a-49d5-ac71-032d2a4e86cb",
+      "https://www.youtube.com/channel/UCgoQgHZP0qTuWyk36ihA4zw"
+    ],
+    "externalIds": {
+      "spotifyId": "4bOqkIGQCcuZgjfDxNuX1I",
+      "youtubeChannelId": "UCgoQgHZP0qTuWyk36ihA4zw",
+      "musicbrainzId": "8e504b01-438a-49d5-ac71-032d2a4e86cb"
+    },
+    "releases": [
+      {
+        "id": "251a1c27-8972-4db4-ac8d-747a868daf1d",
+        "title": "Grady Baby",
+        "releaseDate": "2025-07-18",
+        "sourceUrl": "https://musicbrainz.org/release-group/251a1c27-8972-4db4-ac8d-747a868daf1d",
+        "officialReleaseVerified": true
+      },
+      {
+        "id": "838fbe41-9951-4f03-891f-08f5592f0404",
+        "title": "PRINCESS POP THAT",
+        "releaseDate": "2024-04-26",
+        "sourceUrl": "https://musicbrainz.org/release-group/838fbe41-9951-4f03-891f-08f5592f0404",
+        "officialReleaseVerified": true
+      }
+    ],
+    "catalogueComplete": true
+  },
+  "asap-rocky": {
+    "name": "A$AP Rocky",
+    "searchName": "A$AP Rocky",
+    "aliases": [],
+    "verifiedAt": "2026-10-14",
+    "sources": [
+      "https://musicbrainz.org/artist/25b7b584-d952-4662-a8b9-dd8cdfbfeb64",
+      "https://www.youtube.com/channel/UC0KAFLxIiaR_FFNYDL3utGw",
+      "https://www.wikidata.org/wiki/Q129910"
+    ],
+    "externalIds": {
+      "spotifyId": "13ubrt8QOOCPljQ2FL1Kca",
+      "youtubeChannelId": "UC0KAFLxIiaR_FFNYDL3utGw",
+      "musicbrainzId": "25b7b584-d952-4662-a8b9-dd8cdfbfeb64",
+      "wikipediaArticleTitle": "ASAP Rocky"
+    },
+    "releases": [
+      {
+        "id": "132f6b97-eb7b-44d4-9b34-97014e1e9039",
+        "title": "Don’t Be Dumb",
+        "releaseDate": "2026-01-16",
+        "sourceUrl": "https://musicbrainz.org/release-group/132f6b97-eb7b-44d4-9b34-97014e1e9039",
+        "officialReleaseVerified": true
+      },
+      {
+        "id": "a82cafe6-d3df-4d76-be85-60a757ad2687",
+        "title": "TESTING",
+        "releaseDate": "2018-05-25",
+        "sourceUrl": "https://musicbrainz.org/release-group/a82cafe6-d3df-4d76-be85-60a757ad2687",
+        "officialReleaseVerified": true
+      }
+    ],
+    "catalogueComplete": true
+  },
+  "baby-keem": {
+    "name": "Baby Keem",
+    "searchName": "Baby Keem",
+    "aliases": [],
+    "verifiedAt": "2026-10-14",
+    "sources": [
+      "https://musicbrainz.org/artist/81d12ca7-5b89-4d21-8736-860b7400b4eb",
+      "https://www.youtube.com/channel/UCq0Hi7HpCBCNeKpdKKcQqGQ",
+      "https://www.wikidata.org/wiki/Q70063212"
+    ],
+    "externalIds": {
+      "spotifyId": "5SXuuuRpukkTvsLuUknva1",
+      "youtubeChannelId": "UCq0Hi7HpCBCNeKpdKKcQqGQ",
+      "musicbrainzId": "81d12ca7-5b89-4d21-8736-860b7400b4eb",
+      "wikipediaArticleTitle": "Baby Keem"
+    },
+    "releases": [
+      {
+        "id": "eac8a859-3080-46f5-bc42-a869bcb5606e",
+        "title": "Ca$ino",
+        "releaseDate": "2026-02-20",
+        "sourceUrl": "https://musicbrainz.org/release-group/eac8a859-3080-46f5-bc42-a869bcb5606e",
+        "officialReleaseVerified": true
+      },
+      {
+        "id": "15fa148e-7f69-4559-aa2b-42dc4bf730b3",
+        "title": "The Melodic Blue",
+        "releaseDate": "2021-09-10",
+        "sourceUrl": "https://musicbrainz.org/release-group/15fa148e-7f69-4559-aa2b-42dc4bf730b3",
+        "officialReleaseVerified": true
+      }
+    ],
+    "catalogueComplete": true
+  },
+  "babychiefdoit": {
+    "name": "BabyChiefDoIt",
+    "searchName": "BabyChiefDoIt",
+    "aliases": [],
+    "verifiedAt": "2026-10-14",
+    "sources": [
+      "https://musicbrainz.org/artist/df033c30-93af-439f-9124-431b00c392a8",
+      "https://www.youtube.com/channel/UCCZRnwAMSIxlJNZmUiSDgUw",
+      "https://www.wikidata.org/wiki/Q135068696"
+    ],
+    "externalIds": {
+      "spotifyId": "1J1pGfTqp5ReVIX8Z1Wzsg",
+      "youtubeChannelId": "UCCZRnwAMSIxlJNZmUiSDgUw",
+      "musicbrainzId": "df033c30-93af-439f-9124-431b00c392a8",
+      "wikipediaArticleTitle": "BabyChiefDoit"
+    },
+    "releases": [
+      {
+        "id": "40faf3d1-3a5e-4b64-a737-72f496766507",
+        "title": "Rise Against My Broken Odds",
+        "releaseDate": "2026-06-12",
+        "sourceUrl": "https://musicbrainz.org/release-group/40faf3d1-3a5e-4b64-a737-72f496766507",
+        "officialReleaseVerified": true
+      },
+      {
+        "id": "3db7461d-f270-4ba0-bd06-d330894e750d",
+        "title": "ZOO LIFE",
+        "releaseDate": "2025-04-23",
+        "sourceUrl": "https://musicbrainz.org/release-group/3db7461d-f270-4ba0-bd06-d330894e750d",
+        "officialReleaseVerified": true
+      }
+    ],
+    "catalogueComplete": true
+  },
+  "babyface-ray": {
+    "name": "Babyface Ray",
+    "searchName": "Babyface Ray",
+    "aliases": [],
+    "verifiedAt": "2026-10-14",
+    "sources": [
+      "https://musicbrainz.org/artist/d82481ab-4f2e-4fd7-af2f-9dbaa38704da",
+      "https://www.youtube.com/channel/UCJPyo4ENRsY1zPwHRGA1iXg",
+      "https://www.wikidata.org/wiki/Q115098502"
+    ],
+    "externalIds": {
+      "spotifyId": "3zZ88AwlTwfCJkowsFCvLA",
+      "youtubeChannelId": "UCJPyo4ENRsY1zPwHRGA1iXg",
+      "musicbrainzId": "d82481ab-4f2e-4fd7-af2f-9dbaa38704da",
+      "wikipediaArticleTitle": "Babyface Ray"
+    },
+    "releases": [
+      {
+        "id": "3874ce33-4aae-4f64-b071-a2e7b40a9678",
+        "title": "Codeine Cowboy",
+        "releaseDate": "2025-08-15",
+        "sourceUrl": "https://musicbrainz.org/release-group/3874ce33-4aae-4f64-b071-a2e7b40a9678",
+        "officialReleaseVerified": true
+      },
+      {
+        "id": "1783b485-cf64-4442-94b9-193eb49a6459",
+        "title": "The Kid That Did",
+        "releaseDate": "2024-09-13",
+        "sourceUrl": "https://musicbrainz.org/release-group/1783b485-cf64-4442-94b9-193eb49a6459",
+        "officialReleaseVerified": true
+      }
+    ],
+    "catalogueComplete": true
+  },
+  "bigxthaplug": {
+    "name": "BigXthaPlug",
+    "searchName": "BigXthaPlug",
+    "aliases": [],
+    "verifiedAt": "2026-10-14",
+    "sources": [
+      "https://musicbrainz.org/artist/d25f6294-686a-4569-b1b9-fe64bfef2519",
+      "https://www.youtube.com/channel/UCEJdOGwm6CNtc_kIa_Qjy6A",
+      "https://www.wikidata.org/wiki/Q124750337"
+    ],
+    "externalIds": {
+      "spotifyId": "6qxpnaukVayrQn6ViNvu9I",
+      "youtubeChannelId": "UCEJdOGwm6CNtc_kIa_Qjy6A",
+      "musicbrainzId": "d25f6294-686a-4569-b1b9-fe64bfef2519",
+      "wikipediaArticleTitle": "BigXthaPlug"
+    },
+    "releases": [
+      {
+        "id": "4bf0011e-6ec6-43cf-99dd-666fc4c73069",
+        "title": "6WA",
+        "releaseDate": "2026-03-20",
+        "sourceUrl": "https://musicbrainz.org/release-group/4bf0011e-6ec6-43cf-99dd-666fc4c73069",
+        "officialReleaseVerified": true
+      },
+      {
+        "id": "b50b2287-a73e-43d1-8bf6-4e653d2fad58",
+        "title": "I Hope You’re Happy",
+        "releaseDate": "2025-08-21",
+        "sourceUrl": "https://musicbrainz.org/release-group/b50b2287-a73e-43d1-8bf6-4e653d2fad58",
+        "officialReleaseVerified": true
+      }
+    ],
+    "catalogueComplete": true
+  },
+  "bossman-dlow": {
+    "name": "BossMan Dlow",
+    "searchName": "BossMan Dlow",
+    "aliases": [],
+    "verifiedAt": "2026-10-14",
+    "sources": [
+      "https://musicbrainz.org/artist/44fac0de-d5ae-4bea-a68c-948fedc3d9c5",
+      "https://www.youtube.com/channel/UC1NZP8d-VFjV-kKSo6lDBig",
+      "https://www.wikidata.org/wiki/Q125145666"
+    ],
+    "externalIds": {
+      "spotifyId": "23xFbA9rYgRX8mreqysWPc",
+      "youtubeChannelId": "UC1NZP8d-VFjV-kKSo6lDBig",
+      "musicbrainzId": "44fac0de-d5ae-4bea-a68c-948fedc3d9c5",
+      "wikipediaArticleTitle": "BossMan Dlow"
+    },
+    "releases": [
+      {
+        "id": "63b20620-f709-4611-b194-8ee90fc7f346",
+        "title": "Chicken Talkin Bastard",
+        "releaseDate": "2026-04-10",
+        "sourceUrl": "https://musicbrainz.org/release-group/63b20620-f709-4611-b194-8ee90fc7f346",
+        "officialReleaseVerified": true
+      },
+      {
+        "id": "babec404-2cc7-464b-b83d-f9c7e4762239",
+        "title": "Dlow Curry",
+        "releaseDate": "2024-12-13",
+        "sourceUrl": "https://musicbrainz.org/release-group/babec404-2cc7-464b-b83d-f9c7e4762239",
+        "officialReleaseVerified": true
+      }
+    ],
+    "catalogueComplete": true
+  },
+  "cardi-b": {
+    "name": "Cardi B",
+    "searchName": "Cardi B",
+    "aliases": [],
+    "verifiedAt": "2026-10-14",
+    "sources": [
+      "https://musicbrainz.org/artist/2f3c4d70-0462-40da-bba3-0aec5772c556",
+      "https://www.youtube.com/channel/UCxMAbVFmxKUVGAll0WVGpFw",
+      "https://www.wikidata.org/wiki/Q29033668"
+    ],
+    "externalIds": {
+      "spotifyId": "4A91BvIz3g7H9yrBiVBUkx",
+      "youtubeChannelId": "UCxMAbVFmxKUVGAll0WVGpFw",
+      "musicbrainzId": "2f3c4d70-0462-40da-bba3-0aec5772c556",
+      "wikipediaArticleTitle": "Cardi B"
+    },
+    "releases": [
+      {
+        "id": "0b7306c9-16d4-434a-ad8d-890333359710",
+        "title": "AM I THE DRAMA?",
+        "releaseDate": "2025-09-19",
+        "sourceUrl": "https://musicbrainz.org/release-group/0b7306c9-16d4-434a-ad8d-890333359710",
+        "officialReleaseVerified": true
+      },
+      {
+        "id": "45c6de75-bea5-4dd9-a912-55fb9497c3fc",
+        "title": "Invasion of Privacy",
+        "releaseDate": "2018-04-05",
+        "sourceUrl": "https://musicbrainz.org/release-group/45c6de75-bea5-4dd9-a912-55fb9497c3fc",
+        "officialReleaseVerified": true
+      }
+    ],
+    "catalogueComplete": true
+  },
+  "cash-cobain": {
+    "name": "Cash Cobain",
+    "searchName": "Cash Cobain",
+    "aliases": [],
+    "verifiedAt": "2026-10-14",
+    "sources": [
+      "https://musicbrainz.org/artist/4f57372b-2054-4722-a534-a99ab2598120",
+      "https://www.youtube.com/channel/UCF0RKX3UmHVq4Bk8ejb32xA",
+      "https://www.wikidata.org/wiki/Q125989634"
+    ],
+    "externalIds": {
+      "spotifyId": "2R0CFyeMDiRbfkhkIMbyl1",
+      "youtubeChannelId": "UCF0RKX3UmHVq4Bk8ejb32xA",
+      "musicbrainzId": "4f57372b-2054-4722-a534-a99ab2598120",
+      "wikipediaArticleTitle": "Cash Cobain"
+    },
+    "releases": [
+      {
+        "id": "4433b35a-ec8a-4525-955f-9cffcd7de825",
+        "title": "PLAY CASH COBAIN",
+        "releaseDate": "2024-08-23",
+        "sourceUrl": "https://musicbrainz.org/release-group/4433b35a-ec8a-4525-955f-9cffcd7de825",
+        "officialReleaseVerified": true
+      },
+      {
+        "id": "c4bd1ff9-8e72-4140-9e56-35c97b169e6f",
+        "title": "act like",
+        "releaseDate": "2024-08-21",
+        "sourceUrl": "https://musicbrainz.org/release-group/c4bd1ff9-8e72-4140-9e56-35c97b169e6f",
+        "officialReleaseVerified": true
+      }
+    ],
+    "catalogueComplete": true
+  },
+  "central-cee": {
+    "name": "Central Cee",
+    "searchName": "Central Cee",
+    "aliases": [
+      "Cench"
+    ],
+    "verifiedAt": "2026-10-14",
+    "sources": [
+      "https://musicbrainz.org/artist/b0337af1-8d93-4671-b6c9-ba306bf942bf",
+      "https://www.youtube.com/channel/UCV_CsAy5CNBX_uwDQ7RMe1Q",
+      "https://www.wikidata.org/wiki/Q106078330"
+    ],
+    "externalIds": {
+      "spotifyId": "5H4yInM5zmHqpKIoMNAx4r",
+      "youtubeChannelId": "UCV_CsAy5CNBX_uwDQ7RMe1Q",
+      "musicbrainzId": "b0337af1-8d93-4671-b6c9-ba306bf942bf",
+      "wikipediaArticleTitle": "Central Cee"
+    },
+    "releases": [
+      {
+        "id": "9a1bc19b-c317-4314-9ef9-dbbfa78ae76e",
+        "title": "ALL ROADS LEAD HOME",
+        "releaseDate": "2026-03-20",
+        "sourceUrl": "https://musicbrainz.org/release-group/9a1bc19b-c317-4314-9ef9-dbbfa78ae76e",
+        "officialReleaseVerified": true
+      },
+      {
+        "id": "19eb98ff-d741-4ec2-9137-905654b6e722",
+        "title": "CAN’T RUSH GREATNESS",
+        "releaseDate": "2025-01-24",
+        "sourceUrl": "https://musicbrainz.org/release-group/19eb98ff-d741-4ec2-9137-905654b6e722",
+        "officialReleaseVerified": true
+      }
+    ],
+    "catalogueComplete": true
+  },
+  "che": {
+    "name": "Che",
+    "searchName": "Che",
+    "aliases": [
+      "cheRomani+",
+      "che"
+    ],
+    "verifiedAt": "2026-10-14",
+    "sources": [
+      "https://musicbrainz.org/artist/0a68f3b5-79c2-4f81-a7bc-ebc977602e86",
+      "https://www.youtube.com/channel/UCuNSwwBpexmrxzdIN26b1gw",
+      "https://www.wikidata.org/wiki/Q134697068"
+    ],
+    "externalIds": {
+      "spotifyId": "5A7T1LAGJg5NXySBoIKUmF",
+      "youtubeChannelId": "UCuNSwwBpexmrxzdIN26b1gw",
+      "musicbrainzId": "0a68f3b5-79c2-4f81-a7bc-ebc977602e86",
+      "wikipediaArticleTitle": "Che (rapper)"
+    },
+    "releases": [
+      {
+        "id": "3a62f554-ae74-41e3-b15d-6f780d856ab4",
+        "title": "Empty Clip",
+        "releaseDate": "2026-06-19",
+        "sourceUrl": "https://musicbrainz.org/release-group/3a62f554-ae74-41e3-b15d-6f780d856ab4",
+        "officialReleaseVerified": true
+      },
+      {
+        "id": "02a7db19-61e9-458d-ab25-dceef09c61f2",
+        "title": "Fully Loaded",
+        "releaseDate": "2026-04-01",
+        "sourceUrl": "https://musicbrainz.org/release-group/02a7db19-61e9-458d-ab25-dceef09c61f2",
+        "officialReleaseVerified": true
+      }
+    ],
+    "catalogueComplete": true
+  },
+  "chief-keef": {
+    "name": "Chief Keef",
+    "searchName": "Chief Keef",
+    "aliases": [],
+    "verifiedAt": "2026-10-14",
+    "sources": [
+      "https://musicbrainz.org/artist/9118f524-be76-4eaf-875c-ccf15e2a2ad6",
+      "https://www.youtube.com/channel/UC0032Wkd3aCT4rRi1YOV3gQ",
+      "https://www.wikidata.org/wiki/Q127362"
+    ],
+    "externalIds": {
+      "spotifyId": "15iVAtD3s3FsQR4w1v6M0P",
+      "youtubeChannelId": "UC0032Wkd3aCT4rRi1YOV3gQ",
+      "musicbrainzId": "9118f524-be76-4eaf-875c-ccf15e2a2ad6",
+      "wikipediaArticleTitle": "Chief Keef"
+    },
+    "releases": [
+      {
+        "id": "63e5f1b2-93a6-4eb5-b6e5-76932c999021",
+        "title": "Skeletor",
+        "releaseDate": "2026-03-26",
+        "sourceUrl": "https://musicbrainz.org/release-group/63e5f1b2-93a6-4eb5-b6e5-76932c999021",
+        "officialReleaseVerified": true
+      },
+      {
+        "id": "6232bcb9-4179-4216-b316-f1a922a10a22",
+        "title": "Almighty So 2",
+        "releaseDate": "2024-05-10",
+        "sourceUrl": "https://musicbrainz.org/release-group/6232bcb9-4179-4216-b316-f1a922a10a22",
+        "officialReleaseVerified": true
+      }
+    ],
+    "catalogueComplete": true
+  },
+  "dababy": {
+    "name": "DaBaby",
+    "searchName": "DaBaby",
+    "aliases": [],
+    "verifiedAt": "2026-10-14",
+    "sources": [
+      "https://musicbrainz.org/artist/87ae83df-6173-40cc-a0f2-bad543faa6aa",
+      "https://www.youtube.com/channel/UC2CCXzC56k0b8L49R_iW-Yw",
+      "https://www.wikidata.org/wiki/Q62107457"
+    ],
+    "externalIds": {
+      "spotifyId": "4r63FhuTkUYltbVAg5TQnk",
+      "youtubeChannelId": "UC2CCXzC56k0b8L49R_iW-Yw",
+      "musicbrainzId": "87ae83df-6173-40cc-a0f2-bad543faa6aa",
+      "wikipediaArticleTitle": "DaBaby"
+    },
+    "releases": [
+      {
+        "id": "7c7c827e-b741-4d75-9ab5-227bae712b58",
+        "title": "BE MORE GRATEFUL",
+        "releaseDate": "2026-01-30",
+        "sourceUrl": "https://musicbrainz.org/release-group/7c7c827e-b741-4d75-9ab5-227bae712b58",
+        "officialReleaseVerified": true
+      },
+      {
+        "id": "694b6713-5645-42a3-a0a9-90d11f075134",
+        "title": "KIRK FRANKLIN",
+        "releaseDate": "2025-12-26",
+        "sourceUrl": "https://musicbrainz.org/release-group/694b6713-5645-42a3-a0a9-90d11f075134",
+        "officialReleaseVerified": true
+      }
+    ],
+    "catalogueComplete": true
+  },
+  "dc-the-don": {
+    "name": "DC The Don",
+    "searchName": "DC The Don",
+    "aliases": [],
+    "verifiedAt": "2026-10-14",
+    "sources": [
+      "https://musicbrainz.org/artist/eec466a4-aec6-42ea-ab35-20416e502b9d",
+      "https://www.youtube.com/channel/UChlOsnwkarBH-srYGJnh46w",
+      "https://www.wikidata.org/wiki/Q114857113"
+    ],
+    "externalIds": {
+      "spotifyId": "3YYbAExunnHv5pW7GUZefk",
+      "youtubeChannelId": "UChlOsnwkarBH-srYGJnh46w",
+      "musicbrainzId": "eec466a4-aec6-42ea-ab35-20416e502b9d",
+      "wikipediaArticleTitle": "DC the Don"
+    },
+    "releases": [
+      {
+        "id": "aef95956-40c5-4bbc-896e-1b25c1f0779b",
+        "title": "the rumors are true",
+        "releaseDate": "2026-02-27",
+        "sourceUrl": "https://musicbrainz.org/release-group/aef95956-40c5-4bbc-896e-1b25c1f0779b",
+        "officialReleaseVerified": true
+      },
+      {
+        "id": "13d7b9f0-790b-4fcf-a657-0caed8a67987",
+        "title": "REBIRTH",
+        "releaseDate": "2024-10-23",
+        "sourceUrl": "https://musicbrainz.org/release-group/13d7b9f0-790b-4fcf-a657-0caed8a67987",
+        "officialReleaseVerified": true
+      }
+    ],
+    "catalogueComplete": true
+  },
+  "denzel-curry": {
+    "name": "Denzel Curry",
+    "searchName": "Denzel Curry",
+    "aliases": [],
+    "verifiedAt": "2026-10-14",
+    "sources": [
+      "https://musicbrainz.org/artist/5f95440d-7737-4a36-9bcf-c05337f7129b",
+      "https://www.youtube.com/channel/UCiKxNv_MHAShqT2lATxG_Wg",
+      "https://www.wikidata.org/wiki/Q17517049"
+    ],
+    "externalIds": {
+      "spotifyId": "6fxyWrfmjcbj5d12gXeiNV",
+      "youtubeChannelId": "UCiKxNv_MHAShqT2lATxG_Wg",
+      "musicbrainzId": "5f95440d-7737-4a36-9bcf-c05337f7129b",
+      "wikipediaArticleTitle": "Denzel Curry"
+    },
+    "releases": [
+      {
+        "id": "a4ea9974-cd74-429a-b961-bba9c46bd62f",
+        "title": "ii",
+        "releaseDate": "2026-08-21",
+        "sourceUrl": "https://musicbrainz.org/release-group/a4ea9974-cd74-429a-b961-bba9c46bd62f",
+        "officialReleaseVerified": true
+      },
+      {
+        "id": "4a4cab84-403d-48be-851a-354beae418f4",
+        "title": "Strictly 4 the Scythe",
+        "releaseDate": "2026-03-06",
+        "sourceUrl": "https://musicbrainz.org/release-group/4a4cab84-403d-48be-851a-354beae418f4",
+        "officialReleaseVerified": true
+      }
+    ],
+    "catalogueComplete": true
+  },
+  "destroy-lonely": {
+    "name": "Destroy Lonely",
+    "searchName": "Destroy Lonely",
+    "aliases": [],
+    "verifiedAt": "2026-10-14",
+    "sources": [
+      "https://musicbrainz.org/artist/987d3d86-0d7a-4292-ae96-a8d59e456436",
+      "https://www.youtube.com/channel/UCylvCifeaY7gi1zjhRfpcMg",
+      "https://www.wikidata.org/wiki/Q113510276"
+    ],
+    "externalIds": {
+      "spotifyId": "1HPW4jeRjXBFRoUnSvBzoD",
+      "youtubeChannelId": "UCylvCifeaY7gi1zjhRfpcMg",
+      "musicbrainzId": "987d3d86-0d7a-4292-ae96-a8d59e456436",
+      "wikipediaArticleTitle": "Destroy Lonely"
+    },
+    "releases": [
+      {
+        "id": "103a946b-f276-4aee-bce1-8d277fe321a5",
+        "title": "</3³",
+        "releaseDate": "2025-09-19",
+        "sourceUrl": "https://musicbrainz.org/release-group/103a946b-f276-4aee-bce1-8d277fe321a5",
+        "officialReleaseVerified": true
+      },
+      {
+        "id": "69291a8e-d29c-4c9b-875a-5bbc1604c758",
+        "title": "see u soon </3",
+        "releaseDate": "2025-06-05",
+        "sourceUrl": "https://musicbrainz.org/release-group/69291a8e-d29c-4c9b-875a-5bbc1604c758",
+        "officialReleaseVerified": true
+      }
+    ],
+    "catalogueComplete": true
+  },
+  "doechii": {
+    "name": "Doechii",
+    "searchName": "Doechii",
+    "aliases": [],
+    "verifiedAt": "2026-10-14",
+    "sources": [
+      "https://musicbrainz.org/artist/9f75277c-b283-4846-ac8c-f932255cd0ac",
+      "https://www.youtube.com/channel/UCksiqtuWYtN2YluvAQnV2dQ",
+      "https://www.wikidata.org/wiki/Q106629186"
+    ],
+    "externalIds": {
+      "spotifyId": "4E2rKHVDssGJm2SCDOMMJB",
+      "youtubeChannelId": "UCksiqtuWYtN2YluvAQnV2dQ",
+      "musicbrainzId": "9f75277c-b283-4846-ac8c-f932255cd0ac",
+      "wikipediaArticleTitle": "Doechii"
+    },
+    "releases": [
+      {
+        "id": "2b837d13-b456-4c0c-98d6-afe4aeda417b",
+        "title": "Alligator Bites Never Heal",
+        "releaseDate": "2024-08-30",
+        "sourceUrl": "https://musicbrainz.org/release-group/2b837d13-b456-4c0c-98d6-afe4aeda417b",
+        "officialReleaseVerified": true
+      },
+      {
+        "id": "f8b99381-0e86-495f-86ca-1201192911fc",
+        "title": "she / her / black bitch",
+        "releaseDate": "2022-08-05",
+        "sourceUrl": "https://musicbrainz.org/release-group/f8b99381-0e86-495f-86ca-1201192911fc",
+        "officialReleaseVerified": true
+      }
+    ],
+    "catalogueComplete": true
+  },
+  "doja-cat": {
+    "name": "Doja Cat",
+    "searchName": "Doja Cat",
+    "aliases": [],
+    "verifiedAt": "2026-10-14",
+    "sources": [
+      "https://musicbrainz.org/artist/5df62a88-cac9-490a-b62c-c7c88f4020f4",
+      "https://www.youtube.com/channel/UCzpl23pGTHVYqvKsgY0A-_w",
+      "https://www.wikidata.org/wiki/Q51120673"
+    ],
+    "externalIds": {
+      "spotifyId": "5cj0lLjcoR7YOSnhnX0Po5",
+      "youtubeChannelId": "UCzpl23pGTHVYqvKsgY0A-_w",
+      "musicbrainzId": "5df62a88-cac9-490a-b62c-c7c88f4020f4",
+      "wikipediaArticleTitle": "Doja Cat"
+    },
+    "releases": [
+      {
+        "id": "cf6e7477-2b23-4aab-930a-53eed6a3bc68",
+        "title": "Vie",
+        "releaseDate": "2025-09-26",
+        "sourceUrl": "https://musicbrainz.org/release-group/cf6e7477-2b23-4aab-930a-53eed6a3bc68",
+        "officialReleaseVerified": true
+      },
+      {
+        "id": "77434d0b-1c5f-48c3-8694-050cb378ebd2",
+        "title": "Scarlet",
+        "releaseDate": "2023-09-22",
+        "sourceUrl": "https://musicbrainz.org/release-group/77434d0b-1c5f-48c3-8694-050cb378ebd2",
+        "officialReleaseVerified": true
+      }
+    ],
+    "catalogueComplete": true
+  },
+  "don-toliver": {
+    "name": "Don Toliver",
+    "searchName": "Don Toliver",
+    "aliases": [],
+    "verifiedAt": "2026-10-14",
+    "sources": [
+      "https://musicbrainz.org/artist/a0723a3c-4135-438e-85c5-012712144ede",
+      "https://www.youtube.com/channel/UCgT01FILdWB9BsXBXKjpQ7A",
+      "https://www.wikidata.org/wiki/Q56513383"
+    ],
+    "externalIds": {
+      "spotifyId": "4Gso3d4CscCijv0lmajZWs",
+      "youtubeChannelId": "UCgT01FILdWB9BsXBXKjpQ7A",
+      "musicbrainzId": "a0723a3c-4135-438e-85c5-012712144ede",
+      "wikipediaArticleTitle": "Don Toliver"
+    },
+    "releases": [
+      {
+        "id": "25b63144-8711-47ba-b989-0a5cde590abc",
+        "title": "OCTANE",
+        "releaseDate": "2026-01-29",
+        "sourceUrl": "https://musicbrainz.org/release-group/25b63144-8711-47ba-b989-0a5cde590abc",
+        "officialReleaseVerified": true
+      },
+      {
+        "id": "a9e7b811-5900-4398-af60-6db7ef02b536",
+        "title": "HARDSTONE PSYCHO",
+        "releaseDate": "2024-06-14",
+        "sourceUrl": "https://musicbrainz.org/release-group/a9e7b811-5900-4398-af60-6db7ef02b536",
+        "officialReleaseVerified": true
+      }
+    ],
+    "catalogueComplete": true
+  },
+  "drake": {
+    "name": "Drake",
+    "searchName": "Drake",
+    "aliases": [],
+    "verifiedAt": "2026-10-14",
+    "sources": [
+      "https://musicbrainz.org/artist/9fff2f8a-21e6-47de-a2b8-7f449929d43f",
+      "https://www.youtube.com/channel/UCByOQJjav0CUDwxCk-jVNRQ",
+      "https://www.wikidata.org/wiki/Q33240"
+    ],
+    "externalIds": {
+      "spotifyId": "3TVXtAsR1Inumwj472S9r4",
+      "youtubeChannelId": "UCByOQJjav0CUDwxCk-jVNRQ",
+      "musicbrainzId": "9fff2f8a-21e6-47de-a2b8-7f449929d43f",
+      "wikipediaArticleTitle": "Drake (musician)"
+    },
+    "releases": [
+      {
+        "id": "34009a25-def9-4e37-b3be-803b154902c0",
+        "title": "ICEMAN",
+        "releaseDate": "2026-05-15",
+        "sourceUrl": "https://musicbrainz.org/release-group/34009a25-def9-4e37-b3be-803b154902c0",
+        "officialReleaseVerified": true
+      }
+    ],
+    "catalogueComplete": true
+  },
+  "eminem": {
+    "name": "Eminem",
+    "searchName": "Eminem",
+    "aliases": [
+      "Slim Shady"
+    ],
+    "verifiedAt": "2026-10-14",
+    "sources": [
+      "https://musicbrainz.org/artist/b95ce3ff-3d05-4e87-9e01-c97b66af13d4",
+      "https://www.youtube.com/channel/UCfM3zsQsOnfWNUppiycmBuw",
+      "https://www.wikidata.org/wiki/Q5608"
+    ],
+    "externalIds": {
+      "spotifyId": "7dGJo4pcD2V6oG8kP0tJRR",
+      "youtubeChannelId": "UCfM3zsQsOnfWNUppiycmBuw",
+      "musicbrainzId": "b95ce3ff-3d05-4e87-9e01-c97b66af13d4",
+      "wikipediaArticleTitle": "Eminem"
+    },
+    "releases": [
+      {
+        "id": "7d8c5624-7c04-4d82-85ea-7adb00f55e8e",
+        "title": "STANS: The Official Soundtrack",
+        "releaseDate": "2025-08-25",
+        "sourceUrl": "https://musicbrainz.org/release-group/7d8c5624-7c04-4d82-85ea-7adb00f55e8e",
+        "officialReleaseVerified": true
+      },
+      {
+        "id": "3ec8da7f-a4c3-4951-a967-334321a24342",
+        "title": "The Death of Slim Shady (Coup de Grâce)",
+        "releaseDate": "2024-07-12",
+        "sourceUrl": "https://musicbrainz.org/release-group/3ec8da7f-a4c3-4951-a967-334321a24342",
+        "officialReleaseVerified": true
+      }
+    ],
+    "catalogueComplete": false
+  },
+  "esdeekid": {
+    "name": "EsDeeKid",
+    "searchName": "EsDeeKid",
+    "aliases": [],
+    "verifiedAt": "2026-10-14",
+    "sources": [
+      "https://musicbrainz.org/artist/3d253cbd-fb66-4752-a8d1-f9b0db75bcea",
+      "https://www.youtube.com/channel/UC8jLPGsRRCTaK-PAWIfCrpg",
+      "https://www.wikidata.org/wiki/Q136490481"
+    ],
+    "externalIds": {
+      "spotifyId": "0EyhkwP3UnwGFBy6xwKjSy",
+      "youtubeChannelId": "UC8jLPGsRRCTaK-PAWIfCrpg",
+      "musicbrainzId": "3d253cbd-fb66-4752-a8d1-f9b0db75bcea",
+      "wikipediaArticleTitle": "EsDeeKid"
+    },
+    "releases": [
+      {
+        "id": "d1ec3839-6213-42ea-b912-ac667fb5c245",
+        "title": "Rebel",
+        "releaseDate": "2025-06-20",
+        "sourceUrl": "https://musicbrainz.org/release-group/d1ec3839-6213-42ea-b912-ac667fb5c245",
+        "officialReleaseVerified": true
+      }
+    ],
+    "catalogueComplete": true
+  },
+  "fakemink": {
+    "name": "Fakemink",
+    "searchName": "Fakemink",
+    "aliases": [],
+    "verifiedAt": "2026-10-14",
+    "sources": [
+      "https://musicbrainz.org/artist/968847c6-2150-419d-b14b-68c672dcde99",
+      "https://www.youtube.com/channel/UCDnRK591TaPlJrHxjA1PL4A",
+      "https://www.wikidata.org/wiki/Q133460402"
+    ],
+    "externalIds": {
+      "spotifyId": "0qc4BFxcwRFZfevTck4fOi",
+      "youtubeChannelId": "UCDnRK591TaPlJrHxjA1PL4A",
+      "musicbrainzId": "968847c6-2150-419d-b14b-68c672dcde99",
+      "wikipediaArticleTitle": "Fakemink"
+    },
+    "releases": [
+      {
+        "id": "c94394a1-4be0-465c-a70f-a09367ae59ae",
+        "title": "Terrified .",
+        "releaseDate": "2026-05-22",
+        "sourceUrl": "https://musicbrainz.org/release-group/c94394a1-4be0-465c-a70f-a09367ae59ae",
+        "officialReleaseVerified": true
+      },
+      {
+        "id": "0fa58f21-bfa9-4c81-bfae-8b50c817d2a1",
+        "title": "The Boy who cried Terrified .",
+        "releaseDate": "2026-01-29",
+        "sourceUrl": "https://musicbrainz.org/release-group/0fa58f21-bfa9-4c81-bfae-8b50c817d2a1",
+        "officialReleaseVerified": true
+      }
+    ],
+    "catalogueComplete": true
+  },
+  "feng": {
+    "name": "Feng",
+    "searchName": "Feng",
+    "aliases": [],
+    "verifiedAt": "2026-10-14",
+    "sources": [
+      "https://musicbrainz.org/artist/f4428f61-f681-42b6-93c3-5f898e045c3d",
+      "https://www.youtube.com/channel/UCdNuYbFFVa9CiZ8mJOtZKyQ"
+    ],
+    "externalIds": {
+      "spotifyId": "278vNvolx8H3sQJ2hgOMnh",
+      "youtubeChannelId": "UCdNuYbFFVa9CiZ8mJOtZKyQ",
+      "musicbrainzId": "f4428f61-f681-42b6-93c3-5f898e045c3d"
+    },
+    "releases": [
+      {
+        "id": "a3d195f3-ef83-44f5-b719-03a5b62aeaa3",
+        "title": "Summer at Camp Lakepine",
+        "releaseDate": "2026-08-21",
+        "sourceUrl": "https://musicbrainz.org/release-group/a3d195f3-ef83-44f5-b719-03a5b62aeaa3",
+        "officialReleaseVerified": true
+      },
+      {
+        "id": "91744e74-5fc2-4539-ad64-e82fa00fd577",
+        "title": "Weekend Rockstar",
+        "releaseDate": "2026-02-13",
+        "sourceUrl": "https://musicbrainz.org/release-group/91744e74-5fc2-4539-ad64-e82fa00fd577",
+        "officialReleaseVerified": true
+      }
+    ],
+    "catalogueComplete": true
+  },
+  "flo-milli": {
+    "name": "Flo Milli",
+    "searchName": "Flo Milli",
+    "aliases": [],
+    "verifiedAt": "2026-10-14",
+    "sources": [
+      "https://musicbrainz.org/artist/21dab5d7-3bda-4f72-a054-6379729dcb62",
+      "https://www.youtube.com/channel/UCylw9yLlhFVX_vIdjc6DjGQ",
+      "https://www.wikidata.org/wiki/Q89352069"
+    ],
+    "externalIds": {
+      "spotifyId": "08PvCOlef4xdOr20jFSTPd",
+      "youtubeChannelId": "UCylw9yLlhFVX_vIdjc6DjGQ",
+      "musicbrainzId": "21dab5d7-3bda-4f72-a054-6379729dcb62",
+      "wikipediaArticleTitle": "Flo Milli"
+    },
+    "releases": [
+      {
+        "id": "e71cf1ba-788b-4bfa-8baa-b64a8ec56434",
+        "title": "Fine Ho, Stay",
+        "releaseDate": "2024-03-15",
+        "sourceUrl": "https://musicbrainz.org/release-group/e71cf1ba-788b-4bfa-8baa-b64a8ec56434",
+        "officialReleaseVerified": true
+      },
+      {
+        "id": "8e725c44-8e58-4caa-bb1d-36fa003db6da",
+        "title": "You Still Here, Ho ?",
+        "releaseDate": "2022-07-20",
+        "sourceUrl": "https://musicbrainz.org/release-group/8e725c44-8e58-4caa-bb1d-36fa003db6da",
+        "officialReleaseVerified": true
+      }
+    ],
+    "catalogueComplete": true
+  },
+  "future": {
+    "name": "Future",
+    "searchName": "Future",
+    "aliases": [],
+    "verifiedAt": "2026-10-14",
+    "sources": [
+      "https://musicbrainz.org/artist/48262e82-db9f-4a92-b650-dfef979b73ec",
+      "https://www.youtube.com/channel/UCSDvKdIQOwTfcyOimSi9oYA",
+      "https://www.wikidata.org/wiki/Q3445057"
+    ],
+    "externalIds": {
+      "spotifyId": "1RyvyyTE3xzB2ZywiAwp0i",
+      "youtubeChannelId": "UCSDvKdIQOwTfcyOimSi9oYA",
+      "musicbrainzId": "48262e82-db9f-4a92-b650-dfef979b73ec",
+      "wikipediaArticleTitle": "Future (rapper)"
+    },
+    "releases": [
+      {
+        "id": "b0c04158-9592-4946-bdcf-9cfe4a41da8c",
+        "title": "The Real Me",
+        "releaseDate": "2026-07-09",
+        "sourceUrl": "https://musicbrainz.org/release-group/b0c04158-9592-4946-bdcf-9cfe4a41da8c",
+        "officialReleaseVerified": true
+      },
+      {
+        "id": "3a3eab5b-7b43-44e4-b716-abbca517a72d",
+        "title": "MIXTAPE PLUTO",
+        "releaseDate": "2024-09-20",
+        "sourceUrl": "https://musicbrainz.org/release-group/3a3eab5b-7b43-44e4-b716-abbca517a72d",
+        "officialReleaseVerified": true
+      }
+    ],
+    "catalogueComplete": true
+  },
+  "g-herbo": {
+    "name": "G Herbo",
+    "searchName": "G Herbo",
+    "aliases": [
+      "Lil Herb"
+    ],
+    "verifiedAt": "2026-10-14",
+    "sources": [
+      "https://musicbrainz.org/artist/1b1f50d1-4746-468b-a6a2-7db7200d3dfc",
+      "https://www.youtube.com/channel/UCV0pIPt5HFfulonNog3cz1A",
+      "https://www.wikidata.org/wiki/Q17811716"
+    ],
+    "externalIds": {
+      "spotifyId": "5QdEbQJ3ylBnc3gsIASAT5",
+      "youtubeChannelId": "UCV0pIPt5HFfulonNog3cz1A",
+      "musicbrainzId": "1b1f50d1-4746-468b-a6a2-7db7200d3dfc",
+      "wikipediaArticleTitle": "G Herbo"
+    },
+    "releases": [
+      {
+        "id": "e5172664-5b71-4008-bda9-0d71e2e391a7",
+        "title": "Lil Herb",
+        "releaseDate": "2025-11-07",
+        "sourceUrl": "https://musicbrainz.org/release-group/e5172664-5b71-4008-bda9-0d71e2e391a7",
+        "officialReleaseVerified": true
+      },
+      {
+        "id": "283b0d4d-eae5-4a54-991a-8173e7336fb9",
+        "title": "Greatest Rapper Alive",
+        "releaseDate": "2025-04-09",
+        "sourceUrl": "https://musicbrainz.org/release-group/283b0d4d-eae5-4a54-991a-8173e7336fb9",
+        "officialReleaseVerified": true
+      }
+    ],
+    "catalogueComplete": true
+  },
+  "glorilla": {
+    "name": "GloRilla",
+    "searchName": "GloRilla",
+    "aliases": [],
+    "verifiedAt": "2026-10-14",
+    "sources": [
+      "https://musicbrainz.org/artist/2a7ef045-ca10-4cb5-8fe9-1f5d38e84bc2",
+      "https://www.youtube.com/channel/UC9bZ9eWvF0eXVqrxK9ve7Nw",
+      "https://www.wikidata.org/wiki/Q114132368"
+    ],
+    "externalIds": {
+      "spotifyId": "2qoQgPAilErOKCwE2Y8wOG",
+      "youtubeChannelId": "UC9bZ9eWvF0eXVqrxK9ve7Nw",
+      "musicbrainzId": "2a7ef045-ca10-4cb5-8fe9-1f5d38e84bc2",
+      "wikipediaArticleTitle": "GloRilla"
+    },
+    "releases": [
+      {
+        "id": "1625eb15-cfd9-43b3-80bc-9219661c3a9e",
+        "title": "GLORIOUS",
+        "releaseDate": "2024-10-11",
+        "sourceUrl": "https://musicbrainz.org/release-group/1625eb15-cfd9-43b3-80bc-9219661c3a9e",
+        "officialReleaseVerified": true
+      },
+      {
+        "id": "a9c202a0-5d4b-47a8-bce2-8e38e6c934e9",
+        "title": "Ehhthang Ehhthang",
+        "releaseDate": "2024-04-05",
+        "sourceUrl": "https://musicbrainz.org/release-group/a9c202a0-5d4b-47a8-bce2-8e38e6c934e9",
+        "officialReleaseVerified": true
+      }
+    ],
+    "catalogueComplete": true
+  },
+  "gunna": {
+    "name": "Gunna",
+    "searchName": "Gunna",
+    "aliases": [],
+    "verifiedAt": "2026-10-14",
+    "sources": [
+      "https://musicbrainz.org/artist/100b8734-f4f0-4536-9960-47f7c59d1b4c",
+      "https://www.youtube.com/channel/UCAkIMkEaa9sZmjcy7mfd5lQ",
+      "https://www.wikidata.org/wiki/Q55613105"
+    ],
+    "externalIds": {
+      "spotifyId": "2hlmm7s2ICUX0LVIhVFlZQ",
+      "youtubeChannelId": "UCAkIMkEaa9sZmjcy7mfd5lQ",
+      "musicbrainzId": "100b8734-f4f0-4536-9960-47f7c59d1b4c",
+      "wikipediaArticleTitle": "Gunna (rapper)"
+    },
+    "releases": [
+      {
+        "id": "4f2d8e8d-e688-4267-ac88-27a5ebdb6f32",
+        "title": "The Last Wun",
+        "releaseDate": "2025-08-07",
+        "sourceUrl": "https://musicbrainz.org/release-group/4f2d8e8d-e688-4267-ac88-27a5ebdb6f32",
+        "officialReleaseVerified": true
+      },
+      {
+        "id": "c23cfd44-b731-4b68-bf6b-40b3def0db1c",
+        "title": "One of Wun",
+        "releaseDate": "2024-05-10",
+        "sourceUrl": "https://musicbrainz.org/release-group/c23cfd44-b731-4b68-bf6b-40b3def0db1c",
+        "officialReleaseVerified": true
+      }
+    ],
+    "catalogueComplete": true
+  },
+  "hurricane-wisdom": {
+    "name": "Hurricane Wisdom",
+    "searchName": "Hurricane Wisdom",
+    "aliases": [],
+    "verifiedAt": "2026-10-14",
+    "sources": [
+      "https://musicbrainz.org/artist/bf133b83-6cbd-4cf0-bda1-f2ad3bf24e23",
+      "https://www.youtube.com/channel/UC-tAx6tWF3x-7COrjnpV4Zg"
+    ],
+    "externalIds": {
+      "spotifyId": "4PooHx6BstbetDtBMrLyV7",
+      "youtubeChannelId": "UC-tAx6tWF3x-7COrjnpV4Zg",
+      "musicbrainzId": "bf133b83-6cbd-4cf0-bda1-f2ad3bf24e23"
+    },
+    "releases": [
+      {
+        "id": "b6a38369-4632-492f-b8df-6183cc9a36b6",
+        "title": "Weathering The World",
+        "releaseDate": "2026-08-07",
+        "sourceUrl": "https://musicbrainz.org/release-group/b6a38369-4632-492f-b8df-6183cc9a36b6",
+        "officialReleaseVerified": true
+      },
+      {
+        "id": "e2a9b294-2a44-4f5d-a309-b86eb0f2900e",
+        "title": "Perfect Storm: Sorry 4 The Rain",
+        "releaseDate": "2025-10-17",
+        "sourceUrl": "https://musicbrainz.org/release-group/e2a9b294-2a44-4f5d-a309-b86eb0f2900e",
+        "officialReleaseVerified": true
+      }
+    ],
+    "catalogueComplete": true
+  },
+  "ian": {
+    "name": "ian",
+    "searchName": "ian",
+    "aliases": [],
+    "verifiedAt": "2026-10-14",
+    "sources": [
+      "https://musicbrainz.org/artist/b137ece2-979f-494a-b423-10f894092891",
+      "https://www.youtube.com/channel/UCIKrsCc3hmgBOEjT9GKQZlg"
+    ],
+    "externalIds": {
+      "spotifyId": "23hzc59PkIUau13dqXx5Ef",
+      "youtubeChannelId": "UCIKrsCc3hmgBOEjT9GKQZlg",
+      "musicbrainzId": "b137ece2-979f-494a-b423-10f894092891"
+    },
+    "releases": [
+      {
+        "id": "0045ac3a-a2df-4d13-b35b-e21842e9693d",
+        "title": "2005",
+        "releaseDate": "2025-10-24",
+        "sourceUrl": "https://musicbrainz.org/release-group/0045ac3a-a2df-4d13-b35b-e21842e9693d",
+        "officialReleaseVerified": true
+      },
+      {
+        "id": "6147adca-7fe1-459c-b7ad-8d23c0eff28d",
+        "title": "Goodbye Horses",
+        "releaseDate": "2024-10-18",
+        "sourceUrl": "https://musicbrainz.org/release-group/6147adca-7fe1-459c-b7ad-8d23c0eff28d",
+        "officialReleaseVerified": true
+      }
+    ],
+    "catalogueComplete": true
+  },
+  "ice-spice": {
+    "name": "Ice Spice",
+    "searchName": "Ice Spice",
+    "aliases": [],
+    "verifiedAt": "2026-10-14",
+    "sources": [
+      "https://musicbrainz.org/artist/6f2c949d-9540-4421-bf02-27ae27e00e33",
+      "https://www.youtube.com/channel/UCJTqwQj5iTHYrko04PbGI9w",
+      "https://www.wikidata.org/wiki/Q114114977"
+    ],
+    "externalIds": {
+      "spotifyId": "3LZZPxNDGDFVSIPqf4JuEf",
+      "youtubeChannelId": "UCJTqwQj5iTHYrko04PbGI9w",
+      "musicbrainzId": "6f2c949d-9540-4421-bf02-27ae27e00e33",
+      "wikipediaArticleTitle": "Ice Spice"
+    },
+    "releases": [
+      {
+        "id": "1aebe4a3-8a4c-4360-bd11-05c33e27a565",
+        "title": "Out My Face (My Baby)",
+        "releaseDate": "2026-08-27",
+        "sourceUrl": "https://musicbrainz.org/release-group/1aebe4a3-8a4c-4360-bd11-05c33e27a565",
+        "officialReleaseVerified": true
+      },
+      {
+        "id": "cb0ee2dc-3b27-49d5-9de8-cccaee96b3bc",
+        "title": "Y2K!",
+        "releaseDate": "2024-07-26",
+        "sourceUrl": "https://musicbrainz.org/release-group/cb0ee2dc-3b27-49d5-9de8-cccaee96b3bc",
+        "officialReleaseVerified": true
+      }
+    ],
+    "catalogueComplete": true
+  },
+  "j-cole": {
+    "name": "J. Cole",
+    "searchName": "J. Cole",
+    "aliases": [],
+    "verifiedAt": "2026-10-14",
+    "sources": [
+      "https://musicbrainz.org/artist/875203e1-8e58-4b86-8dcb-7190faf411c5",
+      "https://www.youtube.com/channel/UCnc6db-y3IU7CkT_yeVXdVg",
+      "https://www.wikidata.org/wiki/Q204018"
+    ],
+    "externalIds": {
+      "spotifyId": "6l3HvQ5sa6mXTsMTB19rO5",
+      "youtubeChannelId": "UCnc6db-y3IU7CkT_yeVXdVg",
+      "musicbrainzId": "875203e1-8e58-4b86-8dcb-7190faf411c5",
+      "wikipediaArticleTitle": "J. Cole"
+    },
+    "releases": [
+      {
+        "id": "e3f03ef0-79a1-4636-8266-5d19f214fc37",
+        "title": "The Fall‐Off",
+        "releaseDate": "2026-02-06",
+        "sourceUrl": "https://musicbrainz.org/release-group/e3f03ef0-79a1-4636-8266-5d19f214fc37",
+        "officialReleaseVerified": true
+      },
+      {
+        "id": "66eeec4f-e0d9-47ce-98c8-053e6ae12c65",
+        "title": "Birthday Blizzard ’26",
+        "releaseDate": "2026-01-27",
+        "sourceUrl": "https://musicbrainz.org/release-group/66eeec4f-e0d9-47ce-98c8-053e6ae12c65",
+        "officialReleaseVerified": true
+      }
+    ],
+    "catalogueComplete": true
+  },
+  "jay-z": {
+    "name": "Jay-Z",
+    "searchName": "Jay-Z",
+    "aliases": [
+      "Jay Z",
+      "Jayz",
+      "Hova",
+      "JAY Z",
+      "JAY:Z",
+      "jay z"
+    ],
+    "verifiedAt": "2026-10-14",
+    "sources": [
+      "https://musicbrainz.org/artist/f82bcf78-5b69-4622-a5ef-73800768d9ac",
+      "https://www.youtube.com/channel/UCN-sc1xJr-QQNj_uNIM9wTA",
+      "https://www.wikidata.org/wiki/Q62766"
+    ],
+    "externalIds": {
+      "spotifyId": "3nFkdlSjzX9mRTtwJOzDYB",
+      "youtubeChannelId": "UCN-sc1xJr-QQNj_uNIM9wTA",
+      "musicbrainzId": "f82bcf78-5b69-4622-a5ef-73800768d9ac",
+      "wikipediaArticleTitle": "Jay-Z"
+    },
+    "releases": [
+      {
+        "id": "aa35dd3d-b629-4a5f-abe9-a8463f80b37e",
+        "title": "4:44",
+        "releaseDate": "2017-06-30",
+        "sourceUrl": "https://musicbrainz.org/release-group/aa35dd3d-b629-4a5f-abe9-a8463f80b37e",
+        "officialReleaseVerified": true
+      },
+      {
+        "id": "5b11f1d7-31ca-4e92-98db-15f002ac0f61",
+        "title": "The Black Gangster",
+        "releaseDate": "2015-02-11",
+        "sourceUrl": "https://musicbrainz.org/release-group/5b11f1d7-31ca-4e92-98db-15f002ac0f61",
+        "officialReleaseVerified": true
+      }
+    ],
+    "catalogueComplete": true
+  },
+  "jid": {
+    "name": "JID",
+    "searchName": "JID",
+    "aliases": [
+      "J.I.D"
+    ],
+    "verifiedAt": "2026-10-14",
+    "sources": [
+      "https://musicbrainz.org/artist/d616b606-cf6a-4b6e-ab0f-e253b8db6610",
+      "https://www.youtube.com/channel/UC3WIRbOw46MsbycRc1N5x4g",
+      "https://www.wikidata.org/wiki/Q29588830"
+    ],
+    "externalIds": {
+      "spotifyId": "6U3ybJ9UHNKEdsH7ktGBZ7",
+      "youtubeChannelId": "UC3WIRbOw46MsbycRc1N5x4g",
+      "musicbrainzId": "d616b606-cf6a-4b6e-ab0f-e253b8db6610",
+      "wikipediaArticleTitle": "JID"
+    },
+    "releases": [
+      {
+        "id": "a9ba4443-7ba3-4c46-a568-651eb8dd7139",
+        "title": "Bodies Floor Pack",
+        "releaseDate": "2025-10-03",
+        "sourceUrl": "https://musicbrainz.org/release-group/a9ba4443-7ba3-4c46-a568-651eb8dd7139",
+        "officialReleaseVerified": true
+      },
+      {
+        "id": "577228d1-b5db-45b8-a081-1ee78ee87d60",
+        "title": "God Does Like Ugly",
+        "releaseDate": "2025-08-08",
+        "sourceUrl": "https://musicbrainz.org/release-group/577228d1-b5db-45b8-a081-1ee78ee87d60",
+        "officialReleaseVerified": true
+      }
+    ],
+    "catalogueComplete": true
+  },
+  "ken-carson": {
+    "name": "Ken Carson",
+    "searchName": "Ken Carson",
+    "aliases": [],
+    "verifiedAt": "2026-10-14",
+    "sources": [
+      "https://musicbrainz.org/artist/860d7dc2-618d-437e-a3bb-7b91c2d40095",
+      "https://www.youtube.com/channel/UCtjO8cix9XxwOcAv6nww-TQ",
+      "https://www.wikidata.org/wiki/Q114050700"
+    ],
+    "externalIds": {
+      "spotifyId": "3gBZUcNeVumkeeJ19CY2sX",
+      "youtubeChannelId": "UCtjO8cix9XxwOcAv6nww-TQ",
+      "musicbrainzId": "860d7dc2-618d-437e-a3bb-7b91c2d40095",
+      "wikipediaArticleTitle": "Ken Carson"
+    },
+    "releases": [
+      {
+        "id": "37d75ada-161b-4acb-a6c2-4250e4202644",
+        "title": "cartunez",
+        "releaseDate": "2026-08-27",
+        "sourceUrl": "https://musicbrainz.org/release-group/37d75ada-161b-4acb-a6c2-4250e4202644",
+        "officialReleaseVerified": true
+      },
+      {
+        "id": "27257f34-0756-4a84-b267-2801e333c1d2",
+        "title": "xperiment",
+        "releaseDate": "2026-07-03",
+        "sourceUrl": "https://musicbrainz.org/release-group/27257f34-0756-4a84-b267-2801e333c1d2",
+        "officialReleaseVerified": true
+      }
+    ],
+    "catalogueComplete": true
+  },
+  "kendrick-lamar": {
+    "name": "Kendrick Lamar",
+    "searchName": "Kendrick Lamar",
+    "aliases": [],
+    "verifiedAt": "2026-10-14",
+    "sources": [
+      "https://musicbrainz.org/artist/381086ea-f511-4aba-bdf9-71c753dc5077",
+      "https://www.youtube.com/channel/UC3lBXcrKFnFAFkfVk5WuKcQ",
+      "https://www.wikidata.org/wiki/Q130798"
+    ],
+    "externalIds": {
+      "spotifyId": "2YZyLoL8N0Wb9xBt1NhZWg",
+      "youtubeChannelId": "UC3lBXcrKFnFAFkfVk5WuKcQ",
+      "musicbrainzId": "381086ea-f511-4aba-bdf9-71c753dc5077",
+      "wikipediaArticleTitle": "Kendrick Lamar"
+    },
+    "releases": [
+      {
+        "id": "32cb822c-a14e-49ce-a169-f209c5f31e0f",
+        "title": "GNX",
+        "releaseDate": "2024-11-22",
+        "sourceUrl": "https://musicbrainz.org/release-group/32cb822c-a14e-49ce-a169-f209c5f31e0f",
+        "officialReleaseVerified": true
+      },
+      {
+        "id": "6bd70eee-bd46-4738-851a-f50c19d8d6db",
+        "title": "Mr. Morale & the Big Steppers",
+        "releaseDate": "2022-05-13",
+        "sourceUrl": "https://musicbrainz.org/release-group/6bd70eee-bd46-4738-851a-f50c19d8d6db",
+        "officialReleaseVerified": true
+      }
+    ],
+    "catalogueComplete": true
+  },
+  "key-glock": {
+    "name": "Key Glock",
+    "searchName": "Key Glock",
+    "aliases": [],
+    "verifiedAt": "2026-10-14",
+    "sources": [
+      "https://musicbrainz.org/artist/c5460e21-d5e7-4e26-ab4c-ba9c627809f8",
+      "https://www.youtube.com/channel/UCwd1Np7iEDPBHIKo4evtZtA",
+      "https://www.wikidata.org/wiki/Q70235526"
+    ],
+    "externalIds": {
+      "spotifyId": "0RESbWvOMyua0yuyVrztJ5",
+      "youtubeChannelId": "UCwd1Np7iEDPBHIKo4evtZtA",
+      "musicbrainzId": "c5460e21-d5e7-4e26-ab4c-ba9c627809f8",
+      "wikipediaArticleTitle": "Key Glock"
+    },
+    "releases": [
+      {
+        "id": "c6dffab0-4acc-4a3d-9c1d-731587d381ef",
+        "title": "PROJECT X",
+        "releaseDate": "2026-06-19",
+        "sourceUrl": "https://musicbrainz.org/release-group/c6dffab0-4acc-4a3d-9c1d-731587d381ef",
+        "officialReleaseVerified": true
+      },
+      {
+        "id": "e6a1044f-b0c1-4898-8d9c-58ca539a2f7c",
+        "title": "Glockaveli: All Eyez On Key",
+        "releaseDate": "2025-08-29",
+        "sourceUrl": "https://musicbrainz.org/release-group/e6a1044f-b0c1-4898-8d9c-58ca539a2f7c",
+        "officialReleaseVerified": true
+      }
+    ],
+    "catalogueComplete": true
+  },
+  "kodak-black": {
+    "name": "Kodak Black",
+    "searchName": "Kodak Black",
+    "aliases": [],
+    "verifiedAt": "2026-10-14",
+    "sources": [
+      "https://musicbrainz.org/artist/5ec1ecc6-4535-4911-a27a-e26343f4a189",
+      "https://www.youtube.com/channel/UChEYVadfkMCfrKUi6qr3I1Q",
+      "https://www.wikidata.org/wiki/Q22005867"
+    ],
+    "externalIds": {
+      "spotifyId": "46SHBwWsqBkxI7EeeBEQG7",
+      "youtubeChannelId": "UChEYVadfkMCfrKUi6qr3I1Q",
+      "musicbrainzId": "5ec1ecc6-4535-4911-a27a-e26343f4a189",
+      "wikipediaArticleTitle": "Kodak Black"
+    },
+    "releases": [
+      {
+        "id": "888c52d2-77f1-482c-8bc1-287b49f7e8cb",
+        "title": "Kodak The Blessing",
+        "releaseDate": "2026-06-12",
+        "sourceUrl": "https://musicbrainz.org/release-group/888c52d2-77f1-482c-8bc1-287b49f7e8cb",
+        "officialReleaseVerified": true
+      },
+      {
+        "id": "29768736-cf39-467b-a7d5-d532beaf703e",
+        "title": "Just Getting Started",
+        "releaseDate": "2025-10-31",
+        "sourceUrl": "https://musicbrainz.org/release-group/29768736-cf39-467b-a7d5-d532beaf703e",
+        "officialReleaseVerified": true
+      }
+    ],
+    "catalogueComplete": true
+  },
+  "latto": {
+    "name": "Latto",
+    "searchName": "Latto",
+    "aliases": [
+      "Mulatto",
+      "Big Latto"
+    ],
+    "verifiedAt": "2026-10-14",
+    "sources": [
+      "https://musicbrainz.org/artist/355cc194-b8db-4af2-8678-c7ad54213f4b",
+      "https://www.youtube.com/channel/UCRQ6wJbGwbF9Wmvp5HfT7Pg",
+      "https://www.wikidata.org/wiki/Q65029930"
+    ],
+    "externalIds": {
+      "spotifyId": "3MdXrJWsbVzdn6fe5JYkSQ",
+      "youtubeChannelId": "UCRQ6wJbGwbF9Wmvp5HfT7Pg",
+      "musicbrainzId": "355cc194-b8db-4af2-8678-c7ad54213f4b",
+      "wikipediaArticleTitle": "Latto"
+    },
+    "releases": [
+      {
+        "id": "b4736e99-5be8-44ec-b037-438d86c6c14e",
+        "title": "BIG MAMA",
+        "releaseDate": "2026-05-29",
+        "sourceUrl": "https://musicbrainz.org/release-group/b4736e99-5be8-44ec-b037-438d86c6c14e",
+        "officialReleaseVerified": true
+      },
+      {
+        "id": "97b4a15f-07a6-49a6-8df8-759bc6f810db",
+        "title": "Sugar Honey Iced Tea",
+        "releaseDate": "2024-08-09",
+        "sourceUrl": "https://musicbrainz.org/release-group/97b4a15f-07a6-49a6-8df8-759bc6f810db",
+        "officialReleaseVerified": true
+      }
+    ],
+    "catalogueComplete": true
+  },
+  "lazerdim700": {
+    "name": "Lazer Dim 700",
+    "searchName": "Lazer Dim 700",
+    "aliases": [],
+    "verifiedAt": "2026-10-14",
+    "sources": [
+      "https://musicbrainz.org/artist/95b0d5b3-2815-4ffc-9bfe-2ace8300b463",
+      "https://www.youtube.com/channel/UCZ7a7F6FGMZyRisnXuSazCA"
+    ],
+    "externalIds": {
+      "spotifyId": "3CE6MgsLpKMDfYFtexgc8U",
+      "youtubeChannelId": "UCZ7a7F6FGMZyRisnXuSazCA",
+      "musicbrainzId": "95b0d5b3-2815-4ffc-9bfe-2ace8300b463"
+    },
+    "releases": [
+      {
+        "id": "2953339d-8705-47f7-903f-90f4b36d44ca",
+        "title": "DOE IN music vol 1.",
+        "releaseDate": "2025-12-31",
+        "sourceUrl": "https://musicbrainz.org/release-group/2953339d-8705-47f7-903f-90f4b36d44ca",
+        "officialReleaseVerified": true
+      },
+      {
+        "id": "bb612a5d-08b2-46d6-8753-d35bcacfce80",
+        "title": "Fwaygo",
+        "releaseDate": "2025-12-17",
+        "sourceUrl": "https://musicbrainz.org/release-group/bb612a5d-08b2-46d6-8753-d35bcacfce80",
+        "officialReleaseVerified": true
+      }
+    ],
+    "catalogueComplete": false
+  },
+  "lil-baby": {
+    "name": "Lil Baby",
+    "searchName": "Lil Baby",
+    "aliases": [],
+    "verifiedAt": "2026-10-14",
+    "sources": [
+      "https://musicbrainz.org/artist/d42a5768-ada1-4fb6-85fd-f61aba6264e0",
+      "https://www.youtube.com/channel/UCVS88tG_NYgxF6Udnx2815Q",
+      "https://www.wikidata.org/wiki/Q50527563"
+    ],
+    "externalIds": {
+      "spotifyId": "5f7VJjfbwm532GiveGC0ZK",
+      "youtubeChannelId": "UCVS88tG_NYgxF6Udnx2815Q",
+      "musicbrainzId": "d42a5768-ada1-4fb6-85fd-f61aba6264e0",
+      "wikipediaArticleTitle": "Lil Baby"
+    },
+    "releases": [
+      {
+        "id": "8d8e3d3c-57fa-4010-b627-1ed814b77f3d",
+        "title": "The Leaks",
+        "releaseDate": "2025-12-03",
+        "sourceUrl": "https://musicbrainz.org/release-group/8d8e3d3c-57fa-4010-b627-1ed814b77f3d",
+        "officialReleaseVerified": true
+      },
+      {
+        "id": "a19ed98e-f887-4af9-b338-4e22fd838b47",
+        "title": "WHAM",
+        "releaseDate": "2025-01-03",
+        "sourceUrl": "https://musicbrainz.org/release-group/a19ed98e-f887-4af9-b338-4e22fd838b47",
+        "officialReleaseVerified": true
+      }
+    ],
+    "catalogueComplete": true
+  },
+  "lil-durk": {
+    "name": "Lil Durk",
+    "searchName": "Lil Durk",
+    "aliases": [],
+    "verifiedAt": "2026-10-14",
+    "sources": [
+      "https://musicbrainz.org/artist/c9cd225b-4883-428e-82c2-73e0b6282fb6",
+      "https://www.youtube.com/channel/UCaxOQZrF5llUMp-JjesUz1A",
+      "https://www.wikidata.org/wiki/Q2899818"
+    ],
+    "externalIds": {
+      "spotifyId": "3hcs9uc56yIGFCSy9leWe7",
+      "youtubeChannelId": "UCaxOQZrF5llUMp-JjesUz1A",
+      "musicbrainzId": "c9cd225b-4883-428e-82c2-73e0b6282fb6",
+      "wikipediaArticleTitle": "Lil Durk"
+    },
+    "releases": [
+      {
+        "id": "1d2fcb9d-66d0-41de-8bea-238041b9fa4e",
+        "title": "Deep Thoughts",
+        "releaseDate": "2025-03-28",
+        "sourceUrl": "https://musicbrainz.org/release-group/1d2fcb9d-66d0-41de-8bea-238041b9fa4e",
+        "officialReleaseVerified": true
+      },
+      {
+        "id": "e99987ae-7993-4111-9d1a-bcdf5747ed89",
+        "title": "Almost Healed",
+        "releaseDate": "2023-05-26",
+        "sourceUrl": "https://musicbrainz.org/release-group/e99987ae-7993-4111-9d1a-bcdf5747ed89",
+        "officialReleaseVerified": true
+      }
+    ],
+    "catalogueComplete": true
+  },
+  "lil-tecca": {
+    "name": "Lil Tecca",
+    "searchName": "Lil Tecca",
+    "aliases": [],
+    "verifiedAt": "2026-10-14",
+    "sources": [
+      "https://musicbrainz.org/artist/e6fdf3f9-8077-4126-b0cf-94da9a8b627e",
+      "https://www.youtube.com/channel/UCOlxqtcKc-HBEQJgDsylyhA",
+      "https://www.wikidata.org/wiki/Q65054660"
+    ],
+    "externalIds": {
+      "spotifyId": "4Ga1P7PMIsmqEZqhYZQgDo",
+      "youtubeChannelId": "UCOlxqtcKc-HBEQJgDsylyhA",
+      "musicbrainzId": "e6fdf3f9-8077-4126-b0cf-94da9a8b627e",
+      "wikipediaArticleTitle": "Lil Tecca"
+    },
+    "releases": [
+      {
+        "id": "f961c7ad-1da9-4827-bbef-eebd355e7cd2",
+        "title": "DOPAMINE",
+        "releaseDate": "2025-06-13",
+        "sourceUrl": "https://musicbrainz.org/release-group/f961c7ad-1da9-4827-bbef-eebd355e7cd2",
+        "officialReleaseVerified": true
+      },
+      {
+        "id": "c57e3aaa-bd24-42c8-a6d2-703f61b00170",
+        "title": "TEC",
+        "releaseDate": "2023-09-22",
+        "sourceUrl": "https://musicbrainz.org/release-group/c57e3aaa-bd24-42c8-a6d2-703f61b00170",
+        "officialReleaseVerified": true
+      }
+    ],
+    "catalogueComplete": true
+  },
+  "lil-tjay": {
+    "name": "Lil Tjay",
+    "searchName": "Lil Tjay",
+    "aliases": [],
+    "verifiedAt": "2026-10-14",
+    "sources": [
+      "https://musicbrainz.org/artist/d44b92db-dd49-4636-abe8-7c381f90b7aa",
+      "https://www.youtube.com/channel/UCEB4a5o_6KfjxHwNMnmj54Q",
+      "https://www.wikidata.org/wiki/Q61670761"
+    ],
+    "externalIds": {
+      "spotifyId": "6jGMq4yGs7aQzuGsMgVgZR",
+      "youtubeChannelId": "UCEB4a5o_6KfjxHwNMnmj54Q",
+      "musicbrainzId": "d44b92db-dd49-4636-abe8-7c381f90b7aa",
+      "wikipediaArticleTitle": "Lil Tjay"
+    },
+    "releases": [
+      {
+        "id": "ed2758ed-7bf3-4af0-b1f3-988b385d29ce",
+        "title": "They Just Ain't You",
+        "releaseDate": "2026-05-01",
+        "sourceUrl": "https://musicbrainz.org/release-group/ed2758ed-7bf3-4af0-b1f3-988b385d29ce",
+        "officialReleaseVerified": true
+      },
+      {
+        "id": "c3c97560-a81d-431d-8566-67c4000abeb1",
+        "title": "Farewell",
+        "releaseDate": "2024-12-06",
+        "sourceUrl": "https://musicbrainz.org/release-group/c3c97560-a81d-431d-8566-67c4000abeb1",
+        "officialReleaseVerified": true
+      }
+    ],
+    "catalogueComplete": true
+  },
+  "lil-uzi-vert": {
+    "name": "Lil Uzi Vert",
+    "searchName": "Lil Uzi Vert",
+    "aliases": [
+      "Lil Uzi",
+      "Uzi Vert"
+    ],
+    "verifiedAt": "2026-10-14",
+    "sources": [
+      "https://musicbrainz.org/artist/8837b875-3689-4646-b3fd-d8b53815c7a8",
+      "https://www.youtube.com/channel/UCqwxMqUcL-XC3D9-fTP93Mg",
+      "https://www.wikidata.org/wiki/Q23771950"
+    ],
+    "externalIds": {
+      "spotifyId": "4O15NlyKLIASxsJ0PrXPfz",
+      "youtubeChannelId": "UCqwxMqUcL-XC3D9-fTP93Mg",
+      "musicbrainzId": "8837b875-3689-4646-b3fd-d8b53815c7a8",
+      "wikipediaArticleTitle": "Lil Uzi Vert"
+    },
+    "releases": [
+      {
+        "id": "6b2e43ef-8f5e-4a52-a581-a18281f3f92c",
+        "title": "Maverick “Almost Forever” EP",
+        "releaseDate": "2026-07-31",
+        "sourceUrl": "https://musicbrainz.org/release-group/6b2e43ef-8f5e-4a52-a581-a18281f3f92c",
+        "officialReleaseVerified": true
+      },
+      {
+        "id": "ba869de3-196f-4ccb-8458-a35912f17516",
+        "title": "Eternal Atake 2",
+        "releaseDate": "2024-11-01",
+        "sourceUrl": "https://musicbrainz.org/release-group/ba869de3-196f-4ccb-8458-a35912f17516",
+        "officialReleaseVerified": true
+      }
+    ],
+    "catalogueComplete": true
+  },
+  "lil-wayne": {
+    "name": "Lil Wayne",
+    "searchName": "Lil Wayne",
+    "aliases": [],
+    "verifiedAt": "2026-10-14",
+    "sources": [
+      "https://musicbrainz.org/artist/ac9a487a-d9d2-4f27-bb23-0f4686488345",
+      "https://www.youtube.com/channel/UCO9zJy7HWrIS3ojB4Lr7Yqw",
+      "https://www.wikidata.org/wiki/Q15615"
+    ],
+    "externalIds": {
+      "spotifyId": "55Aa2cqylxrFIXC767Z865",
+      "youtubeChannelId": "UCO9zJy7HWrIS3ojB4Lr7Yqw",
+      "musicbrainzId": "ac9a487a-d9d2-4f27-bb23-0f4686488345",
+      "wikipediaArticleTitle": "Lil Wayne"
+    },
+    "releases": [
+      {
+        "id": "85f995e2-1b87-450c-802d-784b23c94cd6",
+        "title": "Tha Carter VI",
+        "releaseDate": "2025-06-06",
+        "sourceUrl": "https://musicbrainz.org/release-group/85f995e2-1b87-450c-802d-784b23c94cd6",
+        "officialReleaseVerified": true
+      },
+      {
+        "id": "ccdf9833-7ec7-4b98-a6b0-1818c9615867",
+        "title": "Welcome 2 Collegrove",
+        "releaseDate": "2023-11-17",
+        "sourceUrl": "https://musicbrainz.org/release-group/ccdf9833-7ec7-4b98-a6b0-1818c9615867",
+        "officialReleaseVerified": true
+      }
+    ],
+    "catalogueComplete": false
+  },
+  "lil-yachty": {
+    "name": "Lil Yachty",
+    "searchName": "Lil Yachty",
+    "aliases": [],
+    "verifiedAt": "2026-10-14",
+    "sources": [
+      "https://musicbrainz.org/artist/a668565b-41b8-44a8-9d5c-8e609dbf69fc",
+      "https://www.youtube.com/channel/UC1X3TRsCt36QPjF1p5f3HTg",
+      "https://www.wikidata.org/wiki/Q23772141"
+    ],
+    "externalIds": {
+      "spotifyId": "6icQOAFXDZKsumw3YXyusw",
+      "youtubeChannelId": "UC1X3TRsCt36QPjF1p5f3HTg",
+      "musicbrainzId": "a668565b-41b8-44a8-9d5c-8e609dbf69fc",
+      "wikipediaArticleTitle": "Lil Yachty"
+    },
+    "releases": [
+      {
+        "id": "1aebe4a3-8a4c-4360-bd11-05c33e27a565",
+        "title": "Out My Face (My Baby)",
+        "releaseDate": "2026-08-27",
+        "sourceUrl": "https://musicbrainz.org/release-group/1aebe4a3-8a4c-4360-bd11-05c33e27a565",
+        "officialReleaseVerified": true
+      },
+      {
+        "id": "aaac76ca-98dd-44de-89bf-984bee760309",
+        "title": "Bad Cameo",
+        "releaseDate": "2024-06-28",
+        "sourceUrl": "https://musicbrainz.org/release-group/aaac76ca-98dd-44de-89bf-984bee760309",
+        "officialReleaseVerified": true
+      }
+    ],
+    "catalogueComplete": true
+  },
+  "loe-shimmy": {
+    "name": "Loe Shimmy",
+    "searchName": "Loe Shimmy",
+    "aliases": [],
+    "verifiedAt": "2026-10-14",
+    "sources": [
+      "https://musicbrainz.org/artist/ed411d15-00f4-4e56-b264-94e0d2f64ffe",
+      "https://www.youtube.com/channel/UCKNnh5bOfVa6xWeu9x7678Q"
+    ],
+    "externalIds": {
+      "spotifyId": "6UIpxj5ggLdOebFVCOxVax",
+      "youtubeChannelId": "UCKNnh5bOfVa6xWeu9x7678Q",
+      "musicbrainzId": "ed411d15-00f4-4e56-b264-94e0d2f64ffe"
+    },
+    "releases": [
+      {
+        "id": "e5a07148-c036-415c-9408-544c5e9cdbf9",
+        "title": "Pretty Girlz Run The World",
+        "releaseDate": "2026-07-24",
+        "sourceUrl": "https://musicbrainz.org/release-group/e5a07148-c036-415c-9408-544c5e9cdbf9",
+        "officialReleaseVerified": true
+      },
+      {
+        "id": "d52b85ae-3922-455a-b8c6-d36661cce760",
+        "title": "Rockstar Junkie",
+        "releaseDate": "2025-07-18",
+        "sourceUrl": "https://musicbrainz.org/release-group/d52b85ae-3922-455a-b8c6-d36661cce760",
+        "officialReleaseVerified": true
+      }
+    ],
+    "catalogueComplete": true
+  },
+  "luh-tyler": {
+    "name": "Luh Tyler",
+    "searchName": "Luh Tyler",
+    "aliases": [],
+    "verifiedAt": "2026-10-14",
+    "sources": [
+      "https://musicbrainz.org/artist/1f375ea1-617d-485b-ae29-d220bfc1f501",
+      "https://www.youtube.com/channel/UCwEG-vwbSPLEJGlLmgFneiA",
+      "https://www.wikidata.org/wiki/Q116700550"
+    ],
+    "externalIds": {
+      "spotifyId": "1K15GRZZATsCJyGJ4bYiEz",
+      "youtubeChannelId": "UCwEG-vwbSPLEJGlLmgFneiA",
+      "musicbrainzId": "1f375ea1-617d-485b-ae29-d220bfc1f501",
+      "wikipediaArticleTitle": "Luh Tyler"
+    },
+    "releases": [
+      {
+        "id": "db97ecc9-48ba-4341-8cfb-8d5831a26615",
+        "title": "Destined For Greatness",
+        "releaseDate": "2026-06-05",
+        "sourceUrl": "https://musicbrainz.org/release-group/db97ecc9-48ba-4341-8cfb-8d5831a26615",
+        "officialReleaseVerified": true
+      },
+      {
+        "id": "3f703fb7-3e57-41b3-803e-13bc4258a418",
+        "title": "Florida Boy",
+        "releaseDate": "2025-05-30",
+        "sourceUrl": "https://musicbrainz.org/release-group/3f703fb7-3e57-41b3-803e-13bc4258a418",
+        "officialReleaseVerified": true
+      }
+    ],
+    "catalogueComplete": true
+  },
+  "megan-thee-stallion": {
+    "name": "Megan Thee Stallion",
+    "searchName": "Megan Thee Stallion",
+    "aliases": [],
+    "verifiedAt": "2026-10-14",
+    "sources": [
+      "https://musicbrainz.org/artist/ee27b2d8-648c-4a9d-a68c-e55066959975",
+      "https://www.youtube.com/channel/UCKrdjiuS66yXOdEZ_cOD_TA",
+      "https://www.wikidata.org/wiki/Q59268408"
+    ],
+    "externalIds": {
+      "spotifyId": "181bsRPaVXVlUKXrxwZfHK",
+      "youtubeChannelId": "UCKrdjiuS66yXOdEZ_cOD_TA",
+      "musicbrainzId": "ee27b2d8-648c-4a9d-a68c-e55066959975",
+      "wikipediaArticleTitle": "Megan Thee Stallion"
+    },
+    "releases": [
+      {
+        "id": "d35d2779-d4c7-4210-92fe-d0d65289adf4",
+        "title": "MEGAN",
+        "releaseDate": "2024-06-28",
+        "sourceUrl": "https://musicbrainz.org/release-group/d35d2779-d4c7-4210-92fe-d0d65289adf4",
+        "officialReleaseVerified": true
+      },
+      {
+        "id": "d20d5d07-bcb1-4aa2-a1a2-d8d2144ae782",
+        "title": "Traumazine",
+        "releaseDate": "2022-08-12",
+        "sourceUrl": "https://musicbrainz.org/release-group/d20d5d07-bcb1-4aa2-a1a2-d8d2144ae782",
+        "officialReleaseVerified": true
+      }
+    ],
+    "catalogueComplete": true
+  },
+  "molly-santana": {
+    "name": "Molly Santana",
+    "searchName": "Molly Santana",
+    "aliases": [],
+    "verifiedAt": "2026-10-14",
+    "sources": [
+      "https://musicbrainz.org/artist/7c2fd839-62ca-4787-b687-8a4067c48e24",
+      "https://www.youtube.com/channel/UCyixUe1QeV_H2p-MQgMu4Hg"
+    ],
+    "externalIds": {
+      "spotifyId": "1zEHBw7xQf0drXZagRkciU",
+      "youtubeChannelId": "UCyixUe1QeV_H2p-MQgMu4Hg",
+      "musicbrainzId": "7c2fd839-62ca-4787-b687-8a4067c48e24"
+    },
+    "releases": [
+      {
+        "id": "16f28f50-0b07-49d7-b886-f388a69c3584",
+        "title": "Molly And Her Week Of Wonders (Deluxe)",
+        "releaseDate": "2025-10-17",
+        "sourceUrl": "https://musicbrainz.org/release-group/16f28f50-0b07-49d7-b886-f388a69c3584",
+        "officialReleaseVerified": true
+      },
+      {
+        "id": "a04b9cd7-72f4-4381-a84e-d97595bfe4f3",
+        "title": "Molly and Her Week of Wonders",
+        "releaseDate": "2025-05-30",
+        "sourceUrl": "https://musicbrainz.org/release-group/a04b9cd7-72f4-4381-a84e-d97595bfe4f3",
+        "officialReleaseVerified": true
+      }
+    ],
+    "catalogueComplete": true
+  },
+  "moneybagg-yo": {
+    "name": "Moneybagg Yo",
+    "searchName": "Moneybagg Yo",
+    "aliases": [],
+    "verifiedAt": "2026-10-14",
+    "sources": [
+      "https://musicbrainz.org/artist/8971fa37-c402-474a-b897-e2bbc145b59d",
+      "https://www.youtube.com/channel/UCrdPrDuDCbG8xayk5QkRLQA",
+      "https://www.wikidata.org/wiki/Q38459032"
+    ],
+    "externalIds": {
+      "spotifyId": "3tJoFztHeIJkJWMrx0td2f",
+      "youtubeChannelId": "UCrdPrDuDCbG8xayk5QkRLQA",
+      "musicbrainzId": "8971fa37-c402-474a-b897-e2bbc145b59d",
+      "wikipediaArticleTitle": "Moneybagg Yo"
+    },
+    "releases": [
+      {
+        "id": "48523782-f87c-4003-82d8-ebb191b65e7f",
+        "title": "SPEAK NOW",
+        "releaseDate": "2024-06-14",
+        "sourceUrl": "https://musicbrainz.org/release-group/48523782-f87c-4003-82d8-ebb191b65e7f",
+        "officialReleaseVerified": true
+      },
+      {
+        "id": "0cacba85-a55a-4aa7-be2d-cbf24d4fcc94",
+        "title": "We Connected",
+        "releaseDate": "2023-12-08",
+        "sourceUrl": "https://musicbrainz.org/release-group/0cacba85-a55a-4aa7-be2d-cbf24d4fcc94",
+        "officialReleaseVerified": true
+      }
+    ],
+    "catalogueComplete": true
+  },
+  "nav": {
+    "name": "NAV",
+    "searchName": "NAV",
+    "aliases": [],
+    "verifiedAt": "2026-10-14",
+    "sources": [
+      "https://musicbrainz.org/artist/418fe547-4bec-48fe-8df0-ed25e27f4570",
+      "https://www.youtube.com/channel/UCuI48V3qSHZvZimYgFNJYJg",
+      "https://www.wikidata.org/wiki/Q28831246"
+    ],
+    "externalIds": {
+      "spotifyId": "7rkW85dBwwrJtlHRDkJDAC",
+      "youtubeChannelId": "UCuI48V3qSHZvZimYgFNJYJg",
+      "musicbrainzId": "418fe547-4bec-48fe-8df0-ed25e27f4570",
+      "wikipediaArticleTitle": "Nav (rapper)"
+    },
+    "releases": [
+      {
+        "id": "d716a4e7-7990-4b54-9297-c61f1a7a6121",
+        "title": "OMW2 REXDALE",
+        "releaseDate": "2025-03-27",
+        "sourceUrl": "https://musicbrainz.org/release-group/d716a4e7-7990-4b54-9297-c61f1a7a6121",
+        "officialReleaseVerified": true
+      },
+      {
+        "id": "fe373fad-b8c6-46e6-857d-e924771181c2",
+        "title": "Demons Protected by Angels",
+        "releaseDate": "2022-09-09",
+        "sourceUrl": "https://musicbrainz.org/release-group/fe373fad-b8c6-46e6-857d-e924771181c2",
+        "officialReleaseVerified": true
+      }
+    ],
+    "catalogueComplete": true
+  },
+  "nemzzz": {
+    "name": "Nemzzz",
+    "searchName": "Nemzzz",
+    "aliases": [],
+    "verifiedAt": "2026-10-14",
+    "sources": [
+      "https://musicbrainz.org/artist/d2a36c92-546b-4b81-b31b-23e21d2ea6ee",
+      "https://www.youtube.com/channel/UC3ytAKP00gWDkiOrcKfOwTQ",
+      "https://www.wikidata.org/wiki/Q125128094"
+    ],
+    "externalIds": {
+      "spotifyId": "3DHtfeD4PsmR9YGhCP4VF7",
+      "youtubeChannelId": "UC3ytAKP00gWDkiOrcKfOwTQ",
+      "musicbrainzId": "d2a36c92-546b-4b81-b31b-23e21d2ea6ee",
+      "wikipediaArticleTitle": "Nemzzz"
+    },
+    "releases": [
+      {
+        "id": "0ca2e63f-9cd1-4764-a01a-eeceac491360",
+        "title": "LOCKED IN",
+        "releaseDate": "2026-09-04",
+        "sourceUrl": "https://musicbrainz.org/release-group/0ca2e63f-9cd1-4764-a01a-eeceac491360",
+        "officialReleaseVerified": true
+      },
+      {
+        "id": "1740a603-832f-4537-8d69-94a0ab89913d",
+        "title": "From Me 2 U",
+        "releaseDate": "2025-11-21",
+        "sourceUrl": "https://musicbrainz.org/release-group/1740a603-832f-4537-8d69-94a0ab89913d",
+        "officialReleaseVerified": true
+      }
+    ],
+    "catalogueComplete": true
+  },
+  "nettspend": {
+    "name": "Nettspend",
+    "searchName": "Nettspend",
+    "aliases": [],
+    "verifiedAt": "2026-10-14",
+    "sources": [
+      "https://musicbrainz.org/artist/4585749c-5489-4699-9daf-1ffa9717179f",
+      "https://www.youtube.com/channel/UC6CvS47L6uTuPSPhinE5jKA",
+      "https://www.wikidata.org/wiki/Q125255581"
+    ],
+    "externalIds": {
+      "spotifyId": "2jl4qd6UbzeCmImT4nWbtA",
+      "youtubeChannelId": "UC6CvS47L6uTuPSPhinE5jKA",
+      "musicbrainzId": "4585749c-5489-4699-9daf-1ffa9717179f",
+      "wikipediaArticleTitle": "Nettspend"
+    },
+    "releases": [
+      {
+        "id": "4ad287bb-9836-4cc9-883d-b652ebf8f701",
+        "title": "him",
+        "releaseDate": "2026-04-30",
+        "sourceUrl": "https://musicbrainz.org/release-group/4ad287bb-9836-4cc9-883d-b652ebf8f701",
+        "officialReleaseVerified": true
+      },
+      {
+        "id": "d6b0b194-ed2c-491c-a933-79f9ef44aa61",
+        "title": "early life crisis",
+        "releaseDate": "2026-03-06",
+        "sourceUrl": "https://musicbrainz.org/release-group/d6b0b194-ed2c-491c-a933-79f9ef44aa61",
+        "officialReleaseVerified": true
+      }
+    ],
+    "catalogueComplete": true
+  },
+  "nicki-minaj": {
+    "name": "Nicki Minaj",
+    "searchName": "Nicki Minaj",
+    "aliases": [],
+    "verifiedAt": "2026-10-14",
+    "sources": [
+      "https://musicbrainz.org/artist/1036b808-f58c-4a3e-b461-a2c4492ecf1b",
+      "https://www.youtube.com/channel/UC3jOd7GUMhpgJRBhiLzuLsg",
+      "https://www.wikidata.org/wiki/Q162202"
+    ],
+    "externalIds": {
+      "spotifyId": "0hCNtLu0JehylgoiP8L4Gh",
+      "youtubeChannelId": "UC3jOd7GUMhpgJRBhiLzuLsg",
+      "musicbrainzId": "1036b808-f58c-4a3e-b461-a2c4492ecf1b",
+      "wikipediaArticleTitle": "Nicki Minaj"
+    },
+    "releases": [
+      {
+        "id": "016d0958-01da-4d16-8da1-8328f891a3a1",
+        "title": "Pink Friday 2",
+        "releaseDate": "2023-12-08",
+        "sourceUrl": "https://musicbrainz.org/release-group/016d0958-01da-4d16-8da1-8328f891a3a1",
+        "officialReleaseVerified": true
+      },
+      {
+        "id": "eda0fd8e-c281-4173-9bed-8e505184d399",
+        "title": "Queen",
+        "releaseDate": "2018-08-10",
+        "sourceUrl": "https://musicbrainz.org/release-group/eda0fd8e-c281-4173-9bed-8e505184d399",
+        "officialReleaseVerified": true
+      }
+    ],
+    "catalogueComplete": true
+  },
+  "nine-vicious": {
+    "name": "Nine Vicious",
+    "searchName": "Nine Vicious",
+    "aliases": [],
+    "verifiedAt": "2026-10-14",
+    "sources": [
+      "https://musicbrainz.org/artist/ec63abed-419c-45c8-a189-fb8e1b44f926",
+      "https://www.youtube.com/channel/UC-QfBKLrg-2D-2QDGwl6JfA"
+    ],
+    "externalIds": {
+      "spotifyId": "6Rs7Ufqb4h0FTuVg6wlqOy",
+      "youtubeChannelId": "UC-QfBKLrg-2D-2QDGwl6JfA",
+      "musicbrainzId": "ec63abed-419c-45c8-a189-fb8e1b44f926"
+    },
+    "releases": [
+      {
+        "id": "4775c0c0-9701-4eaa-a715-324e42ec2aa5",
+        "title": "SEDITION",
+        "releaseDate": "2026-09-11",
+        "sourceUrl": "https://musicbrainz.org/release-group/4775c0c0-9701-4eaa-a715-324e42ec2aa5",
+        "officialReleaseVerified": true
+      }
+    ],
+    "catalogueComplete": true
+  },
+  "nle-choppa": {
+    "name": "NLE Choppa",
+    "searchName": "NLE Choppa",
+    "aliases": [],
+    "verifiedAt": "2026-10-14",
+    "sources": [
+      "https://musicbrainz.org/artist/2873b450-13c6-4ca1-8ca3-646c25af3202",
+      "https://www.youtube.com/channel/UCWICXNlSLc7eeNazpzUZcLg",
+      "https://www.wikidata.org/wiki/Q64009351"
+    ],
+    "externalIds": {
+      "spotifyId": "0ErzCpIMyLcjPiwT4elrtZ",
+      "youtubeChannelId": "UCWICXNlSLc7eeNazpzUZcLg",
+      "musicbrainzId": "2873b450-13c6-4ca1-8ca3-646c25af3202",
+      "wikipediaArticleTitle": "NLE Choppa"
+    },
+    "releases": [
+      {
+        "id": "5b0e1e25-efc8-4b64-93e7-50a4c5842b6a",
+        "title": "PICASSO: SLUFFIN SZN X SLUT SZN",
+        "releaseDate": "2024-12-23",
+        "sourceUrl": "https://musicbrainz.org/release-group/5b0e1e25-efc8-4b64-93e7-50a4c5842b6a",
+        "officialReleaseVerified": true
+      },
+      {
+        "id": "751ad13d-a690-44b7-b689-68870a944095",
+        "title": "SLUT SZN",
+        "releaseDate": "2024-09-26",
+        "sourceUrl": "https://musicbrainz.org/release-group/751ad13d-a690-44b7-b689-68870a944095",
+        "officialReleaseVerified": true
+      }
+    ],
+    "catalogueComplete": true
+  },
+  "osamason": {
+    "name": "Osamason",
+    "searchName": "Osamason",
+    "aliases": [],
+    "verifiedAt": "2026-10-14",
+    "sources": [
+      "https://musicbrainz.org/artist/35214d53-009b-45d9-8a00-6664325b9e2a",
+      "https://www.youtube.com/channel/UCyLjTgYrVIFO2_VSAEO43tA",
+      "https://www.wikidata.org/wiki/Q124338068"
+    ],
+    "externalIds": {
+      "spotifyId": "0uj6QiPsPfK8ywLC7uwBE1",
+      "youtubeChannelId": "UCyLjTgYrVIFO2_VSAEO43tA",
+      "musicbrainzId": "35214d53-009b-45d9-8a00-6664325b9e2a",
+      "wikipediaArticleTitle": "OsamaSon"
+    },
+    "releases": [
+      {
+        "id": "9bb5f1fe-1a20-44bc-a800-e37795ad2520",
+        "title": "psykotic",
+        "releaseDate": "2025-10-10",
+        "sourceUrl": "https://musicbrainz.org/release-group/9bb5f1fe-1a20-44bc-a800-e37795ad2520",
+        "officialReleaseVerified": true
+      },
+      {
+        "id": "d1c53211-6a4a-4e9e-b9a7-3ee22801af00",
+        "title": "BACKEND v2",
+        "releaseDate": "2025-09-27",
+        "sourceUrl": "https://musicbrainz.org/release-group/d1c53211-6a4a-4e9e-b9a7-3ee22801af00",
+        "officialReleaseVerified": true
+      }
+    ],
+    "catalogueComplete": true
+  },
+  "playboi-carti": {
+    "name": "Playboi Carti",
+    "searchName": "Playboi Carti",
+    "aliases": [
+      "Carti",
+      "Sir Cartier"
+    ],
+    "verifiedAt": "2026-10-14",
+    "sources": [
+      "https://musicbrainz.org/artist/2baf3276-ed6a-4349-8d2e-f4601e7b2167",
+      "https://www.youtube.com/channel/UC652oRUvX1onwrrZ8ADJRPw",
+      "https://www.wikidata.org/wiki/Q27671080"
+    ],
+    "externalIds": {
+      "spotifyId": "699OTQXzgjhIYAHMy9RyPD",
+      "youtubeChannelId": "UC652oRUvX1onwrrZ8ADJRPw",
+      "musicbrainzId": "2baf3276-ed6a-4349-8d2e-f4601e7b2167",
+      "wikipediaArticleTitle": "Playboi Carti"
+    },
+    "releases": [
+      {
+        "id": "fa4bbf26-8f97-48d6-add2-4e7c028d39af",
+        "title": "MUSIC",
+        "releaseDate": "2025-03-14",
+        "sourceUrl": "https://musicbrainz.org/release-group/fa4bbf26-8f97-48d6-add2-4e7c028d39af",
+        "officialReleaseVerified": true
+      }
+    ],
+    "catalogueComplete": true
+  },
+  "polo-g": {
+    "name": "Polo G",
+    "searchName": "Polo G",
+    "aliases": [],
+    "verifiedAt": "2026-10-14",
+    "sources": [
+      "https://musicbrainz.org/artist/7e1e5648-1d6a-4248-975a-98603e781848",
+      "https://www.youtube.com/channel/UC0ifXd2AVf1LMYbqwB5GH4g",
+      "https://www.wikidata.org/wiki/Q62953486"
+    ],
+    "externalIds": {
+      "spotifyId": "6AgTAQt8XS6jRWi4sX7w49",
+      "youtubeChannelId": "UC0ifXd2AVf1LMYbqwB5GH4g",
+      "musicbrainzId": "7e1e5648-1d6a-4248-975a-98603e781848",
+      "wikipediaArticleTitle": "Polo G"
+    },
+    "releases": [
+      {
+        "id": "5c35ec4a-3990-4e65-b25b-e5f53fcdd32f",
+        "title": "HOOD POET",
+        "releaseDate": "2024-08-09",
+        "sourceUrl": "https://musicbrainz.org/release-group/5c35ec4a-3990-4e65-b25b-e5f53fcdd32f",
+        "officialReleaseVerified": true
+      },
+      {
+        "id": "5260e6b0-4a8c-442c-947d-8730e109b565",
+        "title": "Better Days",
+        "releaseDate": "2022-01-28",
+        "sourceUrl": "https://musicbrainz.org/release-group/5260e6b0-4a8c-442c-947d-8730e109b565",
+        "officialReleaseVerified": true
+      }
+    ],
+    "catalogueComplete": true
+  },
+  "pooh-shiesty": {
+    "name": "Pooh Shiesty",
+    "searchName": "Pooh Shiesty",
+    "aliases": [],
+    "verifiedAt": "2026-10-14",
+    "sources": [
+      "https://musicbrainz.org/artist/82cc5b8b-22e8-48e3-9f97-6ab39ac316d6",
+      "https://www.youtube.com/channel/UCTBIIbIs83IBsy4E1BQxYBw",
+      "https://www.wikidata.org/wiki/Q105105274"
+    ],
+    "externalIds": {
+      "spotifyId": "5F1aAS1duwlzExnPs3l2Xe",
+      "youtubeChannelId": "UCTBIIbIs83IBsy4E1BQxYBw",
+      "musicbrainzId": "82cc5b8b-22e8-48e3-9f97-6ab39ac316d6",
+      "wikipediaArticleTitle": "Pooh Shiesty"
+    },
+    "releases": [
+      {
+        "id": "d87f86a3-efb1-47ff-b112-c5690a342bf0",
+        "title": "All Eyes on Shiest",
+        "releaseDate": "2026-08-21",
+        "sourceUrl": "https://musicbrainz.org/release-group/d87f86a3-efb1-47ff-b112-c5690a342bf0",
+        "officialReleaseVerified": true
+      },
+      {
+        "id": "72d30b54-ce02-4cf5-adb2-a81ecaf7c455",
+        "title": "Shiesty Season: Certified",
+        "releaseDate": "2022-04-29",
+        "sourceUrl": "https://musicbrainz.org/release-group/72d30b54-ce02-4cf5-adb2-a81ecaf7c455",
+        "officialReleaseVerified": true
+      }
+    ],
+    "catalogueComplete": true
+  },
+  "prettifun": {
+    "name": "prettifun",
+    "searchName": "prettifun",
+    "aliases": [],
+    "verifiedAt": "2026-10-14",
+    "sources": [
+      "https://musicbrainz.org/artist/b7ea87e2-edfc-427f-a766-83c65c01166c",
+      "https://www.youtube.com/channel/UCLcp1xz2_QEPW3CqGv5536A",
+      "https://www.wikidata.org/wiki/Q135972596"
+    ],
+    "externalIds": {
+      "spotifyId": "3J3ngZn7GjzjwCPBkqtz65",
+      "youtubeChannelId": "UCLcp1xz2_QEPW3CqGv5536A",
+      "musicbrainzId": "b7ea87e2-edfc-427f-a766-83c65c01166c",
+      "wikipediaArticleTitle": "Prettifun"
+    },
+    "releases": [
+      {
+        "id": "31d47f52-8a8a-48c6-85d2-f7ca755fe9ae",
+        "title": "Pretti Loves U 2",
+        "releaseDate": "2026-08-21",
+        "sourceUrl": "https://musicbrainz.org/release-group/31d47f52-8a8a-48c6-85d2-f7ca755fe9ae",
+        "officialReleaseVerified": true
+      },
+      {
+        "id": "66751ca1-22d5-4be4-910f-59db8a42f3bb",
+        "title": "FunHouse Deluxe",
+        "releaseDate": "2025-08-01",
+        "sourceUrl": "https://musicbrainz.org/release-group/66751ca1-22d5-4be4-910f-59db8a42f3bb",
+        "officialReleaseVerified": true
+      }
+    ],
+    "catalogueComplete": true
+  },
+  "quavo": {
+    "name": "Quavo",
+    "searchName": "Quavo",
+    "aliases": [],
+    "verifiedAt": "2026-10-14",
+    "sources": [
+      "https://musicbrainz.org/artist/6143403a-df6c-429e-8ee6-ef869896b0da",
+      "https://www.youtube.com/channel/UCU_xT0uVi5cku7cg9hDgkMA",
+      "https://www.wikidata.org/wiki/Q30072039"
+    ],
+    "externalIds": {
+      "spotifyId": "0VRj0yCOv2FXJNP47XQnx5",
+      "youtubeChannelId": "UCU_xT0uVi5cku7cg9hDgkMA",
+      "musicbrainzId": "6143403a-df6c-429e-8ee6-ef869896b0da",
+      "wikipediaArticleTitle": "Quavo"
+    },
+    "releases": [
+      {
+        "id": "5560c137-5e25-41fa-9df0-bd793cdf99bd",
+        "title": "QRÖMELIFE",
+        "releaseDate": "2026-10-01",
+        "sourceUrl": "https://musicbrainz.org/release-group/5560c137-5e25-41fa-9df0-bd793cdf99bd",
+        "officialReleaseVerified": true
+      },
+      {
+        "id": "b130fc18-235c-4f54-8a46-86e66ffd599c",
+        "title": "Rocket Power",
+        "releaseDate": "2023-08-18",
+        "sourceUrl": "https://musicbrainz.org/release-group/b130fc18-235c-4f54-8a46-86e66ffd599c",
+        "officialReleaseVerified": true
+      }
+    ],
+    "catalogueComplete": true
+  },
+  "rod-wave": {
+    "name": "Rod Wave",
+    "searchName": "Rod Wave",
+    "aliases": [],
+    "verifiedAt": "2026-10-14",
+    "sources": [
+      "https://musicbrainz.org/artist/cb3d3e49-bf08-4cdb-bfa8-4dc7c458cea1",
+      "https://www.youtube.com/channel/UCenjunBhBhvKjfDAESnoppw",
+      "https://www.wikidata.org/wiki/Q78754352"
+    ],
+    "externalIds": {
+      "spotifyId": "45TgXXqMDdF8BkjA83OM7z",
+      "youtubeChannelId": "UCenjunBhBhvKjfDAESnoppw",
+      "musicbrainzId": "cb3d3e49-bf08-4cdb-bfa8-4dc7c458cea1",
+      "wikipediaArticleTitle": "Rod Wave"
+    },
+    "releases": [
+      {
+        "id": "30e34fbc-bfcc-4777-b2b4-1861f8adcc18",
+        "title": "Don't Look Down",
+        "releaseDate": "2026-08-28",
+        "sourceUrl": "https://musicbrainz.org/release-group/30e34fbc-bfcc-4777-b2b4-1861f8adcc18",
+        "officialReleaseVerified": true
+      },
+      {
+        "id": "2026e1fe-d84a-4778-b800-7db8d38935ee",
+        "title": "Last Lap",
+        "releaseDate": "2024-10-11",
+        "sourceUrl": "https://musicbrainz.org/release-group/2026e1fe-d84a-4778-b800-7db8d38935ee",
+        "officialReleaseVerified": true
+      }
+    ],
+    "catalogueComplete": true
+  },
+  "sahbabii": {
+    "name": "SahBabii",
+    "searchName": "SahBabii",
+    "aliases": [],
+    "verifiedAt": "2026-10-14",
+    "sources": [
+      "https://musicbrainz.org/artist/5e934be9-8295-4215-a60f-f5f2386179a3",
+      "https://www.youtube.com/channel/UCfUGy8RvgutYIJ5uOE-Rgcg",
+      "https://www.wikidata.org/wiki/Q39086692"
+    ],
+    "externalIds": {
+      "spotifyId": "7GuUYiGZOzQwq4L6gAfy1T",
+      "youtubeChannelId": "UCfUGy8RvgutYIJ5uOE-Rgcg",
+      "musicbrainzId": "5e934be9-8295-4215-a60f-f5f2386179a3",
+      "wikipediaArticleTitle": "SahBabii"
+    },
+    "releases": [
+      {
+        "id": "fa1f8bb1-c39b-4b6b-9ca1-51db90ae7daa",
+        "title": "Saaheem",
+        "releaseDate": "2024-11-08",
+        "sourceUrl": "https://musicbrainz.org/release-group/fa1f8bb1-c39b-4b6b-9ca1-51db90ae7daa",
+        "officialReleaseVerified": true
+      },
+      {
+        "id": "ba0a849a-09c5-4988-90a0-4834864a9a29",
+        "title": "LeakOut",
+        "releaseDate": "2022-12-27",
+        "sourceUrl": "https://musicbrainz.org/release-group/ba0a849a-09c5-4988-90a0-4834864a9a29",
+        "officialReleaseVerified": true
+      }
+    ],
+    "catalogueComplete": true
+  },
+  "sexyy-red": {
+    "name": "Sexyy Red",
+    "searchName": "Sexyy Red",
+    "aliases": [],
+    "verifiedAt": "2026-10-14",
+    "sources": [
+      "https://musicbrainz.org/artist/0953d634-b964-4f2a-b862-8de475aeaf47",
+      "https://www.youtube.com/channel/UC28rc3PHWPJib68G-VqpJ3w",
+      "https://www.wikidata.org/wiki/Q119842023"
+    ],
+    "externalIds": {
+      "spotifyId": "3DbwFQlvLxRSi2uX8mf81A",
+      "youtubeChannelId": "UC28rc3PHWPJib68G-VqpJ3w",
+      "musicbrainzId": "0953d634-b964-4f2a-b862-8de475aeaf47",
+      "wikipediaArticleTitle": "Sexyy Red"
+    },
+    "releases": [
+      {
+        "id": "4156a528-2f17-4123-b3b5-4c13a2c686cc",
+        "title": "Yo Favorite Trappa Favorite Rappa",
+        "releaseDate": "2026-04-15",
+        "sourceUrl": "https://musicbrainz.org/release-group/4156a528-2f17-4123-b3b5-4c13a2c686cc",
+        "officialReleaseVerified": true
+      },
+      {
+        "id": "0b2b8b06-727d-4101-8588-d4b8a7dc2c4a",
+        "title": "In Sexyy We Trust",
+        "releaseDate": "2024-05-24",
+        "sourceUrl": "https://musicbrainz.org/release-group/0b2b8b06-727d-4101-8588-d4b8a7dc2c4a",
+        "officialReleaseVerified": true
+      }
+    ],
+    "catalogueComplete": true
+  },
+  "skrilla": {
+    "name": "Skrilla",
+    "searchName": "Skrilla",
+    "aliases": [],
+    "verifiedAt": "2026-10-14",
+    "sources": [
+      "https://musicbrainz.org/artist/7edb1ae1-770e-499a-a8be-cbd0c144516c",
+      "https://www.youtube.com/channel/UCMFP3cGDPvKhdaqhmdXmzQg"
+    ],
+    "externalIds": {
+      "spotifyId": "3qdQnBjEBHrk5nZYxXdV1U",
+      "youtubeChannelId": "UCMFP3cGDPvKhdaqhmdXmzQg",
+      "musicbrainzId": "7edb1ae1-770e-499a-a8be-cbd0c144516c"
+    },
+    "releases": [
+      {
+        "id": "15ef802d-41f8-4632-9e0c-dacccdfe3790",
+        "title": "Z",
+        "releaseDate": "2026-05-01",
+        "sourceUrl": "https://musicbrainz.org/release-group/15ef802d-41f8-4632-9e0c-dacccdfe3790",
+        "officialReleaseVerified": true
+      },
+      {
+        "id": "8f283267-5672-4bba-87f9-e521223e1460",
+        "title": "Zombie Love Kensington Paradise",
+        "releaseDate": "2024-11-01",
+        "sourceUrl": "https://musicbrainz.org/release-group/8f283267-5672-4bba-87f9-e521223e1460",
+        "officialReleaseVerified": true
+      }
+    ],
+    "catalogueComplete": true
+  },
+  "slayr": {
+    "name": "Slayr",
+    "searchName": "Slayr",
+    "aliases": [],
+    "verifiedAt": "2026-10-14",
+    "sources": [
+      "https://musicbrainz.org/artist/cfa0e221-4717-4281-bff3-46c88d45bf93",
+      "https://www.youtube.com/channel/UCivyc3VgQwCqqlr6SlnKQSw",
+      "https://www.wikidata.org/wiki/Q138955322"
+    ],
+    "externalIds": {
+      "spotifyId": "0SL3lfuoRP67mrvkdnwIMA",
+      "youtubeChannelId": "UCivyc3VgQwCqqlr6SlnKQSw",
+      "musicbrainzId": "cfa0e221-4717-4281-bff3-46c88d45bf93",
+      "wikipediaArticleTitle": "Slayr"
+    },
+    "releases": [
+      {
+        "id": "37231465-f1ec-487c-b652-164193e42f6d",
+        "title": "AVANT NOVA",
+        "releaseDate": "2026-07-10",
+        "sourceUrl": "https://musicbrainz.org/release-group/37231465-f1ec-487c-b652-164193e42f6d",
+        "officialReleaseVerified": true
+      },
+      {
+        "id": "8dfe53b6-11a3-4a05-939e-72d59d5dba58",
+        "title": "Luxe 0.1",
+        "releaseDate": "2025-12-22",
+        "sourceUrl": "https://musicbrainz.org/release-group/8dfe53b6-11a3-4a05-939e-72d59d5dba58",
+        "officialReleaseVerified": true
+      }
+    ],
+    "catalogueComplete": true
+  },
+  "sosocamo": {
+    "name": "Sosocamo",
+    "searchName": "Sosocamo",
+    "aliases": [],
+    "verifiedAt": "2026-10-14",
+    "sources": [
+      "https://musicbrainz.org/artist/049bd25f-bf79-4bb5-8a0f-ad2e1d91a4f9",
+      "https://www.youtube.com/channel/UC9dJBYOZY3ukxv39LM-EeuQ"
+    ],
+    "externalIds": {
+      "spotifyId": "6hpztnbgmaneFFGGnEOVjd",
+      "youtubeChannelId": "UC9dJBYOZY3ukxv39LM-EeuQ",
+      "musicbrainzId": "049bd25f-bf79-4bb5-8a0f-ad2e1d91a4f9"
+    },
+    "releases": [
+      {
+        "id": "a1468df4-9c2a-46f6-bd47-f9e4230633e7",
+        "title": "homesick",
+        "releaseDate": "2026-06-26",
+        "sourceUrl": "https://musicbrainz.org/release-group/a1468df4-9c2a-46f6-bd47-f9e4230633e7",
+        "officialReleaseVerified": true
+      },
+      {
+        "id": "d7324ac6-a6c0-4db9-8539-03fc3a6b1675",
+        "title": "big country",
+        "releaseDate": "2026-02-27",
+        "sourceUrl": "https://musicbrainz.org/release-group/d7324ac6-a6c0-4db9-8539-03fc3a6b1675",
+        "officialReleaseVerified": true
+      }
+    ],
+    "catalogueComplete": true
+  },
+  "tana": {
+    "name": "Tana",
+    "searchName": "Tana",
+    "aliases": [
+      "BabySantana"
+    ],
+    "verifiedAt": "2026-10-14",
+    "sources": [
+      "https://musicbrainz.org/artist/fc815f2a-7aea-4a3b-a255-c81661526446",
+      "https://www.youtube.com/channel/UCO8Ta3wYCs3rW_4F4W0U2sA",
+      "https://www.wikidata.org/wiki/Q113961820"
+    ],
+    "externalIds": {
+      "spotifyId": "1xgl9yxqIVq8PEEMai38uV",
+      "youtubeChannelId": "UCO8Ta3wYCs3rW_4F4W0U2sA",
+      "musicbrainzId": "fc815f2a-7aea-4a3b-a255-c81661526446",
+      "wikipediaArticleTitle": "Tana (rapper)"
+    },
+    "releases": [
+      {
+        "id": "28f0190c-dfd3-4c29-bb8f-2b0914c25ad6",
+        "title": "ME",
+        "releaseDate": "2026-06-19",
+        "sourceUrl": "https://musicbrainz.org/release-group/28f0190c-dfd3-4c29-bb8f-2b0914c25ad6",
+        "officialReleaseVerified": true
+      },
+      {
+        "id": "399a2bce-8abc-4774-90f0-7fbb0ca5e74d",
+        "title": "BANA",
+        "releaseDate": "2024-04-26",
+        "sourceUrl": "https://musicbrainz.org/release-group/399a2bce-8abc-4774-90f0-7fbb0ca5e74d",
+        "officialReleaseVerified": true
+      }
+    ],
+    "catalogueComplete": true
+  },
+  "tezzus": {
+    "name": "Tezzus",
+    "searchName": "Tezzus",
+    "aliases": [],
+    "verifiedAt": "2026-10-14",
+    "sources": [
+      "https://musicbrainz.org/artist/1753124e-e4be-4dba-9741-5e50e4dc351f",
+      "https://www.youtube.com/channel/UCFm3d7z74iCkyaD5u1YX1Jw"
+    ],
+    "externalIds": {
+      "spotifyId": "3YQEnGNd8ooVyyhjnuwQIm",
+      "youtubeChannelId": "UCFm3d7z74iCkyaD5u1YX1Jw",
+      "musicbrainzId": "1753124e-e4be-4dba-9741-5e50e4dc351f"
+    },
+    "releases": [
+      {
+        "id": "37b63cfa-84c8-4c3e-9568-3449319c0358",
+        "title": "THE RESURRECTIØN",
+        "releaseDate": "2026-06-08",
+        "sourceUrl": "https://musicbrainz.org/release-group/37b63cfa-84c8-4c3e-9568-3449319c0358",
+        "officialReleaseVerified": true
+      },
+      {
+        "id": "c56bc17b-90cc-4df3-bfc1-7d771cb8425d",
+        "title": "UY SCUTI BØYZ",
+        "releaseDate": "2026-04-17",
+        "sourceUrl": "https://musicbrainz.org/release-group/c56bc17b-90cc-4df3-bfc1-7d771cb8425d",
+        "officialReleaseVerified": true
+      }
+    ],
+    "catalogueComplete": true
+  },
+  "trap-dickey": {
+    "name": "Trap Dickey",
+    "searchName": "Trap Dickey",
+    "aliases": [],
+    "verifiedAt": "2026-10-14",
+    "sources": [
+      "https://musicbrainz.org/artist/77f28f00-887d-4d8a-a537-1a26ae6b9862",
+      "https://www.youtube.com/channel/UCoxF3OvdsCBkpBhJO9xsj2g"
+    ],
+    "externalIds": {
+      "spotifyId": "20B8Ga2HfEUNJBAbZsJU2c",
+      "youtubeChannelId": "UCoxF3OvdsCBkpBhJO9xsj2g",
+      "musicbrainzId": "77f28f00-887d-4d8a-a537-1a26ae6b9862"
+    },
+    "releases": [
+      {
+        "id": "af40aa09-53b8-487c-b4d8-85809ced0b11",
+        "title": "The Ville",
+        "releaseDate": "2026-05-08",
+        "sourceUrl": "https://musicbrainz.org/release-group/af40aa09-53b8-487c-b4d8-85809ced0b11",
+        "officialReleaseVerified": true
+      },
+      {
+        "id": "4d5c121f-fafd-47bc-ac7f-22c617d8bf70",
+        "title": "Trap or Die",
+        "releaseDate": "2021-04-21",
+        "sourceUrl": "https://musicbrainz.org/release-group/4d5c121f-fafd-47bc-ac7f-22c617d8bf70",
+        "officialReleaseVerified": true
+      }
+    ],
+    "catalogueComplete": true
+  },
+  "travis-scott": {
+    "name": "Travis Scott",
+    "searchName": "Travis Scott",
+    "aliases": [],
+    "verifiedAt": "2026-10-14",
+    "sources": [
+      "https://musicbrainz.org/artist/e4a51f17-a57b-47b1-b37b-f552d0f8e9e6",
+      "https://www.youtube.com/channel/UCtxdfwb9wfkoGocVUAJ-Bmg",
+      "https://www.wikidata.org/wiki/Q13605596"
+    ],
+    "externalIds": {
+      "spotifyId": "0Y5tJX1MQlPlqiwlOH1tJY",
+      "youtubeChannelId": "UCtxdfwb9wfkoGocVUAJ-Bmg",
+      "musicbrainzId": "e4a51f17-a57b-47b1-b37b-f552d0f8e9e6",
+      "wikipediaArticleTitle": "Travis Scott"
+    },
+    "releases": [
+      {
+        "id": "eac07d92-86b1-4fa7-906d-ec3177f8ebc2",
+        "title": "UTOPIA",
+        "releaseDate": "2023-07-28",
+        "sourceUrl": "https://musicbrainz.org/release-group/eac07d92-86b1-4fa7-906d-ec3177f8ebc2",
+        "officialReleaseVerified": true
+      },
+      {
+        "id": "c0704c7d-dc5b-43cd-b372-8056a3bf7bb2",
+        "title": "ASTROWORLD",
+        "releaseDate": "2018-08-03",
+        "sourceUrl": "https://musicbrainz.org/release-group/c0704c7d-dc5b-43cd-b372-8056a3bf7bb2",
+        "officialReleaseVerified": true
+      }
+    ],
+    "catalogueComplete": true
+  },
+  "tyler-the-creator": {
+    "name": "Tyler, The Creator",
+    "searchName": "Tyler, The Creator",
+    "aliases": [],
+    "verifiedAt": "2026-10-14",
+    "sources": [
+      "https://musicbrainz.org/artist/f6beac20-5dfe-4d1f-ae02-0b0a740aafd6",
+      "https://www.youtube.com/channel/UCsQBsZJltmLzlsJNG7HevBg",
+      "https://www.wikidata.org/wiki/Q167635"
+    ],
+    "externalIds": {
+      "spotifyId": "4V8LLVI7PbaPR0K2TGSxFF",
+      "youtubeChannelId": "UCsQBsZJltmLzlsJNG7HevBg",
+      "musicbrainzId": "f6beac20-5dfe-4d1f-ae02-0b0a740aafd6",
+      "wikipediaArticleTitle": "Tyler, the Creator"
+    },
+    "releases": [
+      {
+        "id": "34cefdcf-dd34-408b-aafd-b55ffa9ccc4a",
+        "title": "DON’T TAP THE GLASS",
+        "releaseDate": "2025-07-21",
+        "sourceUrl": "https://musicbrainz.org/release-group/34cefdcf-dd34-408b-aafd-b55ffa9ccc4a",
+        "officialReleaseVerified": true
+      },
+      {
+        "id": "ae229bdd-2179-440c-bc78-acf0952914d4",
+        "title": "CHROMAKOPIA",
+        "releaseDate": "2024-10-28",
+        "sourceUrl": "https://musicbrainz.org/release-group/ae229bdd-2179-440c-bc78-acf0952914d4",
+        "officialReleaseVerified": true
+      }
+    ],
+    "catalogueComplete": true
+  },
+  "xaviersobased": {
+    "name": "xaviersobased",
+    "searchName": "xaviersobased",
+    "aliases": [],
+    "verifiedAt": "2026-10-14",
+    "sources": [
+      "https://musicbrainz.org/artist/155cfd40-dcde-471e-acc0-32179916165c",
+      "https://www.youtube.com/channel/UCD_4DgHwrNDp63NDfqXaHJQ",
+      "https://www.wikidata.org/wiki/Q122731572"
+    ],
+    "externalIds": {
+      "spotifyId": "2oM7LMPFu882oC6jSwEqjd",
+      "youtubeChannelId": "UCD_4DgHwrNDp63NDfqXaHJQ",
+      "musicbrainzId": "155cfd40-dcde-471e-acc0-32179916165c",
+      "wikipediaArticleTitle": "Xaviersobased"
+    },
+    "releases": [
+      {
+        "id": "c11bc5d0-9334-476a-a21d-9ba0aa5b8a56",
+        "title": "Xavier",
+        "releaseDate": "2026-01-30",
+        "sourceUrl": "https://musicbrainz.org/release-group/c11bc5d0-9334-476a-a21d-9ba0aa5b8a56",
+        "officialReleaseVerified": true
+      },
+      {
+        "id": "095dc55a-0a72-48a5-91b9-40e552b03561",
+        "title": "xav10",
+        "releaseDate": "2025-10-24",
+        "sourceUrl": "https://musicbrainz.org/release-group/095dc55a-0a72-48a5-91b9-40e552b03561",
+        "officialReleaseVerified": true
+      }
+    ],
+    "catalogueComplete": true
+  },
+  "ye": {
+    "name": "Ye",
+    "searchName": "Kanye West",
+    "aliases": [
+      "Kanye West",
+      "Kanye",
+      "Yeezy"
+    ],
+    "verifiedAt": "2026-10-14",
+    "sources": [
+      "https://musicbrainz.org/artist/164f0d73-1234-4e2c-8743-d77bf2191051",
+      "https://www.youtube.com/channel/UCs6eXM7s8Vl5WcECcRHc2qQ",
+      "https://www.wikidata.org/wiki/Q15935"
+    ],
+    "externalIds": {
+      "spotifyId": "5K4W6rqBFWDnAN6FQUkS6x",
+      "youtubeChannelId": "UCs6eXM7s8Vl5WcECcRHc2qQ",
+      "musicbrainzId": "164f0d73-1234-4e2c-8743-d77bf2191051",
+      "wikipediaArticleTitle": "Kanye West"
+    },
+    "releases": [
+      {
+        "id": "7f4792fe-b563-4554-849a-95a89be71f84",
+        "title": "Donda",
+        "releaseDate": "2021-08-29",
+        "sourceUrl": "https://musicbrainz.org/release-group/7f4792fe-b563-4554-849a-95a89be71f84",
+        "officialReleaseVerified": true
+      },
+      {
+        "id": "6448381d-9d98-4f84-b99d-733b6acde906",
+        "title": "ye",
+        "releaseDate": "2018-06-01",
+        "sourceUrl": "https://musicbrainz.org/release-group/6448381d-9d98-4f84-b99d-733b6acde906",
+        "officialReleaseVerified": true
+      }
+    ],
+    "catalogueComplete": false
+  },
+  "yeat": {
+    "name": "Yeat",
+    "searchName": "Yeat",
+    "aliases": [
+      "YEAT"
+    ],
+    "verifiedAt": "2026-10-14",
+    "sources": [
+      "https://musicbrainz.org/artist/9e6a6a2f-f696-4cc0-87f1-e4f712e46802",
+      "https://www.youtube.com/channel/UCV4UK9LNNLViFP4qZA_Wmfw",
+      "https://www.wikidata.org/wiki/Q108761978"
+    ],
+    "externalIds": {
+      "spotifyId": "3qiHUAX7zY4Qnjx8TNUzVx",
+      "youtubeChannelId": "UCV4UK9LNNLViFP4qZA_Wmfw",
+      "musicbrainzId": "9e6a6a2f-f696-4cc0-87f1-e4f712e46802",
+      "wikipediaArticleTitle": "Yeat"
+    },
+    "releases": [
+      {
+        "id": "d1cbe347-bf34-427f-8cb7-4c7e53cc8643",
+        "title": "COCOON",
+        "releaseDate": "2026-09-18",
+        "sourceUrl": "https://musicbrainz.org/release-group/d1cbe347-bf34-427f-8cb7-4c7e53cc8643",
+        "officialReleaseVerified": true
+      },
+      {
+        "id": "5156d18d-0f4d-474f-9d48-2cccf2a48ee7",
+        "title": "ADL",
+        "releaseDate": "2026-03-27",
+        "sourceUrl": "https://musicbrainz.org/release-group/5156d18d-0f4d-474f-9d48-2cccf2a48ee7",
+        "officialReleaseVerified": true
+      }
+    ],
+    "catalogueComplete": true
+  },
+  "young-nudy": {
+    "name": "Young Nudy",
+    "searchName": "Young Nudy",
+    "aliases": [],
+    "verifiedAt": "2026-10-14",
+    "sources": [
+      "https://musicbrainz.org/artist/79c9b9a6-4b78-4738-8b81-95b066321ea9",
+      "https://www.youtube.com/channel/UCQUsq24C0yX_ezzQYj2IjXw",
+      "https://www.wikidata.org/wiki/Q62036530"
+    ],
+    "externalIds": {
+      "spotifyId": "5yPzzu25VzEk8qrGTLIrE1",
+      "youtubeChannelId": "UCQUsq24C0yX_ezzQYj2IjXw",
+      "musicbrainzId": "79c9b9a6-4b78-4738-8b81-95b066321ea9",
+      "wikipediaArticleTitle": "Young Nudy"
+    },
+    "releases": [
+      {
+        "id": "43cd8966-0b01-454e-b4fd-6a7a8ce6657a",
+        "title": "PARADISE",
+        "releaseDate": "2025-08-08",
+        "sourceUrl": "https://musicbrainz.org/release-group/43cd8966-0b01-454e-b4fd-6a7a8ce6657a",
+        "officialReleaseVerified": true
+      },
+      {
+        "id": "9178c3d6-e5db-4723-901f-8626f8c7e8b7",
+        "title": "Sli’merre 2",
+        "releaseDate": "2024-11-13",
+        "sourceUrl": "https://musicbrainz.org/release-group/9178c3d6-e5db-4723-901f-8626f8c7e8b7",
+        "officialReleaseVerified": true
+      }
+    ],
+    "catalogueComplete": true
+  },
+  "young-thug": {
+    "name": "Young Thug",
+    "searchName": "Young Thug",
+    "aliases": [
+      "Thugger"
+    ],
+    "verifiedAt": "2026-10-14",
+    "sources": [
+      "https://musicbrainz.org/artist/800760de-bdf8-43a2-8fe0-44a2401a5515",
+      "https://www.youtube.com/channel/UCuwdplPbuTFZj_64d03tSBA",
+      "https://www.wikidata.org/wiki/Q15637814",
+      "https://pitchfork.com/reviews/albums/young-stoner-life-young-thug-slime-language-3/"
+    ],
+    "externalIds": {
+      "spotifyId": "50co4Is1HCEo8bhOyUWKpn",
+      "youtubeChannelId": "UCuwdplPbuTFZj_64d03tSBA",
+      "musicbrainzId": "800760de-bdf8-43a2-8fe0-44a2401a5515",
+      "wikipediaArticleTitle": "Young Thug"
+    },
+    "releases": [
+      {
+        "id": "672c7355-4621-4cc4-a5a0-0e6e81d5b6f0",
+        "title": "Slime Language 3",
+        "releaseDate": "2026-08-28",
+        "sourceUrl": "https://musicbrainz.org/release-group/672c7355-4621-4cc4-a5a0-0e6e81d5b6f0",
+        "allowStandaloneMatch": true,
+        "contextRole": "label_compilation",
+        "officialReleaseVerified": true
+      },
+      {
+        "id": "fbd1a704-1046-47d4-9bbd-ddb38bdc577b",
+        "title": "UY SCUTI",
+        "releaseDate": "2025-09-26",
+        "sourceUrl": "https://musicbrainz.org/release-group/fbd1a704-1046-47d4-9bbd-ddb38bdc577b",
+        "allowStandaloneMatch": true,
+        "contextRole": "artist_release",
+        "officialReleaseVerified": true
+      },
+      {
+        "id": "d80fab51-36dd-470a-80fc-adb7b11d3cd4",
+        "title": "BUSINESS IS BUSINESS",
+        "releaseDate": "2023-06-22",
+        "sourceUrl": "https://musicbrainz.org/release-group/d80fab51-36dd-470a-80fc-adb7b11d3cd4",
+        "officialReleaseVerified": true
+      }
+    ],
+    "catalogueComplete": true
+  },
+  "youngboy-never-broke-again": {
+    "name": "YoungBoy Never Broke Again",
+    "searchName": "NBA Youngboy",
+    "aliases": [
+      "NBA Youngboy"
+    ],
+    "verifiedAt": "2026-10-14",
+    "sources": [
+      "https://musicbrainz.org/artist/127d8614-0876-4408-886c-6f110b047a78",
+      "https://www.youtube.com/channel/UClW4jraMKz6Qj69lJf-tODA",
+      "https://www.wikidata.org/wiki/Q36490532"
+    ],
+    "externalIds": {
+      "spotifyId": "7wlFDEWiM5OoIAt8RSli8b",
+      "youtubeChannelId": "UClW4jraMKz6Qj69lJf-tODA",
+      "musicbrainzId": "127d8614-0876-4408-886c-6f110b047a78",
+      "wikipediaArticleTitle": "YoungBoy Never Broke Again"
+    },
+    "releases": [
+      {
+        "id": "ea719e86-1f23-4f98-ac54-181a70e87608",
+        "title": "ML2",
+        "releaseDate": "2026-06-26",
+        "sourceUrl": "https://musicbrainz.org/release-group/ea719e86-1f23-4f98-ac54-181a70e87608",
+        "officialReleaseVerified": true
+      },
+      {
+        "id": "5e4ef7cb-488b-430d-9825-ab2e6cd078c3",
+        "title": "Slime Cry",
+        "releaseDate": "2026-01-16",
+        "sourceUrl": "https://musicbrainz.org/release-group/5e4ef7cb-488b-430d-9825-ab2e6cd078c3",
+        "officialReleaseVerified": true
+      }
+    ],
+    "catalogueComplete": true
+  },
+  "yung-fazo": {
+    "name": "Yung Fazo",
+    "searchName": "Yung Fazo",
+    "aliases": [],
+    "verifiedAt": "2026-10-14",
+    "sources": [
+      "https://musicbrainz.org/artist/4103c73e-c23f-47aa-af3b-ec78dbb89fd1",
+      "https://www.youtube.com/channel/UC2rx3EdfU1xAHEHZeRXYh8A"
+    ],
+    "externalIds": {
+      "spotifyId": "2UuVqmRzuGdHQB7BKACEW4",
+      "youtubeChannelId": "UC2rx3EdfU1xAHEHZeRXYh8A",
+      "musicbrainzId": "4103c73e-c23f-47aa-af3b-ec78dbb89fd1"
+    },
+    "releases": [
+      {
+        "id": "62e538f6-6b61-4bc4-a258-3a159e0416e0",
+        "title": "ZO",
+        "releaseDate": "2025-02-07",
+        "sourceUrl": "https://musicbrainz.org/release-group/62e538f6-6b61-4bc4-a258-3a159e0416e0",
+        "officialReleaseVerified": true
+      },
+      {
+        "id": "5fb0eb30-79f2-41bb-9fb6-d53ee69d93b0",
+        "title": "#frvralone",
+        "releaseDate": "2021-08-13",
+        "sourceUrl": "https://musicbrainz.org/release-group/5fb0eb30-79f2-41bb-9fb6-d53ee69d93b0",
+        "officialReleaseVerified": true
+      }
+    ],
+    "catalogueComplete": true
+  }
+}

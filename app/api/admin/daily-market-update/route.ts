@@ -815,9 +815,10 @@ async function collectRealSignals({
               supabase,
               artistIds,
               source: "bluesky",
-              metrics: ["post_count", "engagement_score", "hype_post_count", "negative_post_count"],
+              metrics: ["post_count", "engagement_score", "hype_post_count", "negative_post_count", "sampling_version", "query_scope", "reaction_count", "reaction_engagement"],
               beforeDate: runDate,
-              lookbackDays: 30
+              lookbackDays: 7,
+              strategy: "latest"
             })
           : Promise.resolve({}),
         usePolymarket
@@ -1142,7 +1143,7 @@ async function collectRealSignals({
 
   if (useYoutube && supabase) {
     const roster = await loadActiveArtists(supabase);
-    const stored = await loadRecentMarketEvents({ supabase, artistIds: roster.map(artist => artist.id), runDate, lookbackDays: 30 });
+    const stored = await loadRecentMarketEvents({ supabase, artistIds: roster.map(artist => artist.id), runDate, lookbackDays: 90 });
     // News and video coverage of the same release may share a catalyst, but
     // the recording must remain available for its own viewing observations.
     const candidates = Object.fromEntries(roster.map(artist => [artist.id, [...(stored[artist.id] ?? []), ...(detectedEventsByArtist[artist.id] ?? [])]]));
@@ -1405,7 +1406,7 @@ function filterStoredEventsForSourcePolicy(
           if (!allowBluesky && eventSource === "bluesky_post") {
             return false;
           }
-          if (eventSource === "bluesky_post" && event.rawPayload.samplingVersion !== 2) return false;
+          if (eventSource === "bluesky_post" && event.rawPayload.samplingVersion !== 3) return false;
           if (eventSource === "reddit_post" && !isRedditAccessEnabled()) return false;
 
           return isStoredEventEligibleForPricing(event, artistById.get(artistId));

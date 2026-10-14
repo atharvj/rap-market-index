@@ -147,9 +147,11 @@ const SERIES_DEFINITIONS: Record<string, { label: string; unit: string }> = {
     unit: "engagement"
   },
   "bluesky:average_sentiment": {
-    label: "Social sentiment",
+    label: "Social classifier score (legacy)",
     unit: "score"
   },
+  "bluesky:reaction_sentiment": { label: "Sampled social sentiment", unit: "score" },
+  "bluesky:reaction_count": { label: "Social reactions sampled", unit: "posts" },
   "wikimedia:pageviews_7d": {
     label: "Public attention",
     unit: "views"

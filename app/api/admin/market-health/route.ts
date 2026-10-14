@@ -11,6 +11,7 @@ import {
 } from "@/server/market/market-date";
 import { DEFAULT_MARKET_MODEL_VERSION, getMarketModelVersion } from "@/server/market/model-version";
 import { loadActiveArtists, loadArtistExternalIds } from "@/server/market/supabase-repository";
+import { getArtistTrackingCoverage } from "@/server/market/artist-tracking";
 
 export const dynamic = "force-dynamic";
 
@@ -283,6 +284,7 @@ export async function GET(request: Request) {
       defaultModelVersion: DEFAULT_MARKET_MODEL_VERSION,
       latestModelVersion: recentRuns[0]?.model_version ?? null,
       activeArtistCount: artists.length,
+      artistTracking: getArtistTrackingCoverage(artists, externalIds, runDate),
       sourceCoverage,
       observationHealth,
       priceHistoryHealth,

@@ -36,7 +36,8 @@ export function restoreDailySources(rows: Array<{
     for (const [source, value] of Object.entries(cached)) {
       if (source === "reddit" && !isRedditAccessEnabled()) continue;
       if (!DAILY_SOURCES.has(source) || !isSignal(value, source)) continue;
-      if ((source === "bluesky" || source === "youtube_comments") && value.rawPayload.samplingVersion !== 2) continue;
+      if (source === "bluesky" && value.rawPayload.samplingVersion !== 3) continue;
+      if (source === "youtube_comments" && value.rawPayload.samplingVersion !== 3) continue;
       restored[source] ??= {};
       restored[source][row.artist_id] = {
         ...value,

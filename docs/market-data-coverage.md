@@ -1,6 +1,6 @@
 # Market data coverage
 
-Model: `rmi-core-v37`. These are fantasy-market estimates, not observable exchange prices. More inputs should improve coverage and explain movement; they do not establish a uniquely correct dollar price.
+Model: `rmi-core-v38`. These are fantasy-market estimates, not observable exchange prices. More inputs should improve coverage and explain movement; they do not establish a uniquely correct dollar price.
 
 ## Sources and cadence
 
@@ -178,3 +178,64 @@ References: [YouTube comment sorting](https://developers.google.com/youtube/v3/d
 [Reddit approved access](https://support.reddithelp.com/hc/en-us/articles/14945211791892-Developer-Platform-Accessing-Reddit-Data),
 [UY SCUTI review](https://pitchfork.com/reviews/albums/young-thug-uy-scuti/),
 [Slime Language 3 review](https://pitchfork.com/reviews/albums/young-stoner-life-young-thug-slime-language-3/).
+
+
+## October 14 artist tracking profiles (v38)
+
+The finite active roster now has 89 explicit identity profiles in
+`src/data/artistTrackingProfiles.json`. All MusicBrainz identities and configured
+YouTube channels were checked. Fifteen artists have curated alias variants, and
+74 English Wikipedia titles were resolved through linked Wikidata entities.
+Profiles supplement missing Wikipedia mappings only when the saved MusicBrainz ID
+matches; operator mappings and conflicting IDs are preserved. Unknown/new listings
+continue with the generic collector until a profile is verified.
+
+The profiles carry 175 supported album contexts. Candidate album groups were checked
+for an Official release and performing artist credit; bootleg-only and undated
+entries were rejected. The compilation Slime Language 3 is explicitly a label-project
+context for Young Thug, supported by its catalogue record and a primary review's
+attribution. This does not credit him as a performer on every compilation track.
+Metadata is matching context and never creates a release event or a price bonus.
+Four catalogues were incomplete because of the provider's 100-group limit or an
+unavailable browse response. This is recorded in the profile and health report.
+
+Social collection performs at most three distinct artist/alias/album-context searches
+per artist, deduplicates returned posts, and discounts partial search coverage. Most
+album searches require the artist's name. Only explicitly approved distinctive
+contexts allow album-only matching: UY SCUTI and Slime Language 3. Such matching also
+requires music context; astronomy discussion and generic album titles do not establish
+artist identity. Posts about known old albums cannot become fresh social catalysts.
+
+Artist names appearing in a post and factual release announcements do not establish
+fan approval. Social pricing now uses identifiable positive/negative reactions rather
+than a classifier's announcement/status boost. Unclassified posts do not establish
+neutral sentiment. Reaction counts and engagement seed comparisons under the same
+query cohort and sampling version. Old v37 reception inputs and social events are not replayed by
+v38. Both reception collectors use sampling version 3. Sources remain bounded samples, with limited language/sarcasm understanding.
+Current streaming, viewing and verified news/touring inputs remain separate.
+
+Recording credit resolution also recognizes vetted stage aliases in explicit performer
+credits, with the same strict prefix/feature rules. Incidental mentions and song titles
+still do not create collaborators. Video candidates now cover 90 recorded days rather
+than 30, while only fresh comments contribute to reception. Older recording counters
+still require their own comparable baselines before yielding viewing acceleration.
+
+The admin health report lists each artist's search names, supported album contexts,
+linked Wikipedia identity and remaining gaps. Metadata older than 30 days is flagged
+for review. This registry is curated reference data, not an automatically complete or
+permanently fresh catalogue. New artist/release discovery continues separately; it does
+not automatically approve extra stage aliases. Public artist indicators expose sampled
+social reaction counts and sentiment scores when sufficient reactions are available.
+No source profile contains prices or artist-specific target returns, and stored prior
+closes are not rewritten by these tracking changes.
+
+References: [MusicBrainz alias types](https://musicbrainz.org/doc/Aliases),
+[MusicBrainz API](https://musicbrainz.org/doc/MusicBrainz_API),
+[Slime Language 3 attribution](https://pitchfork.com/reviews/albums/young-stoner-life-young-thug-slime-language-3/).
+
+
+`bluesky:reaction_sentiment` is a new observation metric. Earlier
+`average_sentiment` values are retained as legacy classifier measurements; they
+are not relabeled as newly measured fan opinions. Missing/insufficient reaction
+samples do not create zero sentiment readings. Complete time/relevance comment
+requests are required before a video is admitted to the reaction cohort.

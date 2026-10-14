@@ -21,7 +21,9 @@ const preferredSeries = [
   { key: "trade_flow:trade_count", label: "Orders · 24H" },
   { key: "youtube_comments:positive_comment_share", label: "Sampled Positive Reactions" },
   { key: "youtube_comments:negative_comment_share", label: "Sampled Negative Reactions" },
-  { key: "youtube_comments:comment_count", label: "Recent Comments Sampled" }
+  { key: "youtube_comments:comment_count", label: "Recent Comments Sampled" },
+  { key: "bluesky:reaction_count", label: "Social Reactions Sampled" },
+  { key: "bluesky:reaction_sentiment", label: "Sampled Social Sentiment" }
 ];
 
 export function ArtistAudienceSnapshot({ artistId }: { artistId: string }) {
@@ -111,12 +113,13 @@ export function ArtistAudienceSnapshot({ artistId }: { artistId: string }) {
         {metrics.map((metric) => (
           <div key={metric.key} className="min-w-0 px-3 py-3">
             <p className="truncate text-[10px] font-semibold uppercase text-paper/42">{metric.label}</p>
-            <p className="mt-1 text-sm font-semibold number-tabular">{metric.key.endsWith("_comment_share") ? `${metric.value.toFixed(1)}%` : formatCompact(metric.value)}</p>
+            <p className="mt-1 text-sm font-semibold number-tabular">{metric.key.endsWith("_comment_share") ? `${metric.value.toFixed(1)}%` : metric.key === "bluesky:reaction_sentiment" ? `${metric.value > 0 ? "+" : ""}${metric.value.toFixed(1)} / 100` : formatCompact(metric.value)}</p>
             <p className="mt-1 text-[10px] text-paper/35">Updated {formatDate(metric.date)}</p>
           </div>
         ))}
       </div>
       {metrics.some(metric => metric.key.startsWith("youtube_comments:")) ? <p className="border-t border-line px-4 py-3 text-xs text-paper/48">Reactions come from a limited sample of recent YouTube comments, not all fans. Unclassified comments are included in the sample count. Listening and touring can remain strong despite negative reactions.</p> : null}
+      {metrics.some(metric => metric.key.startsWith("bluesky:")) ? <p className="border-t border-line px-4 py-3 text-xs text-paper/48">Social sentiment samples identifiable reactions, not all fans. Scores range from −100 to +100. Announcements without an opinion do not count as approval.</p> : null}
     </section>
   );
 }
