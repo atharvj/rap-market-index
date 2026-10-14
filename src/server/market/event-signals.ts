@@ -12,6 +12,7 @@ import {
   isLowValueMarketArticleTitle
 } from "@/server/market/artist-event-disambiguation";
 import { isMarketEventSourceIntegrityValid } from "@/server/market/event-integrity";
+import { getNewsAttributionText } from "@/server/market/news-artist-attribution";
 import { classifyArticleEvent, normalizeDomain } from "@/server/market/gdelt-source";
 
 export type ManualMarketEventInput = {
@@ -1313,7 +1314,7 @@ function getStoredMediaEvidenceAdjustment(event: ScoredMarketEvent, artist: Mark
 
   if (!hasRequiredArtistEventDisambiguation({
     artistName: artist.name,
-    text: title,
+    text: getNewsAttributionText(title, rawPayload),
     query,
     sourceTier
   })) {

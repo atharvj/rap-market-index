@@ -37,7 +37,7 @@ describe("news story groups", () => {
     expect(groups[0].events.map((event) => event.artist_id)).toEqual(["che", "nine-vicious"]);
   });
 
-  it("groups differently attributed coverage of the same event", () => {
+  it("keeps separate articles about different concert participants separate", () => {
     const groups = groupNewsStoryEvents([
       {
         ...baseEvent,
@@ -57,7 +57,7 @@ describe("news story groups", () => {
       }
     ]);
 
-    expect(groups).toHaveLength(1);
+    expect(groups).toHaveLength(2);
   });
 
   it("normalizes possessive artist names when matching event coverage", () => {

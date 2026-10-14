@@ -28,6 +28,23 @@ const googleUrl = "https://news.google.com/rss/articles/CBMiTestArticle?oc=5";
 const canonicalUrl = "https://www.billboard.com/music/rb-hip-hop/baby-keem-casino-123/";
 
 describe("media RSS publisher-date verification", () => {
+  it("does not share Cardi B's story with DC The Don or trust a false artist mention in the RSS summary", async () => {
+    const headline = "Cardi B Makes a Splash on ‘GTA VI: The Album’ Soundtrack With Cocky ‘Don’t Chart’: Listen";
+    const publisherUrl = "https://www.billboard.com/music/rb-hip-hop/cardi-b-dont-chart/";
+    const result = await collectMediaRssMarketEvents({ artists: [
+      { ...artist, id: "cardi-b", name: "Cardi B", ticker: "CARDI" },
+      { ...artist, id: "dc-the-don", name: "DC The Don", ticker: "DCTD" }
+    ], runDate: "2026-10-14", includeGoogleNews: false, feedUrls: ["https://feeds.example.com/music.xml"], delayMs: 0,
+      fetchImpl: async input => String(input).includes("feeds.example.com") ? new Response(`<rss><channel><item><title>${headline}</title>
+        <link>${publisherUrl}</link><pubDate>Fri, 09 Oct 2026 12:00:00 GMT</pubDate><description>DC The Don is mentioned alongside Cardi B in chart coverage.</description>
+        </item></channel></rss>`, { headers: { "content-type": "application/xml" } }) : new Response(`<html><head>
+        <link rel="canonical" href="${publisherUrl}"/><meta property="og:type" content="article"/>
+        <meta property="og:description" content="Cardi B's new soundtrack song Don't Chart has arrived."/>
+        <script type="application/ld+json">${JSON.stringify({ "@type": "NewsArticle", url: publisherUrl, headline, datePublished: "2026-10-09T12:00:00Z" })}</script>
+        </head></html>`, { headers: { "content-type": "text/html" } }) });
+    expect(result.eventsByArtist["cardi-b"]).toHaveLength(1);
+    expect(result.eventsByArtist["dc-the-don"]).toBeUndefined();
+  });
   it("discovers news under both Ye and Kanye West", () => {
     const queries = buildArtistNewsQueries({ ...artist, id: "ye", name: "Ye", ticker: "YE" });
     expect(queries).toHaveLength(2);

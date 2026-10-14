@@ -1,5 +1,7 @@
 import { isHistoricalRetrospective } from "@/server/market/article-timeliness";
 import { getArtistTextKey } from "@/server/market/artist-text-identifiers";
+import { getTrackingAliasesByName, resolveVerifiedTrackingName } from "@/server/market/artist-tracking";
+import { stripQuotedMusicTitles } from "@/server/market/article-artist-text";
 import type { ArtistStatusSubtype } from "@/server/market/status-events";
 
 const COMMON_WORD_ARTIST_KEYS = new Set([
@@ -9,6 +11,8 @@ const COMMON_WORD_ARTIST_KEYS = new Set([
   "future",
   "ian",
   "nav",
+  "protect",
+  "tana",
   "ye"
 ]);
 
@@ -94,16 +98,15 @@ const LOW_TIER_CLAIMS_REQUIRING_CORROBORATION = new Set([
 export function hasRequiredArtistEventDisambiguation({
   artistName,
   text,
-  query,
-  sourceTier = 0
 }: {
   artistName: string;
   text: string;
   query?: string;
   sourceTier?: number;
 }) {
-  const normalizedText = normalizeEventSearchText(text);
-  const aliases = getArtistAliases(artistName, query);
+  const attributionText = stripQuotedMusicTitles(text);
+  const normalizedText = normalizeEventSearchText(attributionText);
+  const aliases = getArtistAliases(artistName);
 
   if (
     aliases.some((alias) =>
@@ -127,15 +130,12 @@ export function hasRequiredArtistEventDisambiguation({
     return false;
   }
 
-  if (aliases.some((alias) => hasStrongArtistCatalystContext(normalizedText, alias))) {
+  if (hasCoordinatedMusicArtistContext(attributionText, artistName) || aliases.some((alias) => hasStrongArtistCatalystContext(normalizedText, alias))) {
     return true;
   }
 
-  if (isCommonWord) {
-    return false;
-  }
-
-  return sourceTier >= 1 && hasMusicContext(normalizedText);
+  // A reputable music source still cannot establish an absent artist's identity.
+  return false;
 }
 
 export function isAmbiguousArtistName(name: string) {
@@ -351,10 +351,12 @@ export function isUncorroboratedLowTierMarketClaim({
   );
 }
 
-function getArtistAliases(artistName: string, query?: string) {
+function getArtistAliases(artistName: string, _query?: string) {
   return Array.from(
     new Set(
-      [artistName, ...extractQuotedSearchPhrases(query)]
+      // Search queries include other artists, album titles and topical phrases.
+      // Only the verified identity registry can supply aliases for this artist.
+      getTrackingAliasesByName(artistName)
         .map((alias) => normalizeEventSearchText(alias))
         .filter(Boolean)
     )
@@ -367,23 +369,42 @@ function hasStrongArtistCatalystContext(normalizedText: string, normalizedAlias:
   }
 
   const catalystAlternation = CATALYST_TERMS.map(escapeRegex).join("|");
+  const performerActions = "(?:announces|announced|arrested|charged|disses|dropped|drops|performs|performed|releases|released|responds|sentenced)";
   const alias = escapeRegex(normalizedAlias);
   const patterns = [
+    new RegExp(`^${alias}\\s+and(?:\\s+\\w+){1,8}\\s+perform(?:s|ed|ing)?\\b`),
     new RegExp(`^${alias}\\s+and(?:\\s+\\w+){1,8}\\s+reunit(?:e|es|ed|ing)\\b.{0,60}\\b(?:show|concert|onstage|performance)\\b`),
     // A performer can be the subject without a catalyst immediately following
     // their name. Keep this bounded to performance verbs and concert context;
     // mere co-occurrence of a common-word name and "tour" is insufficient.
     new RegExp(`^${alias}\\s+(?:brings? out|brought out|surpasses?|welcomes?)\\b(?:\\s+\\w+){0,16}\\s+(?:show|concert|tour|festival|stage)\\b`),
-    new RegExp(`\\b${alias}\\s+(?:${catalystAlternation})\\b`),
-    new RegExp(`\\b(?:${catalystAlternation})\\s+(?:from|by|with|for|to|against)\\s+${alias}\\b`),
+    new RegExp(`\\b${alias}\\s+${performerActions}\\b`),
+    new RegExp(`\\b(?:${catalystAlternation})\\s+(?:from|by)\\s+${alias}\\b`),
     new RegExp(`\\b(?:rapper|rap artist|hip hop artist|artist)\\s+${alias}\\b`),
     new RegExp(`\\b${alias}\\s+(?:the\\s+)?(?:rapper|rap artist|hip hop artist|artist)\\b`),
-    new RegExp(`\\b(?:feat|ft|featuring|with|alongside)\\s+${alias}\\b`),
+    ...(/\b(?:album|mixtape|song|track|verse|rap|collab|collabs|collaboration)\b/.test(normalizedText)
+      ? [new RegExp(`\\b(?:feat|ft|featuring|collabs? with)(?:\\s+\\S+){0,8}\\s+${alias}\\b`)] : []),
+    new RegExp(`\\b(?:feat|ft)\\s+${alias}\\b`),
+    new RegExp(`\\b(?:replaces|replaced|overtakes|overtook)\\s+${alias}\\s+at\\s+no\\s+1\\b`),
+    ...(/\b(?:album|mixtape|song|track|verse|drops|dropped|tour|concert|festival)\b/.test(normalizedText)
+      ? [new RegExp(`\\bwith\\s+${alias}(?:\\s+and\\s+|$)`)] : []),
+    new RegExp(`\\b${alias}\\s+s\\s+(?:album|mixtape|song|track|tour)\\b`),
+    new RegExp(`^${alias}\\s+(?:ties|tied|tops|topped|dominates|dominated|leads)\\b.{0,120}\\b(?:rap|hip hop|r b|album|song|chart|charts)\\b`),
+    new RegExp(`^${alias}\\s+makes\\s+(?:a\\s+)?surprise\\s+appearance\\b.{0,100}\\b(?:rapper|rap|concert|show|murder for hire trial)\\b`),
+    new RegExp(`\\b(?:diss track|diss song|shots)\\s+aimed at\\s+${alias}\\b`),
+    new RegExp(`\\b(?:explains|details)\\s+(?:his|her|their)\\s+${alias}\\s+(?:beef|feud)\\b`),
     new RegExp(`\\b(?:response to|responds to|responding to|beef with|disses|calls out|fights?)\\s+${alias}\\b`),
     new RegExp(`\\b${alias}\\s+(?:responds to|beefs with|disses|calls out|fights?)\\b`)
   ];
 
   return patterns.some((pattern) => pattern.test(normalizedText));
+}
+
+function hasCoordinatedMusicArtistContext(text: string, artistName: string) {
+  const match = text.match(/^(.*?)\s+(?:dominates?|dominated|tops?|topped|leads?|perform(?:s|ed)?|teams? up)\b(.*)$/i);
+  if (!match || !/\b(?:rap|hip.hop|charts?|album|concert|tour|festival|song|track|music)\b/i.test(match[2])) return false;
+  const names = match[1].split(/\s*(?:,|&|\band\b)\s*/i).map(name => resolveVerifiedTrackingName(name.trim()));
+  return names.length >= 2 && names.every(Boolean) && names.includes(resolveVerifiedTrackingName(artistName));
 }
 
 function hasDirectStatusSubject(
@@ -603,9 +624,8 @@ function getStatusNouns(statusSubtype?: ArtistStatusSubtype | null) {
 
 function isAmbiguousAlias(normalizedAlias: string) {
   const compact = normalizedAlias.replace(/\s+/g, "");
-  const wordCount = normalizedAlias.split(/\s+/).filter(Boolean).length;
 
-  return compact.length <= 3 || (wordCount === 1 && compact.length <= 4);
+  return compact.length <= 3;
 }
 
 function isCommonWordAlias(normalizedAlias: string) {
@@ -618,14 +638,6 @@ function containsNormalizedPhrase(normalizedText: string, normalizedPhrase: stri
 
 function toRegexPhrase(normalizedPhrase: string) {
   return normalizedPhrase.split(/\s+/).map(escapeRegex).join("\\s+");
-}
-
-function extractQuotedSearchPhrases(query?: string) {
-  if (!query) {
-    return [];
-  }
-
-  return [...query.matchAll(/"([^"]+)"/g)].map((match) => match[1]).filter(Boolean);
 }
 
 function normalizeEventSearchText(value: string) {

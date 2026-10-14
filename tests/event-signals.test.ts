@@ -408,13 +408,10 @@ describe("stored media revalidation", () => {
     return events[0];
   }
 
-  it("zeroes an unrelated article that a broad search attached to the artist", () => {
-    expect(storedMediaSafety(storedMediaEvent({
-      title: "Oscars: South Korea Selects Possible Love for International Feature"
-    }))).toMatchObject({
-      evidenceSafetyLabel: "rejected_stale_media_artist_attribution",
-      evidenceSafetyMultiplier: 0
-    });
+  it("excludes an unrelated article that a broad search attached to the artist", () => {
+    expect(buildEventMarketSignals({ artists: [artist], runDate: "2026-07-11", eventsByArtist: {
+      [artist.id]: [storedMediaEvent({ title: "Oscars: South Korea Selects Possible Love for International Feature" })]
+    } })).toEqual({});
   });
 
   it("zeroes an old blanket controversy when it is now a tour disruption", () => {

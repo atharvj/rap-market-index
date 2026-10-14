@@ -386,7 +386,7 @@ async function buildArtistEvents({
         domain: normalizeDomain(undefined, verification.metadata.canonicalUrl) ?? candidate.item.domain,
         publishedDate: verification.metadata.publishedDate,
         title: verification.metadata.headline,
-        summary: verification.metadata.summary ?? candidate.item.summary
+        summary: verification.metadata.summary ?? ""
       };
       const verifiedTitleMatchedArtist = mentionsArtist(
         verifiedItem.title,
@@ -466,6 +466,7 @@ async function buildArtistEvents({
           classification: verifiedClassification,
           verifiedPublisherDate: verification.metadata.publishedDate,
           verifiedPublisherHeadline: verification.metadata.headline,
+          verifiedPublisherDescription: verification.metadata.summary ?? null,
           verifiedPublisherPageType: verification.metadata.pageType,
           originalFeedDate: candidate.item.publishedDate,
           originalGoogleNewsUrl: googleNewsUrl
@@ -490,7 +491,7 @@ async function buildArtistEvents({
       return true;
     }), maxEventsPerArtist);
 
-  const events = candidateEvents.map(({ item, titleMatchedArtist, textMatchedArtist, disambiguatedArtist, subjectMatchedArtist, artistRole, sourceTier, classification, verifiedPublisherDate, verifiedPublisherHeadline, verifiedPublisherPageType, originalFeedDate, originalGoogleNewsUrl }) => {
+  const events = candidateEvents.map(({ item, titleMatchedArtist, textMatchedArtist, disambiguatedArtist, subjectMatchedArtist, artistRole, sourceTier, classification, verifiedPublisherDate, verifiedPublisherHeadline, verifiedPublisherDescription, verifiedPublisherPageType, originalFeedDate, originalGoogleNewsUrl }) => {
     const classificationText = `${item.title} ${item.summary}`.slice(0, 600);
     const releaseDate = getReleaseEventDate({
       text: classificationText,
@@ -530,6 +531,7 @@ async function buildArtistEvents({
         publisherCanonicalUrl: item.url,
         publisherPublishedDate: verifiedPublisherDate,
         publisherHeadline: verifiedPublisherHeadline,
+        publisherDescription: verifiedPublisherDescription,
         publisherPageType: verifiedPublisherPageType,
         googleNewsUrl: originalGoogleNewsUrl,
         releaseDate,

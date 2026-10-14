@@ -10,6 +10,8 @@ import {
   isLowValueMarketArticleTitle
 } from "@/server/market/artist-event-disambiguation";
 import { buildDefaultGdeltQuery } from "@/server/market/artist-text-identifiers";
+import { getTrackingAliasesByName } from "@/server/market/artist-tracking";
+import { stripQuotedMusicTitles } from "@/server/market/article-artist-text";
 import type {
   AdapterSignal,
   AdapterSignals,
@@ -1175,10 +1177,10 @@ function hasAny(value: string, terms: string[]) {
   });
 }
 
-export function mentionsArtist(title: string, artistName: string, query?: string) {
-  const normalizedTitle = normalizeSearchText(title);
-  const compactTitle = normalizedTitle.replace(/\s+/g, "");
-  const candidateNames = [artistName, ...extractQuotedSearchPhrases(query)].filter(Boolean);
+export function mentionsArtist(title: string, artistName: string, _query?: string) {
+  const normalizedTitle = normalizeSearchText(stripQuotedMusicTitles(title));
+  const titleTokens = new Set(normalizedTitle.split(/\s+/));
+  const candidateNames = getTrackingAliasesByName(artistName);
 
   for (const candidate of candidateNames) {
     const normalizedArtist = normalizeSearchText(candidate);
@@ -1190,18 +1192,10 @@ export function mentionsArtist(title: string, artistName: string, query?: string
     const compactArtist = normalizedArtist.replace(/\s+/g, "");
     const allowCompactMatch = normalizedArtist.includes(" ") || /[^a-z0-9\s]/i.test(candidate);
 
-    if (allowCompactMatch && compactArtist.length > 3 && compactTitle.includes(compactArtist)) {
+    if (allowCompactMatch && compactArtist.length > 3 && titleTokens.has(compactArtist)) {
       return true;
     }
 
-    const meaningfulParts = normalizedArtist.split(" ").filter((part) => part.length > 2);
-
-    if (
-      meaningfulParts.length > 1 &&
-      meaningfulParts.every((part) => containsNormalizedPhrase(normalizedTitle, part))
-    ) {
-      return true;
-    }
   }
 
   return false;
@@ -1219,16 +1213,6 @@ function normalizeSearchText(value: string) {
     .replace(/[^a-z0-9]+/g, " ")
     .replace(/\s+/g, " ")
     .trim();
-}
-
-function extractQuotedSearchPhrases(query: string | undefined) {
-  if (!query) {
-    return [];
-  }
-
-  return Array.from(query.matchAll(/"([^"]+)"/g), (match) => match[1]?.trim()).filter((value): value is string =>
-    Boolean(value)
-  );
 }
 
 function normalizeArticleTitle(value: string | undefined) {

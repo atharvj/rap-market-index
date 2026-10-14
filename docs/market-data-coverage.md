@@ -1,6 +1,6 @@
 # Market data coverage
 
-Model: `rmi-core-v38`. These are fantasy-market estimates, not observable exchange prices. More inputs should improve coverage and explain movement; they do not establish a uniquely correct dollar price.
+Model: `rmi-core-v39`. These are fantasy-market estimates, not observable exchange prices. More inputs should improve coverage and explain movement; they do not establish a uniquely correct dollar price.
 
 ## Sources and cadence
 
@@ -33,6 +33,25 @@ The live team is on Vercel Hobby, which permits only daily cron invocations. A p
 The endpoint already supports the configured `CRON_SECRET`. Disable the GitHub catalyst schedule when enabling the native schedule to avoid duplicate jobs. This proposed entry is not enabled on Hobby. [Vercel's cron limits](https://vercel.com/docs/cron-jobs/usage-and-pricing) and [Pro pricing](https://vercel.com/docs/plans/pro-plan) list a $20/month platform fee, including one deploying seat and $20 usage credit, with additional usage billed separately. No upgrade or purchase has been made.
 
 ## Relevance and recording credits
+
+Artist attribution uses each artist's verified names and aliases. Quoted search
+terms are never aliases, separate name words cannot establish identity, and compact
+names require a complete token match. Common names such as Future, ian and Protect
+require artist context. Quoted music titles do not establish performer credits.
+
+The same attribution checks protect incoming events, stored-event pricing, news
+badges and artist feeds. Related-ID lists and other articles grouped with a story
+cannot supply unsupported badges. Verified publisher descriptions can establish
+genuine participants; descriptions are shared only for the same article URL and
+headline. Different articles about different concert participants remain separate.
+Official recordings retain the explicit performer-credit resolver.
+
+The October 14 audit covered all 1,199 saved events, including 764 article rows.
+Publisher metadata was rechecked for ambiguous cases. Unsupported associations are
+quarantined through an attribution-rejection flag, preserving the original event
+record and recorded price history. Verified participants, including Tezzus as a
+Young Thug tour support act, remain eligible. Legacy coverage without sufficient
+identity evidence stays excluded rather than being guessed.
 
 An article published today about an old release is not a new release. History columns, anniversaries and retrospectives are excluded from catalysts and pricing. A newly announced anniversary tour, reissue or actual chart return can still qualify. Any measurable renewed listening is evaluated through audience sources.
 

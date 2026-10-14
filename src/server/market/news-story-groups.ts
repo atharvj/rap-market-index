@@ -1,4 +1,5 @@
 import { isOfficialRecordingSource, resolveRecordingArtists } from "@/server/market/recording-credits";
+import { hasNewsArtistAttribution } from "@/server/market/news-artist-attribution";
 
 export type NewsStoryEvent = {
   id: string;
@@ -88,7 +89,9 @@ export function areNewsStoryEventsEquivalent(first: NewsStoryEvent, second: News
   const sharedPhrase = hasSharedDistinctiveNewsStoryPhrase(first.title, second.title);
 
   if (differentArtists) {
-    return shared >= 4 && containment >= 0.4;
+    // Separate articles about different artists at the same event are not
+    // interchangeable evidence. Exact URLs/headlines were handled above.
+    return false;
   }
 
   return shared >= 4 || (shared >= 3 && (containment >= 0.5 || sharedPhrase)) || sameRelease;
@@ -122,10 +125,25 @@ export function resolveNewsStoryArtists<T extends NewsStoryEvent>({
   const artistById = new Map(artists.map((artist) => [artist.id, artist]));
   const artistByName = new Map(artists.map((artist) => [normalizeArtistIdentity(artist.name), artist]));
   const artistByTicker = new Map(artists.map((artist) => [artist.ticker.toUpperCase(), artist]));
+  const attributionPayload = { ...toRecord(primary.raw_payload) };
+  const primaryUrl = normalizeNewsSourceUrl(primary.source_url);
+  const publisherDescriptions = [primary, ...events.filter(event => event.id !== primary.id)]
+    .filter(event => primaryUrl && normalizeNewsSourceUrl(event.source_url) === primaryUrl &&
+      normalizeNewsStoryHeadline(event.title) === normalizeNewsStoryHeadline(primary.title))
+    .map(event => toRecord(event.raw_payload))
+    .filter(payload => payload.publisherArticleVerified === true && payload.publisherHeadlineVerified === true &&
+      typeof payload.publisherDescription === "string")
+    .map(payload => payload.publisherDescription as string);
+  if (publisherDescriptions.length) {
+    attributionPayload.publisherArticleVerified = true;
+    attributionPayload.publisherDescription = [...new Set(publisherDescriptions)].join(" ");
+  }
   const selected: NewsStoryArtist[] = [];
   const seen = new Set<string>();
   const addArtist = (artist: NewsStoryArtist | undefined) => {
-    if (!artist || seen.has(artist.id)) {
+    if (!artist || seen.has(artist.id) || !hasNewsArtistAttribution({
+      artistName: artist.name, title: primary.title, rawPayload: attributionPayload
+    })) {
       return;
     }
 
@@ -162,18 +180,9 @@ export function resolveNewsStoryArtists<T extends NewsStoryEvent>({
     }
   }
 
-  // Older feed rows and third-party RSS results do not always include structured
-  // co-artist metadata. Recover only exact, unambiguous roster names from the
-  // visible headline so collaboration stories are not credited to one artist.
-  for (const event of orderedEvents) {
-    const headline = normalizeArtistMentionText(event.title);
-
-    for (const artist of artists) {
-      if (isSafeExplicitHeadlineMention(headline, artist.name)) {
-        addArtist(artist);
-      }
-    }
-  }
+  // Recover genuine mentions in this article using the verified alias registry.
+  // Neither another grouped article nor a related-ID list can supply a badge.
+  for (const artist of artists) addArtist(artist);
 
   return selected;
 }
@@ -265,44 +274,6 @@ function hasReleaseLifecycleMismatch(firstTitle: string, secondTitle: string) {
 
 function normalizeArtistIdentity(value: string) {
   return value.toLowerCase().replace(/[^a-z0-9]+/g, "");
-}
-
-const AMBIGUOUS_HEADLINE_ARTIST_NAMES = new Set([
-  "autumn",
-  "che",
-  "feng",
-  "future",
-  "ian",
-  "nav",
-  "tana",
-  "ye"
-]);
-
-function isSafeExplicitHeadlineMention(normalizedHeadline: string, artistName: string) {
-  const normalizedArtist = normalizeArtistMentionText(artistName);
-  const compactArtist = normalizedArtist.replace(/\s+/g, "");
-
-  if (
-    !normalizedArtist ||
-    compactArtist.length <= 4 ||
-    AMBIGUOUS_HEADLINE_ARTIST_NAMES.has(normalizedArtist)
-  ) {
-    return false;
-  }
-
-  return ` ${normalizedHeadline} `.includes(` ${normalizedArtist} `);
-}
-
-function normalizeArtistMentionText(value: string) {
-  return value
-    .normalize("NFKD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase()
-    .replace(/&/g, " and ")
-    .replace(/\$/g, "s")
-    .replace(/[^a-z0-9]+/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
 }
 
 function toRecord(value: unknown): Record<string, unknown> {

@@ -1,5 +1,7 @@
 import type { MarketEvent } from "@/server/market/market-data";
 import { isHistoricalRetrospective } from "@/server/market/article-timeliness";
+import { hasNewsArtistAttribution } from "@/server/market/news-artist-attribution";
+import { getVerifiedTrackingArtistName } from "@/server/market/artist-tracking";
 
 type EventIdentity = {
   eventDate: string;
@@ -8,6 +10,10 @@ type EventIdentity = {
 };
 
 export function isMarketEventSourceIntegrityValid(event: MarketEvent) {
+  const source = getString(event.rawPayload.source)?.toLowerCase();
+  const artistName = getVerifiedTrackingArtistName(event.artistId);
+  if (artistName && ["media_rss_item", "gdelt_article", "ai_research_event"].includes(source ?? "") &&
+    !hasNewsArtistAttribution({ artistName, title: event.title, rawPayload: event.rawPayload })) return false;
   return isStoredMarketEventSourceIntegrityValid(event.rawPayload, {
     eventDate: event.eventDate,
     title: event.title,
@@ -19,6 +25,7 @@ export function isStoredMarketEventSourceIntegrityValid(
   rawPayload: Record<string, unknown>,
   event: EventIdentity
 ) {
+  if (rawPayload.artistAttributionRejected === true) return false;
   const source = getString(rawPayload.source)?.toLowerCase();
   if (["media_rss_item", "gdelt_article", "ai_research_event"].includes(source ?? "") && isHistoricalRetrospective(event.title)) return false;
 

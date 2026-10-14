@@ -43,6 +43,7 @@ import { hasVerifiedAiResearchArticleProvenance } from "@/server/market/event-in
 import { decodeHtmlEntities } from "@/lib/html-entities";
 import { hasMaterialMarketImpact } from "@/lib/market-news-impact";
 import { getMarketNewsTags, marketNewsHasTag, normalizeMarketNewsTag } from "@/lib/market-news-tags";
+import { getNewsAttributionText, hasNewsArtistAttribution } from "@/server/market/news-artist-attribution";
 
 export const dynamic = "force-dynamic";
 
@@ -516,6 +517,10 @@ function isPublicMarketNewsEvent(
   const confidence = Number(event.confidence);
   const hasStatusSubtype = Boolean(getArtistStatusSubtype(rawPayload.statusSubtype));
 
+  if (rawPayload.artistAttributionRejected === true) return false;
+  if (["media_rss_item", "gdelt_article", "ai_research_event"].includes(source) &&
+    (!artist || !hasNewsArtistAttribution({ artistName: artist.name, title: event.title, rawPayload }))) return false;
+
   if (["media_rss_item", "gdelt_article", "ai_research_event"].includes(source) && isHistoricalRetrospective(event.title)) {
     return false;
   }
@@ -625,7 +630,7 @@ function isStoredMediaEventStillValid(
 
   if (!hasRequiredArtistEventDisambiguation({
     artistName: artist.name,
-    text: event.title,
+    text: getNewsAttributionText(event.title, rawPayload),
     query: getRawString(rawPayload.searchQuery) || undefined,
     sourceTier
   })) {

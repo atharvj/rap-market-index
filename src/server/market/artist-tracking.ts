@@ -16,6 +16,15 @@ export type ArtistTrackingProfile = {
 const registry = profiles as Record<string, ArtistTrackingProfile>;
 type Identity = { id: string; name: string };
 
+export function getVerifiedTrackingArtistName(artistId: string) {
+  return registry[artistId]?.name;
+}
+
+export function resolveVerifiedTrackingName(name: string) {
+  return Object.values(registry).find(profile => [profile.name, profile.searchName, ...profile.aliases]
+    .some(alias => normalizeTrackingText(alias) === normalizeTrackingText(name)))?.name;
+}
+
 export function getArtistTrackingProfile(artist: Identity, ids?: ArtistExternalIds) {
   const profile = registry[artist.id];
   if (!profile || normalizeArtistNameForMatch(profile.name) !== normalizeArtistNameForMatch(artist.name)) return undefined;
