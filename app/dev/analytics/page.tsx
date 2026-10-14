@@ -137,8 +137,8 @@ export default function ProductAnalyticsPage() {
               type="button"
               onClick={() => setDays(option)}
               className={option === days
-                ? "min-h-9 rounded px-4 text-sm font-bold bg-cyan text-ink"
-                : "min-h-9 rounded px-4 text-sm font-bold text-paper/55 hover:text-paper"}
+                ? "min-h-9 rounded-sm px-4 text-sm font-bold bg-cyan text-ink"
+                : "min-h-9 rounded-sm px-4 text-sm font-bold text-paper/55 hover:text-paper"}
             >
               {option}D
             </button>

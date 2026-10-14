@@ -43,7 +43,7 @@ export default function NewsPage() {
               <select
                 value={newsTag}
                 onChange={(event) => setNewsTag(event.target.value)}
-                className="min-w-28 bg-transparent font-semibold text-paper outline-none"
+                className="min-w-28 bg-transparent font-semibold text-paper outline-hidden"
                 aria-label="Filter market news"
               >
                 <option value="">All Stories</option>
@@ -58,7 +58,7 @@ export default function NewsPage() {
               <select
                 value={newsSort}
                 onChange={(event) => setNewsSort(event.target.value as MarketNewsSort)}
-                className="min-w-28 bg-transparent font-semibold text-paper outline-none"
+                className="min-w-28 bg-transparent font-semibold text-paper outline-hidden"
                 aria-label="Sort market news"
               >
                 <option value="top">Top Stories</option>

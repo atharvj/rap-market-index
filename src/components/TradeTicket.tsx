@@ -303,7 +303,7 @@ export function TradeTicket({
           </button>
           <input
             id="shares"
-            className="h-12 min-w-0 flex-1 bg-transparent px-3 text-center text-lg font-semibold outline-none number-tabular"
+            className="h-12 min-w-0 flex-1 bg-transparent px-3 text-center text-lg font-semibold outline-hidden number-tabular"
             inputMode="numeric"
             pattern="[0-9]*"
             value={shares}

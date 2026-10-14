@@ -20,7 +20,7 @@ export default function ErrorPage({
     <section className="mx-auto flex min-h-[520px] max-w-3xl items-center justify-center py-12">
       <div className="rmi-card w-full p-6">
         <div className="flex items-start gap-4">
-          <div className="grid h-11 w-11 shrink-0 place-items-center rounded bg-ember/10 text-ember">
+          <div className="grid h-11 w-11 shrink-0 place-items-center rounded-sm bg-ember/10 text-ember">
             <AlertTriangle className="h-5 w-5" aria-hidden="true" />
           </div>
           <div className="min-w-0">
@@ -39,21 +39,21 @@ export default function ErrorPage({
           <button
             type="button"
             onClick={reset}
-            className="inline-flex min-h-10 items-center justify-center gap-2 rounded bg-paper px-4 text-sm font-semibold text-ink transition-colors hover:bg-paper/90"
+            className="inline-flex min-h-10 items-center justify-center gap-2 rounded-sm bg-paper px-4 text-sm font-semibold text-ink transition-colors hover:bg-paper/90"
           >
             <RefreshCcw className="h-4 w-4" aria-hidden="true" />
             Retry
           </button>
           <Link
             href="/markets"
-            className="inline-flex min-h-10 items-center justify-center gap-2 rounded border border-line px-4 text-sm font-semibold transition-colors hover:border-cyan hover:text-cyan"
+            className="inline-flex min-h-10 items-center justify-center gap-2 rounded-sm border border-line px-4 text-sm font-semibold transition-colors hover:border-cyan hover:text-cyan"
           >
             <BarChart3 className="h-4 w-4" aria-hidden="true" />
             Now trading
           </Link>
           <Link
             href="/"
-            className="inline-flex min-h-10 items-center justify-center gap-2 rounded border border-line px-4 text-sm font-semibold transition-colors hover:border-cyan hover:text-cyan"
+            className="inline-flex min-h-10 items-center justify-center gap-2 rounded-sm border border-line px-4 text-sm font-semibold transition-colors hover:border-cyan hover:text-cyan"
           >
             <Home className="h-4 w-4" aria-hidden="true" />
             Home

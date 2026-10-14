@@ -476,7 +476,7 @@ function NewsThumbnail({ item, size = "row" }: { item: MarketNewsItem; size?: "h
             <img
               src={item.sourceIconUrl}
               alt=""
-              className={clsx(size === "hero" ? "h-10 w-10" : "h-6 w-6", "rounded object-contain")}
+              className={clsx(size === "hero" ? "h-10 w-10" : "h-6 w-6", "rounded-sm object-contain")}
               loading="lazy"
               onError={(event) => {
                 event.currentTarget.style.display = "none";
@@ -514,7 +514,7 @@ function NewsThumbnail({ item, size = "row" }: { item: MarketNewsItem; size?: "h
           </span>
         </span>
       ) : (
-        <span className="absolute bottom-1 left-1 rounded-[var(--radius-control)] bg-white/90 px-1.5 py-0.5 text-[10px] font-semibold text-paper shadow-sm">
+        <span className="absolute bottom-1 left-1 rounded-[var(--radius-control)] bg-white/90 px-1.5 py-0.5 text-[10px] font-semibold text-paper shadow-xs">
           {item.ticker}
         </span>
       )}
@@ -612,7 +612,7 @@ function SourceMeta({ item }: { item: MarketNewsItem }) {
         <img
           src={item.sourceIconUrl}
           alt=""
-          className="h-3.5 w-3.5 shrink-0 rounded object-contain"
+          className="h-3.5 w-3.5 shrink-0 rounded-sm object-contain"
           loading="lazy"
           onError={(event) => {
             event.currentTarget.style.display = "none";

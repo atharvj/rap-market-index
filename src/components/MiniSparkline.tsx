@@ -19,7 +19,7 @@ export function MiniSparkline({
   if (points.length < 2) {
     return (
       <div
-        className="relative overflow-hidden rounded-sm border border-line/60 bg-panelSoft/70"
+        className="relative overflow-hidden rounded-xs border border-line/60 bg-panelSoft/70"
         style={{ width, height }}
         aria-label={`${chartLabel}; price history is still building`}
       >

@@ -217,7 +217,7 @@ export default function PortfolioPage() {
                   <div key={holding.artistId}>
                     <div className="flex items-center justify-between gap-3 text-sm">
                       <span className="flex min-w-0 items-center gap-2">
-                        <span className="h-2.5 w-2.5 rounded-sm" style={{ background: allocationColor(index) }} />
+                        <span className="h-2.5 w-2.5 rounded-xs" style={{ background: allocationColor(index) }} />
                         <span className="truncate font-medium">{holding.artist.name}</span>
                       </span>
                       <span className="font-semibold number-tabular">{Math.round((holding.currentValue / Math.max(1, invested)) * 100)}%</span>

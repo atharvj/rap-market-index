@@ -108,3 +108,18 @@ Artist charts and public indicators cancel superseded requests and time out hung
 requests after 20 seconds. A failed background refresh retains the last loaded
 values with an explicit warning; an initial failure reports unavailability.
 All available public indicators are displayed, including the seventh Orders metric.
+
+The same audit found newly published dependency advisories. Runtime dependencies
+were patched to Next.js 15.5.27 and sharp 0.35.5, with updated minimum overrides for
+brace-expansion 5.0.12, fast-uri 4.1.5 and source-map-js 1.2.2. The old styling build
+chain included braces 3.0.3, for which no patched release is published. Tailwind was
+migrated to 4.3.3 with its supported PostCSS plugin, existing theme configuration,
+explicit app/src sources, and documented utility renames preserving visual values.
+The full npm audit, including development dependencies, reports zero findings.
+
+References: [sharp's security advisory](https://github.com/advisories/GHSA-wq5f-xc86-pv6w),
+[unpatched braces advisory](https://github.com/advisories/GHSA-vfj7-8cjw-p6xm),
+[Tailwind's upgrade guide](https://tailwindcss.com/docs/upgrade-guide).
+Tailwind 4 requires Safari 16.4+, Chrome 111+ or Firefox 128+; older browsers are
+outside the styling framework's supported targets. Visual and mobile checks must
+pass against the existing snapshots before deployment.

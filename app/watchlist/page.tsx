@@ -90,7 +90,7 @@ export default function WatchlistPage() {
               autoFocus
               value={addQuery}
               onChange={(event) => setAddQuery(event.target.value)}
-              className="rmi-terminal-input h-11 w-full pl-9 pr-3 text-sm outline-none placeholder:text-paper/35"
+              className="rmi-terminal-input h-11 w-full pl-9 pr-3 text-sm outline-hidden placeholder:text-paper/35"
               placeholder="Search artist or ticker"
               aria-label="Search artists to add to your watchlist"
             />

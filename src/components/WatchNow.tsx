@@ -596,7 +596,7 @@ export function WatchNow() {
               <div className="flex flex-wrap gap-2">
                 {(currentVideo.relatedArtists?.length ? currentVideo.relatedArtists : [currentVideo]).map(artist => <Link
                   key={artist.artistId} href={`/artists/${artist.artistId}`}
-                  className="rounded bg-cyan/10 px-2 py-1 text-xs font-semibold text-cyan hover:bg-cyan/20"
+                  className="rounded-sm bg-cyan/10 px-2 py-1 text-xs font-semibold text-cyan hover:bg-cyan/20"
                   aria-label={`${artist.artistName} artist page`}
                 >{artist.artistName} · {artist.ticker}</Link>)}
               </div>

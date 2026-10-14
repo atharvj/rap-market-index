@@ -90,11 +90,11 @@ export default function OnboardingPage() {
     return (
       <div className="rmi-auth-surface mx-auto max-w-4xl space-y-6 p-6 sm:p-8" role="status" aria-live="polite">
         <span className="sr-only">Loading your RMI profile setup.</span>
-        <div className="rmi-skeleton h-3 w-32 rounded" />
-        <div className="rmi-skeleton h-1 w-full rounded" />
+        <div className="rmi-skeleton h-3 w-32 rounded-sm" />
+        <div className="rmi-skeleton h-1 w-full rounded-sm" />
         <div className="space-y-3">
-          <div className="rmi-skeleton h-8 w-2/3 rounded" />
-          <div className="rmi-skeleton h-4 w-1/2 rounded" />
+          <div className="rmi-skeleton h-8 w-2/3 rounded-sm" />
+          <div className="rmi-skeleton h-4 w-1/2 rounded-sm" />
         </div>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
           {Array.from({ length: 6 }).map((_, index) => <div key={index} className="rmi-skeleton h-14 rounded-md" />)}
@@ -201,10 +201,10 @@ export default function OnboardingPage() {
                   disabled={unavailable}
                   aria-pressed={active}
                   className={active
-                    ? "rmi-card flex items-center justify-between gap-3 !border-cyan/70 !bg-cyan/15 p-4 text-left ring-2 ring-cyan/55 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan"
+                    ? "rmi-card flex items-center justify-between gap-3 !border-cyan/70 !bg-cyan/15 p-4 text-left ring-2 ring-cyan/55 transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-cyan"
                     : unavailable
                       ? "rmi-card flex cursor-not-allowed items-center justify-between gap-3 p-4 text-left opacity-40"
-                      : "rmi-card flex items-center justify-between gap-3 p-4 text-left transition-colors hover:!border-cyan/60 hover:!bg-panelSoft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan/60"
+                      : "rmi-card flex items-center justify-between gap-3 p-4 text-left transition-colors hover:!border-cyan/60 hover:!bg-panelSoft focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-cyan/60"
                   }
                 >
                   <span className="flex min-w-0 items-center gap-3">

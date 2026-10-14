@@ -474,8 +474,8 @@ function AccountPageContent() {
   if (configured && authLoading) {
     return (
       <div className="rmi-auth-surface mx-auto max-w-xl space-y-4 p-6" role="status" aria-label="Loading account">
-        <div className="rmi-skeleton h-4 w-28 rounded-sm" />
-        <div className="rmi-skeleton h-9 w-56 rounded-sm" />
+        <div className="rmi-skeleton h-4 w-28 rounded-xs" />
+        <div className="rmi-skeleton h-9 w-56 rounded-xs" />
         <div className="rmi-skeleton h-11 w-full rounded-md" />
         <div className="rmi-skeleton h-11 w-full rounded-md" />
         <div className="rmi-skeleton h-11 w-full rounded-md" />
@@ -507,7 +507,7 @@ function AccountPageContent() {
             type="button"
             onClick={continueWithGoogle}
             disabled={submitting}
-            className="inline-flex h-11 items-center justify-center gap-3 rounded-md border border-[#747775] bg-white px-4 text-sm font-semibold text-[#1f1f1f] shadow-sm transition-colors hover:border-[#5f6368] hover:bg-[#f8faff] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan focus-visible:ring-offset-2 focus-visible:ring-offset-ink disabled:cursor-not-allowed disabled:opacity-60"
+            className="inline-flex h-11 items-center justify-center gap-3 rounded-md border border-[#747775] bg-white px-4 text-sm font-semibold text-[#1f1f1f] shadow-xs transition-colors hover:border-[#5f6368] hover:bg-[#f8faff] focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-cyan focus-visible:ring-offset-2 focus-visible:ring-offset-ink disabled:cursor-not-allowed disabled:opacity-60"
           >
             <GoogleLogo />
             {mode === "signup" ? "Create account with Google" : "Continue with Google"}

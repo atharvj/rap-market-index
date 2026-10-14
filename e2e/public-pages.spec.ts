@@ -703,7 +703,7 @@ test("markets search avoids a partial input outline", async ({ page }) => {
   const search = page.getByRole("textbox", { name: "Search artist or ticker" });
   await search.focus();
 
-  await expect(search).toHaveCSS("outline-color", "rgba(0, 0, 0, 0)");
+  await expect(search).toHaveCSS("outline-style", "none");
 });
 
 test("news visual contract", async ({ page }) => {

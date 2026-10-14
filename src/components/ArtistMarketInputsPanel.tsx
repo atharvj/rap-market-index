@@ -113,7 +113,7 @@ export function ArtistMarketInputsPanel({ artistId }: { artistId: string }) {
               onClick={() => setRange(candidate)}
               aria-pressed={range === candidate}
               className={clsx(
-                "h-8 min-w-11 rounded px-2 text-xs font-semibold transition-colors",
+                "h-8 min-w-11 rounded-sm px-2 text-xs font-semibold transition-colors",
                 range === candidate
                   ? "bg-brass text-ink"
                   : "text-paper/55 hover:bg-white/[0.04] hover:text-paper"

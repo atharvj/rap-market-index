@@ -1,103 +1,114 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss" source(none);
+@config "../tailwind.config.ts";
+@source "../app";
+@source "../src";
 
-:root {
-  --color-ink: 5 8 14;
-  --color-panel: 13 19 30;
-  --color-panel-soft: 8 13 22;
-  --color-line: 39 55 76;
-  --color-paper: 237 247 255;
-  --color-brass: 255 199 71;
-  --color-mint: 41 239 161;
-  --color-ember: 255 79 123;
-  --color-cyan: 37 213 255;
-  --color-violet: 151 103 255;
-  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
-  --radius-panel: 5px;
-  --radius-control: 4px;
-  --shadow-panel: none;
-  --shadow-popover: 0 18px 48px rgba(0, 0, 0, 0.32);
-  color-scheme: dark;
+/* Retain v3's default borders and button cursors during the tooling upgrade. */
+@layer base {
+  *, ::after, ::before, ::backdrop, ::file-selector-button {
+    border-color: var(--color-gray-200, currentColor);
+  }
+  button, [role="button"] { cursor: pointer; }
 }
 
-[data-theme="light"] {
-  --color-ink: 238 244 249;
-  --color-panel: 250 253 255;
-  --color-panel-soft: 226 235 242;
-  --color-line: 180 199 213;
-  --color-paper: 11 22 34;
-  --color-brass: 154 99 0;
-  --color-mint: 0 139 88;
-  --color-ember: 207 39 82;
-  --color-cyan: 0 115 174;
-  --color-violet: 99 57 194;
-  color-scheme: light;
-}
+@layer base {
+  :root {
+    --color-ink: 5 8 14;
+    --color-panel: 13 19 30;
+    --color-panel-soft: 8 13 22;
+    --color-line: 39 55 76;
+    --color-paper: 237 247 255;
+    --color-brass: 255 199 71;
+    --color-mint: 41 239 161;
+    --color-ember: 255 79 123;
+    --color-cyan: 37 213 255;
+    --color-violet: 151 103 255;
+    --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    --radius-panel: 5px;
+    --radius-control: 4px;
+    --shadow-panel: none;
+    --shadow-popover: 0 18px 48px rgba(0, 0, 0, 0.32);
+    color-scheme: dark;
+  }
 
-[data-theme="dark"] {
-  --color-ink: 5 8 14;
-  --color-panel: 13 19 30;
-  --color-panel-soft: 8 13 22;
-  --color-line: 39 55 76;
-  --color-paper: 237 247 255;
-  --color-brass: 255 199 71;
-  --color-mint: 41 239 161;
-  --color-ember: 255 79 123;
-  --color-cyan: 37 213 255;
-  --color-violet: 151 103 255;
-  color-scheme: dark;
-}
+  [data-theme="light"] {
+    --color-ink: 238 244 249;
+    --color-panel: 250 253 255;
+    --color-panel-soft: 226 235 242;
+    --color-line: 180 199 213;
+    --color-paper: 11 22 34;
+    --color-brass: 154 99 0;
+    --color-mint: 0 139 88;
+    --color-ember: 207 39 82;
+    --color-cyan: 0 115 174;
+    --color-violet: 99 57 194;
+    color-scheme: light;
+  }
 
-* {
-  box-sizing: border-box;
-}
+  [data-theme="dark"] {
+    --color-ink: 5 8 14;
+    --color-panel: 13 19 30;
+    --color-panel-soft: 8 13 22;
+    --color-line: 39 55 76;
+    --color-paper: 237 247 255;
+    --color-brass: 255 199 71;
+    --color-mint: 41 239 161;
+    --color-ember: 255 79 123;
+    --color-cyan: 37 213 255;
+    --color-violet: 151 103 255;
+    color-scheme: dark;
+  }
 
-body {
-  position: relative;
-  margin: 0;
-  overflow-x: hidden;
-  background: rgb(var(--color-ink));
-  color: rgb(var(--color-paper));
-  font-family: var(--font-sans);
-  font-size: 16px;
-  font-weight: 400;
-  line-height: 1.5;
-  -webkit-font-smoothing: antialiased;
-  text-rendering: optimizeLegibility;
-}
+  * {
+    box-sizing: border-box;
+  }
 
-body::before {
-  display: none;
-}
+  body {
+    position: relative;
+    margin: 0;
+    overflow-x: hidden;
+    background: rgb(var(--color-ink));
+    color: rgb(var(--color-paper));
+    font-family: var(--font-sans);
+    font-size: 16px;
+    font-weight: 400;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
 
-a {
-  color: inherit;
-  text-decoration: none;
-}
+  body::before {
+    display: none;
+  }
 
-button,
-input,
-select {
-  font: inherit;
-}
+  a {
+    color: inherit;
+    text-decoration: none;
+  }
 
-button,
-a {
-  -webkit-tap-highlight-color: transparent;
-}
+  button,
+  input,
+  select {
+    font: inherit;
+  }
 
-button {
-  transition: background-color 160ms ease, border-color 160ms ease, color 160ms ease, box-shadow 160ms ease;
-}
+  button,
+  a {
+    -webkit-tap-highlight-color: transparent;
+  }
 
-:focus-visible {
-  outline: 2px solid rgb(var(--color-cyan));
-  outline-offset: 2px;
-}
+  button {
+    transition: background-color 160ms ease, border-color 160ms ease, color 160ms ease, box-shadow 160ms ease;
+  }
 
-::selection {
-  background: rgba(88, 166, 255, 0.22);
+  :focus-visible {
+    outline: 2px solid rgb(var(--color-cyan));
+    outline-offset: 2px;
+  }
+
+  ::selection {
+    background: rgba(88, 166, 255, 0.22);
+  }
 }
 
 .number-tabular {

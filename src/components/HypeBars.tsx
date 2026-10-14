@@ -27,9 +27,9 @@ export function HypeBars({ stats }: { stats: HypeStats }) {
                 {metric.key === "newsScore" ? raw.toFixed(0) : `${raw > 0 ? "+" : ""}${raw.toFixed(1)}%`}
               </span>
             </div>
-            <div className="h-2 overflow-hidden rounded-sm bg-paper/10">
+            <div className="h-2 overflow-hidden rounded-xs bg-paper/10">
               <div
-                className="h-full rounded-sm bg-cyan"
+                className="h-full rounded-xs bg-cyan"
                 style={{ width: `${Math.min(100, Math.max(4, normalized))}%` }}
               />
             </div>

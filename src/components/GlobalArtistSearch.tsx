@@ -98,7 +98,7 @@ export function GlobalArtistSearch({ className }: { className?: string }) {
             setOpen(true);
           }}
           onFocus={() => setOpen(true)}
-          className="h-10 w-full rounded-[var(--radius-control)] border border-line bg-panelSoft pl-9 pr-3 text-sm outline-none placeholder:text-paper/35 focus:border-cyan"
+          className="h-10 w-full rounded-[var(--radius-control)] border border-line bg-panelSoft pl-9 pr-3 text-sm outline-hidden placeholder:text-paper/35 focus:border-cyan"
           placeholder="Search artists"
           aria-label="Search artists"
           aria-expanded={open}

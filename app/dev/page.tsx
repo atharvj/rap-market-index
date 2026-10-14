@@ -2102,7 +2102,7 @@ export default function DevPage() {
               <input
                 value={resetConfirm}
                 onChange={(event) => setResetConfirm(event.target.value)}
-                className="h-11 w-full rounded-md border border-line bg-ink px-3 text-sm font-bold outline-none focus:border-ember"
+                className="h-11 w-full rounded-md border border-line bg-ink px-3 text-sm font-bold outline-hidden focus:border-ember"
                 placeholder="RESET RMI"
               />
             </label>
@@ -2112,7 +2112,7 @@ export default function DevPage() {
                 value={resetStartingCash}
                 onChange={(event) => setResetStartingCash(event.target.value)}
                 inputMode="numeric"
-                className="h-11 w-full rounded-md border border-line bg-ink px-3 text-sm font-bold outline-none focus:border-ember"
+                className="h-11 w-full rounded-md border border-line bg-ink px-3 text-sm font-bold outline-hidden focus:border-ember"
               />
             </label>
           </div>
@@ -2143,7 +2143,7 @@ export default function DevPage() {
                 value={adminCashValue}
                 onChange={(event) => setAdminCashValue(event.target.value)}
                 inputMode="numeric"
-                className="h-11 w-full rounded-md border border-line bg-ink px-3 text-sm font-bold outline-none focus:border-mint"
+                className="h-11 w-full rounded-md border border-line bg-ink px-3 text-sm font-bold outline-hidden focus:border-mint"
               />
             </label>
             <button
@@ -2283,7 +2283,7 @@ export default function DevPage() {
                     <Icon className="h-4 w-4 shrink-0 text-brass" />
                     {item.title}
                   </span>
-                  <span className="rounded border border-line bg-ink px-2 py-0.5 text-[10px] uppercase tracking-wide text-paper/50">
+                  <span className="rounded-sm border border-line bg-ink px-2 py-0.5 text-[10px] uppercase tracking-wide text-paper/50">
                     {item.status}
                   </span>
                 </div>
@@ -2334,7 +2334,7 @@ function UserSupportPanel({
           <input
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            className="h-11 w-full rounded-md border border-line bg-ink px-3 text-sm font-bold outline-none focus:border-cyan"
+            className="h-11 w-full rounded-md border border-line bg-ink px-3 text-sm font-bold outline-hidden focus:border-cyan"
             placeholder="Username or email"
           />
         </label>
@@ -2344,7 +2344,7 @@ function UserSupportPanel({
             value={reason}
             onChange={(event) => onReasonChange(event.target.value)}
             maxLength={500}
-            className="h-11 w-full rounded-md border border-line bg-ink px-3 text-sm font-bold outline-none focus:border-cyan"
+            className="h-11 w-full rounded-md border border-line bg-ink px-3 text-sm font-bold outline-hidden focus:border-cyan"
             placeholder="Optional operator note"
           />
         </label>
@@ -2354,7 +2354,7 @@ function UserSupportPanel({
             value={resetCash}
             onChange={(event) => onResetCashChange(event.target.value)}
             inputMode="decimal"
-            className="h-11 w-full rounded-md border border-line bg-ink px-3 text-sm font-bold outline-none focus:border-cyan"
+            className="h-11 w-full rounded-md border border-line bg-ink px-3 text-sm font-bold outline-hidden focus:border-cyan"
           />
         </label>
       </div>
@@ -2377,7 +2377,7 @@ function UserSupportPanel({
                 <div className="flex flex-wrap items-center gap-2 font-black">
                   <span className="truncate">{user.username}</span>
                   {user.isAdmin ? (
-                    <span className="rounded border border-brass/35 bg-brass/10 px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-brass">Admin</span>
+                    <span className="rounded-sm border border-brass/35 bg-brass/10 px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-brass">Admin</span>
                   ) : null}
                 </div>
                 <p className="mt-1 break-all font-mono text-[11px] text-paper/50">{user.email ?? "No email"}</p>
@@ -2889,7 +2889,7 @@ function ModelValidationPanel({
             <p className={`mt-1 text-xl font-black capitalize ${statusClassName}`}>{validation.status}</p>
             <p className="mt-2 max-w-3xl text-sm leading-6 text-paper/58">{validation.note}</p>
           </div>
-          <div className="rounded border border-line bg-panel/70 px-3 py-2 text-right">
+          <div className="rounded-sm border border-line bg-panel/70 px-3 py-2 text-right">
             <p className="text-[10px] font-black uppercase tracking-wide text-paper/42">Measured through</p>
             <p className="mt-1 text-sm font-black number-tabular">{formatDate(data.runDate)}</p>
           </div>
@@ -2974,7 +2974,7 @@ function LaunchReadinessPanel({ data }: { data: MarketHealth }) {
                 : "Core market, integrity, source coverage, and event systems meet the current launch gate."}
           </p>
         </div>
-        <div className="rounded border border-line bg-panel/70 px-3 py-2 text-right">
+        <div className="rounded-sm border border-line bg-panel/70 px-3 py-2 text-right">
           <p className="text-[10px] font-black uppercase tracking-wide text-paper/42">Readiness</p>
           <p className={`mt-1 text-2xl font-black number-tabular ${statusClassName}`}>{score}/100</p>
         </div>
@@ -2982,7 +2982,7 @@ function LaunchReadinessPanel({ data }: { data: MarketHealth }) {
 
       <div className="mt-4 grid gap-2 lg:grid-cols-2">
         {checks.map((check) => (
-          <div key={check.id} className="flex gap-3 rounded border border-line bg-panel/55 p-3">
+          <div key={check.id} className="flex gap-3 rounded-sm border border-line bg-panel/55 p-3">
             {check.ok ? (
               <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-mint" />
             ) : check.severity === "blocker" ? (
@@ -3267,7 +3267,7 @@ function MarketControlsPanel({
               <select
                 value={selectedArtistId}
                 onChange={(event) => onSelectArtist(event.target.value)}
-                className="min-h-11 rounded-md border border-line bg-ink px-3 text-sm font-bold text-paper outline-none"
+                className="min-h-11 rounded-md border border-line bg-ink px-3 text-sm font-bold text-paper outline-hidden"
               >
                 <option value="">Select artist</option>
                 {artistRecords
@@ -3283,7 +3283,7 @@ function MarketControlsPanel({
               <input
                 value={haltReason}
                 onChange={(event) => onReasonChange(event.target.value)}
-                className="min-h-11 rounded-md border border-line bg-ink px-3 text-sm font-bold text-paper outline-none"
+                className="min-h-11 rounded-md border border-line bg-ink px-3 text-sm font-bold text-paper outline-hidden"
               />
             </label>
             <div className="grid gap-2 sm:grid-cols-2">
@@ -4027,7 +4027,7 @@ function SourceResolverSuggestionRow({
                     <p className="mt-1 text-xs font-black number-tabular">{formatPercent(candidate.confidence * 100)}</p>
                   </div>
                   <span
-                    className={`shrink-0 rounded border px-2 py-1 text-[10px] font-black uppercase tracking-wide ${statusClassName}`}
+                    className={`shrink-0 rounded-sm border px-2 py-1 text-[10px] font-black uppercase tracking-wide ${statusClassName}`}
                   >
                     {statusLabel}
                   </span>
@@ -4144,7 +4144,7 @@ function ArtistRosterManager({
                   }}
                   disabled={selectedDisabled}
                   placeholder="Lil Tecca"
-                  className="mt-2 min-h-11 w-full rounded-md border border-line bg-ink px-3 text-sm font-bold text-paper outline-none placeholder:text-paper/24 focus:border-cyan disabled:cursor-not-allowed disabled:opacity-55"
+                  className="mt-2 min-h-11 w-full rounded-md border border-line bg-ink px-3 text-sm font-bold text-paper outline-hidden placeholder:text-paper/24 focus:border-cyan disabled:cursor-not-allowed disabled:opacity-55"
                 />
                 <span className="mt-1 block text-xs font-bold leading-5 text-paper/42">
                   Preview ticker, starter price, volatility, category, and source matches before anything is saved.
@@ -4187,7 +4187,7 @@ function ArtistRosterManager({
               <select
                 value={form.selectedId}
                 onChange={(event) => onSelectArtist(event.target.value)}
-                className="mt-2 min-h-11 w-full rounded-md border border-line bg-ink px-3 text-sm font-bold text-paper outline-none focus:border-cyan"
+                className="mt-2 min-h-11 w-full rounded-md border border-line bg-ink px-3 text-sm font-bold text-paper outline-hidden focus:border-cyan"
               >
                 <option value="">New artist</option>
                 {records.map((record) => (
@@ -4222,7 +4222,7 @@ function ArtistRosterManager({
                   onChange={(event) => onChange("id", event.target.value)}
                   disabled={Boolean(selectedRecord) || selectedDisabled}
                   placeholder="auto-from-name"
-                  className="mt-2 min-h-11 w-full rounded-md border border-line bg-ink px-3 text-sm font-bold text-paper outline-none placeholder:text-paper/24 focus:border-cyan disabled:cursor-not-allowed disabled:opacity-55"
+                  className="mt-2 min-h-11 w-full rounded-md border border-line bg-ink px-3 text-sm font-bold text-paper outline-hidden placeholder:text-paper/24 focus:border-cyan disabled:cursor-not-allowed disabled:opacity-55"
                 />
               </label>
               <label className="block">
@@ -4232,7 +4232,7 @@ function ArtistRosterManager({
                   onChange={(event) => onChange("ticker", event.target.value)}
                   disabled={selectedDisabled}
                   placeholder="ARTIST"
-                  className="mt-2 min-h-11 w-full rounded-md border border-line bg-ink px-3 text-sm font-bold text-paper outline-none placeholder:text-paper/24 focus:border-cyan disabled:cursor-not-allowed disabled:opacity-55"
+                  className="mt-2 min-h-11 w-full rounded-md border border-line bg-ink px-3 text-sm font-bold text-paper outline-hidden placeholder:text-paper/24 focus:border-cyan disabled:cursor-not-allowed disabled:opacity-55"
                 />
               </label>
               <label className="block md:col-span-2">
@@ -4242,7 +4242,7 @@ function ArtistRosterManager({
                   onChange={(event) => onChange("name", event.target.value)}
                   disabled={selectedDisabled}
                   placeholder="Artist name"
-                  className="mt-2 min-h-11 w-full rounded-md border border-line bg-ink px-3 text-sm font-bold text-paper outline-none placeholder:text-paper/24 focus:border-cyan disabled:cursor-not-allowed disabled:opacity-55"
+                  className="mt-2 min-h-11 w-full rounded-md border border-line bg-ink px-3 text-sm font-bold text-paper outline-hidden placeholder:text-paper/24 focus:border-cyan disabled:cursor-not-allowed disabled:opacity-55"
                 />
               </label>
               <label className="block">
@@ -4254,7 +4254,7 @@ function ArtistRosterManager({
                   value={form.currentPrice}
                   onChange={(event) => onChange("currentPrice", event.target.value)}
                   disabled={selectedDisabled}
-                  className="mt-2 min-h-11 w-full rounded-md border border-line bg-ink px-3 text-sm font-bold text-paper outline-none focus:border-cyan disabled:cursor-not-allowed disabled:opacity-55"
+                  className="mt-2 min-h-11 w-full rounded-md border border-line bg-ink px-3 text-sm font-bold text-paper outline-hidden focus:border-cyan disabled:cursor-not-allowed disabled:opacity-55"
                 />
               </label>
               <label className="block">
@@ -4266,7 +4266,7 @@ function ArtistRosterManager({
                   value={form.previousClose}
                   onChange={(event) => onChange("previousClose", event.target.value)}
                   disabled={selectedDisabled}
-                  className="mt-2 min-h-11 w-full rounded-md border border-line bg-ink px-3 text-sm font-bold text-paper outline-none focus:border-cyan disabled:cursor-not-allowed disabled:opacity-55"
+                  className="mt-2 min-h-11 w-full rounded-md border border-line bg-ink px-3 text-sm font-bold text-paper outline-hidden focus:border-cyan disabled:cursor-not-allowed disabled:opacity-55"
                 />
               </label>
               <label className="block">
@@ -4279,7 +4279,7 @@ function ArtistRosterManager({
                   value={form.volatility}
                   onChange={(event) => onChange("volatility", event.target.value)}
                   disabled={selectedDisabled}
-                  className="mt-2 min-h-11 w-full rounded-md border border-line bg-ink px-3 text-sm font-bold text-paper outline-none focus:border-cyan disabled:cursor-not-allowed disabled:opacity-55"
+                  className="mt-2 min-h-11 w-full rounded-md border border-line bg-ink px-3 text-sm font-bold text-paper outline-hidden focus:border-cyan disabled:cursor-not-allowed disabled:opacity-55"
                 />
               </label>
               <label className="block">
@@ -4288,7 +4288,7 @@ function ArtistRosterManager({
                   value={form.category}
                   onChange={(event) => onChange("category", event.target.value as ArtistCategory)}
                   disabled={selectedDisabled}
-                  className="mt-2 min-h-11 w-full rounded-md border border-line bg-ink px-3 text-sm font-bold text-paper outline-none focus:border-cyan disabled:cursor-not-allowed disabled:opacity-55"
+                  className="mt-2 min-h-11 w-full rounded-md border border-line bg-ink px-3 text-sm font-bold text-paper outline-hidden focus:border-cyan disabled:cursor-not-allowed disabled:opacity-55"
                 >
                   {artistCategoryOptions.map((category) => (
                     <option key={category} value={category}>
@@ -4379,7 +4379,7 @@ function AutoArtistPreviewCard({
             Review the generated listing and source matches. Save only after the verified IDs look like the real artist.
           </p>
           <div
-            className={`mt-3 inline-flex rounded border px-3 py-1.5 text-xs font-black uppercase tracking-wide ${sourceQuality.className}`}
+            className={`mt-3 inline-flex rounded-sm border px-3 py-1.5 text-xs font-black uppercase tracking-wide ${sourceQuality.className}`}
           >
             {sourceQuality.label}
           </div>
@@ -4424,13 +4424,13 @@ function AutoArtistPreviewCard({
           <div className="mt-3 grid gap-2 text-xs font-bold">
             {savedSources.length ? (
               savedSources.map((source) => (
-                <div key={source.label} className="grid gap-1 rounded border border-line bg-panel/70 p-2">
+                <div key={source.label} className="grid gap-1 rounded-sm border border-line bg-panel/70 p-2">
                   <span className="text-paper/45">{source.label}</span>
                   <span className="break-all text-paper">{source.value}</span>
                 </div>
               ))
             ) : (
-              <p className="rounded border border-brass/35 bg-brass/10 p-3 leading-5 text-paper/65">
+              <p className="rounded-sm border border-brass/35 bg-brass/10 p-3 leading-5 text-paper/65">
                 No high-confidence source IDs were found. You can still save the listing, then add exact IDs manually.
               </p>
             )}
@@ -4442,7 +4442,7 @@ function AutoArtistPreviewCard({
           <div className="mt-3 grid gap-2 text-xs font-bold">
             {candidates.length ? (
               candidates.map((candidate) => (
-                <div key={`${candidate.sourceKey}-${candidate.externalId}`} className="rounded border border-line bg-panel/70 p-2">
+                <div key={`${candidate.sourceKey}-${candidate.externalId}`} className="rounded-sm border border-line bg-panel/70 p-2">
                   <div className="flex items-start justify-between gap-3">
                     <span className="min-w-0">
                       <span className="block truncate text-paper">{candidate.label}</span>
@@ -4454,7 +4454,7 @@ function AutoArtistPreviewCard({
                 </div>
               ))
             ) : (
-              <p className="rounded border border-line bg-panel/70 p-3 leading-5 text-paper/55">
+              <p className="rounded-sm border border-line bg-panel/70 p-3 leading-5 text-paper/55">
                 No resolver candidates were returned for this artist.
               </p>
             )}
@@ -4578,7 +4578,7 @@ function ManualSourceIdEditor({
               <select
                 value={form.artistId}
                 onChange={(event) => onSelectArtist(event.target.value)}
-                className="mt-2 min-h-11 w-full rounded-md border border-line bg-ink px-3 text-sm font-bold text-paper outline-none focus:border-cyan"
+                className="mt-2 min-h-11 w-full rounded-md border border-line bg-ink px-3 text-sm font-bold text-paper outline-hidden focus:border-cyan"
               >
                 <option value="">Select artist</option>
                 {records.map((record) => (
@@ -4625,7 +4625,7 @@ function ManualSourceIdEditor({
                     onChange={(event) => onChange(field.key, event.target.value)}
                     disabled={selectedDisabled}
                     placeholder={field.placeholder}
-                    className="mt-2 min-h-11 w-full rounded-md border border-line bg-ink px-3 text-sm font-bold text-paper outline-none placeholder:text-paper/24 focus:border-cyan disabled:cursor-not-allowed disabled:opacity-55"
+                    className="mt-2 min-h-11 w-full rounded-md border border-line bg-ink px-3 text-sm font-bold text-paper outline-hidden placeholder:text-paper/24 focus:border-cyan disabled:cursor-not-allowed disabled:opacity-55"
                   />
                   <span className="mt-1 block text-xs font-bold leading-5 text-paper/42">{field.helper}</span>
                 </label>
