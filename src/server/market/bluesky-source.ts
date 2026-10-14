@@ -550,8 +550,12 @@ function buildBlueskyEvents({
 
 function classifyBlueskyPost(post: BlueskyPost): BlueskyPostClassification {
   const text = normalizeText(post.text);
-  const positiveMatches = countMatches(text, POSITIVE_TERMS);
-  const negativeMatches = countMatches(text, NEGATIVE_TERMS);
+  const reactionText = text
+    .replace(/\bno skips?\b/g, "classic")
+    .replace(/\b(?:not|isnt|isn t|aint|ain t)\s+(?:bad|trash|mid|boring|terrible|ass)\b/g, "good")
+    .replace(/\b(?:not|isnt|isn t|aint|ain t)\s+(?:good|fire|hard|great|it)\b|\b(?:don t|dont|do not|didn t|didnt)\s+(?:like|love|enjoy)\b|\bhard to listen(?: to)?\b/g, "disappointing");
+  const positiveMatches = countMatches(reactionText, POSITIVE_TERMS);
+  const negativeMatches = countMatches(reactionText, NEGATIVE_TERMS);
   const hasAlbumAnnouncement = hasAny(text, ALBUM_ANNOUNCEMENT_TERMS);
   const hasTracklist = hasAny(text, TRACKLIST_TERMS);
   const hasSnippet = hasAny(text, SNIPPET_TERMS);
@@ -1176,7 +1180,7 @@ function hasSocialCatalystContext(text: string) {
 }
 
 function countMatches(value: string, terms: string[]) {
-  return terms.reduce((count, term) => count + (value.includes(term) ? 1 : 0), 0);
+  return terms.reduce((count, term) => count + (new RegExp(`(?:^|\\s)${escapeRegExp(normalizeText(term))}(?:$|\\s)`).test(value) ? 1 : 0), 0);
 }
 
 function hasAny(value: string, terms: string[]) {
@@ -1556,13 +1560,12 @@ const POSITIVE_TERMS = [
   "classic",
   "co-sign",
   "cosign",
-  "crazy",
   "fire",
   "goes hard",
+  "good",
   "grail",
   "hard",
   "hype",
-  "insane",
   "killed",
   "love",
   "next up",

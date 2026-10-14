@@ -22,7 +22,7 @@ const artist: MarketUpdateArtist = {
 };
 
 describe("Bluesky market source", () => {
-  it.each(["Lil Tecca new album is bad and boring", "Lil Tecca performance was bad with an empty crowd"])("does not classify criticism as release/performance hype: %s", async text => {
+  it.each(["Lil Tecca new album is bad and boring", "Lil Tecca performance was bad with an empty crowd", "Lil Tecca new album isn't fire", "Lil Tecca new album: I don't like it", "crazy how Lil Tecca new album is trash"])("does not classify criticism as release/performance hype: %s", async text => {
     const result = await collectBlueskyMarketSignals({ artists: [artist], runDate: "2026-08-10", delayMs: 0,
       fetchImpl: async () => Response.json({ posts: [{ uri: "at://did:plc:fan/app.bsky.feed.post/negative", author: { handle: "fan.bsky.social" },
         record: { text, createdAt: "2026-08-10T12:00:00Z" }, likeCount: 150 }] }) });
