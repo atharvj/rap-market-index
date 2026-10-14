@@ -14,18 +14,18 @@ export function buildMarketIndexSeries(artists: Artist[], maxPoints = DEFAULT_HI
 
   const dates = getSharedDates(histories).slice(-maxPoints);
 
-  return dates.map((date) => {
-    const normalizedQuotes = histories.flatMap((history) => {
-      const base = history[0]?.price;
-      const quote = getQuoteAtDate(history, date);
-
-      return base > 0 && quote > 0 ? [(quote / base) * 100] : [];
-    });
-
-    return {
-      date,
-      price: average(normalizedQuotes)
-    };
+  let indexValue = 100;
+  return dates.map((date, index) => {
+    if (index > 0) {
+      const previousDate = dates[index - 1];
+      const dailyReturns = histories.flatMap(history => {
+        const previous = getQuoteAtDate(history, previousDate);
+        const current = getQuoteAtDate(history, date);
+        return previous !== null && current !== null ? [current / previous] : [];
+      });
+      if (dailyReturns.length) indexValue *= average(dailyReturns);
+    }
+    return { date, price: indexValue };
   });
 }
 
@@ -47,22 +47,22 @@ export function buildPortfolioQuoteSeries({
     return [];
   }
 
+  // A position cannot be valued before its first recorded quote. Start the
+  // combined trend when all currently held assets have a recorded price.
+  const firstCommonDate = histories.map(history => history[0].date).sort().at(-1)!;
   return getSharedDates(histories)
+    .filter(date => date >= firstCommonDate)
     .slice(-maxPoints)
     .map((date) => {
       const longValue = holdings.reduce(
-        (total, holding) => total + holding.shares * getQuoteAtDate(normalizeHistory(holding.artist), date),
+        (total, holding) => total + holding.shares * (getQuoteAtDate(normalizeHistory(holding.artist), date) ?? 0),
         0
       );
       const shortValue = shortPositions.reduce((total, position) => {
-        const quote = getQuoteAtDate(normalizeHistory(position.artist), date);
+        const quote = getQuoteAtDate(normalizeHistory(position.artist), date) ?? position.averageShortPrice;
         return total + position.collateral + (position.averageShortPrice - quote) * position.shares;
       }, 0);
-
-      return {
-        date,
-        price: Math.max(0, cashBalance + longValue + shortValue)
-      };
+      return { date, price: Math.max(0, cashBalance + longValue + shortValue) };
     });
 }
 
@@ -117,7 +117,7 @@ function getSharedDates(histories: PricePoint[][]) {
 }
 
 function getQuoteAtDate(history: PricePoint[], date: string) {
-  let quote = history[0]?.price ?? 0;
+  let quote: number | null = null;
 
   for (const point of history) {
     if (point.date > date) {

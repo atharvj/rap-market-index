@@ -47,7 +47,7 @@ describe("comparable chart history", () => {
     expect(getShortingReadiness(adjusted)).toEqual(getShortingReadiness(points));
     const artist = { ...createInitialGameState().artists[0], currentPrice: 30, priceHistory: adjusted };
     const index = buildMarketIndexSeries([artist], 32);
-    expect(index[31].price).toBe(100);
+    expect(index[31].price).toBeCloseTo(100, 8);
     const holding = { artistId: artist.id, artist, shares: 2, averageBuyPrice: 10, currentValue: 60, costBasis: 20, profitLoss: 40, profitLossPercent: 200, dayChange: 0 };
     const portfolio = buildPortfolioQuoteSeries({ holdings: [holding], shortPositions: [], cashBalance: 100, maxPoints: 32 });
     expect(portfolio[0].price).toBe(160);

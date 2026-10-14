@@ -1,5 +1,6 @@
 "use client";
 
+import { createLatestRequest } from "@/lib/latest-request";
 import { PriceChart } from "@/components/PriceChart";
 import { formatDate } from "@/lib/formatters";
 import { MARKET_CONTENT_REFRESH_MS } from "@/lib/refresh-policy";
@@ -39,40 +40,48 @@ export function ArtistPriceHistoryPanel({
   const [hasRealHistory, setHasRealHistory] = useState(fallbackData.length > 0);
   const [recordedCloseCount, setRecordedCloseCount] = useState(fallbackData.length);
   const [granularity, setGranularity] = useState<"intraday" | "daily">("daily");
+  const [refreshFailed, setRefreshFailed] = useState(false);
   const hasMovement = hasPriceMovement(history);
 
   useEffect(() => {
-    const controller = new AbortController();
+    const requests = createLatestRequest();
+    let hasLoaded = false;
 
     setStatus("loading");
+    setRefreshFailed(false);
 
-    const loadHistory = () => fetch(`/api/market/history/${artistId}?range=${range}`, {
-      signal: controller.signal
-    })
-      .then((response) => response.json() as Promise<HistoryResponse>)
-      .then((payload) => {
-        if (controller.signal.aborted) return;
-        if (!payload.ok || !payload.points) {
-          throw new Error(payload.error ?? "Could not load price history.");
-        }
-
-        setHistory(payload.points);
-        setHasRealHistory(Boolean(payload.hasRealHistory));
-        setRecordedCloseCount(payload.recordedCloseCount ?? payload.points.length);
-        setGranularity(payload.granularity === "intraday" ? "intraday" : "daily");
-        setStatus("ready");
-      })
-      .catch(() => {
-        if (controller.signal.aborted) {
-          return;
-        }
-
-        setHistory([]);
-        setHasRealHistory(false);
-        setRecordedCloseCount(0);
-        setGranularity("daily");
-        setStatus("error");
-      });
+    const loadHistory = () => {
+      const request = requests.start();
+      return fetch(`/api/market/history/${artistId}?range=${range}`, { signal: request.signal })
+        .then(async response => {
+          if (!response.ok) throw new Error("Could not load price history.");
+          return response.json() as Promise<HistoryResponse>;
+        })
+        .then(payload => {
+          if (!request.isCurrent()) return;
+          if (!payload.ok || !Array.isArray(payload.points)) throw new Error("Could not load price history.");
+          setHistory(payload.points);
+          setHasRealHistory(Boolean(payload.hasRealHistory));
+          setRecordedCloseCount(payload.recordedCloseCount ?? payload.points.length);
+          setGranularity(payload.granularity === "intraday" ? "intraday" : "daily");
+          hasLoaded = true;
+          setRefreshFailed(false);
+          setStatus("ready");
+        })
+        .catch(() => {
+          if (!request.isCurrent()) return;
+          if (hasLoaded) {
+            setRefreshFailed(true);
+          } else {
+            setHistory([]);
+            setHasRealHistory(false);
+            setRecordedCloseCount(0);
+            setGranularity("daily");
+            setStatus("error");
+          }
+        })
+        .finally(request.finish);
+    };
 
     void loadHistory();
 
@@ -90,7 +99,7 @@ export function ArtistPriceHistoryPanel({
     document.addEventListener("visibilitychange", refreshVisibleHistory);
 
     return () => {
-      controller.abort();
+      requests.dispose();
       window.clearInterval(interval);
       window.removeEventListener("focus", refreshVisibleHistory);
       document.removeEventListener("visibilitychange", refreshVisibleHistory);
@@ -148,6 +157,7 @@ export function ArtistPriceHistoryPanel({
             </div>
           )}
         </div>
+        {refreshFailed ? <p className="mt-3 text-xs text-ember" role="status">Latest refresh failed. Showing the last loaded quotes.</p> : null}
         {status !== "error" ? <p className="mt-3 text-xs text-paper/42">
           {status === "loading"
             ? "Loading recorded market quotes."

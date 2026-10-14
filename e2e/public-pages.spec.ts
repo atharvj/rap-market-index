@@ -635,6 +635,41 @@ test("failed history range never displays another range's prices", async ({ page
   await expect(section.locator("path.recharts-area-curve")).toHaveCount(1);
 });
 
+test("background refresh failures retain chart data and every public indicator", async ({ page }) => {
+  const artist = marketState.artists[0];
+  let failRefresh = false;
+  const points = [{ date: "2026-07-22", price: 20 }, { date: "2026-09-11", price: 25 }];
+  const definitions = [
+    ["spotify_public", "monthly_listeners"], ["youtube", "subscriber_count"], ["youtube", "channel_views"],
+    ["wikimedia", "pageviews_7d"], ["media_rss", "source_count"], ["trade_flow", "unique_trader_count"], ["trade_flow", "trade_count"]
+  ];
+  await page.route("**/api/market/history/**", route => route.fulfill({
+    status: failRefresh ? 503 : 200, contentType: "application/json",
+    body: JSON.stringify(failRefresh ? { ok: false } : { ok: true, points, hasRealHistory: true, recordedCloseCount: 2 })
+  }));
+  await page.route("**/api/market/observations/**", route => route.fulfill({
+    status: failRefresh ? 503 : 200, contentType: "application/json",
+    body: JSON.stringify(failRefresh ? { ok: false } : { ok: true, series: definitions.map(([source, metric]) => ({
+      key: `${source}:${metric}`, source, metric, points: [], latestValue: 123, latestDate: "2026-09-11"
+    })) })
+  }));
+  await page.goto(`/artists/${artist.id}`);
+  const chart = page.locator("section").filter({ has: page.getByRole("heading", { name: "Price History", exact: true }) });
+  const indicators = page.locator("section").filter({ has: page.getByRole("heading", { name: "Public Market Indicators", exact: true }) });
+  await expect(chart.locator("path.recharts-area-curve")).toHaveCount(1);
+  await expect(indicators.getByText("Orders · 24H", { exact: true })).toBeVisible();
+  failRefresh = true;
+  await page.evaluate(() => window.dispatchEvent(new Event("focus")));
+  await expect(chart).toContainText("Showing the last loaded quotes");
+  await expect(indicators).toContainText("Showing the last loaded indicators");
+  await expect(chart.locator("path.recharts-area-curve")).toHaveCount(1);
+  await expect(indicators.getByText("Orders · 24H", { exact: true })).toBeVisible();
+  failRefresh = false;
+  await page.evaluate(() => window.dispatchEvent(new Event("focus")));
+  await expect(chart).not.toContainText("Latest refresh failed");
+  await expect(indicators).not.toContainText("Latest refresh failed");
+});
+
 test("public metrics do not use decorative colored side borders", async ({ page }) => {
   for (const path of ["/", "/markets", "/scout"]) {
     await page.goto(path);

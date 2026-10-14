@@ -91,3 +91,20 @@ longer restart the history request. Unchanged quotes are described as unchanged,
 not missing closes. The reusable Market Inputs component also exposes every returned
 metric instead of limiting its selector to six (it is not currently mounted on the
 public artist page, which uses the Audience Snapshot).
+
+## October 13 opening and display integrity audit
+
+The release window verifies today's closes against the active artist IDs; inactive
+listings cannot substitute for a missing active close. Active rosters are paginated.
+A successful daily core run is still required before opening.
+
+Market Pulse and Scout chain the average daily return of artists with recorded
+quotes on both dates. New listings join after they have comparable observations;
+no quote is assigned before their listing date. The current-holdings trend starts
+when all held assets have recorded quotes. These are display calculations and do
+not change artist prices, trades, balances, or stored history.
+
+Artist charts and public indicators cancel superseded requests and time out hung
+requests after 20 seconds. A failed background refresh retains the last loaded
+values with an explicit warning; an initial failure reports unavailability.
+All available public indicators are displayed, including the seventh Orders metric.

@@ -1,4 +1,5 @@
 import "server-only";
+import { loadAllPages } from "@/lib/pagination";
 import type { createServiceRoleClient } from "@/lib/supabase/server";
 import { getMarketDate } from "@/server/market/market-date";
 
@@ -16,7 +17,7 @@ export async function loadReleaseWindowStatus(
   now = new Date()
 ): Promise<ReleaseWindowStatus> {
   const marketDate = getMarketDate(now);
-  const [runResult, artistCountResult, historyCountResult] = await Promise.all([
+  const [runResult, activeArtists] = await Promise.all([
     supabase
       .from("market_update_runs")
       .select("run_date,status,source")
@@ -24,29 +25,28 @@ export async function loadReleaseWindowStatus(
       .eq("status", "succeeded")
       .eq("source", "core")
       .maybeSingle(),
-    supabase
-      .from("artists")
-      .select("id", { count: "exact", head: true })
-      .eq("is_active", true),
-    supabase
-      .from("price_history")
-      .select("artist_id", { count: "exact", head: true })
-      .eq("price_date", marketDate)
+    loadAllPages(async (from, to) => {
+      const { data, error } = await supabase.from("artists").select("id")
+        .eq("is_active", true).order("id").range(from, to);
+      if (error) throw new Error(`Could not verify active market artists: ${error.message}`);
+      return data ?? [];
+    })
   ]);
 
-  const error = runResult.error ?? artistCountResult.error ?? historyCountResult.error;
-
-  if (error) {
-    throw new Error(`Could not verify today's market release window: ${error.message}`);
+  if (runResult.error) {
+    throw new Error(`Could not verify today's market release window: ${runResult.error.message}`);
   }
 
-  const activeArtistCount = artistCountResult.count ?? 0;
-  const completedArtistCount = historyCountResult.count ?? 0;
-  const ready = Boolean(
-    runResult.data
-    && activeArtistCount > 0
-    && completedArtistCount >= activeArtistCount
-  );
+  const artistIds = activeArtists.map(artist => artist.id);
+  let ready = false;
+  if (runResult.data && artistIds.length) {
+    const { count, error } = await supabase.from("price_history")
+      .select("artist_id", { count: "exact", head: true })
+      .eq("price_date", marketDate).in("artist_id", artistIds);
+    if (error) throw new Error(`Could not verify today's active artist closes: ${error.message}`);
+    // Inactive listings must not hide an active artist missing today's close.
+    ready = count === artistIds.length;
+  }
 
   return {
     marketDate,

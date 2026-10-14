@@ -1,5 +1,6 @@
 "use client";
 
+import { createLatestRequest } from "@/lib/latest-request";
 import { formatCompact, formatDate } from "@/lib/formatters";
 import { MARKET_OBSERVATION_REFRESH_MS } from "@/lib/refresh-policy";
 import type { MarketObservationSeries } from "@/lib/types";
@@ -21,23 +22,30 @@ const preferredSeries = [
 ];
 
 export function ArtistAudienceSnapshot({ artistId }: { artistId: string }) {
+  const [refreshFailed, setRefreshFailed] = useState(false);
   const [series, setSeries] = useState<MarketObservationSeries[]>([]);
 
   useEffect(() => {
-    const controller = new AbortController();
+    const requests = createLatestRequest();
+    setSeries([]);
+    setRefreshFailed(false);
 
-    const loadObservations = () => fetch(`/api/market/observations/${artistId}?range=1M`, { signal: controller.signal })
-      .then((response) => response.json() as Promise<ObservationsResponse>)
-      .then((payload) => {
-        if (payload.ok && payload.series) {
+    const loadObservations = () => {
+      const request = requests.start();
+      return fetch(`/api/market/observations/${artistId}?range=1M`, { signal: request.signal })
+        .then(async response => {
+          if (!response.ok) throw new Error("Market indicators unavailable.");
+          return response.json() as Promise<ObservationsResponse>;
+        })
+        .then(payload => {
+          if (!request.isCurrent()) return;
+          if (!payload.ok || !Array.isArray(payload.series)) throw new Error("Market indicators unavailable.");
           setSeries(payload.series);
-        }
-      })
-      .catch(() => {
-        if (!controller.signal.aborted) {
-          setSeries([]);
-        }
-      });
+          setRefreshFailed(false);
+        })
+        .catch(() => { if (request.isCurrent()) setRefreshFailed(true); })
+        .finally(request.finish);
+    };
 
     void loadObservations();
 
@@ -55,7 +63,7 @@ export function ArtistAudienceSnapshot({ artistId }: { artistId: string }) {
     document.addEventListener("visibilitychange", refreshVisibleObservations);
 
     return () => {
-      controller.abort();
+      requests.dispose();
       window.clearInterval(interval);
       window.removeEventListener("focus", refreshVisibleObservations);
       document.removeEventListener("visibilitychange", refreshVisibleObservations);
@@ -79,11 +87,10 @@ export function ArtistAudienceSnapshot({ artistId }: { artistId: string }) {
           date: item.latestDate
         };
       })
-      .filter((item): item is NonNullable<typeof item> => Boolean(item))
-      .slice(0, 6);
+      .filter((item): item is NonNullable<typeof item> => Boolean(item));
   }, [series]);
 
-  if (!metrics.length) {
+  if (!metrics.length && !refreshFailed) {
     return null;
   }
 
@@ -93,6 +100,7 @@ export function ArtistAudienceSnapshot({ artistId }: { artistId: string }) {
         <h2 className="text-base font-semibold">Public Market Indicators</h2>
         <p className="mt-1 text-xs text-paper/48">High-level audience, attention, media, and trading context. No single indicator sets the quote.</p>
       </div>
+      {refreshFailed ? <p className="px-4 py-3 text-xs text-ember" role="status">{metrics.length ? "Latest refresh failed. Showing the last loaded indicators." : "Market indicators are temporarily unavailable."}</p> : null}
       <div
         className="grid divide-x divide-y divide-line"
         style={{ gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))" }}
