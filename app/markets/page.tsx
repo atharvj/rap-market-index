@@ -97,7 +97,7 @@ export default function MarketsPage() {
           }
         >
           <div className="rmi-chart-shell m-4">
-            <PriceChart data={marketIndex} height={190} />
+            <PriceChart data={marketIndex} height={190} valueUnit="index" quoteLabel="Index level" />
           </div>
         </RmiSection>
 

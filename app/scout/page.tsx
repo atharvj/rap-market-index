@@ -60,7 +60,7 @@ export default function ScoutPage() {
           action={<TrendingUp className="h-4 w-4 text-cyan" aria-hidden="true" />}
         >
           <div className="p-4">
-            <div className="rmi-chart-shell p-3"><PriceChart data={discoveryIndex} height={190} /></div>
+            <div className="rmi-chart-shell p-3"><PriceChart data={discoveryIndex} height={190} valueUnit="index" quoteLabel="Index level" /></div>
           </div>
         </RmiSection>
 

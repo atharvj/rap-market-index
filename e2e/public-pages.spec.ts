@@ -696,6 +696,21 @@ test("public metrics do not use decorative colored side borders", async ({ page 
   }
 });
 
+test("market and scout indices display points while artist quotes remain monetary", async ({ page }) => {
+  await page.route("**/api/market/snapshot", route => route.fulfill({ contentType: "application/json", body: JSON.stringify({
+    ok: true, source: "supabase", state: { ...marketState, artists: marketState.artists.map((artist, index) =>
+      index < 2 ? { ...artist, category: "rising" } : artist
+    ) }
+  }) }));
+  for (const [path, title] of [["/markets", "RMI Market Pulse"], ["/scout", "Scout Market Trend"]]) {
+    await page.goto(path);
+    const section = page.locator("section").filter({ has: page.getByRole("heading", { name: title, exact: true }) }).first();
+    await expect(section.locator("path.recharts-area-curve")).toHaveCount(1);
+    await expect(section).toContainText("pts");
+    await expect(section).not.toContainText("$");
+  }
+});
+
 test("markets search avoids a partial input outline", async ({ page }) => {
   await page.goto("/markets");
   await expect(page.locator('[aria-busy="true"]')).toHaveCount(0, { timeout: 15_000 });

@@ -123,3 +123,7 @@ References: [sharp's security advisory](https://github.com/advisories/GHSA-wq5f-
 Tailwind 4 requires Safari 16.4+, Chrome 111+ or Firefox 128+; older browsers are
 outside the styling framework's supported targets. Visual and mobile checks must
 pass against the existing snapshots before deployment.
+
+Market Pulse and Scout chart axes, tooltips and selected values use index points,
+rather than dollar signs. Artist quote and current-holdings charts retain currency
+formatting. Indices start at 100 for the displayed window.

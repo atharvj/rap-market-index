@@ -37,13 +37,15 @@ export function PriceChart({
   height = 270,
   compact = false,
   timeScale = "auto",
-  quoteLabel = "RMI quote"
+  quoteLabel = "RMI quote",
+  valueUnit = "currency"
 }: {
   data: PricePoint[];
   height?: number;
   compact?: boolean;
   timeScale?: "auto" | "intraday" | "daily";
   quoteLabel?: string;
+  valueUnit?: "currency" | "index";
 }) {
   const normalized = useMemo<ChartPoint[]>(
     () => data
@@ -82,6 +84,12 @@ export function PriceChart({
     ? [firstTimestamp - singlePointPadding, firstTimestamp + singlePointPadding]
     : [firstTimestamp, lastTimestamp];
 
+  function formatChartValue(value: number, precision = 2) {
+    return valueUnit === "index"
+      ? `${value.toFixed(precision)} pts`
+      : precision === 2 ? formatCurrency(value) : `$${value.toFixed(precision)}`;
+  }
+
   function formatChartDate(value: string | number, detailed = false) {
     const date = new Date(value);
 
@@ -116,7 +124,7 @@ export function PriceChart({
   }
 
   if (!normalized.length) {
-    return <div className="grid h-full place-items-center text-sm text-paper/45">No recorded quotes yet.</div>;
+    return <div className="grid h-full place-items-center text-sm text-paper/45">{valueUnit === "index" ? "No recorded index points yet." : "No recorded quotes yet."}</div>;
   }
 
   return (
@@ -124,7 +132,7 @@ export function PriceChart({
       {selected ? (
         <div className="mb-1 flex items-center justify-end gap-2 text-xs font-bold number-tabular">
           <span className="text-paper/45">{formatChartDate(selected.date, true)}</span>
-          <span>{formatCurrency(selected.price)}</span>
+          <span>{formatChartValue(selected.price)}</span>
         </div>
       ) : null}
       <div style={{ height: selected ? height - 24 : height }}>
@@ -163,7 +171,7 @@ export function PriceChart({
               tickLine={false}
               tickMargin={8}
               domain={yDomain}
-              tickFormatter={(value) => `$${Number(value).toFixed(axisPrecision)}`}
+              tickFormatter={(value) => formatChartValue(Number(value), axisPrecision)}
               tick={{ fill: "rgb(var(--color-paper) / 0.45)", fontSize: 11 }}
             />
             <Tooltip
@@ -177,7 +185,7 @@ export function PriceChart({
                 fontSize: 12
               }}
               labelFormatter={(value) => formatChartDate(Number(value), true)}
-              formatter={(value) => [formatCurrency(Number(value)), quoteLabel]}
+              formatter={(value) => [formatChartValue(Number(value)), quoteLabel]}
             />
             <Area
               type={intraday ? "stepAfter" : "linear"}
