@@ -1,4 +1,5 @@
 import type { AdapterSignal, AdapterSignals } from "@/server/market/market-data";
+import { isRedditAccessEnabled } from "@/server/market/reddit-access";
 
 const DAILY_SOURCES = new Set([
   "gdelt", "listenbrainz", "spotify", "spotify_public", "wikimedia",
@@ -33,7 +34,9 @@ export function restoreDailySources(rows: Array<{
     const cached = (row.raw_payload as Record<string, unknown>).dailySourceInputs;
     if (!cached || typeof cached !== "object" || Array.isArray(cached)) continue;
     for (const [source, value] of Object.entries(cached)) {
+      if (source === "reddit" && !isRedditAccessEnabled()) continue;
       if (!DAILY_SOURCES.has(source) || !isSignal(value, source)) continue;
+      if ((source === "bluesky" || source === "youtube_comments") && value.rawPayload.samplingVersion !== 2) continue;
       restored[source] ??= {};
       restored[source][row.artist_id] = {
         ...value,

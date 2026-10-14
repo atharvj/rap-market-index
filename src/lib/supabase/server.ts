@@ -1,6 +1,7 @@
 import "server-only";
 import { createClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/database.types";
+import { isRedditAccessEnabled } from "@/server/market/reddit-access";
 
 export type SupabaseConfigStatus = {
   urlConfigured: boolean;
@@ -14,6 +15,7 @@ export type SupabaseConfigStatus = {
   spotifyCredentialsConfigured: boolean;
   youtubeApiKeyConfigured: boolean;
   redditCredentialsConfigured: boolean;
+  redditAccessEnabled: boolean;
   aiResearchConfigured: boolean;
   adminEmailsConfigured: boolean;
   readyForPublicReads: boolean;
@@ -49,6 +51,7 @@ export function getSupabaseConfigStatus(): SupabaseConfigStatus {
     spotifyCredentialsConfigured,
     youtubeApiKeyConfigured,
     redditCredentialsConfigured,
+    redditAccessEnabled: isRedditAccessEnabled(),
     aiResearchConfigured,
     adminEmailsConfigured,
     readyForPublicReads: urlConfigured && anonKeyConfigured,

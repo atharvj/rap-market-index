@@ -22,6 +22,40 @@ const artist: MarketUpdateArtist = {
 };
 
 describe("Bluesky market source", () => {
+  it.each(["Lil Tecca new album is bad and boring", "Lil Tecca performance was bad with an empty crowd"])("does not classify criticism as release/performance hype: %s", async text => {
+    const result = await collectBlueskyMarketSignals({ artists: [artist], runDate: "2026-08-10", delayMs: 0,
+      fetchImpl: async () => Response.json({ posts: [{ uri: "at://did:plc:fan/app.bsky.feed.post/negative", author: { handle: "fan.bsky.social" },
+        record: { text, createdAt: "2026-08-10T12:00:00Z" }, likeCount: 150 }] }) });
+    expect(result.signals[artist.id].stats.socialGrowth).toBeLessThan(0);
+    expect(result.eventsByArtist[artist.id]?.[0].impactScore).toBeLessThan(0);
+    expect(result.eventsByArtist[artist.id]?.[0].sentimentScore).toBeLessThan(0);
+  });
+  it("does not turn widely shared criticism into approval or search growth", async () => {
+    const result = await collectBlueskyMarketSignals({ artists: [artist], runDate: "2026-08-10", delayMs: 0,
+      baselines: { [artist.id]: { post_count: 1, engagement_score: 1, negative_post_count: 1 } },
+      fetchImpl: async () => Response.json({ posts: Array.from({ length: 15 }, (_, i) => ({
+        uri: `at://did:plc:fan${i}/app.bsky.feed.post/negative`, author: { handle: `fan${i}.bsky.social` },
+        record: { text: "Lil Tecca album review: this album is trash, boring and disappointing", createdAt: "2026-08-10T12:00:00Z" }, likeCount: 500
+      })) }) });
+    expect(result.signals[artist.id].stats.socialGrowth).toBeLessThan(0);
+    expect(result.signals[artist.id].stats.searchGrowth).toBeUndefined();
+  });
+  it("limits repeated posts by one author and reduces confidence in tiny samples", async () => {
+    const result = await collectBlueskyMarketSignals({ artists: [artist], runDate: "2026-08-10", delayMs: 0,
+      fetchImpl: async () => Response.json({ posts: Array.from({ length: 20 }, (_, i) => ({
+        uri: `at://did:plc:one/app.bsky.feed.post/post${i}`, author: { handle: "one.bsky.social" },
+        record: { text: "Lil Tecca new album is fire", createdAt: "2026-08-10T12:00:00Z" }, likeCount: 1
+      })) }) });
+    expect(result.signals[artist.id].rawPayload.postCount).toBe(2);
+    expect(result.signals[artist.id].confidence).toBeLessThan(0.25);
+  });
+  it.each([{}, { posts: null }, { error: "Unavailable" }])("does not treat malformed success responses as no discussion: %j", async payload => {
+    const result = await collectBlueskyMarketSignals({ artists: [artist], runDate: "2026-08-10", delayMs: 0,
+      fetchImpl: async () => Response.json(payload) });
+    expect(result.signals[artist.id].stats).toEqual({});
+    expect(result.observations.some(o => o.metric === "post_count")).toBe(false);
+    expect(result.warnings.length).toBeGreaterThan(0);
+  });
   it("disambiguates short artist names without excluding adjacent public attention", async () => {
     let requestedQuery = "";
     await collectBlueskyMarketSignals({

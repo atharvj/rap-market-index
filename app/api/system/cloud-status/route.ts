@@ -99,9 +99,9 @@ export async function GET(request: Request) {
       id: "reddit-credentials",
       label: "Reddit credentials",
       ok: true,
-      detail: config.redditCredentialsConfigured
-        ? "Configured"
-        : "Optional; needed for community hype and snippet/performance signals"
+      detail: !config.redditAccessEnabled
+        ? "Disabled; approved Reddit API access is required"
+        : config.redditCredentialsConfigured ? "Approved and enabled" : "Enabled but missing credentials"
     }
   ];
 

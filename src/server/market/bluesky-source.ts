@@ -236,14 +236,20 @@ function buildBlueskySignal({
       matchConfidence: getArtistMentionConfidence(post, names)
     }))
     .filter((post) => post.matchConfidence > 0);
-  const classifiedPosts = matchedPosts.map((post) => ({
+  const authorCounts = new Map<string, number>();
+  const balancedPosts = matchedPosts.filter(post => {
+    const author = post.authorHandle.toLowerCase(), count = authorCounts.get(author) ?? 0;
+    authorCounts.set(author, count + 1);
+    return count < 2;
+  });
+  const classifiedPosts = balancedPosts.map((post) => ({
     post,
     classification: classifyBlueskyPost(post)
   }));
-  const uniqueAuthors = new Set(matchedPosts.map((post) => post.authorHandle.toLowerCase()));
-  const postCount = matchedPosts.length;
-  const engagementScore = matchedPosts.reduce((total, post) => total + post.engagement, 0);
-  const topPostEngagement = matchedPosts.reduce((highest, post) => Math.max(highest, post.engagement), 0);
+  const uniqueAuthors = new Set(balancedPosts.map((post) => post.authorHandle.toLowerCase()));
+  const postCount = balancedPosts.length;
+  const engagementScore = balancedPosts.reduce((total, post) => total + post.engagement, 0);
+  const topPostEngagement = balancedPosts.reduce((highest, post) => Math.max(highest, post.engagement), 0);
   const hypePostCount = classifiedPosts.filter(({ classification }) => classification.hype).length;
   const negativePostCount = classifiedPosts.filter(({ classification }) => classification.negative).length;
   const catalystPostCount = classifiedPosts.filter(({ classification }) => classification.catalyst).length;
@@ -277,11 +283,7 @@ function buildBlueskySignal({
   const stats = buildStatsFromBluesky({
     postMomentum,
     engagementMomentum,
-    hypeMomentum,
-    negativeMomentum,
     eventImpact,
-    postCount,
-    engagementScore,
     catalystPostCount,
     negativePostCount,
     uniqueAuthorCount: uniqueAuthors.size,
@@ -308,6 +310,10 @@ function buildBlueskySignal({
     uniqueAuthorCount: uniqueAuthors.size,
     topPostEngagement,
     averageSentiment,
+    samplingVersion: 2,
+    matchedPostCount: matchedPosts.length,
+    maxPostsPerAuthor: 2,
+    interpretation: "bounded_social_sample_not_broad_fan_consensus",
     baselinePostCount: baseline[POST_COUNT] ?? null,
     baselineEngagementScore: baseline[ENGAGEMENT_SCORE] ?? null,
     postMomentum,
@@ -392,11 +398,7 @@ function dedupeEventsByArtist(eventsByArtist: Record<string, MarketEvent[]>) {
 function buildStatsFromBluesky({
   postMomentum,
   engagementMomentum,
-  hypeMomentum,
-  negativeMomentum,
   eventImpact,
-  postCount,
-  engagementScore,
   catalystPostCount,
   negativePostCount,
   uniqueAuthorCount,
@@ -404,11 +406,7 @@ function buildStatsFromBluesky({
 }: {
   postMomentum: number | undefined;
   engagementMomentum: number | undefined;
-  hypeMomentum: number | undefined;
-  negativeMomentum: number | undefined;
   eventImpact: number;
-  postCount: number;
-  engagementScore: number;
   catalystPostCount: number;
   negativePostCount: number;
   uniqueAuthorCount: number;
@@ -426,24 +424,17 @@ function buildStatsFromBluesky({
 
   const postSignal = postMomentum ?? 0;
   const engagementSignal = engagementMomentum ?? 0;
-  const hypeSignal = hypeMomentum ?? catalystPostCount * 7;
-  const negativeSignal = negativeMomentum ?? negativePostCount * 8;
   const breadthSignal = clamp(uniqueAuthorCount * 2.5, 0, 18);
-  const catalystLift = catalystPostCount * 8 + Math.max(0, eventImpact) * 0.24;
-  const negativeDrag = negativeSignal * 0.92 + negativePostCount * 5.5 + Math.max(0, -eventImpact) * 0.28;
 
-  return {
-    searchGrowth: clamp(
-      engagementSignal * 0.32 + postSignal * 0.24 + breadthSignal + catalystLift * 0.34 - negativeDrag * 0.42,
-      -35,
-      100
-    ),
-    socialGrowth: clamp(
-      engagementSignal * 0.58 + postSignal * 0.18 + hypeSignal * 0.5 + catalystLift + breadthSignal - negativeDrag,
-      -50,
-      130
-    )
-  };
+  // Attention is not approval. Growing discussion amplifies its measured
+  // direction, and a small sample of headline reposts cannot create a rally.
+  const direction = averageSentiment < -8 ? -1 : averageSentiment > 8 ? 1 : 0;
+  const signedAttention = direction * (Math.max(0, engagementSignal) * 0.2 + Math.max(0, postSignal) * 0.12 + breadthSignal * 0.3);
+  const reaction = averageSentiment * 0.65 + signedAttention + clamp(eventImpact * 0.18, -12, 12);
+  let socialGrowth = reaction;
+  if (direction < 0) socialGrowth = Math.min(socialGrowth, averageSentiment * 0.35);
+  if (direction > 0) socialGrowth = Math.max(socialGrowth, averageSentiment * 0.35);
+  return { socialGrowth: clamp(socialGrowth, -50, 50) };
 }
 
 function buildBlueskyEvents({
@@ -466,7 +457,8 @@ function buildBlueskyEvents({
       }
 
       const engagementFloor = classification.negative ? 14 : 24;
-      return post.engagement >= engagementFloor || Math.abs(classification.impactScore) >= 42;
+      const corroboratingAuthors = new Set(classifiedPosts.filter(item => item.classification.eventType === classification.eventType && item.classification.negative === classification.negative).map(item => item.post.authorHandle));
+      return post.engagement >= engagementFloor || (Math.abs(classification.impactScore) >= 42 && corroboratingAuthors.size >= 3);
     })
     .map(({ post, classification }) => {
       const engagementImpact = clamp(Math.log10(post.engagement + 1) * 16 - 10, 0, 42);
@@ -496,6 +488,7 @@ function buildBlueskyEvents({
     const baseConfidence = clamp(confidence * post.matchConfidence, 0.32, 0.82);
     const baseRawPayload = {
       source: "bluesky_post",
+      samplingVersion: 2,
       authorHandle: post.authorHandle,
       authorDisplayName: post.authorDisplayName,
       likes: post.likes,
@@ -697,6 +690,14 @@ function classifyBlueskyPost(post: BlueskyPost): BlueskyPostClassification {
   }
 
   if (hasAlbumAnnouncement || hasRelease) {
+    if (negative && negativeMatches > positiveMatches) {
+      return {
+        eventType: "review", sentimentScore: Math.min(-18, sentimentScore),
+        impactScore: clamp(Math.min(-18, sentimentScore) - engagementImpact * 0.6, -90, 0),
+        confidence: 0.54, reason: "negative_release_reception", catalyst: true,
+        negative: true, hype: false, socialCatalystKind: "review", receptionPhase: "early", criticReactionDetected: hasCriticReaction
+      };
+    }
     return {
       eventType: "release",
       sentimentScore: clamp(22 + sentimentScore * 0.62, -48, 84),
@@ -738,6 +739,15 @@ function classifyBlueskyPost(post: BlueskyPost): BlueskyPostClassification {
             ? "snippet_terms"
             : "viral_terms";
     const baseImpact = hasFeature ? 36 : hasPerformance ? 34 : hasChart ? 42 : hasSnippet ? 24 : 30;
+
+    if (negative && negativeMatches > positiveMatches) {
+      return {
+        eventType: "review", sentimentScore: Math.min(-18, sentimentScore),
+        impactScore: clamp(Math.min(-18, sentimentScore) - engagementImpact * 0.6, -90, 0),
+        confidence: 0.5, reason: "negative_music_reception", catalyst: true,
+        negative: true, hype: false, socialCatalystKind: "review", criticReactionDetected: hasCriticReaction
+      };
+    }
 
     return {
       eventType: "viral",
@@ -885,9 +895,10 @@ async function fetchBlueskySearchPage({
       };
     }
 
+    if (!parsed || !Array.isArray(parsed.posts)) return { ok: false, error: `Bluesky ${sort} search returned malformed results.` };
     return {
       ok: true,
-      posts: parsed?.posts ?? []
+      posts: parsed.posts
     };
   } catch (error) {
     return {
@@ -1041,7 +1052,8 @@ function getBlueskySignalConfidence({
     (hasCatalyst ? 0.08 : 0);
   const shortNamePenalty = hasShortName ? 0.78 : 1;
 
-  return clamp(rawConfidence * shortNamePenalty, 0.23, 0.78);
+  const evidenceQuality = Math.min(1, 0.4 + engagementScore / 150) * Math.min(1, 0.45 + uniqueAuthorCount / 12);
+  return clamp(rawConfidence * shortNamePenalty * evidenceQuality, 0.08, 0.6);
 }
 
 function calculateMomentum(

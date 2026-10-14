@@ -44,6 +44,7 @@ import { collectListenBrainzMarketSignals } from "@/server/market/listenbrainz-s
 import { collectMusicbrainzReleaseEvents } from "@/server/market/musicbrainz-releases";
 import { collectPolymarketMarketSignals } from "@/server/market/polymarket-source";
 import { collectRedditMarketSignals } from "@/server/market/reddit-source";
+import { isRedditAccessEnabled } from "@/server/market/reddit-access";
 import { collectSpotifyPublicSignals } from "@/server/market/spotify-public-source";
 import { collectSpotifyMarketSignals } from "@/server/market/spotify-source";
 import { collectTradeFlowMarketSignals } from "@/server/market/trade-flow-source";
@@ -641,7 +642,7 @@ async function collectRealSignals({
   const useSpotifyPublic = !intraday && (source === "spotify" || source === "core" || source === "blended");
   const useYoutube = intraday || source === "youtube" || source === "core" || source === "blended";
   const useWikimedia = shouldCollectWikimediaSource(source, intraday);
-  const useReddit = !intraday && (source === "reddit" || ((source === "core" || source === "blended") && hasRedditCredentials()));
+  const useReddit = !intraday && isRedditAccessEnabled() && (source === "reddit" || ((source === "core" || source === "blended") && hasRedditCredentials()));
   const useBluesky =
     !intraday &&
     (source === "bluesky" || source === "core" || source === "blended") &&
@@ -651,6 +652,7 @@ async function collectRealSignals({
     getEnvBoolean("MARKET_POLYMARKET_ENABLED", true);
   const useTradeFlow = Boolean(supabase) && isRealExternalSource(source);
   const warnings: string[] = [];
+  if (source === "reddit" && !isRedditAccessEnabled()) warnings.push("Reddit collection is disabled: approved API access and explicit enablement are required.");
 
   if (
     !useGdelt &&
@@ -779,10 +781,13 @@ async function collectRealSignals({
                 "comment_count",
                 "comment_like_count",
                 "positive_comment_share",
-                "negative_comment_share"
+                "negative_comment_share",
+                "sampling_version",
+                "sample_scope"
               ],
               beforeDate: runDate,
-              lookbackDays: 30
+              lookbackDays: 7,
+              strategy: "latest"
             })
           : Promise.resolve({}),
         useWikimedia
@@ -1004,30 +1009,6 @@ async function collectRealSignals({
           detectedEventsByArtist = mergeEvents(detectedEventsByArtist, youtubeEditorialEvents.eventsByArtist);
         }
       }
-
-      const maxVideosPerArtist = intraday
-        ? 0
-        : getEnvInteger("MARKET_YOUTUBE_COMMENT_VIDEOS", 1, 0, 3);
-
-      if (maxVideosPerArtist > 0) {
-        const youtubeComments = await collectExternalSource("YouTube comments", warnings, () =>
-          collectYoutubeCommentMarketSignals({
-            artists,
-            runDate,
-            apiKey: process.env.YOUTUBE_API_KEY,
-            externalIds,
-            baselines: youtubeCommentBaselines,
-            maxVideosPerArtist,
-            maxCommentsPerVideo: getEnvInteger("MARKET_YOUTUBE_COMMENT_LIMIT", 25, 1, 100)
-          })
-        );
-
-        if (youtubeComments) {
-          sources.push(youtubeComments.signals);
-          observations.push(...youtubeComments.observations);
-          warnings.push(...youtubeComments.warnings);
-        }
-      }
     })());
   }
 
@@ -1176,6 +1157,16 @@ async function collectRealSignals({
     }
     const tracks = await collectYoutubeTrackSignals({ artists, events: tracked, runDate, apiKey: process.env.YOUTUBE_API_KEY, baselines });
     sources.push(tracks.signals); observations.push(...tracks.observations); warnings.push(...tracks.warnings);
+    const maxCommentVideos = intraday ? 0 : getEnvInteger("MARKET_YOUTUBE_COMMENT_VIDEOS", 3, 0, 3);
+    if (maxCommentVideos > 0) {
+      const comments = await collectExternalSource("YouTube comments", warnings, () => collectYoutubeCommentMarketSignals({
+        artists, runDate, apiKey: process.env.YOUTUBE_API_KEY, externalIds,
+        events: candidates, baselines: youtubeCommentBaselines, maxVideosPerArtist: maxCommentVideos,
+        maxCommentsPerVideo: getEnvInteger("MARKET_YOUTUBE_COMMENT_LIMIT", 50, 1, 100)
+      }));
+      if (comments) { sources.push(comments.signals); observations.push(...comments.observations); warnings.push(...comments.warnings); }
+    }
+
   }
 
   return {
@@ -1414,6 +1405,8 @@ function filterStoredEventsForSourcePolicy(
           if (!allowBluesky && eventSource === "bluesky_post") {
             return false;
           }
+          if (eventSource === "bluesky_post" && event.rawPayload.samplingVersion !== 2) return false;
+          if (eventSource === "reddit_post" && !isRedditAccessEnabled()) return false;
 
           return isStoredEventEligibleForPricing(event, artistById.get(artistId));
         })

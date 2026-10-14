@@ -670,6 +670,20 @@ test("background refresh failures retain chart data and every public indicator",
   await expect(indicators).not.toContainText("Latest refresh failed");
 });
 
+test("artist indicators show bounded negative reception even while the quote rises", async ({ page }) => {
+  const artist = marketState.artists[0];
+  await page.route("**/api/market/observations/**", route => route.fulfill({ contentType: "application/json", body: JSON.stringify({ ok: true,
+    series: [["positive_comment_share", 15], ["negative_comment_share", 55], ["comment_count", 80]].map(([metric, value]) => ({
+      key: `youtube_comments:${metric}`, source: "youtube_comments", metric, points: [], latestValue: value, latestDate: "2026-10-14"
+    })) }) }));
+  await page.goto(`/artists/${artist.id}`);
+  const indicators = page.locator("section").filter({ has: page.getByRole("heading", { name: "Public Market Indicators", exact: true }) });
+  await expect(indicators).toContainText("Sampled Negative Reactions");
+  await expect(indicators).toContainText("55.0%");
+  await expect(indicators).toContainText("15.0%");
+  await expect(indicators).toContainText("not all fans");
+});
+
 test("public metrics do not use decorative colored side borders", async ({ page }) => {
   for (const path of ["/", "/markets", "/scout"]) {
     await page.goto(path);

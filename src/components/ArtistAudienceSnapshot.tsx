@@ -18,7 +18,10 @@ const preferredSeries = [
   { key: "wikimedia:pageviews_7d", label: "Wikipedia Attention · 7D" },
   { key: "media_rss:source_count", label: "Media Sources · 30D" },
   { key: "trade_flow:unique_trader_count", label: "Active Traders · 24H" },
-  { key: "trade_flow:trade_count", label: "Orders · 24H" }
+  { key: "trade_flow:trade_count", label: "Orders · 24H" },
+  { key: "youtube_comments:positive_comment_share", label: "Sampled Positive Reactions" },
+  { key: "youtube_comments:negative_comment_share", label: "Sampled Negative Reactions" },
+  { key: "youtube_comments:comment_count", label: "Recent Comments Sampled" }
 ];
 
 export function ArtistAudienceSnapshot({ artistId }: { artistId: string }) {
@@ -108,11 +111,12 @@ export function ArtistAudienceSnapshot({ artistId }: { artistId: string }) {
         {metrics.map((metric) => (
           <div key={metric.key} className="min-w-0 px-3 py-3">
             <p className="truncate text-[10px] font-semibold uppercase text-paper/42">{metric.label}</p>
-            <p className="mt-1 text-sm font-semibold number-tabular">{formatCompact(metric.value)}</p>
+            <p className="mt-1 text-sm font-semibold number-tabular">{metric.key.endsWith("_comment_share") ? `${metric.value.toFixed(1)}%` : formatCompact(metric.value)}</p>
             <p className="mt-1 text-[10px] text-paper/35">Updated {formatDate(metric.date)}</p>
           </div>
         ))}
       </div>
+      {metrics.some(metric => metric.key.startsWith("youtube_comments:")) ? <p className="border-t border-line px-4 py-3 text-xs text-paper/48">Reactions come from a limited sample of recent YouTube comments, not all fans. Unclassified comments are included in the sample count. Listening and touring can remain strong despite negative reactions.</p> : null}
     </section>
   );
 }

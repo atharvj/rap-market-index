@@ -1,6 +1,6 @@
 # Market data coverage
 
-Model: `rmi-core-v36`. These are fantasy-market estimates, not observable exchange prices. More inputs should improve coverage and explain movement; they do not establish a uniquely correct dollar price.
+Model: `rmi-core-v37`. These are fantasy-market estimates, not observable exchange prices. More inputs should improve coverage and explain movement; they do not establish a uniquely correct dollar price.
 
 ## Sources and cadence
 
@@ -127,3 +127,54 @@ pass against the existing snapshots before deployment.
 Market Pulse and Scout chart axes, tooltips and selected values use index points,
 rather than dollar signs. Artist quote and current-holdings charts retain currency
 formatting. Indices start at 100 for the displayed window.
+
+
+## October 14 reception sampling repair (v37)
+
+Reddit access was rejected. Collection, saved intraday inputs and Reddit event
+pricing are disabled unless both `MARKET_REDDIT_API_APPROVED` and
+`MARKET_REDDIT_ENABLED` are explicitly true. Credentials alone are insufficient.
+No alternative Reddit scraper was introduced.
+
+YouTube reaction sampling uses up to three verified recordings or trusted
+performances/lyrics interviews per artist, including explicitly credited
+collaborators' uploads. Uploader identity is checked again against video metadata.
+One available slot is reserved for an independent editorial audience. Recent and
+relevant comment lists are combined, duplicate comments and repeated authors are
+limited, and comments older than seven days or dated in the future are excluded.
+Four bounded workers share video requests across collaborators. Production sampling
+settings are three videos and fifty comment results per video across both orders.
+
+At least twelve recent comments and six identifiable reactions are required for
+pricing. Unclassified text is unknown, not approval or evidence of neutral consensus.
+Negation, basic music reaction terms and unambiguous approval/disapproval emoji are
+handled, but this remains a heuristic with limited language and sarcasm coverage.
+Confidence remains capped; an artist-owned channel is not a representative fan poll.
+Only comparable video cohorts under the same sampling method yield reception momentum.
+Insufficient samples expose counts without manufacturing sentiment measurements.
+
+More comments, likes or replies do not automatically raise prices. YouTube comments
+contribute only to audience response, not searches or viewing demand. Negative reception
+stays a negative contribution even when engagement rises or criticism softens. Streams,
+chart activity, viewing acceleration and verified touring events remain separate inputs
+and can outweigh negative reception. No coefficient was selected to force Young Thug down.
+
+Bluesky caps posts per author, lowers confidence for small low-engagement samples,
+and signs attention with reception instead of rewarding all chatter. Critical release
+and performance reactions cannot become positive hype events. Tiny uncorroborated posts
+cannot become catalysts merely because a classifier assigns a strong impact. Malformed
+provider responses are failures rather than zero discussion. Cached reactions and
+social catalysts from the prior sampling method are excluded from current pricing.
+
+Artist indicators show positive/negative shares and recent comment sample counts when
+available, with the sample limitation stated. Initial UY SCUTI reviews from 2025 are
+outside recorded RMI history and are not reintroduced as fresh 2026 catalysts. Slime
+Language 3's August 2026 release is recorded; old criticism is not proof of current
+reception. Reviews describe critics' opinions, not a fan sentiment poll. Sparse reaction
+coverage remains a gap, especially when videos have few recent comments. This repair
+does not overwrite earlier closes or manufacture historical album reactions.
+
+References: [YouTube comment sorting](https://developers.google.com/youtube/v3/docs/commentThreads/list),
+[Reddit approved access](https://support.reddithelp.com/hc/en-us/articles/14945211791892-Developer-Platform-Accessing-Reddit-Data),
+[UY SCUTI review](https://pitchfork.com/reviews/albums/young-thug-uy-scuti/),
+[Slime Language 3 review](https://pitchfork.com/reviews/albums/young-stoner-life-young-thug-slime-language-3/).
