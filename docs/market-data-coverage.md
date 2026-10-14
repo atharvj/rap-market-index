@@ -60,6 +60,11 @@ The admin health report pages through observations, closes, ticks and events ins
 
 Every successful quote persistence now records a `market_refresh:completed` observation for each updated artist, including unchanged quotes. The last-hour coverage warning measures actual refresh completion independently of daily closes and price movement. Failed stats, history, artist or tick writes do not record completion. A failed completion write fails the refresh; this does not make the preceding separate database writes transactional. Existing scheduler delays remain possible and are now visible in this metric.
 
+Snapshot failures are not cached. An initial feed outage displays unavailable artist
+data rather than claiming the artist does not exist. Repeated failures cannot claim
+to show a previously verified quote unless a snapshot actually loaded successfully;
+later failed or malformed snapshots retain those verified quotes with a warning.
+
 Malformed Apple chart identities and non-numeric YouTube counters cannot seed observations. A chart older than the saved provider timestamp is ignored. These checks do not change the v36 formula or reset price history. Trading status must contain one valid control record; public status and all order types fail closed when it is missing or malformed.
 
 Automation responses require an explicit boolean success flag. The release-window,

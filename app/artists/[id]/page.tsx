@@ -22,7 +22,7 @@ import type { ReactNode } from "react";
 export default function ArtistDetailPage() {
   const params = useParams<{ id: string }>();
   const searchParams = useSearchParams();
-  const { getArtist, getHolding, getShortPosition, state } = useGame();
+  const { getArtist, getHolding, getShortPosition, state, marketError } = useGame();
   const artist = getArtist(params.id);
   const requestedSide = searchParams.get("side");
   const defaultTradeSide = requestedSide === "sell" || requestedSide === "short" || requestedSide === "cover"
@@ -33,7 +33,8 @@ export default function ArtistDetailPage() {
     return (
       <RmiSection>
         <div className="p-6">
-          <h1 className="text-2xl font-bold">Artist not found</h1>
+          <h1 className="text-2xl font-bold">{marketError ? "Artist data temporarily unavailable" : "Artist not found"}</h1>
+          {marketError ? <p className="my-3 text-sm text-paper/60">The market feed could not be loaded. This page will recover when the feed returns.</p> : null}
           <RmiButton href="/markets" variant="secondary">Back to markets</RmiButton>
         </div>
       </RmiSection>

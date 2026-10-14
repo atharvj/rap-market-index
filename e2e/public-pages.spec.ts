@@ -698,6 +698,36 @@ test("artist indicators distinguish sampled reactions from legacy social classif
   await expect(indicators).toContainText("Announcements without an opinion do not count as approval");
 });
 
+test("artist pages distinguish feed outages from missing artists and recover verified quotes", async ({ page }) => {
+  const artist = marketState.artists[0];
+  let mode: "outage" | "success" | "invalid" = "outage";
+  await page.route("**/api/market/snapshot", route => route.fulfill({
+    status: mode === "outage" ? 503 : 200,
+    contentType: "application/json",
+    body: JSON.stringify(mode === "success" ? { ok: true, source: "supabase", state: marketState } : { ok: false })
+  }));
+  await page.goto(`/artists/${artist.id}`);
+  await expect(page.getByRole("heading", { name: "Artist data temporarily unavailable", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Artist not found", exact: true })).toHaveCount(0);
+
+  const refresh = async () => {
+    const response = page.waitForResponse("**/api/market/snapshot");
+    await page.evaluate(() => window.dispatchEvent(new Event("focus")));
+    await response;
+  };
+  await refresh();
+  await expect(page.getByRole("alert").filter({ hasText: "Live market data is temporarily unavailable" })).toBeVisible();
+  await expect(page.getByText("The last verified quote is still shown.", { exact: false })).toHaveCount(0);
+
+  mode = "success";
+  await refresh();
+  await expect(page.getByRole("heading", { name: artist.name, exact: true })).toBeVisible();
+  mode = "invalid";
+  await refresh();
+  await expect(page.getByRole("alert").filter({ hasText: "The last verified quote is still shown" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: artist.name, exact: true })).toBeVisible();
+});
+
 test("public metrics do not use decorative colored side borders", async ({ page }) => {
   for (const path of ["/", "/markets", "/scout"]) {
     await page.goto(path);

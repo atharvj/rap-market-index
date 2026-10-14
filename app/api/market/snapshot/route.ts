@@ -23,6 +23,7 @@ type PriceHistoryPoint = Pick<
 >;
 
 const CACHE_HEADERS = { "Cache-Control": "public, max-age=10, s-maxage=15, stale-while-revalidate=60" };
+const ERROR_HEADERS = { "Cache-Control": "no-store" };
 
 export async function GET() {
   const config = getSupabaseConfigStatus();
@@ -38,7 +39,7 @@ export async function GET() {
   if (!config.serviceRoleConfigured) {
     return NextResponse.json(
       { ok: false, source: "supabase", error: "Market data is temporarily unavailable." },
-      { status: 503, headers: CACHE_HEADERS }
+      { status: 503, headers: ERROR_HEADERS }
     );
   }
 
@@ -95,7 +96,7 @@ export async function GET() {
         source: "supabase",
         error: "Market data is temporarily unavailable."
       },
-      { status: 500, headers: CACHE_HEADERS }
+      { status: 500, headers: ERROR_HEADERS }
     );
   }
 }

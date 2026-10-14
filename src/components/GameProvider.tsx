@@ -121,7 +121,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     let active = true;
 
     const controller = new AbortController();
-    let firstLoad = true;
+    let hasVerifiedSnapshot = false;
     const loadMarketSnapshot = () => fetch("/api/market/snapshot", { signal: controller.signal })
       .then(async (response) => {
         const payload = await response.json() as MarketSnapshotResponse;
@@ -138,12 +138,10 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
         }
 
         if (!payload.ok || payload.source !== "supabase" || !payload.state) {
-          setState((current) => clearMarketQuotes(current));
-          setMarketError("Live market data is temporarily unavailable. Quotes and trading are paused until the feed recovers.");
-          setMarketReady(true);
-          return;
+          throw new Error("Live market data is temporarily unavailable.");
         }
 
+        hasVerifiedSnapshot = true;
         const snapshotState = payload.state;
         setState((current) => ({
           ...snapshotState,
@@ -160,7 +158,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       })
       .catch(() => {
         if (active && !controller.signal.aborted) {
-          if (!firstLoad) {
+          if (hasVerifiedSnapshot) {
             setMarketError("Live quote refresh is temporarily delayed. The last verified quote is still shown.");
             setSyncStatus("Market refresh delayed");
             return;
@@ -171,9 +169,6 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
           setSyncStatus("Market feed unavailable");
           setMarketReady(true);
         }
-      })
-      .finally(() => {
-        firstLoad = false;
       });
 
     void loadMarketSnapshot();
