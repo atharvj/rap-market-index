@@ -123,3 +123,16 @@ it("retains legitimate Various Artists compilation ranks without inventing perfo
   const invalid = await collectAppleChartSignals({ artists, runDate: "2026-09-14", fetchImpl: async () => Response.json(payload) });
   expect(invalid.observations).toHaveLength(0);
 });
+
+it("bounds the expanded feed scan instead of bursting six requests at the provider", async () => {
+  let active = 0, peak = 0, requests = 0;
+  const result = await collectAppleChartSignals({ artists, runDate: "2026-09-14", fetchImpl: async input => {
+    requests++; active++; peak = Math.max(peak, active);
+    await Promise.resolve();
+    active--;
+    return Response.json(String(input).endsWith("/albums.json") ? albumChart() : chart());
+  } });
+  expect(requests).toBe(6);
+  expect(peak).toBe(2);
+  expect(result.warnings).toEqual([]);
+});

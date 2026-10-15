@@ -17,18 +17,24 @@ export async function collectAppleChartSignals({ artists, runDate, previous = {}
   const signals: AdapterSignals = {}, observations: MarketObservation[] = [], warnings: string[] = [];
   const charts: Record<string, Chart> = {};
   const specs = STOREFRONTS.flatMap(storefront => (includeAlbums ? ["songs", "albums"] : ["songs"]).map(kind => ({ storefront, kind: kind as ChartKind })));
-  await Promise.all(specs.map(async ({ storefront, kind }) => {
-    try {
-      const payload = await fetchChart(storefront, kind, fetchImpl);
-      const entries = payload.feed?.results, updated = payload.feed?.updated;
-      const updatedTime = Date.parse(updated);
-      const chartDate = Number.isFinite(updatedTime) ? getMarketDate(new Date(updatedTime)) : "";
-      const age = Date.parse(runDate) - Date.parse(chartDate);
-      if (!Array.isArray(entries) || entries.length !== 100 || !Number.isFinite(age) || age < 0 || age > 3 * 86400000 ||
-        !entries.every((entry: ChartEntry) => validEntry(entry, kind)) || new Set(entries.map((entry: ChartEntry) => entry.id)).size !== 100) throw new Error("Incomplete, stale or invalid chart");
-      // Preserve existing song keys so adding albums cannot invent a chart move.
-      charts[kind === "songs" ? storefront : `${storefront}:albums`] = { storefront, kind, updated, entries };
-    } catch (error) { warnings.push(`Apple Music ${storefront} ${kind} chart unavailable: ${error instanceof Error ? error.message : "request failed"}`); }
+  // Keep the expanded six-feed scan bounded; bursting all storefronts/kinds at
+  // once caused intermittent provider timeouts in live collection.
+  let nextSpec = 0;
+  await Promise.all(Array.from({ length: 2 }, async () => {
+    while (nextSpec < specs.length) {
+      const { storefront, kind } = specs[nextSpec++];
+      try {
+        const payload = await fetchChart(storefront, kind, fetchImpl);
+        const entries = payload.feed?.results, updated = payload.feed?.updated;
+        const updatedTime = Date.parse(updated);
+        const chartDate = Number.isFinite(updatedTime) ? getMarketDate(new Date(updatedTime)) : "";
+        const age = Date.parse(runDate) - Date.parse(chartDate);
+        if (!Array.isArray(entries) || entries.length !== 100 || !Number.isFinite(age) || age < 0 || age > 3 * 86400000 ||
+          !entries.every((entry: ChartEntry) => validEntry(entry, kind)) || new Set(entries.map((entry: ChartEntry) => entry.id)).size !== 100) throw new Error("Incomplete, stale or invalid chart");
+        // Preserve existing song keys so adding albums cannot invent a chart move.
+        charts[kind === "songs" ? storefront : `${storefront}:albums`] = { storefront, kind, updated, entries };
+      } catch (error) { warnings.push(`Apple Music ${storefront} ${kind} chart unavailable: ${error instanceof Error ? error.message : "request failed"}`); }
+    }
   }));
   const credits = Object.fromEntries(Object.entries(charts).map(([key, chart]) => [key, chart.entries.map((entry, index) => ({
     ...entry, rank: index + 1, artists: resolveChartArtists(entry, chart.kind, artists)
