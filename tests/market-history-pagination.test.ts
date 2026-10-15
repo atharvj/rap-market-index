@@ -58,3 +58,16 @@ it("retries a canceled baseline read once and still rejects a repeated failure",
   calls = 0;
   await expect(loadObservationBaselines({ ...options, supabase: make(true) })).rejects.toThrow("youtube_comments observation baselines"); expect(calls).toBe(2);
 });
+
+it("rehydrates missing Apple keys from same-day saved totals without borrowing an older market date", async () => {
+  const { loadLatestObservationPayloads } = await import("@/server/market/supabase-repository");
+  const stamp = "2026-10-15T06:00:00Z", partial = { runDate: "2026-10-15", scores: { gb: 30 }, chartUpdatedAt: { gb: stamp } };
+  const rows = [
+    { artist_id: "a", observed_date: "2026-10-15", raw_payload: partial },
+    { artist_id: "a", observed_date: "2026-10-15", raw_payload: { ...partial, scores: { us: 80, gb: 31 }, chartUpdatedAt: { us: stamp, gb: stamp } } },
+    { artist_id: "b", observed_date: "2026-10-15", raw_payload: partial },
+    { artist_id: "b", observed_date: "2026-10-14", raw_payload: { runDate: "2026-10-14", scores: { us: 99 }, chartUpdatedAt: { us: stamp } } }
+  ];
+  const result = await loadLatestObservationPayloads({ supabase: mockDatabase({ market_observations: rows }, []), artistIds: ["a", "b"], source: "apple_charts", metric: ["chart_snapshot", "chart_points"], beforeDate: "2026-10-16", lookbackDays: 3 });
+  expect(result.a.scores).toEqual({ gb: 30, us: 80 }); expect(result.b.scores).toEqual({ gb: 30 });
+});

@@ -16,6 +16,7 @@ describe("bounded chart observation recovery", () => {
     expect(isAppleChartRecoveryDue({ runDate: "2026-10-15", scores }, undefined, "2026-10-15", now)).toBe(false);
     expect(isAppleChartRecoveryDue({ runDate: "2026-10-14", scores }, undefined, "2026-10-15", now)).toBe(true);
     expect(isAppleChartRecoveryDue({}, "2026-10-15T11:30:00Z", "2026-10-15", now)).toBe(false);
+    expect(isAppleChartRecoveryDue({ runDate: "2026-10-15", scores, missingKeys: ["us"] }, "2026-10-15T10:30:00Z", "2026-10-15", now)).toBe(true);
     expect(isAppleChartRecoveryDue({}, "2026-10-15T10:30:00Z", "2026-10-15", now)).toBe(true);
   });
   it("persists recovered evidence without calling any quote persistence function", async () => {

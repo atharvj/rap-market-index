@@ -136,3 +136,16 @@ it("bounds the expanded feed scan instead of bursting six requests at the provid
   expect(peak).toBe(2);
   expect(result.warnings).toEqual([]);
 });
+
+it("preserves a more complete same-day stored snapshot without pricing the retained country or publishing a partial total", async () => {
+  const first = await collectAppleChartSignals({ artists, runDate: "2026-09-14", fetchImpl: combinedFetch() });
+  const currentSnapshots = Object.fromEntries(Object.entries(first.signals).map(([id, signal]) => [id, signal.rawPayload]));
+  const second = await collectAppleChartSignals({ artists, runDate: "2026-09-14", previous: prior, currentSnapshots,
+    fetchImpl: async input => String(input).includes("/us/") && String(input).endsWith("/songs.json") ? new Response("Unavailable", { status: 503 }) : combinedFetch()(input) });
+  const snapshot = second.observations.find(o => o.artistId === "Skrilla" && o.metric === "chart_snapshot");
+  expect(snapshot?.value).toBe(6);
+  expect(snapshot?.rawPayload).toMatchObject({ scores: { us: 91 }, retainedKeys: ["us"], missingKeys: ["us"] });
+  expect(second.signals.Skrilla.rawPayload.scores).not.toHaveProperty("us");
+  expect(second.observations.some(o => o.metric === "chart_points")).toBe(false);
+  expect(second.signals.Skrilla.stats.streamingGrowth).toBe(0);
+});

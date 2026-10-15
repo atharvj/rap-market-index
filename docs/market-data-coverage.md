@@ -402,3 +402,10 @@ recordings with more lifetime comments, using statistics in the same metadata
 request. Lifetime volume only prioritizes discovery; it adds no price signal, and
 only actual last-seven-day comments are admitted. This keeps several quiet recent
 uploads from hiding ongoing discussion of an artist's established recordings.
+
+A later incomplete Apple scan now retains actual same-day country snapshots and
+their provider timestamps instead of replacing a complete snapshot with fewer
+keys. Saved song/album payloads can restore missing keyed context. Retained keys
+are marked missing from the latest attempt and remain eligible for bounded retry;
+they are not scored as freshly collected inputs or used to publish a partial
+regional aggregate. Yesterday's ranks cannot fill today's absent observations.

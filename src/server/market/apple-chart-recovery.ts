@@ -7,7 +7,8 @@ const RETRY_INTERVAL_MS = 60 * 60 * 1000;
 
 export function isAppleChartRecoveryDue(snapshot: Record<string, unknown> | undefined, lastAttempt: string | undefined, runDate: string, now = Date.now()) {
   const scores = snapshot?.scores as Record<string, unknown> | undefined;
-  if (snapshot?.runDate === runDate && CHART_KEYS.every(key => typeof scores?.[key] === "number" && Number.isFinite(scores[key]))) return false;
+  if (snapshot?.runDate === runDate && (!Array.isArray(snapshot.missingKeys) || snapshot.missingKeys.length === 0) &&
+    CHART_KEYS.every(key => typeof scores?.[key] === "number" && Number.isFinite(scores[key]))) return false;
   const last = Date.parse(lastAttempt ?? "");
   return !Number.isFinite(last) || now - last >= RETRY_INTERVAL_MS;
 }
@@ -17,7 +18,7 @@ export function isAppleChartRecoveryDue(snapshot: Record<string, unknown> | unde
 export async function recoverAppleChartObservations(supabase: Parameters<typeof loadActiveArtists>[0], runDate = getMarketDate()) {
   const artists = await loadActiveArtists(supabase), artistIds = artists.map(artist => artist.id);
   const [snapshots, attempts] = await Promise.all([
-    loadLatestObservationPayloads({ supabase, artistIds, source: "apple_charts", metric: "chart_snapshot", beforeDate: shiftMarketDate(runDate, 1), lookbackDays: 3 }),
+    loadLatestObservationPayloads({ supabase, artistIds, source: "apple_charts", metric: ["chart_snapshot", "chart_points", "album_chart_points"], beforeDate: shiftMarketDate(runDate, 1), lookbackDays: 3 }),
     loadLatestSourceObservationTimes({ supabase, artistIds, source: "apple_charts", runDate, lookbackDays: 3 })
   ]);
   const due = artists.filter(artist => isAppleChartRecoveryDue(snapshots[artist.id], attempts[artist.id], runDate));

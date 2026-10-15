@@ -20,6 +20,7 @@ import type { ArtistCategory, HypeStats } from "@/lib/types";
 import { isMarketEventSourceIntegrityValid } from "@/server/market/event-integrity";
 import { shouldRecordIntradayPriceTick } from "@/server/market/intraday-refresh";
 import { decodeHtmlEntities } from "@/lib/html-entities";
+import { mergeSameDayAppleSnapshots } from "@/server/market/apple-chart-snapshot";
 
 type Supabase = SupabaseClient<Database>;
 
@@ -701,6 +702,8 @@ export async function loadLatestObservationPayloads({
     .reduce<Record<string, Record<string, unknown>>>((memo, row) => {
       if (!memo[row.artist_id] && row.raw_payload && typeof row.raw_payload === "object" && !Array.isArray(row.raw_payload)) {
         memo[row.artist_id] = row.raw_payload as Record<string, unknown>;
+      } else if (source === "apple_charts" && row.raw_payload && typeof row.raw_payload === "object" && !Array.isArray(row.raw_payload)) {
+        memo[row.artist_id] = mergeSameDayAppleSnapshots(memo[row.artist_id], row.raw_payload as Record<string, unknown>);
       }
 
       return memo;

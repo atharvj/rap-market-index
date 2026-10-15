@@ -4,6 +4,7 @@ import type { AdapterSignals, MarketObservation } from "@/server/market/market-d
 import { resolveRecordingArtists } from "@/server/market/recording-credits";
 import { getArtistTrackingProfile, getTrackingAliases, normalizeTrackingText } from "@/server/market/artist-tracking";
 import { getMarketDate } from "@/server/market/market-date";
+import { mergeSameDayAppleSnapshots } from "@/server/market/apple-chart-snapshot";
 
 type ChartKind = "songs" | "albums";
 type ChartEntry = { id: string; name: string; artistName: string; artistId?: string; artistUrl?: string; url: string; kind?: string; genres?: Array<{ genreId: string }> };
@@ -11,8 +12,8 @@ type PreviousCharts = Record<string, Record<string, unknown>>;
 type Chart = { storefront: string; kind: ChartKind; updated: string; entries: ChartEntry[] };
 const STOREFRONTS = ["us", "gb", "ca"];
 
-export async function collectAppleChartSignals({ artists, runDate, previous = {}, includeAlbums = true, fetchImpl = fetch }: {
-  artists: MarketUpdateArtist[]; runDate: string; previous?: PreviousCharts; includeAlbums?: boolean; fetchImpl?: typeof fetch;
+export async function collectAppleChartSignals({ artists, runDate, previous = {}, currentSnapshots = {}, includeAlbums = true, fetchImpl = fetch }: {
+  artists: MarketUpdateArtist[]; runDate: string; previous?: PreviousCharts; currentSnapshots?: PreviousCharts; includeAlbums?: boolean; fetchImpl?: typeof fetch;
 }) {
   const signals: AdapterSignals = {}, observations: MarketObservation[] = [], warnings: string[] = [];
   const charts: Record<string, Chart> = {};
@@ -43,10 +44,12 @@ export async function collectAppleChartSignals({ artists, runDate, previous = {}
     const current: Record<string, number> = {}, deltas: number[] = [];
     const tracks: Array<Record<string, unknown>> = [], albums: Array<Record<string, unknown>> = [];
     const priorScores = previous[artist.id]?.scores as Record<string, number> | undefined;
+    const savedToday = currentSnapshots[artist.id] ?? (previous[artist.id]?.runDate === runDate ? previous[artist.id] : undefined);
     for (const [key, entries] of Object.entries(credits)) {
       const chart = charts[key];
       const previousUpdated = (previous[artist.id]?.chartUpdatedAt as Record<string, string> | undefined)?.[key];
-      if (previousUpdated && Date.parse(chart.updated) < Date.parse(previousUpdated)) {
+      const todayUpdated = (savedToday?.chartUpdatedAt as Record<string, string> | undefined)?.[key];
+      if ([previousUpdated, todayUpdated].some(stamp => stamp && Date.parse(chart.updated) < Date.parse(stamp))) {
         warnings.push(`Apple Music ${key} chart predates the saved observation for ${artist.ticker}.`);
         continue;
       }
@@ -62,10 +65,12 @@ export async function collectAppleChartSignals({ artists, runDate, previous = {}
     }
     if (!Object.keys(current).length) continue;
     const rawPayload = { source: "apple_charts", runDate, schemaVersion: 2, status: deltas.length ? "ok" : "baseline_only", scores: current,
-      tracks, albums, chartUpdatedAt: Object.fromEntries(Object.keys(current).map(key => [key, charts[key].updated])) };
+      tracks, albums, chartUpdatedAt: Object.fromEntries(Object.keys(current).map(key => [key, charts[key].updated])),
+      missingKeys: specs.map(({ storefront, kind }) => kind === "songs" ? storefront : `${storefront}:albums`).filter(key => !(key in current)) };
     signals[artist.id] = { stats: deltas.length ? { streamingGrowth: deltas.reduce((a, b) => a + b, 0) / deltas.length } : {}, confidence: 0.82, rawPayload };
+    const snapshot = mergeSameDayAppleSnapshots(rawPayload, savedToday);
     observations.push({ artistId: artist.id, source: "apple_charts", metric: "chart_snapshot", observedDate: runDate,
-      value: Object.keys(current).length, unit: "feeds", rawPayload });
+      value: Object.keys(snapshot.scores as Record<string, unknown>).length, unit: "feeds", rawPayload: snapshot });
     for (const kind of ["songs", "albums"] as const) {
       const keys = Object.keys(current).filter(key => charts[key].kind === kind);
       // A partial regional total would look like a decline on the public chart.

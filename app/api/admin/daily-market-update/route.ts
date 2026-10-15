@@ -53,7 +53,7 @@ import { collectYoutubeMarketSignals } from "@/server/market/youtube-source";
 import { collectYoutubeCommentMarketSignals } from "@/server/market/youtube-comments-source";
 import { collectYoutubeUploadEvents } from "@/server/market/youtube-upload-events-source";
 import { collectYoutubeEditorialEvents } from "@/server/market/youtube-editorial-events-source";
-import { getMarketDate } from "@/server/market/market-date";
+import { getMarketDate, shiftMarketDate } from "@/server/market/market-date";
 import { getMarketModelVersion } from "@/server/market/model-version";
 import { shouldRecordIntradayPriceTick } from "@/server/market/intraday-refresh";
 import { isVideoDiscoveryDue, shouldCollectWikimediaSource } from "@/server/market/source-refresh-policy";
@@ -1124,8 +1124,11 @@ async function collectRealSignals({
 
   if (!intraday && supabase && ["core", "blended"].includes(source)) {
     sourceTasks.push((async () => {
-      const previous = await loadLatestObservationPayloads({ supabase, artistIds, source: "apple_charts", metric: ["chart_snapshot", "chart_points", "album_chart_points"], beforeDate: runDate, lookbackDays: 7 });
-      const charts = await collectAppleChartSignals({ artists, runDate, previous });
+      const [previous, currentSnapshots] = await Promise.all([
+        loadLatestObservationPayloads({ supabase, artistIds, source: "apple_charts", metric: ["chart_snapshot", "chart_points", "album_chart_points"], beforeDate: runDate, lookbackDays: 7 }),
+        loadLatestObservationPayloads({ supabase, artistIds, source: "apple_charts", metric: ["chart_snapshot", "chart_points", "album_chart_points"], beforeDate: shiftMarketDate(runDate, 1), lookbackDays: 1 })
+      ]);
+      const charts = await collectAppleChartSignals({ artists, runDate, previous, currentSnapshots });
       sources.push(charts.signals); observations.push(...charts.observations); warnings.push(...charts.warnings);
     })());
   }
