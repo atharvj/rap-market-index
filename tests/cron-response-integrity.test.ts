@@ -8,11 +8,13 @@ vi.mock("@/lib/supabase/server", () => ({
 }));
 vi.mock("@/server/rate-limit", () => ({ enforceRateLimit: async () => null, getRequestIp: () => "127.0.0.1" }));
 vi.mock("@/server/product-analytics", () => ({ pruneProductAnalyticsEvents: async () => undefined }));
+const lease = vi.hoisted(() => vi.fn());
+vi.mock("@/server/market/automation-lease", () => ({ claimAutomationWindow: lease }));
 vi.mock("@/server/market/release-window", () => ({ loadReleaseWindowStatus: async () => ({ ready: false }) }));
 import { GET as catalyst } from "../app/api/cron/catalyst-refresh/route";
 import { GET as release } from "../app/api/cron/release-window/route";
 const request = () => new Request("https://example.test/api/cron/refresh", { headers: { "x-market-update-secret": "test-secret" } });
-beforeEach(() => { vi.stubEnv("MARKET_UPDATE_SECRET", "test-secret"); vi.stubGlobal("fetch", vi.fn()); });
+beforeEach(() => { lease.mockReset().mockResolvedValue(true); vi.stubEnv("MARKET_UPDATE_SECRET", "test-secret"); vi.stubGlobal("fetch", vi.fn()); });
 afterEach(() => { vi.unstubAllGlobals(); vi.unstubAllEnvs(); });
 for (const [name, handler] of [["catalyst", catalyst], ["release", release]] as const) {
   describe(`${name} scheduler failure reporting`, () => {
@@ -22,6 +24,20 @@ for (const [name, handler] of [["catalyst", catalyst], ["release", release]] as 
       expect(response.status).toBe(502);
       expect((await response.json()).ok).toBe(false);
       expect(fetch).toHaveBeenCalledTimes(1);
+    });
+    it("skips concurrent automation before scanning or repricing", async () => {
+      lease.mockResolvedValue(false);
+      const response = await handler(request());
+      expect(response.status).toBe(200);
+      expect(await response.json()).toMatchObject({ ok: true, skipped: true, busy: true });
+      expect(fetch).not.toHaveBeenCalled();
+    });
+    it("fails closed when shared automation locking is unavailable", async () => {
+      lease.mockRejectedValue(new Error("database unavailable"));
+      const response = await handler(request());
+      expect(response.status).toBe(503);
+      expect((await response.json()).ok).toBe(false);
+      expect(fetch).not.toHaveBeenCalled();
     });
     it("reports a failed quote update as an HTTP failure even if upstream used HTTP 200", async () => {
       vi.mocked(fetch).mockResolvedValueOnce(Response.json({ ok: true, artists: [{ id: "ye" }] }))

@@ -9,7 +9,7 @@ export type ArtistTrackingProfile = {
   aliases: string[];
   verifiedAt: string;
   sources: string[];
-  externalIds: { spotifyId: string; youtubeChannelId: string; musicbrainzId: string; wikipediaArticleTitle?: string; appleMusicArtistIds?: string[] };
+  externalIds: { spotifyId: string; youtubeChannelId: string; youtubeRecordingChannelIds?: string[]; musicbrainzId: string; wikipediaArticleTitle?: string; appleMusicArtistIds?: string[] };
   releases: TrackingRelease[];
   catalogueComplete: boolean;
 };
@@ -40,6 +40,16 @@ export function getArtistTrackingProfile(artist: Identity, ids?: ArtistExternalI
 export function getTrackingAliases(artist: Identity, ids?: ArtistExternalIds) {
   const profile = getArtistTrackingProfile(artist, ids);
   return [...new Set([profile?.searchName, artist.name, ...(profile?.aliases ?? []), ids?.lastfmName].filter((value): value is string => Boolean(value)))];
+}
+
+// Companion channels supply recordings, not extra channel-level audience totals.
+// A changed canonical identity must not inherit a previously verified companion.
+export function getVerifiedRecordingChannelIds(artist: Identity, ids?: ArtistExternalIds) {
+  const primary = ids?.youtubeChannelId;
+  const profile = getArtistTrackingProfile(artist, ids);
+  const companions = profile && (!primary || primary === profile.externalIds.youtubeChannelId)
+    ? profile.externalIds.youtubeRecordingChannelIds ?? [] : [];
+  return [...new Set([primary, ...companions].filter((id): id is string => Boolean(id)))];
 }
 
 export function getTrackingAliasesByName(name: string) {

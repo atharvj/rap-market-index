@@ -122,26 +122,23 @@ export async function loadPreviousClosePrices({
     return {};
   }
 
-  const { data, error } = await supabase
-    .from("price_history")
-    .select("artist_id,price,price_date")
-    .in("artist_id", artistIds)
-    .lt("price_date", runDate)
-    .order("price_date", { ascending: false });
-
-  if (error) {
-    throw new Error(`Could not load previous closes: ${error.message}`);
-  }
-
-  return ((data ?? []) as Pick<Database["public"]["Tables"]["price_history"]["Row"], "artist_id" | "price">[]).reduce<
-    Record<string, number>
-  >((previousCloses, row) => {
-    if (previousCloses[row.artist_id] === undefined) {
-      previousCloses[row.artist_id] = Number(row.price);
+  const previousCloses: Record<string, number> = {};
+  let missing = [...new Set(artistIds)];
+  // A backend page can contain hundreds of closes for one artist. Re-query
+  // unresolved artists rather than silently losing their older latest close.
+  while (missing.length) {
+    const { data, error } = await supabase.from("price_history")
+      .select("artist_id,price,price_date").in("artist_id", missing).lt("price_date", runDate)
+      .order("price_date", { ascending: false }).order("artist_id").range(0, 999);
+    if (error) throw new Error(`Could not load previous closes: ${error.message}`);
+    for (const row of data ?? []) {
+      if (previousCloses[row.artist_id] === undefined) previousCloses[row.artist_id] = Number(row.price);
     }
-
-    return previousCloses;
-  }, {});
+    const unresolved = missing.filter(id => previousCloses[id] === undefined);
+    if (unresolved.length === missing.length || (data ?? []).length < 1000) break;
+    missing = unresolved;
+  }
+  return previousCloses;
 }
 
 export async function loadExistingPriceHistoryArtistIds({
@@ -499,14 +496,19 @@ export async function loadObservationBaselines({
   const annualStartDate = shiftDate(beforeDate, -372);
   const annualEndDate = shiftDate(beforeDate, -358);
   const loadWindow = (start: string, end: string, inclusive: boolean) => loadAllPages(async (from, to) => {
-    let query = supabase.from("market_observations")
-      .select("artist_id,metric,value,observed_date,observed_at")
-      .in("artist_id", artistIds).eq("source", source).in("metric", metrics).gte("observed_date", start);
-    query = inclusive ? query.lte("observed_date", end) : query.lt("observed_date", end);
-    const { data, error } = await query.order("observed_date", { ascending: false })
-      .order("artist_id").order("metric").range(from, to);
-    if (error) throw new Error(`Could not load observation baselines: ${error.message}`);
-    return data ?? [];
+    const readPage = async () => {
+      let query = supabase.from("market_observations")
+        .select("artist_id,metric,value,observed_date,observed_at")
+        .in("artist_id", artistIds).eq("source", source).in("metric", metrics).gte("observed_date", start);
+      query = inclusive ? query.lte("observed_date", end) : query.lt("observed_date", end);
+      return query.order("observed_date", { ascending: false }).order("artist_id").order("metric").range(from, to);
+    };
+    let result = await readPage();
+    // Retry only an explicit transient database cancellation, once, for this
+    // read-only page. A repeated failure still blocks unverified repricing.
+    if (result.error?.code === "57014") result = await readPage();
+    if (result.error) throw new Error(`Could not load ${source} observation baselines: ${result.error.message}`);
+    return result.data ?? [];
   });
   const [rows, annualRows] = await Promise.all([
     loadWindow(startDate, beforeDate, false),

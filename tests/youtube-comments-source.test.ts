@@ -145,7 +145,7 @@ function createYoutubeFetch(comments: TestComment[]): typeof fetch {
         items: comments.map((comment, index) => ({
           snippet: {
             topLevelComment: {
-              id: `comment-${index}`,
+              id: `${url.searchParams.get("videoId")}:comment-${index}`,
               snippet: {
                 authorChannelId: { value: comment.author ?? `author-${index}` },
                 textOriginal: comment.text,
@@ -226,4 +226,82 @@ it("uses recent comments on verified older music when no recent recording is ava
   expect(result).not.toHaveProperty("eventsByArtist");
   const fresh = await collect(Array.from({ length: 20 }, () => ({ text: "song is trash", likes: 10 })));
   expect(result.signals[artist.id].confidence).toBeLessThan(fresh.signals[artist.id].confidence!);
+});
+
+it.each(["wrong-uploader", "disabled-comments", "empty-comments"])("replaces a %s recent candidate with a verified official recording", async failure => {
+  const event: MarketEvent = { artistId: artist.id, eventDate: "2026-08-21", eventType: "release", title: "Test Artist - Recent Song",
+    sourceUrl: "https://www.youtube.com/watch?v=abcdefghijk", sentimentScore: 25, impactScore: 30, confidence: 0.9,
+    rawPayload: { source: "youtube_upload_event", videoId: "abcdefghijk", channelId: "UC-test-artist", durationSeconds: 210 } };
+  const comments = createYoutubeFetch(Array.from({ length: 20 }, () => ({ text: "this song is trash", likes: 1 })));
+  const readVideos: string[] = [];
+  const result = await collectYoutubeCommentMarketSignals({ artists: [artist], events: { [artist.id]: [event] }, runDate: "2026-08-24", apiKey: "test", delayMs: 0,
+    externalIds: { [artist.id]: { artistId: artist.id, youtubeChannelId: "UC-test-artist" } }, fetchImpl: async input => {
+      const url = new URL(String(input));
+      if (url.pathname.endsWith("/playlistItems")) return jsonResponse({ items: [{ contentDetails: { videoId: "replacement" } }] });
+      if (url.pathname.endsWith("/videos")) {
+        if (url.searchParams.get("part")?.includes("status")) return jsonResponse({ items: [{ id: "replacement", snippet: { title: "Test Artist - Older Song (Official Video)", channelId: "UC-test-artist", categoryId: "10", publishedAt: "2025-01-01T00:00:00Z" }, contentDetails: { duration: "PT3M" }, status: { privacyStatus: "public" } }] });
+        const id = url.searchParams.get("id"); return jsonResponse({ items: [{ id, snippet: { channelId: id === "abcdefghijk" && failure === "wrong-uploader" ? "UC-wrong" : "UC-test-artist" } }] });
+      }
+      if (url.pathname.endsWith("/commentThreads")) {
+        const id = url.searchParams.get("videoId")!; readVideos.push(id);
+        if (id === "abcdefghijk") return failure === "disabled-comments" ? new Response("{}", { status: 403 }) : jsonResponse({ items: [] });
+      }
+      return comments(input);
+    } });
+  expect(result.signals[artist.id].rawPayload).toMatchObject({ sampledCommentCount: 20, classifiedCommentCount: 20, catalogueFallbackVideoCount: 1, samplingVersion: 6 });
+  expect(result.signals[artist.id].stats.socialGrowth).toBeLessThan(0);
+  expect(readVideos.filter(id => id === "replacement")).toHaveLength(2);
+  if (failure === "wrong-uploader") expect(readVideos).not.toContain("abcdefghijk");
+});
+
+it("expands a thin current sample by quantity and caps attempts without searching for positive or negative opinions", async () => {
+  const originals = Array.from({ length: 3 }, (_, i) => `recent-${i}`), catalogue = Array.from({ length: 12 }, (_, i) => `catalogue-${i}`);
+  const events: MarketEvent[] = originals.map(id => ({ artistId: artist.id, eventDate: "2026-08-21", eventType: "release", title: "Test Artist - Song", sourceUrl: `https://www.youtube.com/watch?v=${id}`,
+    sentimentScore: 25, impactScore: 30, confidence: 0.9, rawPayload: { source: "youtube_upload_event", videoId: id, channelId: "UC-test-artist", durationSeconds: 210 } }));
+  const readVideos = new Set<string>();
+  const result = await collectYoutubeCommentMarketSignals({ artists: [artist], events: { [artist.id]: events }, runDate: "2026-08-24", apiKey: "test", delayMs: 0, maxVideosPerArtist: 3,
+    externalIds: { [artist.id]: { artistId: artist.id, youtubeChannelId: "UC-test-artist" } }, fetchImpl: async input => {
+      const url = new URL(String(input));
+      if (url.pathname.endsWith("/channels")) return jsonResponse({ items: [{ id: "UC-test-artist", contentDetails: { relatedPlaylists: { uploads: "UU-test-artist" } } }] });
+      if (url.pathname.endsWith("/playlistItems")) return jsonResponse({ items: catalogue.map(id => ({ contentDetails: { videoId: id } })) });
+      if (url.pathname.endsWith("/videos")) return jsonResponse({ items: (url.searchParams.get("id") ?? "").split(",").map(id => ({ id, snippet: { title: "Test Artist - Song (Official Audio)", channelId: "UC-test-artist", categoryId: "10", publishedAt: "2025-01-01T00:00:00Z" }, contentDetails: { duration: "PT3M" }, status: { privacyStatus: "public" } })) });
+      const id = url.searchParams.get("videoId")!; readVideos.add(id);
+      return createYoutubeFetch(Array.from({ length: 2 }, (_, i) => ({ text: "hello from London", likes: 0, author: `${id}-${i}` })))(input);
+    } });
+  expect(readVideos.size).toBe(6);
+  expect(result.signals[artist.id].rawPayload).toMatchObject({ sampledVideoCount: 6, sampledCommentCount: 12, classifiedCommentCount: 0, status: "insufficient_comments" });
+  expect(result.signals[artist.id].stats).toEqual({});
+});
+
+it("recovers recent reactions from a separately verified Vevo channel while preserving actual uploader checks", async () => {
+  const ye = { ...artist, id: "ye", name: "Ye", ticker: "YE" }, primary = "UCs6eXM7s8Vl5WcECcRHc2qQ", companion = "UChpJbg7zMbi5jx9Gdjaxa9g";
+  const comments = createYoutubeFetch(Array.from({ length: 20 }, () => ({ text: "song is trash", likes: 0 })));
+  const result = await collectYoutubeCommentMarketSignals({ artists: [ye], events: {}, runDate: "2026-08-24", apiKey: "test", delayMs: 0,
+    externalIds: { ye: { artistId: "ye", youtubeChannelId: primary } }, fetchImpl: async input => {
+      const url = new URL(String(input));
+      if (url.pathname.endsWith("/channels")) return jsonResponse({ items: [primary, companion].map(id => ({ id, contentDetails: { relatedPlaylists: { uploads: id === primary ? "primary-uploads" : "companion-uploads" } } })) });
+      if (url.pathname.endsWith("/playlistItems")) return jsonResponse({ items: url.searchParams.get("playlistId") === "primary-uploads" ? [] : [{ contentDetails: { videoId: "vevo-recording" } }] });
+      if (url.pathname.endsWith("/videos")) return jsonResponse({ items: [{ id: "vevo-recording", snippet: { channelId: companion, title: "Kanye West - Song (Official Video)", categoryId: "10", publishedAt: "2025-01-01T00:00:00Z" }, contentDetails: { duration: "PT3M" }, status: { privacyStatus: "public" } }] });
+      return comments(input);
+    } });
+  expect(result.signals.ye.rawPayload).toMatchObject({ sampledCommentCount: 20, classifiedCommentCount: 20, catalogueFallbackCommentCount: 20, catalogueFallbackVideoCount: 1 });
+  expect(result.signals.ye.stats.socialGrowth).toBeLessThan(0);
+  expect(result.warnings).toEqual([]);
+});
+
+it("samples recent and heavily discussed recordings without scoring lifetime comments as current reactions", async () => {
+  const original = createYoutubeFetch([{ text: "hello London", likes: 0 }]), sampled: string[] = [];
+  const result = await collectYoutubeCommentMarketSignals({ artists: [artist], events: {}, runDate: "2026-08-24", apiKey: "test", delayMs: 0, maxVideosPerArtist: 1,
+    externalIds: { [artist.id]: { artistId: artist.id, youtubeChannelId: "UC-test-artist" } }, fetchImpl: async input => {
+      const url = new URL(String(input)), ids = ["newest", "quiet", "popular"];
+      if (url.pathname.endsWith("/playlistItems")) return jsonResponse({ items: ids.map(id => ({ contentDetails: { videoId: id } })) });
+      if (url.pathname.endsWith("/videos")) return jsonResponse({ items: (url.searchParams.get("id") ?? "").split(",").map(id => ({ id,
+        snippet: { channelId: "UC-test-artist", title: "Test Artist - Song (Official Audio)", categoryId: "10", publishedAt: id === "newest" ? "2026-08-01T00:00:00Z" : id === "quiet" ? "2025-02-01T00:00:00Z" : "2025-01-01T00:00:00Z" },
+        contentDetails: { duration: "PT3M" }, status: { privacyStatus: "public" }, statistics: { commentCount: id === "popular" ? "100000" : "10" } })) });
+      if (url.pathname.endsWith("/commentThreads")) sampled.push(url.searchParams.get("videoId")!);
+      return original(input);
+    } });
+  expect([...new Set(sampled)]).toEqual(["newest", "popular"]);
+  expect(result.signals[artist.id].rawPayload.sampledCommentCount).toBe(1);
+  expect(result.signals[artist.id].stats).toEqual({});
 });

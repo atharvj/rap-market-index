@@ -1,6 +1,6 @@
 # Market data coverage
 
-Model: `rmi-core-v42`. These are fantasy-market estimates, not observable exchange prices. More inputs should improve coverage and explain movement; they do not establish a uniquely correct dollar price.
+Model: `rmi-core-v43`. These are fantasy-market estimates, not observable exchange prices. More inputs should improve coverage and explain movement; they do not establish a uniquely correct dollar price.
 
 ## Sources and cadence
 
@@ -352,3 +352,53 @@ may concern those songs rather than the newest album. This is broader current
 listener feedback, not representative reception of a particular new album. The
 fallback adds bounded public API requests only for artists without eligible recent
 candidates; the two balanced comment requests per sampled video are unchanged.
+
+
+### Recovery of rejected and thin samples (v43)
+
+An unusable saved recording no longer blocks official-channel discovery. The
+collector checks up to six recent candidates, replacing rejected uploaders,
+disabled comments and empty recent responses. Thin samples can add verified
+recordings until fifty independent comments are available, with at most six
+nonempty recordings and twelve attempted videos per artist. Limits scale down
+when fewer primary videos are configured. The expansion rule uses quantity, never
+sentiment or whether the text is classified. Uploader and performer checks remain
+mandatory; an older recording still has reduced confidence and explicit context.
+YouTube sampling version 6 invalidates older cached reception comparisons.
+
+A successful production market snapshot schedules a freshness check after returning
+the response, using [Next.js after](https://nextjs.org/docs/app/api-reference/functions/after).
+If any current artist lacks a completed refresh within thirty minutes, an atomic
+database cooldown admits at most one visitor recovery attempt per fifteen minutes.
+It calls the existing authenticated daily opening or intraday catalyst refresh;
+the intraday path also retries incomplete Apple observations. The destination is
+fixed server-side, the credential is never exposed, and redirects are rejected.
+No visitor can choose an artist, source, date or target price. Mock, preview and
+failed snapshots do not trigger collection. Scheduled and visitor-triggered price
+automation share a fifteen-minute database window to avoid overlapping runs. Lock
+failures stop work rather than falling back to an instance-local lock. The existing
+workflow exits on a busy response and reports failures without an immediate retry
+that could be mistaken for completion. This adds recovery during site use, not a
+promise that collectors run while nobody visits or a provider is unavailable.
+
+Previous-close loading now re-queries unresolved artists when the backend's first
+page is dominated by another artist's history. Baseline pages retry an explicit
+Postgres statement cancellation once; a repeated error still blocks repricing and
+identifies the affected source. Neither repair discards history or substitutes a
+made-up baseline. No paid provider, AI research service or scheduler was enabled.
+
+The full-roster channel audit also verified separate Vevo recording channels for
+Drake, Eminem, Future, Kendrick Lamar, Lil Wayne, Travis Scott and Ye. Each added
+channel has a canonical artist-to-YouTube MusicBrainz relation and matching official
+Vevo API metadata. Recording selection alternates verified channels within the
+same bounded attempt budget. Uploader verification still applies. An overridden
+canonical identity cannot inherit old companions. These channels do not add their
+subscriber or lifetime-view counters to the primary channel totals. The confidence
+reduction for older recordings follows their share of retained comments, so several
+almost-empty recent videos cannot disguise a sample dominated by older songs.
+
+Within each verified channel, catalogue discovery alternates recent uploads and
+recordings with more lifetime comments, using statistics in the same metadata
+request. Lifetime volume only prioritizes discovery; it adds no price signal, and
+only actual last-seven-day comments are admitted. This keeps several quiet recent
+uploads from hiding ongoing discussion of an artist's established recordings.

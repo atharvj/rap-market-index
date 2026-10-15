@@ -41,15 +41,16 @@ jobs:
             echo "Daily opening did not return a verified success response."
             exit 1
           fi
+          if jq -e '.busy == true' "$rmi_response_file" > /dev/null; then
+            echo "Another market recovery is already running."
+            exit 0
+          fi
           if ! jq -e '.skipped == true' "$rmi_response_file" > /dev/null; then
             jq '{ok, runDate, recoveredDailyOpening: true}' "$rmi_response_file"
             exit 0
           fi
 
           curl --output "$rmi_response_file" --fail-with-body --silent --show-error --max-time 420 \
-            --retry 2 \
-            --retry-delay 10 \
-            --retry-all-errors \
             --header "x-market-update-secret: $MARKET_UPDATE_SECRET" \
             https://rap-market-index.vercel.app/api/cron/catalyst-refresh
 
@@ -61,6 +62,11 @@ jobs:
             quoteChangeCount: .marketUpdate.quoteChangeCount,
             priceTickCount: .marketUpdate.priceTickCount,
             error, warningCount: ((.warnings // .marketUpdate.warnings // []) | length)}' "$rmi_response_file"
+
+          if jq -e '.busy == true' "$rmi_response_file" > /dev/null; then
+            echo "Another market recovery is already running."
+            exit 0
+          fi
 
           # Recover incomplete chart observations independently of pricing.
           # The endpoint skips complete rosters and limits retries to once/hour.

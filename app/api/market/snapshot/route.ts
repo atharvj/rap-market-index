@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 import { createInitialGameState } from "@/lib/market";
 import { sanitizeMoveExplanation } from "@/lib/artist-explanations";
 import { loadAllPages } from "@/lib/pagination";
@@ -11,8 +11,10 @@ import { getMarketDate, shiftMarketDate } from "@/server/market/market-date";
 import { reportServerError } from "@/server/observability";
 import { adjustPriceHistory } from "@/lib/adjusted-price-history";
 import { loadChartAdjustments } from "@/server/market/chart-adjustments";
+import { recoverStaleMarket } from "@/server/market/market-catchup";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 300;
 
 type ArtistRow = Database["public"]["Tables"]["artists"]["Row"];
 type ArtistStatsRow = Database["public"]["Tables"]["artist_stats"]["Row"];
@@ -82,6 +84,13 @@ export async function GET() {
       transactions: [],
       lastUpdatedAt: getMarketDate()
     };
+
+    if (process.env.VERCEL_ENV === "production" && artistIds.length) {
+      after(async () => {
+        try { await recoverStaleMarket({ supabase, artistIds }); }
+        catch (error) { reportServerError(error, "market.background-recovery"); }
+      });
+    }
 
     return NextResponse.json({
       ok: true,

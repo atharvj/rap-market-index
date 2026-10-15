@@ -37,3 +37,24 @@ function mockDatabase(tables: Record<string, unknown[]>, ranges: number[]) {
     return builder;
   } } as never;
 }
+
+it("recovers an artist's older previous close beyond a full backend page", async () => {
+  const { loadPreviousClosePrices } = await import("@/server/market/supabase-repository");
+  const queries: string[][] = [];
+  const supabase = { from() { let ids: string[] = []; const builder = { select: () => builder,
+    in: (_: string, values: string[]) => { ids = values; queries.push(values); return builder; }, lt: () => builder, order: () => builder,
+    range: async () => ({ error: null, data: ids.includes("newer") ? Array.from({ length: 1000 }, () => ({ artist_id: "newer", price: 100 })) : [{ artist_id: "older", price: 73 }] }) }; return builder; } } as never;
+  expect(await loadPreviousClosePrices({ supabase, artistIds: ["newer", "older", "new-listing"], runDate: "2026-10-15" })).toEqual({ newer: 100, older: 73 });
+  expect(queries).toEqual([["newer", "older", "new-listing"], ["older", "new-listing"]]);
+});
+
+it("retries a canceled baseline read once and still rejects a repeated failure", async () => {
+  let calls = 0;
+  const base = mockDatabase({ market_observations: [] }, []) as unknown as { from(table: string): unknown };
+  const make = (alwaysFail: boolean) => ({ from() { const builder = base.from("market_observations") as unknown as Record<string, unknown>;
+    builder.range = async () => { calls++; return alwaysFail || calls === 1 ? { data: null, error: { code: "57014", message: "statement timeout" } } : { data: [], error: null }; }; return builder; } }) as never;
+  const options = { artistIds: ["a"], source: "youtube_comments", metrics: ["comment_count"], beforeDate: "2026-10-15", lookbackDays: 7 };
+  expect(await loadObservationBaselines({ ...options, supabase: make(false) })).toEqual({}); expect(calls).toBe(2);
+  calls = 0;
+  await expect(loadObservationBaselines({ ...options, supabase: make(true) })).rejects.toThrow("youtube_comments observation baselines"); expect(calls).toBe(2);
+});

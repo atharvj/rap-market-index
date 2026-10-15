@@ -6,6 +6,7 @@ import { getMarketDate } from "@/server/market/market-date";
 import { loadReleaseWindowStatus } from "@/server/market/release-window";
 import { enforceRateLimit, getRequestIp } from "@/server/rate-limit";
 import { secureCompare } from "@/server/secrets";
+import { claimAutomationWindow } from "@/server/market/automation-lease";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
@@ -57,6 +58,13 @@ export async function GET(request: Request) {
     });
   }
 
+  try {
+    if (!await claimAutomationWindow(createServiceRoleClient())) {
+      return NextResponse.json({ ok: true, skipped: true, busy: true, runDate, reason: "Another market automation attempt owns the current recovery window." });
+    }
+  } catch {
+    return NextResponse.json({ ok: false, runDate, error: "Market automation locking is unavailable; retry shortly." }, { status: 503 });
+  }
   const eventScanResponse = await fetch(new URL("/api/admin/market-event-scan", request.url), {
     method: "POST",
     headers: {

@@ -970,14 +970,15 @@
     "name": "Drake",
     "searchName": "Drake",
     "aliases": [],
-    "verifiedAt": "2026-10-14",
+    "verifiedAt": "2026-10-15",
     "sources": [
       "https://musicbrainz.org/artist/9fff2f8a-21e6-47de-a2b8-7f449929d43f",
       "https://www.youtube.com/channel/UCByOQJjav0CUDwxCk-jVNRQ",
       "https://www.wikidata.org/wiki/Q33240",
       "https://music.apple.com/ca/artist/271256",
       "https://music.apple.com/gb/artist/271256",
-      "https://music.apple.com/us/artist/271256"
+      "https://music.apple.com/us/artist/271256",
+      "https://www.youtube.com/channel/UCQznUf1SjfDqx65hX3zRDiA"
     ],
     "externalIds": {
       "spotifyId": "3TVXtAsR1Inumwj472S9r4",
@@ -986,6 +987,9 @@
       "wikipediaArticleTitle": "Drake (musician)",
       "appleMusicArtistIds": [
         "271256"
+      ],
+      "youtubeRecordingChannelIds": [
+        "UCQznUf1SjfDqx65hX3zRDiA"
       ]
     },
     "releases": [
@@ -1005,14 +1009,15 @@
     "aliases": [
       "Slim Shady"
     ],
-    "verifiedAt": "2026-10-14",
+    "verifiedAt": "2026-10-15",
     "sources": [
       "https://musicbrainz.org/artist/b95ce3ff-3d05-4e87-9e01-c97b66af13d4",
       "https://www.youtube.com/channel/UCfM3zsQsOnfWNUppiycmBuw",
       "https://www.wikidata.org/wiki/Q5608",
       "https://itunes.apple.com/us/artist/id111051",
       "https://music.apple.com/us/artist/111051",
-      "https://music.apple.com/gb/artist/111051"
+      "https://music.apple.com/gb/artist/111051",
+      "https://www.youtube.com/channel/UC20vb-R_px4CguHzzBPhoyQ"
     ],
     "externalIds": {
       "spotifyId": "7dGJo4pcD2V6oG8kP0tJRR",
@@ -1021,6 +1026,9 @@
       "wikipediaArticleTitle": "Eminem",
       "appleMusicArtistIds": [
         "111051"
+      ],
+      "youtubeRecordingChannelIds": [
+        "UC20vb-R_px4CguHzzBPhoyQ"
       ]
     },
     "releases": [
@@ -1190,12 +1198,13 @@
     "name": "Future",
     "searchName": "Future",
     "aliases": [],
-    "verifiedAt": "2026-10-14",
+    "verifiedAt": "2026-10-15",
     "sources": [
       "https://musicbrainz.org/artist/48262e82-db9f-4a92-b650-dfef979b73ec",
       "https://www.youtube.com/channel/UCSDvKdIQOwTfcyOimSi9oYA",
       "https://www.wikidata.org/wiki/Q3445057",
-      "https://music.apple.com/us/artist/128050210"
+      "https://music.apple.com/us/artist/128050210",
+      "https://www.youtube.com/channel/UCFNosi99Sp0_eLilBiXmmXA"
     ],
     "externalIds": {
       "spotifyId": "1RyvyyTE3xzB2ZywiAwp0i",
@@ -1204,6 +1213,9 @@
       "wikipediaArticleTitle": "Future (rapper)",
       "appleMusicArtistIds": [
         "128050210"
+      ],
+      "youtubeRecordingChannelIds": [
+        "UCFNosi99Sp0_eLilBiXmmXA"
       ]
     },
     "releases": [
@@ -1623,14 +1635,15 @@
     "name": "Kendrick Lamar",
     "searchName": "Kendrick Lamar",
     "aliases": [],
-    "verifiedAt": "2026-10-14",
+    "verifiedAt": "2026-10-15",
     "sources": [
       "https://musicbrainz.org/artist/381086ea-f511-4aba-bdf9-71c753dc5077",
       "https://www.youtube.com/channel/UC3lBXcrKFnFAFkfVk5WuKcQ",
       "https://www.wikidata.org/wiki/Q130798",
       "https://music.apple.com/us/artist/368183298",
       "https://itunes.apple.com/artist/id368183298",
-      "https://music.apple.com/gb/artist/368183298"
+      "https://music.apple.com/gb/artist/368183298",
+      "https://www.youtube.com/channel/UCoYfzC2zMlc9M-Odgaf6OSg"
     ],
     "externalIds": {
       "spotifyId": "2YZyLoL8N0Wb9xBt1NhZWg",
@@ -1639,6 +1652,9 @@
       "wikipediaArticleTitle": "Kendrick Lamar",
       "appleMusicArtistIds": [
         "368183298"
+      ],
+      "youtubeRecordingChannelIds": [
+        "UCoYfzC2zMlc9M-Odgaf6OSg"
       ]
     },
     "releases": [
@@ -2013,13 +2029,14 @@
     "name": "Lil Wayne",
     "searchName": "Lil Wayne",
     "aliases": [],
-    "verifiedAt": "2026-10-14",
+    "verifiedAt": "2026-10-15",
     "sources": [
       "https://musicbrainz.org/artist/ac9a487a-d9d2-4f27-bb23-0f4686488345",
       "https://www.youtube.com/channel/UCO9zJy7HWrIS3ojB4Lr7Yqw",
       "https://www.wikidata.org/wiki/Q15615",
       "https://itunes.apple.com/us/artist/id5869117",
-      "https://music.apple.com/us/artist/5869117"
+      "https://music.apple.com/us/artist/5869117",
+      "https://www.youtube.com/channel/UCEOhcOACopL42xyOBIv1ekg"
     ],
     "externalIds": {
       "spotifyId": "55Aa2cqylxrFIXC767Z865",
@@ -2028,6 +2045,9 @@
       "wikipediaArticleTitle": "Lil Wayne",
       "appleMusicArtistIds": [
         "5869117"
+      ],
+      "youtubeRecordingChannelIds": [
+        "UCEOhcOACopL42xyOBIv1ekg"
       ]
     },
     "releases": [
@@ -3064,13 +3084,14 @@
     "name": "Travis Scott",
     "searchName": "Travis Scott",
     "aliases": [],
-    "verifiedAt": "2026-10-14",
+    "verifiedAt": "2026-10-15",
     "sources": [
       "https://musicbrainz.org/artist/e4a51f17-a57b-47b1-b37b-f552d0f8e9e6",
       "https://www.youtube.com/channel/UCtxdfwb9wfkoGocVUAJ-Bmg",
       "https://www.wikidata.org/wiki/Q13605596",
       "https://music.apple.com/us/artist/549236696",
-      "https://music.apple.com/gb/artist/549236696"
+      "https://music.apple.com/gb/artist/549236696",
+      "https://www.youtube.com/channel/UClRx3MMyYUyqOxyEqA5F2nQ"
     ],
     "externalIds": {
       "spotifyId": "0Y5tJX1MQlPlqiwlOH1tJY",
@@ -3079,6 +3100,9 @@
       "wikipediaArticleTitle": "Travis Scott",
       "appleMusicArtistIds": [
         "549236696"
+      ],
+      "youtubeRecordingChannelIds": [
+        "UClRx3MMyYUyqOxyEqA5F2nQ"
       ]
     },
     "releases": [
@@ -3184,14 +3208,15 @@
       "Kanye",
       "Yeezy"
     ],
-    "verifiedAt": "2026-10-14",
+    "verifiedAt": "2026-10-15",
     "sources": [
       "https://musicbrainz.org/artist/164f0d73-1234-4e2c-8743-d77bf2191051",
       "https://www.youtube.com/channel/UCs6eXM7s8Vl5WcECcRHc2qQ",
       "https://www.wikidata.org/wiki/Q15935",
       "https://itunes.apple.com/us/artist/id2715720",
       "https://music.apple.com/us/artist/1714710847",
-      "https://music.apple.com/us/artist/2715720"
+      "https://music.apple.com/us/artist/2715720",
+      "https://www.youtube.com/channel/UChpJbg7zMbi5jx9Gdjaxa9g"
     ],
     "externalIds": {
       "spotifyId": "5K4W6rqBFWDnAN6FQUkS6x",
@@ -3201,6 +3226,9 @@
       "appleMusicArtistIds": [
         "2715720",
         "1714710847"
+      ],
+      "youtubeRecordingChannelIds": [
+        "UChpJbg7zMbi5jx9Gdjaxa9g"
       ]
     },
     "releases": [

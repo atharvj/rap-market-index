@@ -36,3 +36,12 @@ describe("verified artist tracking", () => {
     expect(buildTrackingSearchQueries({ id: "new", name: "New Artist" }, "2026-10-14")).toEqual([]);
   });
 });
+
+it("admits corroborated companion recording channels without overriding a changed primary identity", async () => {
+  const { getVerifiedRecordingChannelIds } = await import("@/server/market/artist-tracking");
+  const artist = { id: "ye", name: "Ye" }, primary = "UCs6eXM7s8Vl5WcECcRHc2qQ", companion = "UChpJbg7zMbi5jx9Gdjaxa9g";
+  expect(getVerifiedRecordingChannelIds(artist, { artistId: "ye", youtubeChannelId: primary })).toEqual([primary, companion]);
+  expect(getVerifiedRecordingChannelIds(artist, { artistId: "ye", youtubeChannelId: "UC-new-primary" })).toEqual(["UC-new-primary"]);
+  expect(getVerifiedRecordingChannelIds(artist, { artistId: "ye", youtubeChannelId: primary, musicbrainzId: "wrong-identity" })).toEqual([primary]);
+  expect(getVerifiedRecordingChannelIds({ id: "ye", name: "Another Artist" }, { artistId: "ye", youtubeChannelId: primary })).toEqual([primary]);
+});

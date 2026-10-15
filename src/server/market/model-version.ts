@@ -1,4 +1,4 @@
-export const DEFAULT_MARKET_MODEL_VERSION = "rmi-core-v42";
+export const DEFAULT_MARKET_MODEL_VERSION = "rmi-core-v43";
 
 export function getMarketModelVersion() {
   const value = process.env.MARKET_MODEL_VERSION?.trim();

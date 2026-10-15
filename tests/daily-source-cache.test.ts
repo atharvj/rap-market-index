@@ -7,11 +7,13 @@ describe("same-day source continuity", () => {
   it("does not replay reception calculated before the sampling repair", () => {
     const row = { artist_id: "artist", source_date: "2026-10-14", raw_payload: { dailySourceInputs: {
       bluesky: { stats: { socialGrowth: 130 }, rawPayload: { source: "bluesky" } },
-      youtube_comments: { stats: { socialGrowth: 90 }, rawPayload: { source: "youtube_comments", samplingVersion: 5 } }
+      youtube_comments: { stats: { socialGrowth: 90 }, rawPayload: { source: "youtube_comments", samplingVersion: 6 } }
     } } };
     const sources = restoreDailySources([row], row.source_date);
     expect(sources).toHaveLength(1);
     expect(sources[0].artist.rawPayload.source).toBe("youtube_comments");
+    row.raw_payload.dailySourceInputs.youtube_comments.rawPayload.samplingVersion = 5;
+    expect(restoreDailySources([row], row.source_date)).toEqual([]);
   });
   it("preserves confidence and calibrates each source only once when reused intraday", () => {
     const wiki: AdapterSignals = Object.fromEntries(Array.from({ length: 15 }, (_, i) => [String(i), {
