@@ -205,3 +205,25 @@ it("does not score a collaborator's criticism as the primary artist's reception"
   expect(result.signals[artist.id].stats.socialGrowth).toBeLessThan(0);
   expect(result.signals[collaborator.id].stats.socialGrowth).toBeGreaterThan(0);
 });
+
+it("uses recent comments on verified older music when no recent recording is available, excluding other uploaders and performers", async () => {
+  const calls: string[] = [], original = createYoutubeFetch(Array.from({ length: 20 }, () => ({ text: "song is trash", likes: 10 })));
+  const result = await collectYoutubeCommentMarketSignals({ artists: [artist], events: {}, runDate: "2026-08-24", apiKey: "test", delayMs: 0,
+    externalIds: { [artist.id]: { artistId: artist.id, youtubeChannelId: "UC-test-artist" } }, fetchImpl: input => {
+      const url = new URL(String(input));
+      if (url.pathname.endsWith("/playlistItems")) return Promise.resolve(jsonResponse({ items: ["real", "other-uploader", "other-performer", "trailer"].map(id => ({ contentDetails: { videoId: id } })) }));
+      if (url.pathname.endsWith("/videos") && url.searchParams.get("part")?.includes("contentDetails")) return Promise.resolve(jsonResponse({ items: ["real", "other-uploader", "other-performer", "trailer"].map(id => ({ id,
+        snippet: { title: id === "other-performer" ? "Another Performer - Song (Official Video)" : id === "trailer" ? "Test Artist Trailer" : "Test Artist - Song (Official Video)",
+          channelId: id === "other-uploader" ? "UC-unverified" : "UC-test-artist", categoryId: "10", publishedAt: "2025-01-01T00:00:00Z" },
+        contentDetails: { duration: "PT3M" }, status: { privacyStatus: "public" } })) }));
+      if (url.pathname.endsWith("/videos")) return Promise.resolve(jsonResponse({ items: [{ id: "real", snippet: { channelId: "UC-test-artist" } }] }));
+      if (url.pathname.endsWith("/commentThreads")) calls.push(url.searchParams.get("videoId")!);
+      return original(input);
+    } });
+  expect(calls).toEqual(["real", "real"]);
+  expect(result.signals[artist.id].rawPayload.catalogueFallbackVideoCount).toBe(1);
+  expect(result.signals[artist.id].stats.socialGrowth).toBeLessThan(0);
+  expect(result).not.toHaveProperty("eventsByArtist");
+  const fresh = await collect(Array.from({ length: 20 }, () => ({ text: "song is trash", likes: 10 })));
+  expect(result.signals[artist.id].confidence).toBeLessThan(fresh.signals[artist.id].confidence!);
+});

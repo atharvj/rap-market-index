@@ -490,7 +490,7 @@ function hasAnyTerm(value: string, terms: string[]) {
   return terms.some((term) => hasWholePhrase(value, normalizeText(term)));
 }
 
-function parseIsoDurationSeconds(value: string) {
+export function parseIsoDurationSeconds(value: string) {
   const match = value.match(/^PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?$/);
   if (!match) return null;
   return Number(match[1] ?? 0) * 3600 + Number(match[2] ?? 0) * 60 + Number(match[3] ?? 0);

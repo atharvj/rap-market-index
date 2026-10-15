@@ -180,3 +180,11 @@ workflow, skips complete snapshots, and throttles incomplete attempts hourly. It
 collects evidence without repricing quotes. No subscription, paid API model or
 replacement Reddit scraper was enabled. The acquisition and independent evaluation
 priorities above remain outstanding.
+
+
+The v42 follow-up adds a verified older-recording fallback for artists with no
+recent saved candidates. It checks the actual uploader and recording metadata,
+counts only fresh comments, and creates no release catalyst. These cohorts have
+separate scope and lower confidence; the UI states that comments may describe
+older songs rather than the latest album. Additional catalogue lookups are bounded
+and use the existing public YouTube API access.

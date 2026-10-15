@@ -1026,12 +1026,14 @@ test("insufficient current reactions cannot leave an older positive estimate loo
       { key: "youtube_comments:positive_comment_share", latestValue: null, latestDate: null, points: [{ date: "2026-10-15", value: 85 }] },
       { key: "youtube_comments:comment_count", latestValue: 2, latestDate: "2026-10-15", points: [] },
       { key: "youtube_comments:classified_comment_count", latestValue: 1, latestDate: "2026-10-15", points: [] },
-      { key: "youtube_comments:reception_available", latestValue: 0, latestDate: "2026-10-15", points: [] }
+      { key: "youtube_comments:reception_available", latestValue: 0, latestDate: "2026-10-15", points: [] },
+      { key: "youtube_comments:catalogue_video_count", latestValue: 1, latestDate: "2026-10-15", points: [] }
     ] }) }));
   await page.goto(`/artists/${artist.id}`);
   const indicators = page.locator("section").filter({ has: page.getByRole("heading", { name: "Public Market Indicators", exact: true }) });
   await expect(indicators).toContainText("Identifiable YouTube Reactions");
   await expect(indicators).toContainText("insufficient or unavailable");
+  await expect(indicators).toContainText("older official recordings");
   await expect(indicators).not.toContainText("85.0%");
   await expect(indicators).not.toContainText("Sampled Positive Reactions");
 });

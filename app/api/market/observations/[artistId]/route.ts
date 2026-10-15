@@ -27,6 +27,7 @@ const CACHE_HEADERS = { "Cache-Control": "public, max-age=30, s-maxage=60, stale
 
 const SERIES_DEFINITIONS: Record<string, { label: string; unit: string }> = {
   "youtube_comments:classified_comment_count": { label: "Identifiable YouTube reactions", unit: "comments" },
+  "youtube_comments:catalogue_video_count": { label: "Older official recordings sampled", unit: "videos" },
   "youtube_comments:reception_available": { label: "YouTube reception availability", unit: "boolean" },
   "bluesky:reception_available": { label: "Social reception availability", unit: "boolean" },
   "apple_charts:chart_points": { label: "Apple song chart points", unit: "rank_points" },

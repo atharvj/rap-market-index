@@ -1,6 +1,6 @@
 # Market data coverage
 
-Model: `rmi-core-v41`. These are fantasy-market estimates, not observable exchange prices. More inputs should improve coverage and explain movement; they do not establish a uniquely correct dollar price.
+Model: `rmi-core-v42`. These are fantasy-market estimates, not observable exchange prices. More inputs should improve coverage and explain movement; they do not establish a uniquely correct dollar price.
 
 ## Sources and cadence
 
@@ -334,3 +334,21 @@ quote persistence. It needs no paid provider or additional scheduled job. GitHub
 scheduling is still best-effort and provider failures can still leave partial data.
 
 Reference: [YouTube's comment endpoint limits and sorting](https://developers.google.com/youtube/v3/docs/commentThreads/list).
+
+
+### Older-recording fallback (v42)
+
+A paired live check found no recent saved video candidates for Drake or Ye. When
+that happens, the daily collector now inspects up to fifty uploads from the
+verified official channel and selects at most three public music recordings.
+Actual uploader, public status, duration, music category/explicit recording markers,
+and performing credits are checked. Trailers, interviews, shorts and another
+performer's explicitly credited recording are excluded. Only comments from the
+last seven days count; no old upload becomes a new release event.
+
+Older-recording cohorts have a separate sample scope, half the usual confidence
+ceiling, a recorded catalogue-video count and a public explanation that comments
+may concern those songs rather than the newest album. This is broader current
+listener feedback, not representative reception of a particular new album. The
+fallback adds bounded public API requests only for artists without eligible recent
+candidates; the two balanced comment requests per sampled video are unchanged.

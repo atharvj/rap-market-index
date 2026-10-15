@@ -11,9 +11,9 @@ import type {
 } from "@/server/market/market-data";
 import type { HypeStats } from "@/lib/types";
 import type { MarketEvent } from "@/server/market/market-data";
-import { expandRecordingEvents, isOfficialRecordingSource } from "@/server/market/recording-credits";
+import { expandRecordingEvents, isOfficialRecordingSource, resolveRecordingArtists } from "@/server/market/recording-credits";
 import { getYoutubeVideoId } from "@/server/market/watch-now-videos";
-import { TRUSTED_YOUTUBE_EDITORIAL_CHANNELS } from "@/server/market/youtube-editorial-events-source";
+import { TRUSTED_YOUTUBE_EDITORIAL_CHANNELS, parseIsoDurationSeconds } from "@/server/market/youtube-editorial-events-source";
 import { createArtistReceptionSelector, getLongReactionCopyKey } from "@/server/market/artist-reception";
 import { unavailableReception } from "@/server/market/reception-availability";
 
@@ -92,6 +92,7 @@ type YoutubeVideo = {
   publishedAt?: string;
   channelId?: string;
   audience?: "official" | "editorial";
+  catalogueFallback?: boolean;
 };
 
 type YoutubeComment = {
@@ -161,12 +162,23 @@ export async function collectYoutubeCommentMarketSignals({
     // Candidate identity and performing credits come from verified discovery;
     // recheck the actual uploader before reading any audience reactions.
     const expanded = expandRecordingEvents(events, artists);
+    const fallbackChannels = artists.filter(artist => maxVideosPerArtist > 0 && !selectCommentVideos(expanded[artist.id] ?? [], runDate, maxVideosPerArtist).length)
+      .map(artist => normalizeYoutubeChannelId(externalIds[artist.id]?.youtubeChannelId)).filter((id): id is string => Boolean(id));
+    const fallbackPlaylists = fallbackChannels.length ? await fetchYoutubeUploadPlaylists({ apiKey: cleanApiKey,
+      channelIds: [...new Set(fallbackChannels)], timeoutMs, delayMs: 0, fetchImpl }) : null;
+    if (fallbackPlaylists && !fallbackPlaylists.ok) warnings.push(`Catalogue comment discovery unavailable: ${fallbackPlaylists.error}`);
     const commentCache = new Map<string, Promise<Awaited<ReturnType<typeof fetchBalancedVideoComments>>>>();
     let artistIndex = 0;
     const worker = async () => {
       while (artistIndex < artists.length) {
         const artist = artists[artistIndex++];
         const candidates = selectCommentVideos(expanded[artist.id] ?? [], runDate, maxVideosPerArtist);
+        const officialChannel = normalizeYoutubeChannelId(externalIds[artist.id]?.youtubeChannelId);
+        if (!candidates.length && officialChannel && fallbackPlaylists?.ok && fallbackPlaylists.playlists[officialChannel]) {
+          const catalogue = await fetchCatalogueRecordings({ artist, channelId: officialChannel, playlistId: fallbackPlaylists.playlists[officialChannel], runDate,
+            apiKey: cleanApiKey, limit: maxVideosPerArtist, timeoutMs, fetchImpl });
+          candidates.push(...catalogue);
+        }
         const samples: VideoCommentSample[] = [];
         let failures = 0;
         for (const video of candidates) {
@@ -420,7 +432,7 @@ function buildYoutubeCommentSignal({
   const negativeShare = commentCount
     ? scored.filter((item) => item.sentiment <= -CLASSIFICATION_THRESHOLD).length / commentCount * 100
     : 0;
-  const sampleScope = getSampleScope([...samples.map(sample => sample.video.id), `limit:${maxCommentsPerVideo}`]);
+  const sampleScope = getSampleScope([...samples.map(sample => `${sample.video.id}:${sample.video.catalogueFallback ? "catalogue" : "recent"}`), `limit:${maxCommentsPerVideo}`]);
   const hasBaseline = baseline.sampling_version === SAMPLING_VERSION && baseline.sample_scope === sampleScope &&
     typeof baseline[COMMENT_SENTIMENT] === "number" &&
     typeof baseline[COMMENT_LIKE_COUNT] === "number" &&
@@ -463,6 +475,7 @@ function buildYoutubeCommentSignal({
     runDate,
     channelId,
     sampledVideoCount: samples.length,
+    catalogueFallbackVideoCount: samples.filter(sample => sample.video.catalogueFallback).length,
     recentVideoCount: videos.length,
     sampledCommentCount: commentCount,
     classifiedCommentCount,
@@ -492,7 +505,7 @@ function buildYoutubeCommentSignal({
     baselineNegativeShare: baseline[NEGATIVE_COMMENT_SHARE] ?? null,
     videoIds: samples.map((sample) => sample.video.id),
     requestedVideoIds: videos.map((video) => video.id),
-    selectionBias: samples.some(sample => sample.video.audience === "editorial") ? "official_and_trusted_editorial_channels" : "artist_owned_channel_core_fans",
+    selectionBias: samples.some(sample => sample.video.catalogueFallback) ? "older_recording_audiences" : samples.some(sample => sample.video.audience === "editorial") ? "official_and_trusted_editorial_channels" : "artist_owned_channel_core_fans",
     interpretation: "confirmation_only_not_broad_fan_consensus",
     status: hasEnoughComments ? (hasBaseline ? "momentum_and_reception" : "reception_baseline") : "insufficient_comments"
   };
@@ -506,6 +519,7 @@ function buildYoutubeCommentSignal({
     createObservation(artist.id, runDate, "sampling_version", SAMPLING_VERSION, "version", rawPayload),
     createObservation(artist.id, runDate, "sample_scope", sampleScope, "cohort", rawPayload),
     createObservation(artist.id, runDate, "classified_comment_count", classifiedCommentCount, "comments", rawPayload),
+    createObservation(artist.id, runDate, "catalogue_video_count", rawPayload.catalogueFallbackVideoCount, "videos", rawPayload),
     createObservation(artist.id, runDate, "reception_available", hasEnoughComments ? 1 : 0, "boolean", rawPayload)
   ];
 
@@ -513,9 +527,10 @@ function buildYoutubeCommentSignal({
     signal: {
       stats,
       rawPayload,
-      confidence: hasEnoughComments ? getSignalConfidence(classifiedCommentCount, commentLikeCount) : 0
+      confidence: hasEnoughComments ? getSignalConfidence(classifiedCommentCount, commentLikeCount) *
+        (1 - 0.5 * rawPayload.catalogueFallbackVideoCount / Math.max(1, samples.length)) : 0
     },
-    observations: hasEnoughComments ? observations : observations.filter(observation => [COMMENT_COUNT, "classified_comment_count", "reception_available", "sampling_version", "sample_scope"].includes(observation.metric))
+    observations: hasEnoughComments ? observations : observations.filter(observation => [COMMENT_COUNT, "classified_comment_count", "catalogue_video_count", "reception_available", "sampling_version", "sample_scope"].includes(observation.metric))
   };
 }
 
@@ -655,7 +670,7 @@ async function fetchRecentUploadedVideos({
 
   url.searchParams.set("part", "snippet,contentDetails");
   url.searchParams.set("playlistId", playlistId);
-  url.searchParams.set("maxResults", String(clampInteger(maxResults, 1, 5)));
+  url.searchParams.set("maxResults", String(clampInteger(maxResults, 1, 50)));
   url.searchParams.set("key", apiKey);
 
   const result = await fetchJson({
@@ -681,6 +696,32 @@ async function fetchRecentUploadedVideos({
     ok: true,
     videos
   };
+}
+
+async function fetchCatalogueRecordings({ artist, channelId, playlistId, runDate, apiKey, limit, timeoutMs, fetchImpl }: {
+  artist: MarketUpdateArtist; channelId: string; playlistId: string; runDate: string; apiKey: string; limit: number; timeoutMs: number; fetchImpl: typeof fetch;
+}): Promise<YoutubeVideo[]> {
+  const uploads = await fetchRecentUploadedVideos({ apiKey, playlistId, maxResults: 50, timeoutMs, fetchImpl });
+  if (!uploads.ok || !uploads.videos.length) return [];
+  const url = new URL("https://www.googleapis.com/youtube/v3/videos");
+  url.search = new URLSearchParams({ part: "snippet,contentDetails,status", id: uploads.videos.map(video => video.id).join(","), key: apiKey }).toString();
+  const metadata = await fetchJson({ url: url.toString(), timeoutMs, fetchImpl });
+  if (!metadata.ok) return [];
+  const items = (metadata.value as { items?: Array<{ id?: string; snippet?: { title?: string; description?: string; channelId?: string; categoryId?: string; publishedAt?: string }; contentDetails?: { duration?: string }; status?: { privacyStatus?: string } }> }).items;
+  if (!Array.isArray(items)) return [];
+  return items.flatMap(item => {
+    const snippet = item.snippet, title = snippet?.title, duration = item.contentDetails?.duration;
+    if (!item.id || !uploads.videos.some(video => video.id === item.id) || !title || snippet?.channelId !== channelId ||
+      item.status?.privacyStatus !== "public" || !duration || (parseIsoDurationSeconds(duration) ?? 0) <= 75 ||
+      !Number.isFinite(Date.parse(snippet.publishedAt ?? "")) || Date.parse(snippet.publishedAt!) > Date.now() ||
+      /\b(?:trailer|teaser|podcast|interview|recap|announcement|shorts|merch)\b/i.test(title)) return [];
+    if (snippet.categoryId !== "10" && !/\b(?:official (?:music )?(?:video|audio)|visuali[sz]er|lyrics? video)\b/i.test(title)) return [];
+    // Label channels can upload someone else's song. Explicit performer credits
+    // must include this artist; channel ownership alone cannot override them.
+    if ((/\s+[-–—]\s+/.test(title) || /^(?:artists?|performers?|performed by|vocals(?: by)?)\s*:/im.test(snippet.description ?? "")) &&
+      !resolveRecordingArtists({ title, description: snippet.description, primaryArtistId: "", artists: [artist] }).length) return [];
+    return [{ id: item.id, title, publishedAt: snippet.publishedAt, channelId, audience: "official" as const, catalogueFallback: !isRecentDate(snippet.publishedAt, runDate, 90) }];
+  }).sort((first, second) => (second.publishedAt ?? "").localeCompare(first.publishedAt ?? "")).slice(0, Math.min(3, Math.max(0, limit)));
 }
 
 async function fetchVideoComments({
