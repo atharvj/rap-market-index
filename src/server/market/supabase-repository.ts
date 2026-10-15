@@ -670,7 +670,7 @@ export async function loadLatestObservationPayloads({
   supabase: Supabase;
   artistIds: string[];
   source: string;
-  metric: string;
+  metric: string | string[];
   beforeDate: string;
   lookbackDays: number;
 }): Promise<Record<string, Record<string, unknown>>> {
@@ -680,16 +680,17 @@ export async function loadLatestObservationPayloads({
 
   const startDate = shiftDate(beforeDate, -lookbackDays);
   const rows = await loadAllPages(async (from, to) => {
-    const { data, error } = await supabase
+    let query = supabase
       .from("market_observations")
       .select("artist_id,observed_date,raw_payload")
       .in("artist_id", artistIds)
       .eq("source", source)
-      .eq("metric", metric)
       .gte("observed_date", startDate)
       .lt("observed_date", beforeDate)
       .order("observed_date", { ascending: false })
-      .order("artist_id").range(from, to);
+      .order("observed_at", { ascending: false }).order("artist_id").order("metric");
+    query = Array.isArray(metric) ? query.in("metric", metric) : query.eq("metric", metric);
+    const { data, error } = await query.range(from, to);
     if (error) throw new Error(`Could not load observation payloads: ${error.message}`);
     return data ?? [];
   });

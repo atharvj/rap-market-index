@@ -38,12 +38,18 @@
     "verifiedAt": "2026-10-14",
     "sources": [
       "https://musicbrainz.org/artist/0075e2ed-858d-4310-a79e-bdc9848a2ae9",
-      "https://www.youtube.com/channel/UCcxw8Vzg9M39bjGrR_MVADg"
+      "https://www.youtube.com/channel/UCcxw8Vzg9M39bjGrR_MVADg",
+      "https://music.apple.com/us/artist/1486228075",
+      "https://music.apple.com/us/artist/1789185769"
     ],
     "externalIds": {
       "spotifyId": "089ASSwOW4Cih3frNuDtUv",
       "youtubeChannelId": "UCcxw8Vzg9M39bjGrR_MVADg",
-      "musicbrainzId": "0075e2ed-858d-4310-a79e-bdc9848a2ae9"
+      "musicbrainzId": "0075e2ed-858d-4310-a79e-bdc9848a2ae9",
+      "appleMusicArtistIds": [
+        "1486228075",
+        "1789185769"
+      ]
     },
     "releases": [
       {
@@ -71,13 +77,18 @@
     "sources": [
       "https://musicbrainz.org/artist/37b2cb82-ef79-4d46-a184-a549450aa231",
       "https://www.youtube.com/channel/UCOjEHmBKwdS7joWpW0VrXkg",
-      "https://www.wikidata.org/wiki/Q25095399"
+      "https://www.wikidata.org/wiki/Q25095399",
+      "https://itunes.apple.com/us/artist/id894820464",
+      "https://music.apple.com/us/artist/894820464"
     ],
     "externalIds": {
       "spotifyId": "1URnnhqYAYcrqrcwql10ft",
       "youtubeChannelId": "UCOjEHmBKwdS7joWpW0VrXkg",
       "musicbrainzId": "37b2cb82-ef79-4d46-a184-a549450aa231",
-      "wikipediaArticleTitle": "21 Savage"
+      "wikipediaArticleTitle": "21 Savage",
+      "appleMusicArtistIds": [
+        "894820464"
+      ]
     },
     "releases": [
       {
@@ -105,13 +116,17 @@
     "sources": [
       "https://musicbrainz.org/artist/8bd5a8fb-4c25-401d-a597-2c24affdd5c5",
       "https://www.youtube.com/channel/UCFSjUwWd_1ro9p9ZlTr7Z4A",
-      "https://www.wikidata.org/wiki/Q127977668"
+      "https://www.wikidata.org/wiki/Q127977668",
+      "https://music.apple.com/gb/artist/1535847112"
     ],
     "externalIds": {
       "spotifyId": "72NhFAGG5Pt91VbheJeEPG",
       "youtubeChannelId": "UCFSjUwWd_1ro9p9ZlTr7Z4A",
       "musicbrainzId": "8bd5a8fb-4c25-401d-a597-2c24affdd5c5",
-      "wikipediaArticleTitle": "2hollis"
+      "wikipediaArticleTitle": "2hollis",
+      "appleMusicArtistIds": [
+        "1535847112"
+      ]
     },
     "releases": [
       {
@@ -141,13 +156,17 @@
     "sources": [
       "https://musicbrainz.org/artist/dfbf8c6d-d4f9-44b5-8390-a6f38e09b647",
       "https://www.youtube.com/channel/UCTXkV1wE4J8vr8kpUNBxZ-g",
-      "https://www.wikidata.org/wiki/Q138580882"
+      "https://www.wikidata.org/wiki/Q138580882",
+      "https://music.apple.com/gb/artist/1577410850"
     ],
     "externalIds": {
       "spotifyId": "0ZXbQLu4a7sk3iQ8tlgFy4",
       "youtubeChannelId": "UCTXkV1wE4J8vr8kpUNBxZ-g",
       "musicbrainzId": "dfbf8c6d-d4f9-44b5-8390-a6f38e09b647",
-      "wikipediaArticleTitle": "2Slimey"
+      "wikipediaArticleTitle": "2Slimey",
+      "appleMusicArtistIds": [
+        "1577410850"
+      ]
     },
     "releases": [
       {
@@ -175,13 +194,17 @@
     "sources": [
       "https://musicbrainz.org/artist/4214aa04-64b0-442a-982b-0560e6d3a5bd",
       "https://www.youtube.com/channel/UChFLDvWugOtrzxmUCAjfnGg",
-      "https://www.wikidata.org/wiki/Q95694810"
+      "https://www.wikidata.org/wiki/Q95694810",
+      "https://itunes.apple.com/us/artist/id1277595465"
     ],
     "externalIds": {
       "spotifyId": "45gHcnDnMC15sgx3VL7ROG",
       "youtubeChannelId": "UChFLDvWugOtrzxmUCAjfnGg",
       "musicbrainzId": "4214aa04-64b0-442a-982b-0560e6d3a5bd",
-      "wikipediaArticleTitle": "42 Dugg"
+      "wikipediaArticleTitle": "42 Dugg",
+      "appleMusicArtistIds": [
+        "1277595465"
+      ]
     },
     "releases": [
       {
@@ -208,12 +231,17 @@
     "verifiedAt": "2026-10-14",
     "sources": [
       "https://musicbrainz.org/artist/8e504b01-438a-49d5-ac71-032d2a4e86cb",
-      "https://www.youtube.com/channel/UCgoQgHZP0qTuWyk36ihA4zw"
+      "https://www.youtube.com/channel/UCgoQgHZP0qTuWyk36ihA4zw",
+      "https://music.apple.com/gb/artist/1645077712",
+      "https://music.apple.com/us/artist/1645077712"
     ],
     "externalIds": {
       "spotifyId": "4bOqkIGQCcuZgjfDxNuX1I",
       "youtubeChannelId": "UCgoQgHZP0qTuWyk36ihA4zw",
-      "musicbrainzId": "8e504b01-438a-49d5-ac71-032d2a4e86cb"
+      "musicbrainzId": "8e504b01-438a-49d5-ac71-032d2a4e86cb",
+      "appleMusicArtistIds": [
+        "1645077712"
+      ]
     },
     "releases": [
       {
@@ -241,13 +269,18 @@
     "sources": [
       "https://musicbrainz.org/artist/25b7b584-d952-4662-a8b9-dd8cdfbfeb64",
       "https://www.youtube.com/channel/UC0KAFLxIiaR_FFNYDL3utGw",
-      "https://www.wikidata.org/wiki/Q129910"
+      "https://www.wikidata.org/wiki/Q129910",
+      "https://music.apple.com/us/artist/481488005",
+      "https://music.apple.com/gb/artist/481488005"
     ],
     "externalIds": {
       "spotifyId": "13ubrt8QOOCPljQ2FL1Kca",
       "youtubeChannelId": "UC0KAFLxIiaR_FFNYDL3utGw",
       "musicbrainzId": "25b7b584-d952-4662-a8b9-dd8cdfbfeb64",
-      "wikipediaArticleTitle": "ASAP Rocky"
+      "wikipediaArticleTitle": "ASAP Rocky",
+      "appleMusicArtistIds": [
+        "481488005"
+      ]
     },
     "releases": [
       {
@@ -275,13 +308,18 @@
     "sources": [
       "https://musicbrainz.org/artist/81d12ca7-5b89-4d21-8736-860b7400b4eb",
       "https://www.youtube.com/channel/UCq0Hi7HpCBCNeKpdKKcQqGQ",
-      "https://www.wikidata.org/wiki/Q70063212"
+      "https://www.wikidata.org/wiki/Q70063212",
+      "https://itunes.apple.com/us/artist/id1413572916",
+      "https://music.apple.com/us/artist/1413572916"
     ],
     "externalIds": {
       "spotifyId": "5SXuuuRpukkTvsLuUknva1",
       "youtubeChannelId": "UCq0Hi7HpCBCNeKpdKKcQqGQ",
       "musicbrainzId": "81d12ca7-5b89-4d21-8736-860b7400b4eb",
-      "wikipediaArticleTitle": "Baby Keem"
+      "wikipediaArticleTitle": "Baby Keem",
+      "appleMusicArtistIds": [
+        "1413572916"
+      ]
     },
     "releases": [
       {
@@ -309,13 +347,17 @@
     "sources": [
       "https://musicbrainz.org/artist/df033c30-93af-439f-9124-431b00c392a8",
       "https://www.youtube.com/channel/UCCZRnwAMSIxlJNZmUiSDgUw",
-      "https://www.wikidata.org/wiki/Q135068696"
+      "https://www.wikidata.org/wiki/Q135068696",
+      "https://music.apple.com/us/artist/1696609280"
     ],
     "externalIds": {
       "spotifyId": "1J1pGfTqp5ReVIX8Z1Wzsg",
       "youtubeChannelId": "UCCZRnwAMSIxlJNZmUiSDgUw",
       "musicbrainzId": "df033c30-93af-439f-9124-431b00c392a8",
-      "wikipediaArticleTitle": "BabyChiefDoit"
+      "wikipediaArticleTitle": "BabyChiefDoit",
+      "appleMusicArtistIds": [
+        "1696609280"
+      ]
     },
     "releases": [
       {
@@ -343,13 +385,17 @@
     "sources": [
       "https://musicbrainz.org/artist/d82481ab-4f2e-4fd7-af2f-9dbaa38704da",
       "https://www.youtube.com/channel/UCJPyo4ENRsY1zPwHRGA1iXg",
-      "https://www.wikidata.org/wiki/Q115098502"
+      "https://www.wikidata.org/wiki/Q115098502",
+      "https://music.apple.com/us/artist/689177365"
     ],
     "externalIds": {
       "spotifyId": "3zZ88AwlTwfCJkowsFCvLA",
       "youtubeChannelId": "UCJPyo4ENRsY1zPwHRGA1iXg",
       "musicbrainzId": "d82481ab-4f2e-4fd7-af2f-9dbaa38704da",
-      "wikipediaArticleTitle": "Babyface Ray"
+      "wikipediaArticleTitle": "Babyface Ray",
+      "appleMusicArtistIds": [
+        "689177365"
+      ]
     },
     "releases": [
       {
@@ -377,13 +423,17 @@
     "sources": [
       "https://musicbrainz.org/artist/d25f6294-686a-4569-b1b9-fe64bfef2519",
       "https://www.youtube.com/channel/UCEJdOGwm6CNtc_kIa_Qjy6A",
-      "https://www.wikidata.org/wiki/Q124750337"
+      "https://www.wikidata.org/wiki/Q124750337",
+      "https://music.apple.com/us/artist/1482508209"
     ],
     "externalIds": {
       "spotifyId": "6qxpnaukVayrQn6ViNvu9I",
       "youtubeChannelId": "UCEJdOGwm6CNtc_kIa_Qjy6A",
       "musicbrainzId": "d25f6294-686a-4569-b1b9-fe64bfef2519",
-      "wikipediaArticleTitle": "BigXthaPlug"
+      "wikipediaArticleTitle": "BigXthaPlug",
+      "appleMusicArtistIds": [
+        "1482508209"
+      ]
     },
     "releases": [
       {
@@ -411,13 +461,18 @@
     "sources": [
       "https://musicbrainz.org/artist/44fac0de-d5ae-4bea-a68c-948fedc3d9c5",
       "https://www.youtube.com/channel/UC1NZP8d-VFjV-kKSo6lDBig",
-      "https://www.wikidata.org/wiki/Q125145666"
+      "https://www.wikidata.org/wiki/Q125145666",
+      "https://itunes.apple.com/us/artist/id1474308236",
+      "https://music.apple.com/gb/artist/1474308236"
     ],
     "externalIds": {
       "spotifyId": "23xFbA9rYgRX8mreqysWPc",
       "youtubeChannelId": "UC1NZP8d-VFjV-kKSo6lDBig",
       "musicbrainzId": "44fac0de-d5ae-4bea-a68c-948fedc3d9c5",
-      "wikipediaArticleTitle": "BossMan Dlow"
+      "wikipediaArticleTitle": "BossMan Dlow",
+      "appleMusicArtistIds": [
+        "1474308236"
+      ]
     },
     "releases": [
       {
@@ -445,13 +500,19 @@
     "sources": [
       "https://musicbrainz.org/artist/2f3c4d70-0462-40da-bba3-0aec5772c556",
       "https://www.youtube.com/channel/UCxMAbVFmxKUVGAll0WVGpFw",
-      "https://www.wikidata.org/wiki/Q29033668"
+      "https://www.wikidata.org/wiki/Q29033668",
+      "https://itunes.apple.com/us/artist/id956078923",
+      "https://music.apple.com/us/artist/956078923",
+      "https://music.apple.com/us/artist/cardi-b/956078923"
     ],
     "externalIds": {
       "spotifyId": "4A91BvIz3g7H9yrBiVBUkx",
       "youtubeChannelId": "UCxMAbVFmxKUVGAll0WVGpFw",
       "musicbrainzId": "2f3c4d70-0462-40da-bba3-0aec5772c556",
-      "wikipediaArticleTitle": "Cardi B"
+      "wikipediaArticleTitle": "Cardi B",
+      "appleMusicArtistIds": [
+        "956078923"
+      ]
     },
     "releases": [
       {
@@ -515,13 +576,18 @@
     "sources": [
       "https://musicbrainz.org/artist/b0337af1-8d93-4671-b6c9-ba306bf942bf",
       "https://www.youtube.com/channel/UCV_CsAy5CNBX_uwDQ7RMe1Q",
-      "https://www.wikidata.org/wiki/Q106078330"
+      "https://www.wikidata.org/wiki/Q106078330",
+      "https://music.apple.com/fr/artist/1085149646",
+      "https://music.apple.com/gb/artist/1085149646"
     ],
     "externalIds": {
       "spotifyId": "5H4yInM5zmHqpKIoMNAx4r",
       "youtubeChannelId": "UCV_CsAy5CNBX_uwDQ7RMe1Q",
       "musicbrainzId": "b0337af1-8d93-4671-b6c9-ba306bf942bf",
-      "wikipediaArticleTitle": "Central Cee"
+      "wikipediaArticleTitle": "Central Cee",
+      "appleMusicArtistIds": [
+        "1085149646"
+      ]
     },
     "releases": [
       {
@@ -552,13 +618,17 @@
     "sources": [
       "https://musicbrainz.org/artist/0a68f3b5-79c2-4f81-a7bc-ebc977602e86",
       "https://www.youtube.com/channel/UCuNSwwBpexmrxzdIN26b1gw",
-      "https://www.wikidata.org/wiki/Q134697068"
+      "https://www.wikidata.org/wiki/Q134697068",
+      "https://music.apple.com/gb/artist/1586243773"
     ],
     "externalIds": {
       "spotifyId": "5A7T1LAGJg5NXySBoIKUmF",
       "youtubeChannelId": "UCuNSwwBpexmrxzdIN26b1gw",
       "musicbrainzId": "0a68f3b5-79c2-4f81-a7bc-ebc977602e86",
-      "wikipediaArticleTitle": "Che (rapper)"
+      "wikipediaArticleTitle": "Che (rapper)",
+      "appleMusicArtistIds": [
+        "1586243773"
+      ]
     },
     "releases": [
       {
@@ -586,13 +656,18 @@
     "sources": [
       "https://musicbrainz.org/artist/9118f524-be76-4eaf-875c-ccf15e2a2ad6",
       "https://www.youtube.com/channel/UC0032Wkd3aCT4rRi1YOV3gQ",
-      "https://www.wikidata.org/wiki/Q127362"
+      "https://www.wikidata.org/wiki/Q127362",
+      "https://itunes.apple.com/us/artist/id516663045",
+      "https://music.apple.com/us/artist/516663045"
     ],
     "externalIds": {
       "spotifyId": "15iVAtD3s3FsQR4w1v6M0P",
       "youtubeChannelId": "UC0032Wkd3aCT4rRi1YOV3gQ",
       "musicbrainzId": "9118f524-be76-4eaf-875c-ccf15e2a2ad6",
-      "wikipediaArticleTitle": "Chief Keef"
+      "wikipediaArticleTitle": "Chief Keef",
+      "appleMusicArtistIds": [
+        "516663045"
+      ]
     },
     "releases": [
       {
@@ -620,13 +695,18 @@
     "sources": [
       "https://musicbrainz.org/artist/87ae83df-6173-40cc-a0f2-bad543faa6aa",
       "https://www.youtube.com/channel/UC2CCXzC56k0b8L49R_iW-Yw",
-      "https://www.wikidata.org/wiki/Q62107457"
+      "https://www.wikidata.org/wiki/Q62107457",
+      "https://itunes.apple.com/us/artist/id1175595427",
+      "https://music.apple.com/us/artist/1175595427"
     ],
     "externalIds": {
       "spotifyId": "4r63FhuTkUYltbVAg5TQnk",
       "youtubeChannelId": "UC2CCXzC56k0b8L49R_iW-Yw",
       "musicbrainzId": "87ae83df-6173-40cc-a0f2-bad543faa6aa",
-      "wikipediaArticleTitle": "DaBaby"
+      "wikipediaArticleTitle": "DaBaby",
+      "appleMusicArtistIds": [
+        "1175595427"
+      ]
     },
     "releases": [
       {
@@ -654,13 +734,17 @@
     "sources": [
       "https://musicbrainz.org/artist/eec466a4-aec6-42ea-ab35-20416e502b9d",
       "https://www.youtube.com/channel/UChlOsnwkarBH-srYGJnh46w",
-      "https://www.wikidata.org/wiki/Q114857113"
+      "https://www.wikidata.org/wiki/Q114857113",
+      "https://music.apple.com/us/artist/1293634796"
     ],
     "externalIds": {
       "spotifyId": "3YYbAExunnHv5pW7GUZefk",
       "youtubeChannelId": "UChlOsnwkarBH-srYGJnh46w",
       "musicbrainzId": "eec466a4-aec6-42ea-ab35-20416e502b9d",
-      "wikipediaArticleTitle": "DC the Don"
+      "wikipediaArticleTitle": "DC the Don",
+      "appleMusicArtistIds": [
+        "1293634796"
+      ]
     },
     "releases": [
       {
@@ -688,13 +772,17 @@
     "sources": [
       "https://musicbrainz.org/artist/5f95440d-7737-4a36-9bcf-c05337f7129b",
       "https://www.youtube.com/channel/UCiKxNv_MHAShqT2lATxG_Wg",
-      "https://www.wikidata.org/wiki/Q17517049"
+      "https://www.wikidata.org/wiki/Q17517049",
+      "https://music.apple.com/us/artist/631440154"
     ],
     "externalIds": {
       "spotifyId": "6fxyWrfmjcbj5d12gXeiNV",
       "youtubeChannelId": "UCiKxNv_MHAShqT2lATxG_Wg",
       "musicbrainzId": "5f95440d-7737-4a36-9bcf-c05337f7129b",
-      "wikipediaArticleTitle": "Denzel Curry"
+      "wikipediaArticleTitle": "Denzel Curry",
+      "appleMusicArtistIds": [
+        "631440154"
+      ]
     },
     "releases": [
       {
@@ -722,13 +810,17 @@
     "sources": [
       "https://musicbrainz.org/artist/987d3d86-0d7a-4292-ae96-a8d59e456436",
       "https://www.youtube.com/channel/UCylvCifeaY7gi1zjhRfpcMg",
-      "https://www.wikidata.org/wiki/Q113510276"
+      "https://www.wikidata.org/wiki/Q113510276",
+      "https://music.apple.com/us/artist/1344665482"
     ],
     "externalIds": {
       "spotifyId": "1HPW4jeRjXBFRoUnSvBzoD",
       "youtubeChannelId": "UCylvCifeaY7gi1zjhRfpcMg",
       "musicbrainzId": "987d3d86-0d7a-4292-ae96-a8d59e456436",
-      "wikipediaArticleTitle": "Destroy Lonely"
+      "wikipediaArticleTitle": "Destroy Lonely",
+      "appleMusicArtistIds": [
+        "1344665482"
+      ]
     },
     "releases": [
       {
@@ -756,13 +848,19 @@
     "sources": [
       "https://musicbrainz.org/artist/9f75277c-b283-4846-ac8c-f932255cd0ac",
       "https://www.youtube.com/channel/UCksiqtuWYtN2YluvAQnV2dQ",
-      "https://www.wikidata.org/wiki/Q106629186"
+      "https://www.wikidata.org/wiki/Q106629186",
+      "https://itunes.apple.com/us/artist/id1437641643",
+      "https://music.apple.com/fr/artist/1437641643",
+      "https://music.apple.com/us/artist/1437641643"
     ],
     "externalIds": {
       "spotifyId": "4E2rKHVDssGJm2SCDOMMJB",
       "youtubeChannelId": "UCksiqtuWYtN2YluvAQnV2dQ",
       "musicbrainzId": "9f75277c-b283-4846-ac8c-f932255cd0ac",
-      "wikipediaArticleTitle": "Doechii"
+      "wikipediaArticleTitle": "Doechii",
+      "appleMusicArtistIds": [
+        "1437641643"
+      ]
     },
     "releases": [
       {
@@ -790,13 +888,18 @@
     "sources": [
       "https://musicbrainz.org/artist/5df62a88-cac9-490a-b62c-c7c88f4020f4",
       "https://www.youtube.com/channel/UCzpl23pGTHVYqvKsgY0A-_w",
-      "https://www.wikidata.org/wiki/Q51120673"
+      "https://www.wikidata.org/wiki/Q51120673",
+      "https://music.apple.com/us/artist/830588310",
+      "https://itunes.apple.com/us/artist/id830588310"
     ],
     "externalIds": {
       "spotifyId": "5cj0lLjcoR7YOSnhnX0Po5",
       "youtubeChannelId": "UCzpl23pGTHVYqvKsgY0A-_w",
       "musicbrainzId": "5df62a88-cac9-490a-b62c-c7c88f4020f4",
-      "wikipediaArticleTitle": "Doja Cat"
+      "wikipediaArticleTitle": "Doja Cat",
+      "appleMusicArtistIds": [
+        "830588310"
+      ]
     },
     "releases": [
       {
@@ -824,13 +927,18 @@
     "sources": [
       "https://musicbrainz.org/artist/a0723a3c-4135-438e-85c5-012712144ede",
       "https://www.youtube.com/channel/UCgT01FILdWB9BsXBXKjpQ7A",
-      "https://www.wikidata.org/wiki/Q56513383"
+      "https://www.wikidata.org/wiki/Q56513383",
+      "https://music.apple.com/us/artist/1237012992",
+      "https://music.apple.com/fr/artist/1237012992"
     ],
     "externalIds": {
       "spotifyId": "4Gso3d4CscCijv0lmajZWs",
       "youtubeChannelId": "UCgT01FILdWB9BsXBXKjpQ7A",
       "musicbrainzId": "a0723a3c-4135-438e-85c5-012712144ede",
-      "wikipediaArticleTitle": "Don Toliver"
+      "wikipediaArticleTitle": "Don Toliver",
+      "appleMusicArtistIds": [
+        "1237012992"
+      ]
     },
     "releases": [
       {
@@ -858,13 +966,19 @@
     "sources": [
       "https://musicbrainz.org/artist/9fff2f8a-21e6-47de-a2b8-7f449929d43f",
       "https://www.youtube.com/channel/UCByOQJjav0CUDwxCk-jVNRQ",
-      "https://www.wikidata.org/wiki/Q33240"
+      "https://www.wikidata.org/wiki/Q33240",
+      "https://music.apple.com/ca/artist/271256",
+      "https://music.apple.com/gb/artist/271256",
+      "https://music.apple.com/us/artist/271256"
     ],
     "externalIds": {
       "spotifyId": "3TVXtAsR1Inumwj472S9r4",
       "youtubeChannelId": "UCByOQJjav0CUDwxCk-jVNRQ",
       "musicbrainzId": "9fff2f8a-21e6-47de-a2b8-7f449929d43f",
-      "wikipediaArticleTitle": "Drake (musician)"
+      "wikipediaArticleTitle": "Drake (musician)",
+      "appleMusicArtistIds": [
+        "271256"
+      ]
     },
     "releases": [
       {
@@ -887,13 +1001,19 @@
     "sources": [
       "https://musicbrainz.org/artist/b95ce3ff-3d05-4e87-9e01-c97b66af13d4",
       "https://www.youtube.com/channel/UCfM3zsQsOnfWNUppiycmBuw",
-      "https://www.wikidata.org/wiki/Q5608"
+      "https://www.wikidata.org/wiki/Q5608",
+      "https://itunes.apple.com/us/artist/id111051",
+      "https://music.apple.com/us/artist/111051",
+      "https://music.apple.com/gb/artist/111051"
     ],
     "externalIds": {
       "spotifyId": "7dGJo4pcD2V6oG8kP0tJRR",
       "youtubeChannelId": "UCfM3zsQsOnfWNUppiycmBuw",
       "musicbrainzId": "b95ce3ff-3d05-4e87-9e01-c97b66af13d4",
-      "wikipediaArticleTitle": "Eminem"
+      "wikipediaArticleTitle": "Eminem",
+      "appleMusicArtistIds": [
+        "111051"
+      ]
     },
     "releases": [
       {
@@ -921,13 +1041,18 @@
     "sources": [
       "https://musicbrainz.org/artist/3d253cbd-fb66-4752-a8d1-f9b0db75bcea",
       "https://www.youtube.com/channel/UC8jLPGsRRCTaK-PAWIfCrpg",
-      "https://www.wikidata.org/wiki/Q136490481"
+      "https://www.wikidata.org/wiki/Q136490481",
+      "https://music.apple.com/gb/artist/1754179834",
+      "https://music.apple.com/us/artist/1754179834"
     ],
     "externalIds": {
       "spotifyId": "0EyhkwP3UnwGFBy6xwKjSy",
       "youtubeChannelId": "UC8jLPGsRRCTaK-PAWIfCrpg",
       "musicbrainzId": "3d253cbd-fb66-4752-a8d1-f9b0db75bcea",
-      "wikipediaArticleTitle": "EsDeeKid"
+      "wikipediaArticleTitle": "EsDeeKid",
+      "appleMusicArtistIds": [
+        "1754179834"
+      ]
     },
     "releases": [
       {
@@ -948,13 +1073,17 @@
     "sources": [
       "https://musicbrainz.org/artist/968847c6-2150-419d-b14b-68c672dcde99",
       "https://www.youtube.com/channel/UCDnRK591TaPlJrHxjA1PL4A",
-      "https://www.wikidata.org/wiki/Q133460402"
+      "https://www.wikidata.org/wiki/Q133460402",
+      "https://music.apple.com/gb/artist/1744500063"
     ],
     "externalIds": {
       "spotifyId": "0qc4BFxcwRFZfevTck4fOi",
       "youtubeChannelId": "UCDnRK591TaPlJrHxjA1PL4A",
       "musicbrainzId": "968847c6-2150-419d-b14b-68c672dcde99",
-      "wikipediaArticleTitle": "Fakemink"
+      "wikipediaArticleTitle": "Fakemink",
+      "appleMusicArtistIds": [
+        "1744500063"
+      ]
     },
     "releases": [
       {
@@ -981,12 +1110,16 @@
     "verifiedAt": "2026-10-14",
     "sources": [
       "https://musicbrainz.org/artist/f4428f61-f681-42b6-93c3-5f898e045c3d",
-      "https://www.youtube.com/channel/UCdNuYbFFVa9CiZ8mJOtZKyQ"
+      "https://www.youtube.com/channel/UCdNuYbFFVa9CiZ8mJOtZKyQ",
+      "https://music.apple.com/gb/artist/1761933449"
     ],
     "externalIds": {
       "spotifyId": "278vNvolx8H3sQJ2hgOMnh",
       "youtubeChannelId": "UCdNuYbFFVa9CiZ8mJOtZKyQ",
-      "musicbrainzId": "f4428f61-f681-42b6-93c3-5f898e045c3d"
+      "musicbrainzId": "f4428f61-f681-42b6-93c3-5f898e045c3d",
+      "appleMusicArtistIds": [
+        "1761933449"
+      ]
     },
     "releases": [
       {
@@ -1014,13 +1147,18 @@
     "sources": [
       "https://musicbrainz.org/artist/21dab5d7-3bda-4f72-a054-6379729dcb62",
       "https://www.youtube.com/channel/UCylw9yLlhFVX_vIdjc6DjGQ",
-      "https://www.wikidata.org/wiki/Q89352069"
+      "https://www.wikidata.org/wiki/Q89352069",
+      "https://itunes.apple.com/us/artist/id1263242099",
+      "https://music.apple.com/us/artist/1263242099"
     ],
     "externalIds": {
       "spotifyId": "08PvCOlef4xdOr20jFSTPd",
       "youtubeChannelId": "UCylw9yLlhFVX_vIdjc6DjGQ",
       "musicbrainzId": "21dab5d7-3bda-4f72-a054-6379729dcb62",
-      "wikipediaArticleTitle": "Flo Milli"
+      "wikipediaArticleTitle": "Flo Milli",
+      "appleMusicArtistIds": [
+        "1263242099"
+      ]
     },
     "releases": [
       {
@@ -1048,13 +1186,17 @@
     "sources": [
       "https://musicbrainz.org/artist/48262e82-db9f-4a92-b650-dfef979b73ec",
       "https://www.youtube.com/channel/UCSDvKdIQOwTfcyOimSi9oYA",
-      "https://www.wikidata.org/wiki/Q3445057"
+      "https://www.wikidata.org/wiki/Q3445057",
+      "https://music.apple.com/us/artist/128050210"
     ],
     "externalIds": {
       "spotifyId": "1RyvyyTE3xzB2ZywiAwp0i",
       "youtubeChannelId": "UCSDvKdIQOwTfcyOimSi9oYA",
       "musicbrainzId": "48262e82-db9f-4a92-b650-dfef979b73ec",
-      "wikipediaArticleTitle": "Future (rapper)"
+      "wikipediaArticleTitle": "Future (rapper)",
+      "appleMusicArtistIds": [
+        "128050210"
+      ]
     },
     "releases": [
       {
@@ -1084,13 +1226,19 @@
     "sources": [
       "https://musicbrainz.org/artist/1b1f50d1-4746-468b-a6a2-7db7200d3dfc",
       "https://www.youtube.com/channel/UCV0pIPt5HFfulonNog3cz1A",
-      "https://www.wikidata.org/wiki/Q17811716"
+      "https://www.wikidata.org/wiki/Q17811716",
+      "https://music.apple.com/us/artist/1036753321",
+      "https://music.apple.com/fr/artist/1036753321",
+      "https://music.apple.com/gb/artist/1036753321"
     ],
     "externalIds": {
       "spotifyId": "5QdEbQJ3ylBnc3gsIASAT5",
       "youtubeChannelId": "UCV0pIPt5HFfulonNog3cz1A",
       "musicbrainzId": "1b1f50d1-4746-468b-a6a2-7db7200d3dfc",
-      "wikipediaArticleTitle": "G Herbo"
+      "wikipediaArticleTitle": "G Herbo",
+      "appleMusicArtistIds": [
+        "1036753321"
+      ]
     },
     "releases": [
       {
@@ -1118,13 +1266,18 @@
     "sources": [
       "https://musicbrainz.org/artist/2a7ef045-ca10-4cb5-8fe9-1f5d38e84bc2",
       "https://www.youtube.com/channel/UC9bZ9eWvF0eXVqrxK9ve7Nw",
-      "https://www.wikidata.org/wiki/Q114132368"
+      "https://www.wikidata.org/wiki/Q114132368",
+      "https://itunes.apple.com/us/artist/id1441017729",
+      "https://music.apple.com/us/artist/1441017729"
     ],
     "externalIds": {
       "spotifyId": "2qoQgPAilErOKCwE2Y8wOG",
       "youtubeChannelId": "UC9bZ9eWvF0eXVqrxK9ve7Nw",
       "musicbrainzId": "2a7ef045-ca10-4cb5-8fe9-1f5d38e84bc2",
-      "wikipediaArticleTitle": "GloRilla"
+      "wikipediaArticleTitle": "GloRilla",
+      "appleMusicArtistIds": [
+        "1441017729"
+      ]
     },
     "releases": [
       {
@@ -1152,13 +1305,18 @@
     "sources": [
       "https://musicbrainz.org/artist/100b8734-f4f0-4536-9960-47f7c59d1b4c",
       "https://www.youtube.com/channel/UCAkIMkEaa9sZmjcy7mfd5lQ",
-      "https://www.wikidata.org/wiki/Q55613105"
+      "https://www.wikidata.org/wiki/Q55613105",
+      "https://music.apple.com/us/artist/1236267297",
+      "https://music.apple.com/gb/artist/1236267297"
     ],
     "externalIds": {
       "spotifyId": "2hlmm7s2ICUX0LVIhVFlZQ",
       "youtubeChannelId": "UCAkIMkEaa9sZmjcy7mfd5lQ",
       "musicbrainzId": "100b8734-f4f0-4536-9960-47f7c59d1b4c",
-      "wikipediaArticleTitle": "Gunna (rapper)"
+      "wikipediaArticleTitle": "Gunna (rapper)",
+      "appleMusicArtistIds": [
+        "1236267297"
+      ]
     },
     "releases": [
       {
@@ -1185,12 +1343,16 @@
     "verifiedAt": "2026-10-14",
     "sources": [
       "https://musicbrainz.org/artist/bf133b83-6cbd-4cf0-bda1-f2ad3bf24e23",
-      "https://www.youtube.com/channel/UC-tAx6tWF3x-7COrjnpV4Zg"
+      "https://www.youtube.com/channel/UC-tAx6tWF3x-7COrjnpV4Zg",
+      "https://music.apple.com/us/artist/1527844433"
     ],
     "externalIds": {
       "spotifyId": "4PooHx6BstbetDtBMrLyV7",
       "youtubeChannelId": "UC-tAx6tWF3x-7COrjnpV4Zg",
-      "musicbrainzId": "bf133b83-6cbd-4cf0-bda1-f2ad3bf24e23"
+      "musicbrainzId": "bf133b83-6cbd-4cf0-bda1-f2ad3bf24e23",
+      "appleMusicArtistIds": [
+        "1527844433"
+      ]
     },
     "releases": [
       {
@@ -1250,13 +1412,17 @@
     "sources": [
       "https://musicbrainz.org/artist/6f2c949d-9540-4421-bf02-27ae27e00e33",
       "https://www.youtube.com/channel/UCJTqwQj5iTHYrko04PbGI9w",
-      "https://www.wikidata.org/wiki/Q114114977"
+      "https://www.wikidata.org/wiki/Q114114977",
+      "https://music.apple.com/us/artist/1552372505"
     ],
     "externalIds": {
       "spotifyId": "3LZZPxNDGDFVSIPqf4JuEf",
       "youtubeChannelId": "UCJTqwQj5iTHYrko04PbGI9w",
       "musicbrainzId": "6f2c949d-9540-4421-bf02-27ae27e00e33",
-      "wikipediaArticleTitle": "Ice Spice"
+      "wikipediaArticleTitle": "Ice Spice",
+      "appleMusicArtistIds": [
+        "1552372505"
+      ]
     },
     "releases": [
       {
@@ -1284,13 +1450,18 @@
     "sources": [
       "https://musicbrainz.org/artist/875203e1-8e58-4b86-8dcb-7190faf411c5",
       "https://www.youtube.com/channel/UCnc6db-y3IU7CkT_yeVXdVg",
-      "https://www.wikidata.org/wiki/Q204018"
+      "https://www.wikidata.org/wiki/Q204018",
+      "https://music.apple.com/us/artist/73705833",
+      "https://itunes.apple.com/us/artist/id73705833"
     ],
     "externalIds": {
       "spotifyId": "6l3HvQ5sa6mXTsMTB19rO5",
       "youtubeChannelId": "UCnc6db-y3IU7CkT_yeVXdVg",
       "musicbrainzId": "875203e1-8e58-4b86-8dcb-7190faf411c5",
-      "wikipediaArticleTitle": "J. Cole"
+      "wikipediaArticleTitle": "J. Cole",
+      "appleMusicArtistIds": [
+        "73705833"
+      ]
     },
     "releases": [
       {
@@ -1325,13 +1496,19 @@
     "sources": [
       "https://musicbrainz.org/artist/f82bcf78-5b69-4622-a5ef-73800768d9ac",
       "https://www.youtube.com/channel/UCN-sc1xJr-QQNj_uNIM9wTA",
-      "https://www.wikidata.org/wiki/Q62766"
+      "https://www.wikidata.org/wiki/Q62766",
+      "https://itunes.apple.com/us/artist/id1352449404",
+      "https://music.apple.com/us/artist/1352449404",
+      "https://music.apple.com/gb/artist/1352449404"
     ],
     "externalIds": {
       "spotifyId": "3nFkdlSjzX9mRTtwJOzDYB",
       "youtubeChannelId": "UCN-sc1xJr-QQNj_uNIM9wTA",
       "musicbrainzId": "f82bcf78-5b69-4622-a5ef-73800768d9ac",
-      "wikipediaArticleTitle": "Jay-Z"
+      "wikipediaArticleTitle": "Jay-Z",
+      "appleMusicArtistIds": [
+        "1352449404"
+      ]
     },
     "releases": [
       {
@@ -1361,13 +1538,18 @@
     "sources": [
       "https://musicbrainz.org/artist/d616b606-cf6a-4b6e-ab0f-e253b8db6610",
       "https://www.youtube.com/channel/UC3WIRbOw46MsbycRc1N5x4g",
-      "https://www.wikidata.org/wiki/Q29588830"
+      "https://www.wikidata.org/wiki/Q29588830",
+      "https://itunes.apple.com/artist/id282841404",
+      "https://music.apple.com/ca/artist/282841404"
     ],
     "externalIds": {
       "spotifyId": "6U3ybJ9UHNKEdsH7ktGBZ7",
       "youtubeChannelId": "UC3WIRbOw46MsbycRc1N5x4g",
       "musicbrainzId": "d616b606-cf6a-4b6e-ab0f-e253b8db6610",
-      "wikipediaArticleTitle": "JID"
+      "wikipediaArticleTitle": "JID",
+      "appleMusicArtistIds": [
+        "282841404"
+      ]
     },
     "releases": [
       {
@@ -1395,13 +1577,17 @@
     "sources": [
       "https://musicbrainz.org/artist/860d7dc2-618d-437e-a3bb-7b91c2d40095",
       "https://www.youtube.com/channel/UCtjO8cix9XxwOcAv6nww-TQ",
-      "https://www.wikidata.org/wiki/Q114050700"
+      "https://www.wikidata.org/wiki/Q114050700",
+      "https://music.apple.com/us/artist/1434801023"
     ],
     "externalIds": {
       "spotifyId": "3gBZUcNeVumkeeJ19CY2sX",
       "youtubeChannelId": "UCtjO8cix9XxwOcAv6nww-TQ",
       "musicbrainzId": "860d7dc2-618d-437e-a3bb-7b91c2d40095",
-      "wikipediaArticleTitle": "Ken Carson"
+      "wikipediaArticleTitle": "Ken Carson",
+      "appleMusicArtistIds": [
+        "1434801023"
+      ]
     },
     "releases": [
       {
@@ -1429,13 +1615,19 @@
     "sources": [
       "https://musicbrainz.org/artist/381086ea-f511-4aba-bdf9-71c753dc5077",
       "https://www.youtube.com/channel/UC3lBXcrKFnFAFkfVk5WuKcQ",
-      "https://www.wikidata.org/wiki/Q130798"
+      "https://www.wikidata.org/wiki/Q130798",
+      "https://music.apple.com/us/artist/368183298",
+      "https://itunes.apple.com/artist/id368183298",
+      "https://music.apple.com/gb/artist/368183298"
     ],
     "externalIds": {
       "spotifyId": "2YZyLoL8N0Wb9xBt1NhZWg",
       "youtubeChannelId": "UC3lBXcrKFnFAFkfVk5WuKcQ",
       "musicbrainzId": "381086ea-f511-4aba-bdf9-71c753dc5077",
-      "wikipediaArticleTitle": "Kendrick Lamar"
+      "wikipediaArticleTitle": "Kendrick Lamar",
+      "appleMusicArtistIds": [
+        "368183298"
+      ]
     },
     "releases": [
       {
@@ -1463,13 +1655,17 @@
     "sources": [
       "https://musicbrainz.org/artist/c5460e21-d5e7-4e26-ab4c-ba9c627809f8",
       "https://www.youtube.com/channel/UCwd1Np7iEDPBHIKo4evtZtA",
-      "https://www.wikidata.org/wiki/Q70235526"
+      "https://www.wikidata.org/wiki/Q70235526",
+      "https://music.apple.com/us/artist/1199258326"
     ],
     "externalIds": {
       "spotifyId": "0RESbWvOMyua0yuyVrztJ5",
       "youtubeChannelId": "UCwd1Np7iEDPBHIKo4evtZtA",
       "musicbrainzId": "c5460e21-d5e7-4e26-ab4c-ba9c627809f8",
-      "wikipediaArticleTitle": "Key Glock"
+      "wikipediaArticleTitle": "Key Glock",
+      "appleMusicArtistIds": [
+        "1199258326"
+      ]
     },
     "releases": [
       {
@@ -1497,13 +1693,17 @@
     "sources": [
       "https://musicbrainz.org/artist/5ec1ecc6-4535-4911-a27a-e26343f4a189",
       "https://www.youtube.com/channel/UChEYVadfkMCfrKUi6qr3I1Q",
-      "https://www.wikidata.org/wiki/Q22005867"
+      "https://www.wikidata.org/wiki/Q22005867",
+      "https://music.apple.com/us/artist/953921140"
     ],
     "externalIds": {
       "spotifyId": "46SHBwWsqBkxI7EeeBEQG7",
       "youtubeChannelId": "UChEYVadfkMCfrKUi6qr3I1Q",
       "musicbrainzId": "5ec1ecc6-4535-4911-a27a-e26343f4a189",
-      "wikipediaArticleTitle": "Kodak Black"
+      "wikipediaArticleTitle": "Kodak Black",
+      "appleMusicArtistIds": [
+        "953921140"
+      ]
     },
     "releases": [
       {
@@ -1534,13 +1734,18 @@
     "sources": [
       "https://musicbrainz.org/artist/355cc194-b8db-4af2-8678-c7ad54213f4b",
       "https://www.youtube.com/channel/UCRQ6wJbGwbF9Wmvp5HfT7Pg",
-      "https://www.wikidata.org/wiki/Q65029930"
+      "https://www.wikidata.org/wiki/Q65029930",
+      "https://music.apple.com/us/artist/419799506",
+      "https://music.apple.com/gb/artist/419799506"
     ],
     "externalIds": {
       "spotifyId": "3MdXrJWsbVzdn6fe5JYkSQ",
       "youtubeChannelId": "UCRQ6wJbGwbF9Wmvp5HfT7Pg",
       "musicbrainzId": "355cc194-b8db-4af2-8678-c7ad54213f4b",
-      "wikipediaArticleTitle": "Latto"
+      "wikipediaArticleTitle": "Latto",
+      "appleMusicArtistIds": [
+        "419799506"
+      ]
     },
     "releases": [
       {
@@ -1567,12 +1772,16 @@
     "verifiedAt": "2026-10-14",
     "sources": [
       "https://musicbrainz.org/artist/95b0d5b3-2815-4ffc-9bfe-2ace8300b463",
-      "https://www.youtube.com/channel/UCZ7a7F6FGMZyRisnXuSazCA"
+      "https://www.youtube.com/channel/UCZ7a7F6FGMZyRisnXuSazCA",
+      "https://music.apple.com/gb/artist/1608411300"
     ],
     "externalIds": {
       "spotifyId": "3CE6MgsLpKMDfYFtexgc8U",
       "youtubeChannelId": "UCZ7a7F6FGMZyRisnXuSazCA",
-      "musicbrainzId": "95b0d5b3-2815-4ffc-9bfe-2ace8300b463"
+      "musicbrainzId": "95b0d5b3-2815-4ffc-9bfe-2ace8300b463",
+      "appleMusicArtistIds": [
+        "1608411300"
+      ]
     },
     "releases": [
       {
@@ -1600,13 +1809,17 @@
     "sources": [
       "https://musicbrainz.org/artist/d42a5768-ada1-4fb6-85fd-f61aba6264e0",
       "https://www.youtube.com/channel/UCVS88tG_NYgxF6Udnx2815Q",
-      "https://www.wikidata.org/wiki/Q50527563"
+      "https://www.wikidata.org/wiki/Q50527563",
+      "https://music.apple.com/us/artist/1276656483"
     ],
     "externalIds": {
       "spotifyId": "5f7VJjfbwm532GiveGC0ZK",
       "youtubeChannelId": "UCVS88tG_NYgxF6Udnx2815Q",
       "musicbrainzId": "d42a5768-ada1-4fb6-85fd-f61aba6264e0",
-      "wikipediaArticleTitle": "Lil Baby"
+      "wikipediaArticleTitle": "Lil Baby",
+      "appleMusicArtistIds": [
+        "1276656483"
+      ]
     },
     "releases": [
       {
@@ -1634,13 +1847,18 @@
     "sources": [
       "https://musicbrainz.org/artist/c9cd225b-4883-428e-82c2-73e0b6282fb6",
       "https://www.youtube.com/channel/UCaxOQZrF5llUMp-JjesUz1A",
-      "https://www.wikidata.org/wiki/Q2899818"
+      "https://www.wikidata.org/wiki/Q2899818",
+      "https://music.apple.com/us/artist/541282483",
+      "https://music.apple.com/gb/artist/541282483"
     ],
     "externalIds": {
       "spotifyId": "3hcs9uc56yIGFCSy9leWe7",
       "youtubeChannelId": "UCaxOQZrF5llUMp-JjesUz1A",
       "musicbrainzId": "c9cd225b-4883-428e-82c2-73e0b6282fb6",
-      "wikipediaArticleTitle": "Lil Durk"
+      "wikipediaArticleTitle": "Lil Durk",
+      "appleMusicArtistIds": [
+        "541282483"
+      ]
     },
     "releases": [
       {
@@ -1668,13 +1886,17 @@
     "sources": [
       "https://musicbrainz.org/artist/e6fdf3f9-8077-4126-b0cf-94da9a8b627e",
       "https://www.youtube.com/channel/UCOlxqtcKc-HBEQJgDsylyhA",
-      "https://www.wikidata.org/wiki/Q65054660"
+      "https://www.wikidata.org/wiki/Q65054660",
+      "https://itunes.apple.com/us/artist/id1366503504"
     ],
     "externalIds": {
       "spotifyId": "4Ga1P7PMIsmqEZqhYZQgDo",
       "youtubeChannelId": "UCOlxqtcKc-HBEQJgDsylyhA",
       "musicbrainzId": "e6fdf3f9-8077-4126-b0cf-94da9a8b627e",
-      "wikipediaArticleTitle": "Lil Tecca"
+      "wikipediaArticleTitle": "Lil Tecca",
+      "appleMusicArtistIds": [
+        "1366503504"
+      ]
     },
     "releases": [
       {
@@ -1702,13 +1924,18 @@
     "sources": [
       "https://musicbrainz.org/artist/d44b92db-dd49-4636-abe8-7c381f90b7aa",
       "https://www.youtube.com/channel/UCEB4a5o_6KfjxHwNMnmj54Q",
-      "https://www.wikidata.org/wiki/Q61670761"
+      "https://www.wikidata.org/wiki/Q61670761",
+      "https://music.apple.com/us/artist/1436446949",
+      "https://music.apple.com/gb/artist/1436446949"
     ],
     "externalIds": {
       "spotifyId": "6jGMq4yGs7aQzuGsMgVgZR",
       "youtubeChannelId": "UCEB4a5o_6KfjxHwNMnmj54Q",
       "musicbrainzId": "d44b92db-dd49-4636-abe8-7c381f90b7aa",
-      "wikipediaArticleTitle": "Lil Tjay"
+      "wikipediaArticleTitle": "Lil Tjay",
+      "appleMusicArtistIds": [
+        "1436446949"
+      ]
     },
     "releases": [
       {
@@ -1739,13 +1966,18 @@
     "sources": [
       "https://musicbrainz.org/artist/8837b875-3689-4646-b3fd-d8b53815c7a8",
       "https://www.youtube.com/channel/UCqwxMqUcL-XC3D9-fTP93Mg",
-      "https://www.wikidata.org/wiki/Q23771950"
+      "https://www.wikidata.org/wiki/Q23771950",
+      "https://music.apple.com/us/artist/940710524",
+      "https://itunes.apple.com/us/artist/id940710524"
     ],
     "externalIds": {
       "spotifyId": "4O15NlyKLIASxsJ0PrXPfz",
       "youtubeChannelId": "UCqwxMqUcL-XC3D9-fTP93Mg",
       "musicbrainzId": "8837b875-3689-4646-b3fd-d8b53815c7a8",
-      "wikipediaArticleTitle": "Lil Uzi Vert"
+      "wikipediaArticleTitle": "Lil Uzi Vert",
+      "appleMusicArtistIds": [
+        "940710524"
+      ]
     },
     "releases": [
       {
@@ -1773,13 +2005,18 @@
     "sources": [
       "https://musicbrainz.org/artist/ac9a487a-d9d2-4f27-bb23-0f4686488345",
       "https://www.youtube.com/channel/UCO9zJy7HWrIS3ojB4Lr7Yqw",
-      "https://www.wikidata.org/wiki/Q15615"
+      "https://www.wikidata.org/wiki/Q15615",
+      "https://itunes.apple.com/us/artist/id5869117",
+      "https://music.apple.com/us/artist/5869117"
     ],
     "externalIds": {
       "spotifyId": "55Aa2cqylxrFIXC767Z865",
       "youtubeChannelId": "UCO9zJy7HWrIS3ojB4Lr7Yqw",
       "musicbrainzId": "ac9a487a-d9d2-4f27-bb23-0f4686488345",
-      "wikipediaArticleTitle": "Lil Wayne"
+      "wikipediaArticleTitle": "Lil Wayne",
+      "appleMusicArtistIds": [
+        "5869117"
+      ]
     },
     "releases": [
       {
@@ -1807,13 +2044,17 @@
     "sources": [
       "https://musicbrainz.org/artist/a668565b-41b8-44a8-9d5c-8e609dbf69fc",
       "https://www.youtube.com/channel/UC1X3TRsCt36QPjF1p5f3HTg",
-      "https://www.wikidata.org/wiki/Q23772141"
+      "https://www.wikidata.org/wiki/Q23772141",
+      "https://music.apple.com/us/artist/1080733657"
     ],
     "externalIds": {
       "spotifyId": "6icQOAFXDZKsumw3YXyusw",
       "youtubeChannelId": "UC1X3TRsCt36QPjF1p5f3HTg",
       "musicbrainzId": "a668565b-41b8-44a8-9d5c-8e609dbf69fc",
-      "wikipediaArticleTitle": "Lil Yachty"
+      "wikipediaArticleTitle": "Lil Yachty",
+      "appleMusicArtistIds": [
+        "1080733657"
+      ]
     },
     "releases": [
       {
@@ -1873,13 +2114,17 @@
     "sources": [
       "https://musicbrainz.org/artist/1f375ea1-617d-485b-ae29-d220bfc1f501",
       "https://www.youtube.com/channel/UCwEG-vwbSPLEJGlLmgFneiA",
-      "https://www.wikidata.org/wiki/Q116700550"
+      "https://www.wikidata.org/wiki/Q116700550",
+      "https://music.apple.com/us/artist/1638445286"
     ],
     "externalIds": {
       "spotifyId": "1K15GRZZATsCJyGJ4bYiEz",
       "youtubeChannelId": "UCwEG-vwbSPLEJGlLmgFneiA",
       "musicbrainzId": "1f375ea1-617d-485b-ae29-d220bfc1f501",
-      "wikipediaArticleTitle": "Luh Tyler"
+      "wikipediaArticleTitle": "Luh Tyler",
+      "appleMusicArtistIds": [
+        "1638445286"
+      ]
     },
     "releases": [
       {
@@ -1907,13 +2152,18 @@
     "sources": [
       "https://musicbrainz.org/artist/ee27b2d8-648c-4a9d-a68c-e55066959975",
       "https://www.youtube.com/channel/UCKrdjiuS66yXOdEZ_cOD_TA",
-      "https://www.wikidata.org/wiki/Q59268408"
+      "https://www.wikidata.org/wiki/Q59268408",
+      "https://itunes.apple.com/us/artist/id1258989914",
+      "https://music.apple.com/us/artist/1258989914"
     ],
     "externalIds": {
       "spotifyId": "181bsRPaVXVlUKXrxwZfHK",
       "youtubeChannelId": "UCKrdjiuS66yXOdEZ_cOD_TA",
       "musicbrainzId": "ee27b2d8-648c-4a9d-a68c-e55066959975",
-      "wikipediaArticleTitle": "Megan Thee Stallion"
+      "wikipediaArticleTitle": "Megan Thee Stallion",
+      "appleMusicArtistIds": [
+        "1258989914"
+      ]
     },
     "releases": [
       {
@@ -1940,12 +2190,16 @@
     "verifiedAt": "2026-10-14",
     "sources": [
       "https://musicbrainz.org/artist/7c2fd839-62ca-4787-b687-8a4067c48e24",
-      "https://www.youtube.com/channel/UCyixUe1QeV_H2p-MQgMu4Hg"
+      "https://www.youtube.com/channel/UCyixUe1QeV_H2p-MQgMu4Hg",
+      "https://music.apple.com/us/artist/1589625158"
     ],
     "externalIds": {
       "spotifyId": "1zEHBw7xQf0drXZagRkciU",
       "youtubeChannelId": "UCyixUe1QeV_H2p-MQgMu4Hg",
-      "musicbrainzId": "7c2fd839-62ca-4787-b687-8a4067c48e24"
+      "musicbrainzId": "7c2fd839-62ca-4787-b687-8a4067c48e24",
+      "appleMusicArtistIds": [
+        "1589625158"
+      ]
     },
     "releases": [
       {
@@ -1973,13 +2227,17 @@
     "sources": [
       "https://musicbrainz.org/artist/8971fa37-c402-474a-b897-e2bbc145b59d",
       "https://www.youtube.com/channel/UCrdPrDuDCbG8xayk5QkRLQA",
-      "https://www.wikidata.org/wiki/Q38459032"
+      "https://www.wikidata.org/wiki/Q38459032",
+      "https://music.apple.com/us/artist/991187319"
     ],
     "externalIds": {
       "spotifyId": "3tJoFztHeIJkJWMrx0td2f",
       "youtubeChannelId": "UCrdPrDuDCbG8xayk5QkRLQA",
       "musicbrainzId": "8971fa37-c402-474a-b897-e2bbc145b59d",
-      "wikipediaArticleTitle": "Moneybagg Yo"
+      "wikipediaArticleTitle": "Moneybagg Yo",
+      "appleMusicArtistIds": [
+        "991187319"
+      ]
     },
     "releases": [
       {
@@ -2007,13 +2265,19 @@
     "sources": [
       "https://musicbrainz.org/artist/418fe547-4bec-48fe-8df0-ed25e27f4570",
       "https://www.youtube.com/channel/UCuI48V3qSHZvZimYgFNJYJg",
-      "https://www.wikidata.org/wiki/Q28831246"
+      "https://www.wikidata.org/wiki/Q28831246",
+      "https://itunes.apple.com/us/artist/id1200089113",
+      "https://music.apple.com/fr/artist/1200089113",
+      "https://music.apple.com/gb/artist/1200089113"
     ],
     "externalIds": {
       "spotifyId": "7rkW85dBwwrJtlHRDkJDAC",
       "youtubeChannelId": "UCuI48V3qSHZvZimYgFNJYJg",
       "musicbrainzId": "418fe547-4bec-48fe-8df0-ed25e27f4570",
-      "wikipediaArticleTitle": "Nav (rapper)"
+      "wikipediaArticleTitle": "Nav (rapper)",
+      "appleMusicArtistIds": [
+        "1200089113"
+      ]
     },
     "releases": [
       {
@@ -2041,13 +2305,17 @@
     "sources": [
       "https://musicbrainz.org/artist/d2a36c92-546b-4b81-b31b-23e21d2ea6ee",
       "https://www.youtube.com/channel/UC3ytAKP00gWDkiOrcKfOwTQ",
-      "https://www.wikidata.org/wiki/Q125128094"
+      "https://www.wikidata.org/wiki/Q125128094",
+      "https://music.apple.com/gb/artist/1434427948"
     ],
     "externalIds": {
       "spotifyId": "3DHtfeD4PsmR9YGhCP4VF7",
       "youtubeChannelId": "UC3ytAKP00gWDkiOrcKfOwTQ",
       "musicbrainzId": "d2a36c92-546b-4b81-b31b-23e21d2ea6ee",
-      "wikipediaArticleTitle": "Nemzzz"
+      "wikipediaArticleTitle": "Nemzzz",
+      "appleMusicArtistIds": [
+        "1434427948"
+      ]
     },
     "releases": [
       {
@@ -2075,13 +2343,17 @@
     "sources": [
       "https://musicbrainz.org/artist/4585749c-5489-4699-9daf-1ffa9717179f",
       "https://www.youtube.com/channel/UC6CvS47L6uTuPSPhinE5jKA",
-      "https://www.wikidata.org/wiki/Q125255581"
+      "https://www.wikidata.org/wiki/Q125255581",
+      "https://music.apple.com/us/artist/1662047435"
     ],
     "externalIds": {
       "spotifyId": "2jl4qd6UbzeCmImT4nWbtA",
       "youtubeChannelId": "UC6CvS47L6uTuPSPhinE5jKA",
       "musicbrainzId": "4585749c-5489-4699-9daf-1ffa9717179f",
-      "wikipediaArticleTitle": "Nettspend"
+      "wikipediaArticleTitle": "Nettspend",
+      "appleMusicArtistIds": [
+        "1662047435"
+      ]
     },
     "releases": [
       {
@@ -2109,13 +2381,18 @@
     "sources": [
       "https://musicbrainz.org/artist/1036b808-f58c-4a3e-b461-a2c4492ecf1b",
       "https://www.youtube.com/channel/UC3jOd7GUMhpgJRBhiLzuLsg",
-      "https://www.wikidata.org/wiki/Q162202"
+      "https://www.wikidata.org/wiki/Q162202",
+      "https://music.apple.com/us/artist/278464538",
+      "https://itunes.apple.com/us/artist/id278464538"
     ],
     "externalIds": {
       "spotifyId": "0hCNtLu0JehylgoiP8L4Gh",
       "youtubeChannelId": "UC3jOd7GUMhpgJRBhiLzuLsg",
       "musicbrainzId": "1036b808-f58c-4a3e-b461-a2c4492ecf1b",
-      "wikipediaArticleTitle": "Nicki Minaj"
+      "wikipediaArticleTitle": "Nicki Minaj",
+      "appleMusicArtistIds": [
+        "278464538"
+      ]
     },
     "releases": [
       {
@@ -2168,13 +2445,17 @@
     "sources": [
       "https://musicbrainz.org/artist/2873b450-13c6-4ca1-8ca3-646c25af3202",
       "https://www.youtube.com/channel/UCWICXNlSLc7eeNazpzUZcLg",
-      "https://www.wikidata.org/wiki/Q64009351"
+      "https://www.wikidata.org/wiki/Q64009351",
+      "https://music.apple.com/us/artist/1449052753"
     ],
     "externalIds": {
       "spotifyId": "0ErzCpIMyLcjPiwT4elrtZ",
       "youtubeChannelId": "UCWICXNlSLc7eeNazpzUZcLg",
       "musicbrainzId": "2873b450-13c6-4ca1-8ca3-646c25af3202",
-      "wikipediaArticleTitle": "NLE Choppa"
+      "wikipediaArticleTitle": "NLE Choppa",
+      "appleMusicArtistIds": [
+        "1449052753"
+      ]
     },
     "releases": [
       {
@@ -2202,13 +2483,18 @@
     "sources": [
       "https://musicbrainz.org/artist/35214d53-009b-45d9-8a00-6664325b9e2a",
       "https://www.youtube.com/channel/UCyLjTgYrVIFO2_VSAEO43tA",
-      "https://www.wikidata.org/wiki/Q124338068"
+      "https://www.wikidata.org/wiki/Q124338068",
+      "https://music.apple.com/gb/artist/1580316111",
+      "https://music.apple.com/us/artist/1580316111"
     ],
     "externalIds": {
       "spotifyId": "0uj6QiPsPfK8ywLC7uwBE1",
       "youtubeChannelId": "UCyLjTgYrVIFO2_VSAEO43tA",
       "musicbrainzId": "35214d53-009b-45d9-8a00-6664325b9e2a",
-      "wikipediaArticleTitle": "OsamaSon"
+      "wikipediaArticleTitle": "OsamaSon",
+      "appleMusicArtistIds": [
+        "1580316111"
+      ]
     },
     "releases": [
       {
@@ -2239,13 +2525,17 @@
     "sources": [
       "https://musicbrainz.org/artist/2baf3276-ed6a-4349-8d2e-f4601e7b2167",
       "https://www.youtube.com/channel/UC652oRUvX1onwrrZ8ADJRPw",
-      "https://www.wikidata.org/wiki/Q27671080"
+      "https://www.wikidata.org/wiki/Q27671080",
+      "https://music.apple.com/us/artist/982372505"
     ],
     "externalIds": {
       "spotifyId": "699OTQXzgjhIYAHMy9RyPD",
       "youtubeChannelId": "UC652oRUvX1onwrrZ8ADJRPw",
       "musicbrainzId": "2baf3276-ed6a-4349-8d2e-f4601e7b2167",
-      "wikipediaArticleTitle": "Playboi Carti"
+      "wikipediaArticleTitle": "Playboi Carti",
+      "appleMusicArtistIds": [
+        "982372505"
+      ]
     },
     "releases": [
       {
@@ -2266,13 +2556,18 @@
     "sources": [
       "https://musicbrainz.org/artist/7e1e5648-1d6a-4248-975a-98603e781848",
       "https://www.youtube.com/channel/UC0ifXd2AVf1LMYbqwB5GH4g",
-      "https://www.wikidata.org/wiki/Q62953486"
+      "https://www.wikidata.org/wiki/Q62953486",
+      "https://music.apple.com/us/artist/1159371412",
+      "https://music.apple.com/gb/artist/1159371412"
     ],
     "externalIds": {
       "spotifyId": "6AgTAQt8XS6jRWi4sX7w49",
       "youtubeChannelId": "UC0ifXd2AVf1LMYbqwB5GH4g",
       "musicbrainzId": "7e1e5648-1d6a-4248-975a-98603e781848",
-      "wikipediaArticleTitle": "Polo G"
+      "wikipediaArticleTitle": "Polo G",
+      "appleMusicArtistIds": [
+        "1159371412"
+      ]
     },
     "releases": [
       {
@@ -2300,13 +2595,18 @@
     "sources": [
       "https://musicbrainz.org/artist/82cc5b8b-22e8-48e3-9f97-6ab39ac316d6",
       "https://www.youtube.com/channel/UCTBIIbIs83IBsy4E1BQxYBw",
-      "https://www.wikidata.org/wiki/Q105105274"
+      "https://www.wikidata.org/wiki/Q105105274",
+      "https://itunes.apple.com/us/artist/id1456620250",
+      "https://music.apple.com/us/artist/1456620250"
     ],
     "externalIds": {
       "spotifyId": "5F1aAS1duwlzExnPs3l2Xe",
       "youtubeChannelId": "UCTBIIbIs83IBsy4E1BQxYBw",
       "musicbrainzId": "82cc5b8b-22e8-48e3-9f97-6ab39ac316d6",
-      "wikipediaArticleTitle": "Pooh Shiesty"
+      "wikipediaArticleTitle": "Pooh Shiesty",
+      "appleMusicArtistIds": [
+        "1456620250"
+      ]
     },
     "releases": [
       {
@@ -2334,13 +2634,17 @@
     "sources": [
       "https://musicbrainz.org/artist/b7ea87e2-edfc-427f-a766-83c65c01166c",
       "https://www.youtube.com/channel/UCLcp1xz2_QEPW3CqGv5536A",
-      "https://www.wikidata.org/wiki/Q135972596"
+      "https://www.wikidata.org/wiki/Q135972596",
+      "https://music.apple.com/gb/artist/1755650335"
     ],
     "externalIds": {
       "spotifyId": "3J3ngZn7GjzjwCPBkqtz65",
       "youtubeChannelId": "UCLcp1xz2_QEPW3CqGv5536A",
       "musicbrainzId": "b7ea87e2-edfc-427f-a766-83c65c01166c",
-      "wikipediaArticleTitle": "Prettifun"
+      "wikipediaArticleTitle": "Prettifun",
+      "appleMusicArtistIds": [
+        "1755650335"
+      ]
     },
     "releases": [
       {
@@ -2368,13 +2672,17 @@
     "sources": [
       "https://musicbrainz.org/artist/6143403a-df6c-429e-8ee6-ef869896b0da",
       "https://www.youtube.com/channel/UCU_xT0uVi5cku7cg9hDgkMA",
-      "https://www.wikidata.org/wiki/Q30072039"
+      "https://www.wikidata.org/wiki/Q30072039",
+      "https://music.apple.com/us/artist/673556643"
     ],
     "externalIds": {
       "spotifyId": "0VRj0yCOv2FXJNP47XQnx5",
       "youtubeChannelId": "UCU_xT0uVi5cku7cg9hDgkMA",
       "musicbrainzId": "6143403a-df6c-429e-8ee6-ef869896b0da",
-      "wikipediaArticleTitle": "Quavo"
+      "wikipediaArticleTitle": "Quavo",
+      "appleMusicArtistIds": [
+        "673556643"
+      ]
     },
     "releases": [
       {
@@ -2402,13 +2710,17 @@
     "sources": [
       "https://musicbrainz.org/artist/cb3d3e49-bf08-4cdb-bfa8-4dc7c458cea1",
       "https://www.youtube.com/channel/UCenjunBhBhvKjfDAESnoppw",
-      "https://www.wikidata.org/wiki/Q78754352"
+      "https://www.wikidata.org/wiki/Q78754352",
+      "https://music.apple.com/us/artist/1140623439"
     ],
     "externalIds": {
       "spotifyId": "45TgXXqMDdF8BkjA83OM7z",
       "youtubeChannelId": "UCenjunBhBhvKjfDAESnoppw",
       "musicbrainzId": "cb3d3e49-bf08-4cdb-bfa8-4dc7c458cea1",
-      "wikipediaArticleTitle": "Rod Wave"
+      "wikipediaArticleTitle": "Rod Wave",
+      "appleMusicArtistIds": [
+        "1140623439"
+      ]
     },
     "releases": [
       {
@@ -2436,13 +2748,17 @@
     "sources": [
       "https://musicbrainz.org/artist/5e934be9-8295-4215-a60f-f5f2386179a3",
       "https://www.youtube.com/channel/UCfUGy8RvgutYIJ5uOE-Rgcg",
-      "https://www.wikidata.org/wiki/Q39086692"
+      "https://www.wikidata.org/wiki/Q39086692",
+      "https://music.apple.com/us/artist/1024252053"
     ],
     "externalIds": {
       "spotifyId": "7GuUYiGZOzQwq4L6gAfy1T",
       "youtubeChannelId": "UCfUGy8RvgutYIJ5uOE-Rgcg",
       "musicbrainzId": "5e934be9-8295-4215-a60f-f5f2386179a3",
-      "wikipediaArticleTitle": "SahBabii"
+      "wikipediaArticleTitle": "SahBabii",
+      "appleMusicArtistIds": [
+        "1024252053"
+      ]
     },
     "releases": [
       {
@@ -2470,13 +2786,17 @@
     "sources": [
       "https://musicbrainz.org/artist/0953d634-b964-4f2a-b862-8de475aeaf47",
       "https://www.youtube.com/channel/UC28rc3PHWPJib68G-VqpJ3w",
-      "https://www.wikidata.org/wiki/Q119842023"
+      "https://www.wikidata.org/wiki/Q119842023",
+      "https://music.apple.com/us/artist/1409330762"
     ],
     "externalIds": {
       "spotifyId": "3DbwFQlvLxRSi2uX8mf81A",
       "youtubeChannelId": "UC28rc3PHWPJib68G-VqpJ3w",
       "musicbrainzId": "0953d634-b964-4f2a-b862-8de475aeaf47",
-      "wikipediaArticleTitle": "Sexyy Red"
+      "wikipediaArticleTitle": "Sexyy Red",
+      "appleMusicArtistIds": [
+        "1409330762"
+      ]
     },
     "releases": [
       {
@@ -2503,12 +2823,16 @@
     "verifiedAt": "2026-10-14",
     "sources": [
       "https://musicbrainz.org/artist/7edb1ae1-770e-499a-a8be-cbd0c144516c",
-      "https://www.youtube.com/channel/UCMFP3cGDPvKhdaqhmdXmzQg"
+      "https://www.youtube.com/channel/UCMFP3cGDPvKhdaqhmdXmzQg",
+      "https://music.apple.com/us/artist/1564997362"
     ],
     "externalIds": {
       "spotifyId": "3qdQnBjEBHrk5nZYxXdV1U",
       "youtubeChannelId": "UCMFP3cGDPvKhdaqhmdXmzQg",
-      "musicbrainzId": "7edb1ae1-770e-499a-a8be-cbd0c144516c"
+      "musicbrainzId": "7edb1ae1-770e-499a-a8be-cbd0c144516c",
+      "appleMusicArtistIds": [
+        "1564997362"
+      ]
     },
     "releases": [
       {
@@ -2536,13 +2860,18 @@
     "sources": [
       "https://musicbrainz.org/artist/cfa0e221-4717-4281-bff3-46c88d45bf93",
       "https://www.youtube.com/channel/UCivyc3VgQwCqqlr6SlnKQSw",
-      "https://www.wikidata.org/wiki/Q138955322"
+      "https://www.wikidata.org/wiki/Q138955322",
+      "https://music.apple.com/gb/artist/1676805496",
+      "https://music.apple.com/us/artist/1676805496"
     ],
     "externalIds": {
       "spotifyId": "0SL3lfuoRP67mrvkdnwIMA",
       "youtubeChannelId": "UCivyc3VgQwCqqlr6SlnKQSw",
       "musicbrainzId": "cfa0e221-4717-4281-bff3-46c88d45bf93",
-      "wikipediaArticleTitle": "Slayr"
+      "wikipediaArticleTitle": "Slayr",
+      "appleMusicArtistIds": [
+        "1676805496"
+      ]
     },
     "releases": [
       {
@@ -2569,12 +2898,16 @@
     "verifiedAt": "2026-10-14",
     "sources": [
       "https://musicbrainz.org/artist/049bd25f-bf79-4bb5-8a0f-ad2e1d91a4f9",
-      "https://www.youtube.com/channel/UC9dJBYOZY3ukxv39LM-EeuQ"
+      "https://www.youtube.com/channel/UC9dJBYOZY3ukxv39LM-EeuQ",
+      "https://music.apple.com/us/artist/1615285313"
     ],
     "externalIds": {
       "spotifyId": "6hpztnbgmaneFFGGnEOVjd",
       "youtubeChannelId": "UC9dJBYOZY3ukxv39LM-EeuQ",
-      "musicbrainzId": "049bd25f-bf79-4bb5-8a0f-ad2e1d91a4f9"
+      "musicbrainzId": "049bd25f-bf79-4bb5-8a0f-ad2e1d91a4f9",
+      "appleMusicArtistIds": [
+        "1615285313"
+      ]
     },
     "releases": [
       {
@@ -2604,13 +2937,18 @@
     "sources": [
       "https://musicbrainz.org/artist/fc815f2a-7aea-4a3b-a255-c81661526446",
       "https://www.youtube.com/channel/UCO8Ta3wYCs3rW_4F4W0U2sA",
-      "https://www.wikidata.org/wiki/Q113961820"
+      "https://www.wikidata.org/wiki/Q113961820",
+      "https://itunes.apple.com/us/artist/id1477540355",
+      "https://music.apple.com/us/artist/1477540355"
     ],
     "externalIds": {
       "spotifyId": "1xgl9yxqIVq8PEEMai38uV",
       "youtubeChannelId": "UCO8Ta3wYCs3rW_4F4W0U2sA",
       "musicbrainzId": "fc815f2a-7aea-4a3b-a255-c81661526446",
-      "wikipediaArticleTitle": "Tana (rapper)"
+      "wikipediaArticleTitle": "Tana (rapper)",
+      "appleMusicArtistIds": [
+        "1477540355"
+      ]
     },
     "releases": [
       {
@@ -2637,12 +2975,16 @@
     "verifiedAt": "2026-10-14",
     "sources": [
       "https://musicbrainz.org/artist/1753124e-e4be-4dba-9741-5e50e4dc351f",
-      "https://www.youtube.com/channel/UCFm3d7z74iCkyaD5u1YX1Jw"
+      "https://www.youtube.com/channel/UCFm3d7z74iCkyaD5u1YX1Jw",
+      "https://music.apple.com/us/artist/1378027228"
     ],
     "externalIds": {
       "spotifyId": "3YQEnGNd8ooVyyhjnuwQIm",
       "youtubeChannelId": "UCFm3d7z74iCkyaD5u1YX1Jw",
-      "musicbrainzId": "1753124e-e4be-4dba-9741-5e50e4dc351f"
+      "musicbrainzId": "1753124e-e4be-4dba-9741-5e50e4dc351f",
+      "appleMusicArtistIds": [
+        "1378027228"
+      ]
     },
     "releases": [
       {
@@ -2669,12 +3011,16 @@
     "verifiedAt": "2026-10-14",
     "sources": [
       "https://musicbrainz.org/artist/77f28f00-887d-4d8a-a537-1a26ae6b9862",
-      "https://www.youtube.com/channel/UCoxF3OvdsCBkpBhJO9xsj2g"
+      "https://www.youtube.com/channel/UCoxF3OvdsCBkpBhJO9xsj2g",
+      "https://music.apple.com/gb/artist/1351019310"
     ],
     "externalIds": {
       "spotifyId": "20B8Ga2HfEUNJBAbZsJU2c",
       "youtubeChannelId": "UCoxF3OvdsCBkpBhJO9xsj2g",
-      "musicbrainzId": "77f28f00-887d-4d8a-a537-1a26ae6b9862"
+      "musicbrainzId": "77f28f00-887d-4d8a-a537-1a26ae6b9862",
+      "appleMusicArtistIds": [
+        "1351019310"
+      ]
     },
     "releases": [
       {
@@ -2702,13 +3048,18 @@
     "sources": [
       "https://musicbrainz.org/artist/e4a51f17-a57b-47b1-b37b-f552d0f8e9e6",
       "https://www.youtube.com/channel/UCtxdfwb9wfkoGocVUAJ-Bmg",
-      "https://www.wikidata.org/wiki/Q13605596"
+      "https://www.wikidata.org/wiki/Q13605596",
+      "https://music.apple.com/us/artist/549236696",
+      "https://music.apple.com/gb/artist/549236696"
     ],
     "externalIds": {
       "spotifyId": "0Y5tJX1MQlPlqiwlOH1tJY",
       "youtubeChannelId": "UCtxdfwb9wfkoGocVUAJ-Bmg",
       "musicbrainzId": "e4a51f17-a57b-47b1-b37b-f552d0f8e9e6",
-      "wikipediaArticleTitle": "Travis Scott"
+      "wikipediaArticleTitle": "Travis Scott",
+      "appleMusicArtistIds": [
+        "549236696"
+      ]
     },
     "releases": [
       {
@@ -2736,13 +3087,17 @@
     "sources": [
       "https://musicbrainz.org/artist/f6beac20-5dfe-4d1f-ae02-0b0a740aafd6",
       "https://www.youtube.com/channel/UCsQBsZJltmLzlsJNG7HevBg",
-      "https://www.wikidata.org/wiki/Q167635"
+      "https://www.wikidata.org/wiki/Q167635",
+      "https://music.apple.com/us/artist/420368335"
     ],
     "externalIds": {
       "spotifyId": "4V8LLVI7PbaPR0K2TGSxFF",
       "youtubeChannelId": "UCsQBsZJltmLzlsJNG7HevBg",
       "musicbrainzId": "f6beac20-5dfe-4d1f-ae02-0b0a740aafd6",
-      "wikipediaArticleTitle": "Tyler, the Creator"
+      "wikipediaArticleTitle": "Tyler, the Creator",
+      "appleMusicArtistIds": [
+        "420368335"
+      ]
     },
     "releases": [
       {
@@ -2770,13 +3125,18 @@
     "sources": [
       "https://musicbrainz.org/artist/155cfd40-dcde-471e-acc0-32179916165c",
       "https://www.youtube.com/channel/UCD_4DgHwrNDp63NDfqXaHJQ",
-      "https://www.wikidata.org/wiki/Q122731572"
+      "https://www.wikidata.org/wiki/Q122731572",
+      "https://music.apple.com/us/artist/1540848340",
+      "https://music.apple.com/gb/artist/1540848340"
     ],
     "externalIds": {
       "spotifyId": "2oM7LMPFu882oC6jSwEqjd",
       "youtubeChannelId": "UCD_4DgHwrNDp63NDfqXaHJQ",
       "musicbrainzId": "155cfd40-dcde-471e-acc0-32179916165c",
-      "wikipediaArticleTitle": "Xaviersobased"
+      "wikipediaArticleTitle": "Xaviersobased",
+      "appleMusicArtistIds": [
+        "1540848340"
+      ]
     },
     "releases": [
       {
@@ -2808,13 +3168,20 @@
     "sources": [
       "https://musicbrainz.org/artist/164f0d73-1234-4e2c-8743-d77bf2191051",
       "https://www.youtube.com/channel/UCs6eXM7s8Vl5WcECcRHc2qQ",
-      "https://www.wikidata.org/wiki/Q15935"
+      "https://www.wikidata.org/wiki/Q15935",
+      "https://itunes.apple.com/us/artist/id2715720",
+      "https://music.apple.com/us/artist/1714710847",
+      "https://music.apple.com/us/artist/2715720"
     ],
     "externalIds": {
       "spotifyId": "5K4W6rqBFWDnAN6FQUkS6x",
       "youtubeChannelId": "UCs6eXM7s8Vl5WcECcRHc2qQ",
       "musicbrainzId": "164f0d73-1234-4e2c-8743-d77bf2191051",
-      "wikipediaArticleTitle": "Kanye West"
+      "wikipediaArticleTitle": "Kanye West",
+      "appleMusicArtistIds": [
+        "2715720",
+        "1714710847"
+      ]
     },
     "releases": [
       {
@@ -2844,13 +3211,17 @@
     "sources": [
       "https://musicbrainz.org/artist/9e6a6a2f-f696-4cc0-87f1-e4f712e46802",
       "https://www.youtube.com/channel/UCV4UK9LNNLViFP4qZA_Wmfw",
-      "https://www.wikidata.org/wiki/Q108761978"
+      "https://www.wikidata.org/wiki/Q108761978",
+      "https://music.apple.com/us/artist/1318094493"
     ],
     "externalIds": {
       "spotifyId": "3qiHUAX7zY4Qnjx8TNUzVx",
       "youtubeChannelId": "UCV4UK9LNNLViFP4qZA_Wmfw",
       "musicbrainzId": "9e6a6a2f-f696-4cc0-87f1-e4f712e46802",
-      "wikipediaArticleTitle": "Yeat"
+      "wikipediaArticleTitle": "Yeat",
+      "appleMusicArtistIds": [
+        "1318094493"
+      ]
     },
     "releases": [
       {
@@ -2878,13 +3249,18 @@
     "sources": [
       "https://musicbrainz.org/artist/79c9b9a6-4b78-4738-8b81-95b066321ea9",
       "https://www.youtube.com/channel/UCQUsq24C0yX_ezzQYj2IjXw",
-      "https://www.wikidata.org/wiki/Q62036530"
+      "https://www.wikidata.org/wiki/Q62036530",
+      "https://itunes.apple.com/us/artist/id898005271",
+      "https://music.apple.com/gb/artist/898005271"
     ],
     "externalIds": {
       "spotifyId": "5yPzzu25VzEk8qrGTLIrE1",
       "youtubeChannelId": "UCQUsq24C0yX_ezzQYj2IjXw",
       "musicbrainzId": "79c9b9a6-4b78-4738-8b81-95b066321ea9",
-      "wikipediaArticleTitle": "Young Nudy"
+      "wikipediaArticleTitle": "Young Nudy",
+      "appleMusicArtistIds": [
+        "898005271"
+      ]
     },
     "releases": [
       {
@@ -2915,13 +3291,17 @@
       "https://musicbrainz.org/artist/800760de-bdf8-43a2-8fe0-44a2401a5515",
       "https://www.youtube.com/channel/UCuwdplPbuTFZj_64d03tSBA",
       "https://www.wikidata.org/wiki/Q15637814",
-      "https://pitchfork.com/reviews/albums/young-stoner-life-young-thug-slime-language-3/"
+      "https://pitchfork.com/reviews/albums/young-stoner-life-young-thug-slime-language-3/",
+      "https://music.apple.com/us/artist/81886939"
     ],
     "externalIds": {
       "spotifyId": "50co4Is1HCEo8bhOyUWKpn",
       "youtubeChannelId": "UCuwdplPbuTFZj_64d03tSBA",
       "musicbrainzId": "800760de-bdf8-43a2-8fe0-44a2401a5515",
-      "wikipediaArticleTitle": "Young Thug"
+      "wikipediaArticleTitle": "Young Thug",
+      "appleMusicArtistIds": [
+        "81886939"
+      ]
     },
     "releases": [
       {
@@ -2962,13 +3342,17 @@
     "sources": [
       "https://musicbrainz.org/artist/127d8614-0876-4408-886c-6f110b047a78",
       "https://www.youtube.com/channel/UClW4jraMKz6Qj69lJf-tODA",
-      "https://www.wikidata.org/wiki/Q36490532"
+      "https://www.wikidata.org/wiki/Q36490532",
+      "https://music.apple.com/us/artist/1168822104"
     ],
     "externalIds": {
       "spotifyId": "7wlFDEWiM5OoIAt8RSli8b",
       "youtubeChannelId": "UClW4jraMKz6Qj69lJf-tODA",
       "musicbrainzId": "127d8614-0876-4408-886c-6f110b047a78",
-      "wikipediaArticleTitle": "YoungBoy Never Broke Again"
+      "wikipediaArticleTitle": "YoungBoy Never Broke Again",
+      "appleMusicArtistIds": [
+        "1168822104"
+      ]
     },
     "releases": [
       {

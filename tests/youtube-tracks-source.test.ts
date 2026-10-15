@@ -33,7 +33,7 @@ describe("recording-level audience velocity", () => {
     const result = await collect(120000);
     expect(result.signals.Skrilla.stats.youtubeGrowth).toBeGreaterThan(0);
     expect(result.signals["1900Rugrat"].stats).toEqual(result.signals.Skrilla.stats);
-    expect(result.observations).toHaveLength(2);
+    expect(result.observations).toHaveLength(4);
     expect(result.observations[0].rawPayload.likes).toBe(0);
     expect(result.observations[0].rawPayload.comments).toBeNull();
   });
@@ -44,7 +44,7 @@ describe("recording-level audience velocity", () => {
   it("establishes a first baseline without inventing a rate", async () => {
     const result = await collect(120000, {});
     expect(result.signals.Skrilla.stats).toEqual({});
-    expect(result.observations).toHaveLength(2);
+    expect(result.observations).toHaveLength(4);
   });
   it("reduces confidence when the comparison has few rate samples", async () => {
     const full = await collect(120000);
@@ -67,4 +67,17 @@ it.each([null, "", " ", false, "NaN", "-1", "1.5"])("rejects malformed view coun
     fetchImpl: async () => Response.json({ items: [{ id: "abcdefghijk", snippet: { channelId: "UCofficial" }, statistics: { viewCount } }] }) });
   expect(result.observations).toHaveLength(0);
   expect(result.signals).toEqual({});
+});
+
+it("retains available engagement counters without inventing missing values or changing view momentum", async () => {
+  const result = await collectYoutubeTrackSignals({ artists, events, runDate: "2026-09-14", apiKey: "test",
+    fetchImpl: async () => Response.json({ items: [{ id: "abcdefghijk", snippet: { channelId: "UCofficial" },
+      statistics: { viewCount: "120000", likeCount: "2300", commentCount: "90" } }] }) });
+  expect(result.signals.Skrilla.stats).toEqual({});
+  expect(result.observations.filter(o => o.artistId === "Skrilla").map(o => [o.metric, o.value])).toEqual([
+    ["views_abcdefghijk", 120000], ["likes_abcdefghijk", 2300], ["comments_abcdefghijk", 90]
+  ]);
+  const unavailable = await collect(120000, {});
+  expect(unavailable.observations.some(o => o.metric === "comments_abcdefghijk")).toBe(false);
+  expect(unavailable.observations.find(o => o.metric === "likes_abcdefghijk")?.value).toBe(0);
 });

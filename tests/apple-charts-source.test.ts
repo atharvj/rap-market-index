@@ -14,7 +14,7 @@ function chart(rank = 10) {
   })) } };
 }
 const prior = { Skrilla: { scores: { us: 91, gb: 91, ca: 91 } } };
-const collect = (payload = chart(), previous: Record<string, Record<string, unknown>> = prior) => collectAppleChartSignals({ artists, runDate: "2026-09-14", previous, fetchImpl: async () => Response.json(payload) });
+const collect = (payload = chart(), previous: Record<string, Record<string, unknown>> = prior) => collectAppleChartSignals({ artists, runDate: "2026-09-14", previous, includeAlbums: false, fetchImpl: async () => Response.json(payload) });
 
 describe("Apple Music chart observations", () => {
   it("seeds a baseline without inventing a change and credits only performers", async () => {
@@ -46,7 +46,7 @@ describe("Apple Music chart observations", () => {
     for (const payload of [stale, duplicate, invalid]) expect((await collect(payload)).observations).toHaveLength(0);
   });
   it("compares only countries with valid observations on both dates", async () => {
-    const result = await collectAppleChartSignals({ artists, runDate: "2026-09-14", previous: prior,
+    const result = await collectAppleChartSignals({ artists, runDate: "2026-09-14", previous: prior, includeAlbums: false,
       fetchImpl: async url => String(url).includes("/us/") ? Response.json(chart(1)) : new Response("Unavailable", { status: 503 }) });
     expect(result.signals.Skrilla.stats.streamingGrowth).toBeCloseTo(1.08);
     expect(result.signals.Skrilla.rawPayload.scores).toEqual({ us: 100 });
@@ -64,4 +64,62 @@ it("does not replace a newer saved chart with an older provider snapshot", async
   } } });
   expect(result.signals.Skrilla).toBeUndefined();
   expect(result.observations.some(row => row.artistId === "Skrilla")).toBe(false);
+});
+
+function albumChart(rank = 10) {
+  const payload = chart(rank);
+  payload.feed.results = payload.feed.results.map(entry => ({ ...entry, name: "Album (feat. BabyChiefDoIt)",
+    url: `https://music.apple.com/us/album/record/${entry.id}` }));
+  return payload;
+}
+const combinedFetch = (songRank = 10, albumRank = 10): typeof fetch => async input =>
+  Response.json(String(input).endsWith("/albums.json") ? albumChart(albumRank) : chart(songRank));
+
+describe("album chart coverage", () => {
+  it("adds a separate album baseline without changing song points or inventing an album rally", async () => {
+    const result = await collectAppleChartSignals({ artists, runDate: "2026-09-14", previous: prior, fetchImpl: combinedFetch() });
+    expect(result.signals.Skrilla.stats.streamingGrowth).toBe(0);
+    expect(result.observations.find(o => o.artistId === "Skrilla" && o.metric === "chart_points")?.value).toBe(273);
+    expect(result.observations.find(o => o.artistId === "Skrilla" && o.metric === "album_chart_points")?.value).toBe(273);
+    expect(result.signals.BabyChiefDoIt.rawPayload.albums).toEqual([]);
+    expect((result.signals.Skrilla.rawPayload.albums as unknown[])).toHaveLength(3);
+  });
+  it("measures an album rank change only against an existing album baseline", async () => {
+    const first = await collectAppleChartSignals({ artists, runDate: "2026-09-14", fetchImpl: combinedFetch() });
+    const previous = Object.fromEntries(Object.entries(first.signals).map(([id, signal]) => [id, signal.rawPayload]));
+    const second = await collectAppleChartSignals({ artists, runDate: "2026-09-14", previous, fetchImpl: combinedFetch(10, 1) });
+    expect(second.signals.Skrilla.stats.streamingGrowth).toBeCloseTo(0.54);
+  });
+  it("retains an album-only snapshot during song-feed failures without creating song exits", async () => {
+    const result = await collectAppleChartSignals({ artists, runDate: "2026-09-14", previous: prior,
+      fetchImpl: async input => String(input).endsWith("/albums.json") ? Response.json(albumChart()) : new Response("Unavailable", { status: 503 }) });
+    expect(result.signals.Skrilla.stats).toEqual({});
+    expect(result.signals.Skrilla.rawPayload.scores).toEqual({ "us:albums": 91, "gb:albums": 91, "ca:albums": 91 });
+    expect(result.observations.some(o => o.metric === "chart_points")).toBe(false);
+    expect(result.observations.some(o => o.metric === "chart_snapshot")).toBe(true);
+  });
+  it("does not publish a smaller regional sum when a country feed fails", async () => {
+    const result = await collectAppleChartSignals({ artists, runDate: "2026-09-14", previous: prior,
+      fetchImpl: async input => String(input).includes("/us/") ? combinedFetch()(input) : new Response("Unavailable", { status: 503 }) });
+    expect(result.observations.every(o => o.metric === "chart_snapshot")).toBe(true);
+    expect(result.signals.Skrilla.stats.streamingGrowth).toBe(0);
+  });
+  it("rejects a solo namesake with a different verified provider ID", async () => {
+    const thug = { ...artists[0], id: "young-thug", name: "Young Thug" };
+    const payload = chart(); payload.feed.results[9].artistName = "Young Thug";
+    const result = await collectAppleChartSignals({ artists: [thug], runDate: "2026-09-14", includeAlbums: false, fetchImpl: async () => Response.json(payload) });
+    expect(result.signals[thug.id].rawPayload.tracks).toEqual([]);
+  });
+});
+
+it("retains legitimate Various Artists compilation ranks without inventing performer credits", async () => {
+  const payload = albumChart();
+  Object.assign(payload.feed.results[0], { artistName: "Various Artists", name: "Skrilla Greatest Hits", artistId: undefined, artistUrl: undefined });
+  const result = await collectAppleChartSignals({ artists, runDate: "2026-09-14",
+    fetchImpl: async input => Response.json(String(input).endsWith("/albums.json") ? payload : chart()) });
+  expect(result.warnings).toEqual([]);
+  expect(result.observations.find(o => o.artistId === "Skrilla" && o.metric === "album_chart_points")?.value).toBe(273);
+  Object.assign(payload.feed.results[0], { artistName: "Skrilla" });
+  const invalid = await collectAppleChartSignals({ artists, runDate: "2026-09-14", fetchImpl: async () => Response.json(payload) });
+  expect(invalid.observations).toHaveLength(0);
 });

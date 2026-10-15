@@ -16,6 +16,8 @@ const preferredSeries = [
   { key: "youtube:subscriber_count", label: "YouTube Subscribers · Total" },
   { key: "youtube:channel_views", label: "YouTube Views · Lifetime" },
   { key: "wikimedia:pageviews_7d", label: "Wikipedia Attention · 7D" },
+  { key: "apple_charts:chart_points", label: "Apple Song Chart Points" },
+  { key: "apple_charts:album_chart_points", label: "Apple Album Chart Points" },
   { key: "media_rss:source_count", label: "Media Sources · 30D" },
   { key: "trade_flow:unique_trader_count", label: "Active Traders · 24H" },
   { key: "trade_flow:trade_count", label: "Orders · 24H" },
@@ -120,6 +122,7 @@ export function ArtistAudienceSnapshot({ artistId }: { artistId: string }) {
       </div>
       {metrics.some(metric => metric.key.startsWith("youtube_comments:")) ? <p className="border-t border-line px-4 py-3 text-xs text-paper/48">Reactions come from a limited sample of recent YouTube comments, not all fans. Unclassified comments are included in the sample count. Listening and touring can remain strong despite negative reactions.</p> : null}
       {metrics.some(metric => metric.key.startsWith("bluesky:")) ? <p className="border-t border-line px-4 py-3 text-xs text-paper/48">Social sentiment samples identifiable reactions, not all fans. Scores range from −100 to +100. Announcements without an opinion do not count as approval.</p> : null}
+      {metrics.some(metric => metric.key.startsWith("apple_charts:")) ? <p className="border-t border-line px-4 py-3 text-xs text-paper/48">Chart points summarize US, UK, and Canada rank positions, not stream counts. Song and album charts share one provider.</p> : null}
     </section>
   );
 }

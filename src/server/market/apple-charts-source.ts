@@ -2,88 +2,113 @@ import { clamp } from "@/lib/pricing";
 import type { MarketUpdateArtist } from "@/server/market/daily-update";
 import type { AdapterSignals, MarketObservation } from "@/server/market/market-data";
 import { resolveRecordingArtists } from "@/server/market/recording-credits";
+import { getArtistTrackingProfile, getTrackingAliases, normalizeTrackingText } from "@/server/market/artist-tracking";
 import { getMarketDate } from "@/server/market/market-date";
 
-type ChartEntry = { id: string; name: string; artistName: string; artistId: string; artistUrl: string; url: string; genres?: Array<{ genreId: string }> };
+type ChartKind = "songs" | "albums";
+type ChartEntry = { id: string; name: string; artistName: string; artistId?: string; artistUrl?: string; url: string; kind?: string; genres?: Array<{ genreId: string }> };
 type PreviousCharts = Record<string, Record<string, unknown>>;
+type Chart = { storefront: string; kind: ChartKind; updated: string; entries: ChartEntry[] };
 const STOREFRONTS = ["us", "gb", "ca"];
 
-export async function collectAppleChartSignals({ artists, runDate, previous = {}, fetchImpl = fetch }: {
-  artists: MarketUpdateArtist[]; runDate: string; previous?: PreviousCharts; fetchImpl?: typeof fetch;
+export async function collectAppleChartSignals({ artists, runDate, previous = {}, includeAlbums = true, fetchImpl = fetch }: {
+  artists: MarketUpdateArtist[]; runDate: string; previous?: PreviousCharts; includeAlbums?: boolean; fetchImpl?: typeof fetch;
 }) {
-  const signals: AdapterSignals = {};
-  const observations: MarketObservation[] = [];
-  const warnings: string[] = [];
-  const charts: Record<string, { updated: string; entries: ChartEntry[] }> = {};
-  for (const storefront of STOREFRONTS) {
+  const signals: AdapterSignals = {}, observations: MarketObservation[] = [], warnings: string[] = [];
+  const charts: Record<string, Chart> = {};
+  const specs = STOREFRONTS.flatMap(storefront => (includeAlbums ? ["songs", "albums"] : ["songs"]).map(kind => ({ storefront, kind: kind as ChartKind })));
+  await Promise.all(specs.map(async ({ storefront, kind }) => {
     try {
-      const payload = await fetchChart(storefront, fetchImpl);
-      const entries = payload.feed?.results;
-      const updated = payload.feed?.updated;
+      const payload = await fetchChart(storefront, kind, fetchImpl);
+      const entries = payload.feed?.results, updated = payload.feed?.updated;
       const updatedTime = Date.parse(updated);
       const chartDate = Number.isFinite(updatedTime) ? getMarketDate(new Date(updatedTime)) : "";
       const age = Date.parse(runDate) - Date.parse(chartDate);
       if (!Array.isArray(entries) || entries.length !== 100 || !Number.isFinite(age) || age < 0 || age > 3 * 86400000 ||
-        !entries.every(validEntry) || new Set(entries.map(e => e.id)).size !== 100) throw new Error("Incomplete, stale or invalid chart");
-      charts[storefront] = { updated, entries };
-    } catch (error) { warnings.push(`Apple Music ${storefront} chart unavailable: ${error instanceof Error ? error.message : "request failed"}`); }
-  }
-  const credits = Object.fromEntries(Object.entries(charts).map(([country, chart]) => [country, chart.entries.map((entry, index) => ({
-    ...entry, rank: index + 1,
-    artists: resolveRecordingArtists({ title: `${entry.artistName} - ${entry.name}`, primaryArtistId: "", artists })
-      .filter(artist => artist.name.length > 3 || entry.genres?.some(genre => genre.genreId === "18"))
+        !entries.every((entry: ChartEntry) => validEntry(entry, kind)) || new Set(entries.map((entry: ChartEntry) => entry.id)).size !== 100) throw new Error("Incomplete, stale or invalid chart");
+      // Preserve existing song keys so adding albums cannot invent a chart move.
+      charts[kind === "songs" ? storefront : `${storefront}:albums`] = { storefront, kind, updated, entries };
+    } catch (error) { warnings.push(`Apple Music ${storefront} ${kind} chart unavailable: ${error instanceof Error ? error.message : "request failed"}`); }
+  }));
+  const credits = Object.fromEntries(Object.entries(charts).map(([key, chart]) => [key, chart.entries.map((entry, index) => ({
+    ...entry, rank: index + 1, artists: resolveChartArtists(entry, chart.kind, artists)
   }))]));
   for (const artist of artists) {
-    const current: Record<string, number> = {};
-    const deltas: number[] = [];
-    const tracks: Array<{ storefront: string; id: string; title: string; rank: number; url: string }> = [];
+    const current: Record<string, number> = {}, deltas: number[] = [];
+    const tracks: Array<Record<string, unknown>> = [], albums: Array<Record<string, unknown>> = [];
     const priorScores = previous[artist.id]?.scores as Record<string, number> | undefined;
-    for (const [country, entries] of Object.entries(credits)) {
-      const previousUpdated = (previous[artist.id]?.chartUpdatedAt as Record<string, string> | undefined)?.[country];
-      if (previousUpdated && Date.parse(charts[country].updated) < Date.parse(previousUpdated)) {
-        warnings.push(`Apple Music ${country} chart predates the saved observation for ${artist.ticker}.`);
+    for (const [key, entries] of Object.entries(credits)) {
+      const chart = charts[key];
+      const previousUpdated = (previous[artist.id]?.chartUpdatedAt as Record<string, string> | undefined)?.[key];
+      if (previousUpdated && Date.parse(chart.updated) < Date.parse(previousUpdated)) {
+        warnings.push(`Apple Music ${key} chart predates the saved observation for ${artist.ticker}.`);
         continue;
       }
       const matching = entries.filter(entry => entry.artists.some(a => a.id === artist.id));
-      // Rank points measure chart presence, not stream counts. An unchanged
-      // chart is neutral; absence counts only when the full chart was fetched.
-      current[country] = matching.reduce((sum, entry) => sum + 101 - entry.rank, 0);
-      // Uncharted on both dates says nothing about an artist's listening trend.
-      if (typeof priorScores?.[country] === "number" && Number.isFinite(priorScores[country]) && (current[country] > 0 || priorScores[country] > 0)) {
-        deltas.push(clamp((current[country] - priorScores[country]) * 0.12, -25, 25));
+      current[key] = matching.reduce((sum, entry) => sum + 101 - entry.rank, 0);
+      // Only complete, comparable charts can create rank changes or exits.
+      // An artist uncharted on both dates supplies no listening-trend evidence.
+      if (typeof priorScores?.[key] === "number" && Number.isFinite(priorScores[key]) && (current[key] > 0 || priorScores[key] > 0)) {
+        deltas.push(clamp((current[key] - priorScores[key]) * 0.12, -25, 25));
       }
-      tracks.push(...matching.map(entry => ({ storefront: country, id: entry.id, title: entry.name, rank: entry.rank, url: entry.url })));
+      (chart.kind === "songs" ? tracks : albums).push(...matching.map(entry => ({ storefront: chart.storefront,
+        id: entry.id, title: entry.name, rank: entry.rank, url: entry.url })));
     }
     if (!Object.keys(current).length) continue;
-    const rawPayload = { source: "apple_charts", runDate, status: deltas.length ? "ok" : "baseline_only", scores: current,
-      tracks, chartUpdatedAt: Object.fromEntries(Object.keys(current).map(country => [country, charts[country].updated])) };
+    const rawPayload = { source: "apple_charts", runDate, schemaVersion: 2, status: deltas.length ? "ok" : "baseline_only", scores: current,
+      tracks, albums, chartUpdatedAt: Object.fromEntries(Object.keys(current).map(key => [key, charts[key].updated])) };
     signals[artist.id] = { stats: deltas.length ? { streamingGrowth: deltas.reduce((a, b) => a + b, 0) / deltas.length } : {}, confidence: 0.82, rawPayload };
-    observations.push({ artistId: artist.id, source: "apple_charts", metric: "chart_points", observedDate: runDate,
-      value: Object.values(current).reduce((a, b) => a + b, 0), unit: "rank_points", rawPayload });
+    observations.push({ artistId: artist.id, source: "apple_charts", metric: "chart_snapshot", observedDate: runDate,
+      value: Object.keys(current).length, unit: "feeds", rawPayload });
+    for (const kind of ["songs", "albums"] as const) {
+      const keys = Object.keys(current).filter(key => charts[key].kind === kind);
+      // A partial regional total would look like a decline on the public chart.
+      // Retain the keyed snapshot for comparisons without publishing that total.
+      if (keys.length === STOREFRONTS.length) observations.push({ artistId: artist.id, source: "apple_charts", metric: kind === "songs" ? "chart_points" : "album_chart_points",
+        observedDate: runDate, value: keys.reduce((sum, key) => sum + current[key], 0), unit: "rank_points", rawPayload });
+    }
   }
   return { signals, observations, warnings };
 }
 
-function validEntry(entry: ChartEntry) {
-  if (!entry || ![entry.id, entry.artistId, entry.name, entry.artistName, entry.url, entry.artistUrl].every(value => typeof value === "string" && value.trim().length > 0) ||
+function resolveChartArtists(entry: ChartEntry, kind: ChartKind, artists: MarketUpdateArtist[]) {
+  if (!entry.artistId) return [];
+  // Album features do not establish a performer credit on every track.
+  const credited = resolveRecordingArtists({ title: `${entry.artistName} - ${kind === "songs" ? entry.name : ""}`, primaryArtistId: "", artists });
+  return credited.filter(artist => {
+    const expectedIds = getArtistTrackingProfile(artist)?.externalIds.appleMusicArtistIds;
+    const names = getTrackingAliases(artist);
+    const isSoloPrimary = names.some(name => normalizeTrackingText(name) === normalizeTrackingText(entry.artistName));
+    if (isSoloPrimary && expectedIds?.length && !expectedIds.includes(entry.artistId!)) return false;
+    return expectedIds?.includes(entry.artistId!) || artist.name.length > 3 || entry.genres?.some(genre => genre.genreId === "18");
+  });
+}
+
+function validEntry(entry: ChartEntry, kind: ChartKind) {
+  if (!entry || ![entry.id, entry.name, entry.artistName, entry.url].every(value => typeof value === "string" && value.trim().length > 0) ||
+    (entry.kind !== undefined && entry.kind !== kind) ||
     (entry.genres !== undefined && (!Array.isArray(entry.genres) || !entry.genres.every(genre => genre && typeof genre.genreId === "string"))) ||
-    !/^\d+$/.test(entry.id) || !/^\d+$/.test(entry.artistId) || !entry.name || !entry.artistName) return false;
+    !/^\d+$/.test(entry.id)) return false;
   try {
-    const track = new URL(entry.url), artist = new URL(entry.artistUrl);
-    return track.hostname === "music.apple.com" && artist.hostname === "music.apple.com" &&
-      artist.pathname.endsWith(`/${entry.artistId}`) && artist.pathname.includes("/artist/") &&
-      (track.searchParams.get("i") === entry.id || track.pathname.endsWith(`/${entry.id}`));
+    const item = new URL(entry.url);
+    if (item.protocol !== "https:" || item.hostname !== "music.apple.com" || !item.pathname.includes("/album/") ||
+      !(kind === "albums" ? item.pathname.endsWith(`/${entry.id}`) && !item.searchParams.has("i") : item.searchParams.get("i") === entry.id || item.pathname.endsWith(`/${entry.id}`))) return false;
+    // Official compilation entries omit performer IDs. They occupy real chart
+    // ranks but cannot establish a roster artist's credit through the title.
+    if (kind === "albums" && entry.artistName === "Various Artists" && entry.artistId === undefined && entry.artistUrl === undefined) return true;
+    if (typeof entry.artistId !== "string" || !/^\d+$/.test(entry.artistId) || typeof entry.artistUrl !== "string") return false;
+    const artist = new URL(entry.artistUrl);
+    return artist.protocol === "https:" && artist.hostname === "music.apple.com" &&
+      artist.pathname.endsWith(`/${entry.artistId}`) && artist.pathname.includes("/artist/");
   } catch { return false; }
 }
 
-async function fetchChart(storefront: string, fetchImpl: typeof fetch) {
+async function fetchChart(storefront: string, kind: ChartKind, fetchImpl: typeof fetch) {
   for (let attempt = 0; ; attempt++) {
     try {
-      const response = await fetchImpl(`https://rss.marketingtools.apple.com/api/v2/${storefront}/music/most-played/100/songs.json`, { signal: AbortSignal.timeout(15000) });
+      const response = await fetchImpl(`https://rss.marketingtools.apple.com/api/v2/${storefront}/music/most-played/100/${kind}.json`, { signal: AbortSignal.timeout(15000) });
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       return await response.json();
-    } catch (error) {
-      if (attempt >= 1) throw error;
-    }
+    } catch (error) { if (attempt >= 1) throw error; }
   }
 }

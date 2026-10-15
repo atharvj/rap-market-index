@@ -1,7 +1,8 @@
 import { clamp } from "@/lib/pricing";
 import type { MarketUpdateArtist } from "@/server/market/daily-update";
 import { buildDefaultGdeltQuery } from "@/server/market/artist-text-identifiers";
-import { buildTrackingSearchQueries, getTrackingAliases, matchTrackedRelease, matchNamedRelease } from "@/server/market/artist-tracking";
+import { buildTrackingSearchQueries, getTrackingAliases, getTrackingIdentities, matchTrackedRelease, matchNamedRelease } from "@/server/market/artist-tracking";
+import { hasRequiredArtistEventDisambiguation } from "@/server/market/artist-event-disambiguation";
 import { scoreMusicReception } from "@/server/market/music-reception";
 import { buildCommunityEventTitle, getCommunityEventLabel } from "@/server/market/event-title";
 import {
@@ -106,7 +107,8 @@ const UNIQUE_AUTHOR_COUNT = "unique_author_count";
 const TOP_POST_ENGAGEMENT = "top_post_engagement";
 const REACTION_SENTIMENT = "reaction_sentiment";
 const REQUEST_ERROR = "request_error";
-const SEARCH_SORTS = ["latest"] as const;
+const SEARCH_SORTS = ["latest", "top"] as const;
+const SAMPLING_VERSION = 4;
 
 export async function collectBlueskyMarketSignals({
   artists,
@@ -248,7 +250,7 @@ function buildBlueskySignal({
 } {
   const names = buildArtistNameCandidates(artist, externalIds);
   const queryScope = fingerprintQueries(successfulQueries);
-  baseline = baseline.sampling_version === 3 && baseline.query_scope === queryScope ? baseline : {};
+  baseline = baseline.sampling_version === SAMPLING_VERSION && baseline.query_scope === queryScope ? baseline : {};
   const matchedPosts = posts
     .map((post) => normalizeBlueskyPost(post))
     .filter((post): post is BlueskyPost => Boolean(post))
@@ -261,16 +263,25 @@ function buildBlueskySignal({
     })
     .filter((post) => post.matchConfidence > 0);
   const authorCounts = new Map<string, number>();
+  const seenLongCopies = new Set<string>();
+  let duplicateCopyCount = 0;
   const balancedPosts = matchedPosts.filter(post => {
+    // Preserve short independent reactions. Long copied promotions/reviews do
+    // not become independent opinions merely by appearing on several accounts.
+    const copy = normalizeText(post.text.replace(/https?:\/\/\S+/g, " ").replace(/@[\w.-]+/g, " "));
+    if (copy.length >= 48 && copy.split(" ").length >= 9) {
+      if (seenLongCopies.has(copy)) { duplicateCopyCount++; return false; }
+      seenLongCopies.add(copy);
+    }
     const author = post.authorHandle.toLowerCase(), count = authorCounts.get(author) ?? 0;
     authorCounts.set(author, count + 1);
     return count < 2;
   });
-  const classifiedPosts = balancedPosts.map((post) => ({
-    post,
-    classification: classifyBlueskyPost(post),
-    reception: scoreMusicReception(post.text)
-  }));
+  const classifiedPosts = balancedPosts.map((post) => {
+    const receptionText = getTargetedReceptionText(post, artist, allArtists, allExternalIds, runDate);
+    return { post, classification: classifyBlueskyPost({ ...post, text: receptionText }),
+      reception: scoreMusicReception(receptionText) };
+  });
   const reactions = classifiedPosts.filter(item => Math.abs(item.reception) >= 12);
   const reactionAuthors = new Set(reactions.map(item => item.post.authorHandle));
   const reactionEngagement = reactions.reduce((sum, item) => sum + item.post.engagement, 0);
@@ -337,7 +348,9 @@ function buildBlueskySignal({
     uniqueAuthorCount: uniqueAuthors.size,
     topPostEngagement,
     averageSentiment,
-    samplingVersion: 3,
+    samplingVersion: SAMPLING_VERSION,
+    searchSorts: SEARCH_SORTS,
+    duplicateCopyCount,
     classifiedReactionCount: reactions.length,
     reactionAuthorCount: reactionAuthors.size,
     unclassifiedPostCount: postCount - reactions.length,
@@ -359,7 +372,7 @@ function buildBlueskySignal({
     topPosts: classifiedPosts
       .sort((a, b) => b.post.engagement - a.post.engagement)
       .slice(0, 5)
-      .map(({ post, classification }) => ({
+      .map(({ post, classification, reception }) => ({
         signalLabel: getCommunityEventLabel(classification.eventType, classification.reason),
         sourceUrl: post.sourceUrl,
         authorHandle: post.authorHandle,
@@ -372,6 +385,7 @@ function buildBlueskySignal({
         viralityTier: getEngagementTier(post.engagement),
         matchConfidence: post.matchConfidence,
         sentimentScore: classification.sentimentScore,
+        receptionScore: reception,
         impactScore: classification.impactScore,
         reason: classification.reason,
         matchBasis: post.matchedReleaseTitle ? "verified_release" : "artist_name",
@@ -394,7 +408,7 @@ function buildBlueskySignal({
       createObservation(artist.id, runDate, UNIQUE_AUTHOR_COUNT, uniqueAuthors.size, "authors", rawPayload),
       createObservation(artist.id, runDate, TOP_POST_ENGAGEMENT, topPostEngagement, "engagement", rawPayload),
       createObservation(artist.id, runDate, REACTION_SENTIMENT, averageSentiment, "score", rawPayload),
-      createObservation(artist.id, runDate, "sampling_version", 3, "version", rawPayload),
+      createObservation(artist.id, runDate, "sampling_version", SAMPLING_VERSION, "version", rawPayload),
       createObservation(artist.id, runDate, "query_scope", queryScope, "cohort", rawPayload),
       createObservation(artist.id, runDate, "reaction_count", reactions.length, "posts", rawPayload),
       createObservation(artist.id, runDate, "reaction_engagement", reactionEngagement, "engagement", rawPayload)
@@ -522,7 +536,7 @@ function buildBlueskyEvents({
     const baseConfidence = clamp(confidence * post.matchConfidence, 0.32, 0.82);
     const baseRawPayload = {
       source: "bluesky_post",
-      samplingVersion: 3,
+      samplingVersion: SAMPLING_VERSION,
       authorHandle: post.authorHandle,
       authorDisplayName: post.authorDisplayName,
       likes: post.likes,
@@ -853,16 +867,15 @@ async function fetchBlueskySearch({
   const postsById = new Map<string, BlueskyPostData>();
   const errors: string[] = [];
 
-  for (const sort of SEARCH_SORTS) {
-    const result = await fetchBlueskySearchPage({
+  const results = await Promise.all(SEARCH_SORTS.map(sort => fetchBlueskySearchPage({
       query,
       sort,
       since: `${shiftDate(runDate, -lookbackDays)}T00:00:00.000Z`,
       postsPerArtist,
       timeoutMs,
       fetchImpl
-    });
-
+    })));
+  for (const result of results) {
     if (!result.ok) {
       errors.push(result.error);
       continue;
@@ -877,7 +890,7 @@ async function fetchBlueskySearch({
     }
   }
 
-  if (postsById.size > 0 || errors.length < SEARCH_SORTS.length) {
+  if (errors.length === 0) {
     return {
       ok: true,
       posts: Array.from(postsById.values())
@@ -994,12 +1007,11 @@ function buildBlueskyQuery(artist: MarketUpdateArtist, externalIds?: ArtistExter
   return `"${cleanName}"`;
 }
 
-function buildArtistNameCandidates(artist: MarketUpdateArtist, externalIds?: ArtistExternalIds) {
+function buildArtistNameCandidates(artist: Pick<MarketUpdateArtist, "id" | "name">, externalIds?: ArtistExternalIds) {
   const names = [
     ...getTrackingAliases(artist, externalIds),
     artist.name,
-    externalIds?.lastfmName,
-    ...extractQuotedSearchPhrases(externalIds?.gdeltQuery)
+    externalIds?.lastfmName
   ].filter((value): value is string => Boolean(value?.trim()));
 
   return Array.from(new Set(names.map((value) => value.trim())));
@@ -1037,7 +1049,6 @@ function getArtistMentionConfidence(post: BlueskyPost, names: string[]) {
 }
 
 function getTextMentionConfidence(text: string, names: string[], catalystContextOverride: boolean) {
-  const compactText = text.replace(/\s+/g, "");
   const musicContext = hasMusicContext(text) || (catalystContextOverride && hasSocialCatalystContext(text));
 
   for (const name of names) {
@@ -1055,12 +1066,30 @@ function getTextMentionConfidence(text: string, names: string[], catalystContext
       return isShortName && !musicContext ? 0 : isShortName ? 0.7 : 0.92;
     }
 
-    if (!isShortName && compactName.length > 4 && compactText.includes(compactName)) {
+    if (!isShortName && compactName.length > 4 && new RegExp(`(^|\\s)${escapeRegExp(compactName)}($|\\s)`).test(text)) {
       return 0.8;
     }
   }
 
   return 0;
+}
+
+function getTargetedReceptionText(post: BlueskyPost, artist: MarketUpdateArtist, artists: MarketUpdateArtist[], ids: Record<string, ArtistExternalIds>, runDate: string) {
+  // Pricing batches may contain only part of the roster. An artist outside the
+  // current batch can still be the subject of a reaction in the returned text.
+  const identities = new Map([...getTrackingIdentities(), ...artists].map(other => [other.id, other]));
+  const others = [...identities.values()].filter(other => other.id !== artist.id && hasRequiredArtistEventDisambiguation({ artistName: other.name, text: post.text }));
+  if (!others.length) return post.text;
+  // Only explicit subjects establish ownership when a post discusses several
+  // artists. Do not copy Future's praise into Young Thug's criticism, or infer
+  // which artist an unanchored "he"/"this" refers to.
+  const clauses = post.text.replace(/https?:\/\/\S+/g, " ").split(/(?<!\d)\.(?!\d)|[;!?\n]|\b(?:but|whereas|while|however)\b/i);
+  return clauses.filter(clause => {
+    const own = getTextMentionConfidence(normalizeText(clause), buildArtistNameCandidates(artist, ids[artist.id]), false) > 0 ||
+      Boolean(matchTrackedRelease(clause, artist, runDate, ids[artist.id]));
+    const otherSubjects = others.filter(other => getTextMentionConfidence(normalizeText(clause), buildArtistNameCandidates(other, ids[other.id]), false) > 0);
+    return own && otherSubjects.length === 0;
+  }).join(". ");
 }
 
 function getBlueskySignalConfidence({

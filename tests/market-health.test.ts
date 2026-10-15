@@ -27,7 +27,7 @@ describe("market health completeness", () => {
     const response = await GET(new Request(`https://example.test/api/admin/market-health?runDate=${date}`));
     const body = await response.json();
     expect(response.status).toBe(200);
-    expect(body.observationHealth.find((row: { source: string }) => row.source === "youtube_tracks").freshArtistCount).toBe(2);
+    expect(body.observationHealth.find((row: { key: string }) => row.key === "youtube_tracks:views_*").freshArtistCount).toBe(2);
     expect(body.priceHistoryHealth.freshArtistCount).toBe(2);
     expect(body.priceTickHealth.tickCount).toBe(1001);
     expect(body.eventHealth.eventCount).toBe(1001);

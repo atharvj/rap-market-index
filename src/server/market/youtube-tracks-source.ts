@@ -64,6 +64,12 @@ export async function collectYoutubeTrackSignals({ artists, events, runDate, api
       metrics.push(raw);
       observations.push({ artistId: artist.id, source: "youtube_tracks", metric, observedDate: runDate,
         observedAt: new Date().toISOString(), value: views, unit: "views", rawPayload: raw });
+      // These counters already arrive with views; retain their history without
+      // spending more quota or mistaking comment volume for approval.
+      for (const [name, value] of [["likes", raw.likes], ["comments", raw.comments]] as const) {
+        if (value !== null) observations.push({ artistId: artist.id, source: "youtube_tracks", metric: `${name}_${id}`,
+          observedDate: runDate, observedAt: new Date().toISOString(), value, unit: name, rawPayload: raw });
+      }
     }
     if (!metrics.length) continue;
     const weight = deltas.reduce((sum, item) => sum + item.weight, 0);

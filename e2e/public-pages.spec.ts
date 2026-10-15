@@ -1002,3 +1002,19 @@ function createTestAccessToken(userId: string) {
     role: "authenticated"
   })}.test-signature`;
 }
+
+test("artist indicators distinguish Apple song and album ranks from streams", async ({ page }) => {
+  const artist = marketState.artists[0];
+  await page.route("**/api/market/observations/**", route => route.fulfill({ contentType: "application/json", body: JSON.stringify({ ok: true,
+    series: [["chart_points", 273], ["album_chart_points", 194]].map(([metric, value]) => ({
+      key: `apple_charts:${metric}`, source: "apple_charts", metric, points: [], latestValue: value, latestDate: "2026-10-14"
+    })) }) }));
+  await page.goto(`/artists/${artist.id}`);
+  const indicators = page.locator("section").filter({ has: page.getByRole("heading", { name: "Public Market Indicators", exact: true }) });
+  await expect(indicators).toContainText("Apple Song Chart Points");
+  await expect(indicators).toContainText("Apple Album Chart Points");
+  await expect(indicators).toContainText("273");
+  await expect(indicators).toContainText("194");
+  await expect(indicators).toContainText("not stream counts");
+  await expect(indicators).toContainText("share one provider");
+});

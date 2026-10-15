@@ -125,7 +125,7 @@ const DEFAULT_VIDEOS_PER_ARTIST = 2;
 const DEFAULT_COMMENTS_PER_VIDEO = 50;
 const MIN_COMMENTS_FOR_SIGNAL = 12;
 const CLASSIFICATION_THRESHOLD = 12;
-const SAMPLING_VERSION = 3;
+const SAMPLING_VERSION = 4;
 
 export async function collectYoutubeCommentMarketSignals({
   artists,

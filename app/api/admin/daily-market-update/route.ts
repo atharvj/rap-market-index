@@ -1124,7 +1124,7 @@ async function collectRealSignals({
 
   if (!intraday && supabase && ["core", "blended"].includes(source)) {
     sourceTasks.push((async () => {
-      const previous = await loadLatestObservationPayloads({ supabase, artistIds, source: "apple_charts", metric: "chart_points", beforeDate: runDate, lookbackDays: 7 });
+      const previous = await loadLatestObservationPayloads({ supabase, artistIds, source: "apple_charts", metric: ["chart_snapshot", "chart_points", "album_chart_points"], beforeDate: runDate, lookbackDays: 7 });
       const charts = await collectAppleChartSignals({ artists, runDate, previous });
       sources.push(charts.signals); observations.push(...charts.observations); warnings.push(...charts.warnings);
     })());
@@ -1406,7 +1406,7 @@ function filterStoredEventsForSourcePolicy(
           if (!allowBluesky && eventSource === "bluesky_post") {
             return false;
           }
-          if (eventSource === "bluesky_post" && event.rawPayload.samplingVersion !== 3) return false;
+          if (eventSource === "bluesky_post" && event.rawPayload.samplingVersion !== 4) return false;
           if (eventSource === "reddit_post" && !isRedditAccessEnabled()) return false;
 
           return isStoredEventEligibleForPricing(event, artistById.get(artistId));

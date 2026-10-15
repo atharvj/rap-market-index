@@ -1,6 +1,6 @@
 # Market data coverage
 
-Model: `rmi-core-v39`. These are fantasy-market estimates, not observable exchange prices. More inputs should improve coverage and explain movement; they do not establish a uniquely correct dollar price.
+Model: `rmi-core-v40`. These are fantasy-market estimates, not observable exchange prices. More inputs should improve coverage and explain movement; they do not establish a uniquely correct dollar price.
 
 ## Sources and cadence
 
@@ -263,3 +263,30 @@ References: [MusicBrainz alias types](https://musicbrainz.org/doc/Aliases),
 are not relabeled as newly measured fan opinions. Missing/insufficient reaction
 samples do not create zero sentiment readings. Complete time/relevance comment
 requests are required before a video is admitted to the reaction cohort.
+
+
+## October 14 broader evidence research (v40)
+
+The [accuracy research and acquisition plan](accuracy-research.md) records primary
+provider references, implemented improvements, access limits and an evaluation
+plan. Album charts now accompany song charts across the same three Apple
+storefronts. Their first observations seed baselines; partial country totals are
+not published as apparent declines. Both chart types share one provider. Verified
+Apple artist IDs now cover 83 profiles; the six remaining gaps appear in tracking
+health.
+
+Bluesky expands from latest-only to latest and top results. Both sorts must
+complete for each admitted query. Long copied posts do not become independent
+fans, explicit multi-artist clauses keep their own reactions, and unresolved
+comparisons abstain. Both reception collectors now use sampling version 4 and
+recognize explicit numerical ratings. Older method caches are excluded. Additional
+YouTube recording likes/comment counters are retained from existing requests for
+observation history; no extra positive pricing coefficient was added for them.
+
+The strongest remaining acquisition candidates are licensed historical streaming/
+playlist coverage and verified touring outcomes. X search requires appropriate
+API access; Google Trends alpha requires approval; TikTok research eligibility is
+not general commercial access. Reddit remains disabled after the rejected request.
+No paid service or new account access was enabled. The current lexical reception
+model remains limited and needs independently reviewed, held-out evaluation before
+any claim of representative fan sentiment or quantified classification accuracy.

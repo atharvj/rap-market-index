@@ -25,6 +25,8 @@ const RANGE_DAYS: Record<Exclude<ObservationRange, "ALL">, number> = {
 const CACHE_HEADERS = { "Cache-Control": "public, max-age=30, s-maxage=60, stale-while-revalidate=300" };
 
 const SERIES_DEFINITIONS: Record<string, { label: string; unit: string }> = {
+  "apple_charts:chart_points": { label: "Apple song chart points", unit: "rank_points" },
+  "apple_charts:album_chart_points": { label: "Apple album chart points", unit: "rank_points" },
   "lastfm:listeners": {
     label: "Last.fm listeners",
     unit: "listeners"

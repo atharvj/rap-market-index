@@ -9,12 +9,16 @@ export type ArtistTrackingProfile = {
   aliases: string[];
   verifiedAt: string;
   sources: string[];
-  externalIds: { spotifyId: string; youtubeChannelId: string; musicbrainzId: string; wikipediaArticleTitle?: string };
+  externalIds: { spotifyId: string; youtubeChannelId: string; musicbrainzId: string; wikipediaArticleTitle?: string; appleMusicArtistIds?: string[] };
   releases: TrackingRelease[];
   catalogueComplete: boolean;
 };
 const registry = profiles as Record<string, ArtistTrackingProfile>;
 type Identity = { id: string; name: string };
+
+export function getTrackingIdentities(): Identity[] {
+  return Object.entries(registry).map(([id, profile]) => ({ id, name: profile.name }));
+}
 
 export function getVerifiedTrackingArtistName(artistId: string) {
   return registry[artistId]?.name;
@@ -57,8 +61,10 @@ export function getArtistTrackingCoverage(artists: Identity[], externalIds: Reco
     const wikipediaArticleTitle = externalIds[artist.id]?.wikipediaArticleTitle ?? profile?.externalIds.wikipediaArticleTitle ?? null;
     return { artistId: artist.id, name: artist.name, profileVerifiedAt: profile?.verifiedAt ?? null,
       searchNames: getTrackingAliases(artist, externalIds[artist.id]), wikipediaArticleTitle,
+      appleMusicArtistIds: profile?.externalIds.appleMusicArtistIds ?? [],
       releaseContexts: releases.map(release => ({ title: release.title, sourceUrl: release.sourceUrl })),
       gaps: [ ...(!profile ? ["unverified_profile"] : []), ...(!wikipediaArticleTitle ? ["unverified_wikipedia"] : []),
+        ...(!profile?.externalIds.appleMusicArtistIds?.length ? ["unverified_apple_music"] : []),
         ...(!releases.length ? ["no_verified_album_context"] : []), ...(profile && !profile.catalogueComplete ? ["partial_catalogue"] : []),
         ...(profile && Date.parse(runDate) - Date.parse(profile.verifiedAt) > 30 * 86400000 ? ["metadata_needs_review"] : []) ] };
   });

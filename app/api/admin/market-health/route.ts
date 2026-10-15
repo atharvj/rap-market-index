@@ -122,7 +122,10 @@ const SOURCE_ID_FIELDS = [
 const OBSERVATION_SERIES = [
   { source: "market_refresh", metric: "completed", label: "Quote refreshes (last hour)", warningThreshold: 100 },
   { source: "spotify_public", metric: "monthly_listeners", label: "Spotify monthly listeners", warningThreshold: null },
-  { source: "apple_charts", metric: "chart_points", label: "Apple Music charts", warningThreshold: null },
+  { source: "apple_charts", metric: "chart_points", label: "Apple Music song charts", warningThreshold: null },
+  { source: "apple_charts", metric: "album_chart_points", label: "Apple Music album charts", warningThreshold: null },
+  { source: "youtube_tracks", metric: "likes_*", label: "Official recording likes", warningThreshold: null },
+  { source: "youtube_tracks", metric: "comments_*", label: "Official recording comments", warningThreshold: null },
   { source: "youtube_tracks", metric: "views_*", label: "Official song views", warningThreshold: null },
   { source: "youtube_editorial", metric: "music_editorial_video_count", label: "Music editorial videos", warningThreshold: null },
   { source: "lastfm", metric: "listeners", label: "Audience listeners", warningThreshold: 80 },
