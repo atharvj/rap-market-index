@@ -1,6 +1,6 @@
 # Market data coverage
 
-Model: `rmi-core-v40`. These are fantasy-market estimates, not observable exchange prices. More inputs should improve coverage and explain movement; they do not establish a uniquely correct dollar price.
+Model: `rmi-core-v41`. These are fantasy-market estimates, not observable exchange prices. More inputs should improve coverage and explain movement; they do not establish a uniquely correct dollar price.
 
 ## Sources and cadence
 
@@ -290,3 +290,47 @@ not general commercial access. Reddit remains disabled after the rejected reques
 No paid service or new account access was enabled. The current lexical reception
 model remains limited and needs independently reviewed, held-out evaluation before
 any claim of representative fan sentiment or quantified classification accuracy.
+
+
+## October 15 market date: free coverage improvements (v41)
+
+YouTube requests up to 100 candidates in each existing time/relevance comment call,
+then interleaves recent results and applies the configured sample cap after ID,
+author and copied-text checks. This increases the pool within the same two comment
+requests. Comments still require a verified uploader, at least twelve recent
+comments and six identifiable reactions. The legacy upload-playlist path now also
+rechecks actual video uploaders. Future timestamps are excluded, including future
+times on today's date.
+
+Both reception collectors share artist-specific clause selection. Explicit criticism
+of one collaborator cannot become another's negative reaction; unresolved joint
+clauses and pronouns abstain. YouTube now also deduplicates long copied reviews.
+Sampling version 5 and the configured sample limit identify comparable cohorts;
+older saved methods are excluded from pricing.
+
+Every completed/failed reception attempt records availability. Public indicators
+withhold an older headline reception estimate when a newer sample is insufficient
+or unavailable. Recorded historical points remain available. Sampled and classified
+comment counts are separate, and the public page explains unavailable estimates.
+
+All 89 profiles now have verified Apple artist IDs. The remaining six mappings were
+checked against official Apple artist/catalogue records and already verified release
+contexts; same-name thin/incorrect artist pages were excluded. Paginated MusicBrainz
+browse results resolve the four incomplete provider scans, yielding 176 verified
+release contexts. Ye's contexts now include BULLY. A complete provider browse is not
+a claim that the community database contains an artist's entire real catalogue.
+
+An older album's title no longer suppresses an explicitly current concert reaction
+with actual artist identification and recent performance language. Replays/throwbacks
+and album-only matches remain excluded from fresh catalysts. Trusted editorial video
+matching now recognizes verified stage aliases and ignores quoted music titles as
+performer identities. No artist is guaranteed a price increase from a performance.
+
+The existing catalyst workflow now calls an authenticated chart-recovery endpoint
+after its normal update. Complete current-date snapshots skip collection; incomplete
+scans can retry at most once per hour per artist. Failed attempts also record the
+throttle marker. Recovery saves observations independently of prices and never calls
+quote persistence. It needs no paid provider or additional scheduled job. GitHub
+scheduling is still best-effort and provider failures can still leave partial data.
+
+Reference: [YouTube's comment endpoint limits and sorting](https://developers.google.com/youtube/v3/docs/commentThreads/list).

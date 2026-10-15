@@ -219,8 +219,9 @@ describe("Bluesky market source", () => {
 
     expect(result.signals).toEqual({});
     expect(result.eventsByArtist).toEqual({});
-    expect(result.observations).toHaveLength(9);
-    expect(result.observations.every((observation) => observation.metric === "request_error")).toBe(true);
+    expect(result.observations.filter(o => o.metric === "request_error")).toHaveLength(9);
+    expect(result.observations.filter(o => o.metric === "reception_available")).toHaveLength(12);
+    expect(result.observations.filter(o => o.metric === "reception_available").every(o => o.value === 0)).toBe(true);
     expect(result.warnings).toEqual([
       "Bluesky was excluded from pricing because 9 of 12 artist searches failed."
     ]);
@@ -278,6 +279,35 @@ it("does not treat a quoted search term or a partial compact name as an artist i
     fetchImpl: async () => Response.json({ posts: ["another performer album is fire", "Lil Teccalicious album is fire"].map((text, i) => ({
       uri: `at://did:plc:fan${i}/app.bsky.feed.post/review`, author: { handle: `fan${i}.bsky.social` },
       record: { text, createdAt: "2026-10-14T12:00:00Z" }, likeCount: 100 })) }) });
+  expect(result.signals[artist.id].rawPayload.postCount).toBe(0);
+  expect(result.signals[artist.id].stats).toEqual({});
+});
+
+it.each([
+  ["Kanye West BULLY concert last night was fire", true],
+  ["Kanye West BULLY album is fire", false],
+  ["Rewatched old footage of Kanye West BULLY concert last night, fire", false]
+])("keeps current shows distinct from old album discussion: %s", async (text, shouldHaveEvent) => {
+  const ye = { ...artist, id: "ye", name: "Ye" };
+  const result = await collectBlueskyMarketSignals({ artists: [ye], runDate: "2026-10-15", delayMs: 0,
+    fetchImpl: async () => Response.json({ posts: [{ uri: "at://did:plc:fan/app.bsky.feed.post/show", author: { handle: "fan.bsky.social" },
+      record: { text, createdAt: "2026-10-15T01:00:00Z" }, likeCount: 200 }] }) });
+  expect(Boolean(result.eventsByArtist[ye.id]?.length)).toBe(shouldHaveEvent);
+});
+
+it("excludes future timestamps even when they fall on the current calendar date", async () => {
+  const createdAt = new Date(Date.now() + 3600000).toISOString();
+  const result = await collectBlueskyMarketSignals({ artists: [artist], runDate: createdAt.slice(0, 10), delayMs: 0,
+    fetchImpl: async () => Response.json({ posts: [{ uri: "at://did:plc:fan/app.bsky.feed.post/future", author: { handle: "fan.bsky.social" },
+      record: { text: "Lil Tecca album is fire", createdAt }, likeCount: 200 }] }) });
+  expect(result.signals[artist.id].rawPayload.postCount).toBe(0);
+  expect(result.signals[artist.id].stats).toEqual({});
+});
+
+it("does not establish artist identity from a URL slug alone", async () => {
+  const result = await collectBlueskyMarketSignals({ artists: [artist], runDate: "2026-10-14", delayMs: 0,
+    fetchImpl: async () => Response.json({ posts: [{ uri: "at://did:plc:fan/app.bsky.feed.post/url", author: { handle: "fan.bsky.social" },
+      record: { text: "this album is fire https://example.com/lil-tecca/album", createdAt: "2026-10-14T01:00:00Z" }, likeCount: 200 }] }) });
   expect(result.signals[artist.id].rawPayload.postCount).toBe(0);
   expect(result.signals[artist.id].stats).toEqual({});
 });

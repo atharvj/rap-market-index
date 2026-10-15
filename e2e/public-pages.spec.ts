@@ -1018,3 +1018,20 @@ test("artist indicators distinguish Apple song and album ranks from streams", as
   await expect(indicators).toContainText("not stream counts");
   await expect(indicators).toContainText("share one provider");
 });
+
+test("insufficient current reactions cannot leave an older positive estimate looking current", async ({ page }) => {
+  const artist = marketState.artists[0];
+  await page.route("**/api/market/observations/**", route => route.fulfill({ contentType: "application/json", body: JSON.stringify({ ok: true,
+    series: [
+      { key: "youtube_comments:positive_comment_share", latestValue: null, latestDate: null, points: [{ date: "2026-10-15", value: 85 }] },
+      { key: "youtube_comments:comment_count", latestValue: 2, latestDate: "2026-10-15", points: [] },
+      { key: "youtube_comments:classified_comment_count", latestValue: 1, latestDate: "2026-10-15", points: [] },
+      { key: "youtube_comments:reception_available", latestValue: 0, latestDate: "2026-10-15", points: [] }
+    ] }) }));
+  await page.goto(`/artists/${artist.id}`);
+  const indicators = page.locator("section").filter({ has: page.getByRole("heading", { name: "Public Market Indicators", exact: true }) });
+  await expect(indicators).toContainText("Identifiable YouTube Reactions");
+  await expect(indicators).toContainText("insufficient or unavailable");
+  await expect(indicators).not.toContainText("85.0%");
+  await expect(indicators).not.toContainText("Sampled Positive Reactions");
+});

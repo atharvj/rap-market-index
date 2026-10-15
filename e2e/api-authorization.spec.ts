@@ -17,7 +17,7 @@ test("private APIs reject anonymous callers", async ({ request }) => {
 });
 
 test("admin APIs reject anonymous callers", async ({ request }) => {
-  for (const path of ["/api/admin/market-health", "/api/admin/product-analytics"]) {
+  for (const path of ["/api/admin/market-health", "/api/admin/product-analytics", "/api/cron/chart-recovery"]) {
     const response = await request.get(path);
     expect([401, 403]).toContain(response.status());
     await expect(response.json()).resolves.toMatchObject({ ok: false });

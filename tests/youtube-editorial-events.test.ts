@@ -105,3 +105,12 @@ describe("trusted YouTube editorial catalysts", () => {
     expect(undergroundImpact).toBeGreaterThan(superstarImpact);
   });
 });
+
+it("recognizes verified stage aliases without assigning quoted song titles as performers", () => {
+  const ye = artist({ id: "ye", name: "Ye", ticker: "YE" });
+  const drake = artist({ id: "drake", name: "Drake", ticker: "DRAKE" });
+  const events = buildYoutubeEditorialEvents({ artists: [ye, drake], runDate: "2026-08-05", publisher,
+    videos: [video({ title: "Kanye West - Song (Live Performance)", viewCount: 500000, likeCount: 20000 }),
+      video({ title: 'OsamaSon "Drake" Official Lyrics & Meaning | Genius Verified', viewCount: 500000, likeCount: 20000 })] });
+  expect(events.map(event => event.artistId)).toEqual(["ye"]);
+});

@@ -149,3 +149,34 @@ retention/redistribution rights and permission to derive/display game estimates.
 Test emerging artists and the known missed events, not just superstars. Select
 based on measured incremental coverage and allowed use, not advertised platform
 count. This is the largest remaining acquisition step; it has not been purchased.
+
+
+## Free follow-up delivered in v41
+
+Without a paid service, comment sampling now requests full 100-result pages in the
+same two calls, chooses recent balanced results, and retains the configured sample
+cap after duplicate ID/author/copy checks. Both reception sources use artist-specific
+clauses and sampling version 5. Availability observations prevent an insufficient or
+failed new sample from presenting an earlier reception estimate as current; earlier
+historical points are preserved. Neither wider pages nor these regression tests
+establish population-representative sentiment.
+
+Apple identity coverage is now 89/89. The additional IDs were verified through
+official artist pages and known release catalogues: [1900Rugrat](https://music.apple.com/us/artist/1900rugrat/1589691131),
+[Cash Cobain](https://music.apple.com/us/artist/cash-cobain/953108105),
+[ian](https://music.apple.com/us/artist/ian/1699587685),
+[Loe Shimmy](https://music.apple.com/us/artist/loe-shimmy/1506815992),
+[Nine Vicious](https://music.apple.com/us/artist/nine-vicious/1772456174),
+and [Yung Fazo](https://music.apple.com/us/artist/yung-fazo/1500510384). Same-name
+results without matching release evidence were not approved. Complete MusicBrainz
+pagination for the four flagged profiles recovers newer official album contexts,
+including BULLY for Ye. These are identity/search contexts, not retroactive price
+events or guaranteed exhaustive discographies.
+
+Trusted music-video discovery now uses the verified aliases as well as display
+names. Older album mentions cannot suppress explicitly current concert reactions,
+while throwbacks stay excluded. Chart observation recovery runs through the existing
+workflow, skips complete snapshots, and throttles incomplete attempts hourly. It
+collects evidence without repricing quotes. No subscription, paid API model or
+replacement Reddit scraper was enabled. The acquisition and independent evaluation
+priorities above remain outstanding.

@@ -1406,7 +1406,7 @@ function filterStoredEventsForSourcePolicy(
           if (!allowBluesky && eventSource === "bluesky_post") {
             return false;
           }
-          if (eventSource === "bluesky_post" && event.rawPayload.samplingVersion !== 4) return false;
+          if (eventSource === "bluesky_post" && event.rawPayload.samplingVersion !== 5) return false;
           if (eventSource === "reddit_post" && !isRedditAccessEnabled()) return false;
 
           return isStoredEventEligibleForPricing(event, artistById.get(artistId));

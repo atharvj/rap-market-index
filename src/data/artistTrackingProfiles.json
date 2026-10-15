@@ -6,12 +6,16 @@
     "verifiedAt": "2026-10-14",
     "sources": [
       "https://musicbrainz.org/artist/e9ef6e2b-3117-4c09-938e-21b79527306b",
-      "https://www.youtube.com/channel/UCfiRrH6OkNSi7jZ15HQXNlA"
+      "https://www.youtube.com/channel/UCfiRrH6OkNSi7jZ15HQXNlA",
+      "https://music.apple.com/us/artist/1589691131"
     ],
     "externalIds": {
       "spotifyId": "6HHAJjAD9nZ2GftcwEf8r5",
       "youtubeChannelId": "UCfiRrH6OkNSi7jZ15HQXNlA",
-      "musicbrainzId": "e9ef6e2b-3117-4c09-938e-21b79527306b"
+      "musicbrainzId": "e9ef6e2b-3117-4c09-938e-21b79527306b",
+      "appleMusicArtistIds": [
+        "1589691131"
+      ]
     },
     "releases": [
       {
@@ -540,13 +544,17 @@
     "sources": [
       "https://musicbrainz.org/artist/4f57372b-2054-4722-a534-a99ab2598120",
       "https://www.youtube.com/channel/UCF0RKX3UmHVq4Bk8ejb32xA",
-      "https://www.wikidata.org/wiki/Q125989634"
+      "https://www.wikidata.org/wiki/Q125989634",
+      "https://music.apple.com/us/artist/953108105"
     ],
     "externalIds": {
       "spotifyId": "2R0CFyeMDiRbfkhkIMbyl1",
       "youtubeChannelId": "UCF0RKX3UmHVq4Bk8ejb32xA",
       "musicbrainzId": "4f57372b-2054-4722-a534-a99ab2598120",
-      "wikipediaArticleTitle": "Cash Cobain"
+      "wikipediaArticleTitle": "Cash Cobain",
+      "appleMusicArtistIds": [
+        "953108105"
+      ]
     },
     "releases": [
       {
@@ -1031,7 +1039,7 @@
         "officialReleaseVerified": true
       }
     ],
-    "catalogueComplete": false
+    "catalogueComplete": true
   },
   "esdeekid": {
     "name": "EsDeeKid",
@@ -1379,12 +1387,16 @@
     "verifiedAt": "2026-10-14",
     "sources": [
       "https://musicbrainz.org/artist/b137ece2-979f-494a-b423-10f894092891",
-      "https://www.youtube.com/channel/UCIKrsCc3hmgBOEjT9GKQZlg"
+      "https://www.youtube.com/channel/UCIKrsCc3hmgBOEjT9GKQZlg",
+      "https://music.apple.com/us/artist/1699587685"
     ],
     "externalIds": {
       "spotifyId": "23hzc59PkIUau13dqXx5Ef",
       "youtubeChannelId": "UCIKrsCc3hmgBOEjT9GKQZlg",
-      "musicbrainzId": "b137ece2-979f-494a-b423-10f894092891"
+      "musicbrainzId": "b137ece2-979f-494a-b423-10f894092891",
+      "appleMusicArtistIds": [
+        "1699587685"
+      ]
     },
     "releases": [
       {
@@ -1799,7 +1811,7 @@
         "officialReleaseVerified": true
       }
     ],
-    "catalogueComplete": false
+    "catalogueComplete": true
   },
   "lil-baby": {
     "name": "Lil Baby",
@@ -2034,7 +2046,7 @@
         "officialReleaseVerified": true
       }
     ],
-    "catalogueComplete": false
+    "catalogueComplete": true
   },
   "lil-yachty": {
     "name": "Lil Yachty",
@@ -2081,12 +2093,16 @@
     "verifiedAt": "2026-10-14",
     "sources": [
       "https://musicbrainz.org/artist/ed411d15-00f4-4e56-b264-94e0d2f64ffe",
-      "https://www.youtube.com/channel/UCKNnh5bOfVa6xWeu9x7678Q"
+      "https://www.youtube.com/channel/UCKNnh5bOfVa6xWeu9x7678Q",
+      "https://music.apple.com/us/artist/1506815992"
     ],
     "externalIds": {
       "spotifyId": "6UIpxj5ggLdOebFVCOxVax",
       "youtubeChannelId": "UCKNnh5bOfVa6xWeu9x7678Q",
-      "musicbrainzId": "ed411d15-00f4-4e56-b264-94e0d2f64ffe"
+      "musicbrainzId": "ed411d15-00f4-4e56-b264-94e0d2f64ffe",
+      "appleMusicArtistIds": [
+        "1506815992"
+      ]
     },
     "releases": [
       {
@@ -2419,12 +2435,16 @@
     "verifiedAt": "2026-10-14",
     "sources": [
       "https://musicbrainz.org/artist/ec63abed-419c-45c8-a189-fb8e1b44f926",
-      "https://www.youtube.com/channel/UC-QfBKLrg-2D-2QDGwl6JfA"
+      "https://www.youtube.com/channel/UC-QfBKLrg-2D-2QDGwl6JfA",
+      "https://music.apple.com/us/artist/1772456174"
     ],
     "externalIds": {
       "spotifyId": "6Rs7Ufqb4h0FTuVg6wlqOy",
       "youtubeChannelId": "UC-QfBKLrg-2D-2QDGwl6JfA",
-      "musicbrainzId": "ec63abed-419c-45c8-a189-fb8e1b44f926"
+      "musicbrainzId": "ec63abed-419c-45c8-a189-fb8e1b44f926",
+      "appleMusicArtistIds": [
+        "1772456174"
+      ]
     },
     "releases": [
       {
@@ -3185,6 +3205,13 @@
     },
     "releases": [
       {
+        "id": "56327267-51fb-472c-919e-d6ca258ebab2",
+        "title": "BULLY",
+        "releaseDate": "2026-03-24",
+        "sourceUrl": "https://musicbrainz.org/release-group/56327267-51fb-472c-919e-d6ca258ebab2",
+        "officialReleaseVerified": true
+      },
+      {
         "id": "7f4792fe-b563-4554-849a-95a89be71f84",
         "title": "Donda",
         "releaseDate": "2021-08-29",
@@ -3199,7 +3226,7 @@
         "officialReleaseVerified": true
       }
     ],
-    "catalogueComplete": false
+    "catalogueComplete": true
   },
   "yeat": {
     "name": "Yeat",
@@ -3379,12 +3406,16 @@
     "verifiedAt": "2026-10-14",
     "sources": [
       "https://musicbrainz.org/artist/4103c73e-c23f-47aa-af3b-ec78dbb89fd1",
-      "https://www.youtube.com/channel/UC2rx3EdfU1xAHEHZeRXYh8A"
+      "https://www.youtube.com/channel/UC2rx3EdfU1xAHEHZeRXYh8A",
+      "https://music.apple.com/us/artist/1500510384"
     ],
     "externalIds": {
       "spotifyId": "2UuVqmRzuGdHQB7BKACEW4",
       "youtubeChannelId": "UC2rx3EdfU1xAHEHZeRXYh8A",
-      "musicbrainzId": "4103c73e-c23f-47aa-af3b-ec78dbb89fd1"
+      "musicbrainzId": "4103c73e-c23f-47aa-af3b-ec78dbb89fd1",
+      "appleMusicArtistIds": [
+        "1500510384"
+      ]
     },
     "releases": [
       {

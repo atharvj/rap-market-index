@@ -83,7 +83,8 @@ describe("YouTube comment reception", () => {
     const rejected = await collectYoutubeCommentMarketSignals({ artists: [artist], events: { [artist.id]: [event] }, runDate: "2026-08-24", apiKey: "test", delayMs: 0,
       fetchImpl: async () => jsonResponse({ items: [{ id: "abcdefghijk", snippet: { channelId: "wrong-channel" } }] }) });
     expect(rejected.signals[artist.id].stats).toEqual({});
-    expect(rejected.observations.map(o => o.metric)).toEqual(["request_error"]);
+    expect(rejected.observations.map(o => o.metric)).toEqual(["request_error", "reception_available"]);
+    expect(rejected.observations.find(o => o.metric === "reception_available")?.value).toBe(0);
   });
   it("shows strongly negative reception on the first sample instead of forcing it flat", async () => {
     const result = await collectYoutubeCommentMarketSignals({
@@ -137,6 +138,8 @@ function createYoutubeFetch(comments: TestComment[]): typeof fetch {
       });
     }
 
+    if (url.pathname.endsWith("/videos")) return jsonResponse({ items: [{ id: "video-1", snippet: { channelId: "UC-test-artist" } }] });
+
     if (url.pathname.endsWith("/commentThreads")) {
       return jsonResponse({
         items: comments.map((comment, index) => ({
@@ -166,3 +169,39 @@ function jsonResponse(value: unknown) {
     headers: { "content-type": "application/json" }
   });
 }
+
+it("asks for full pages in the same two calls and caps recent, deduplicated results", async () => {
+  const requests: URL[] = [], original = createYoutubeFetch([]);
+  const result = await collectYoutubeCommentMarketSignals({ artists: [artist], runDate: "2026-08-24", apiKey: "test", delayMs: 0,
+    maxVideosPerArtist: 1, maxCommentsPerVideo: 20,
+    externalIds: { [artist.id]: { artistId: artist.id, youtubeChannelId: "UC-test-artist" } }, fetchImpl: input => {
+      const url = new URL(String(input));
+      if (!url.pathname.endsWith("/commentThreads")) return original(input);
+      requests.push(url);
+      return createYoutubeFetch(Array.from({ length: 100 }, (_, i) => ({ text: "song is fire", likes: 0,
+        author: `${url.searchParams.get("order")}-${i}`, date: i < 40 ? "2025-01-01T00:00:00Z" : "2026-08-22T00:00:00Z" })))(input);
+    } });
+  expect(requests).toHaveLength(2);
+  expect(requests.every(url => url.searchParams.get("maxResults") === "100")).toBe(true);
+  expect(result.signals[artist.id].rawPayload.sampledCommentCount).toBe(20);
+  expect(result.signals[artist.id].stats.socialGrowth).toBeGreaterThan(0);
+});
+
+it("does not turn copied long reviews into an independent audience", async () => {
+  const result = await collect(Array.from({ length: 30 }, () => ({ text: "This album review is clear: the entire new project is trash, boring and disappointing", likes: 1 })));
+  expect(result.signals[artist.id].rawPayload.sampledCommentCount).toBe(1);
+  expect(result.signals[artist.id].stats).toEqual({});
+  expect(result.observations.find(o => o.metric === "reception_available")?.value).toBe(0);
+});
+
+it("does not score a collaborator's criticism as the primary artist's reception", async () => {
+  const collaborator = { ...artist, id: "featured", name: "Featured Artist" };
+  const event: MarketEvent = { artistId: artist.id, eventDate: "2026-08-21", eventType: "release", title: "Test Artist - Song (feat. Featured Artist)",
+    sourceUrl: "https://www.youtube.com/watch?v=abcdefghijk", sentimentScore: 25, impactScore: 30, confidence: 0.9,
+    rawPayload: { source: "youtube_upload_event", videoId: "abcdefghijk", channelId: "UC-test-artist", durationSeconds: 210 } };
+  const comments = createYoutubeFetch(Array.from({ length: 20 }, (_, i) => ({ text: `Track ${i}: Test Artist verse is trash but Featured Artist verse is fire`, likes: 1 })));
+  const result = await collectYoutubeCommentMarketSignals({ artists: [artist, collaborator], events: { [artist.id]: [event] }, runDate: "2026-08-24", apiKey: "test", delayMs: 0,
+    fetchImpl: input => new URL(String(input)).pathname.endsWith("/videos") ? Promise.resolve(jsonResponse({ items: [{ id: "abcdefghijk", snippet: { channelId: "UC-test-artist" } }] })) : comments(input) });
+  expect(result.signals[artist.id].stats.socialGrowth).toBeLessThan(0);
+  expect(result.signals[collaborator.id].stats.socialGrowth).toBeGreaterThan(0);
+});

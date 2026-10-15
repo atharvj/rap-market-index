@@ -1,5 +1,7 @@
 import type { MarketUpdateArtist } from "@/server/market/daily-update";
 import type { MarketEvent, MarketObservation } from "@/server/market/market-data";
+import { getTrackingAliases } from "@/server/market/artist-tracking";
+import { stripQuotedMusicTitles } from "@/server/market/article-artist-text";
 
 type YoutubeEditorialEventOptions = {
   artists: MarketUpdateArtist[];
@@ -238,10 +240,13 @@ function classifyEditorialVideo(video: YoutubeVideo): EditorialClassification | 
 }
 
 function matchEditorialVideoArtists(video: YoutubeVideo, artists: MarketUpdateArtist[]) {
-  const title = normalizeText(video.title);
+  // Classification already establishes music context. A quoted work named after
+  // an artist still cannot establish that artist's appearance in this video.
+  const attributionTitle = stripQuotedMusicTitles(`song ${video.title}`).slice(5);
+  const title = normalizeText(attributionTitle);
 
-  return artists.filter((artist) => {
-    const artistName = normalizeText(artist.name);
+  return artists.filter((artist) => getTrackingAliases(artist).some(alias => {
+    const artistName = normalizeText(alias);
 
     if (!artistName || !hasWholePhrase(title, artistName)) {
       return false;
@@ -249,12 +254,12 @@ function matchEditorialVideoArtists(video: YoutubeVideo, artists: MarketUpdateAr
 
     // These names are ordinary prose when lowercased; require publisher-style name placement.
     if (AMBIGUOUS_SINGLE_WORD_ARTISTS.has(artistName)) {
-      const rawPattern = new RegExp(`(?:^|[-|:,(]\\s*)${escapeRegExp(artist.name)}(?:\\s|$|[-|:,)])`);
-      return rawPattern.test(video.title);
+      const rawPattern = new RegExp(`(?:^|[-|:,(]\\s*)${escapeRegExp(alias)}(?:\\s|$|[-|:,)])`);
+      return rawPattern.test(attributionTitle);
     }
 
     return true;
-  });
+  }));
 }
 
 function getEditorialImpactProfile(
@@ -538,8 +543,8 @@ const INTERVIEW_TERMS = [
   "interview", "talks", "discuss", "discusses", "explains", "breaks down", "behind the song", "conversation"
 ];
 const DOCUMENTARY_TERMS = ["documentary", "mini documentary", "profile", "the story of"];
-const PERFORMANCE_TERMS = ["performance", "live session", "freestyle", "on the radar", "a colors show"];
+const PERFORMANCE_TERMS = ["performance", "performs live", "performed live", "live session", "freestyle", "on the radar", "a colors show"];
 const MUSIC_CONTEXT_TERMS = [
   "album", "beat", "career", "collaboration", "feature", "lyrics", "mixtape", "music", "producer", "rap", "release", "song", "studio", "tour", "track"
 ];
-const AMBIGUOUS_SINGLE_WORD_ARTISTS = new Set(["future"]);
+const AMBIGUOUS_SINGLE_WORD_ARTISTS = new Set(["future", "ye", "ian", "nav", "che", "feng", "tana", "autumn", "protect"]);

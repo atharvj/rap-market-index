@@ -6,6 +6,7 @@ import type { MarketObservationSeries } from "@/lib/types";
 import { getMarketDate, shiftMarketDate } from "@/server/market/market-date";
 import { reportServerError } from "@/server/observability";
 import { loadAllPages } from "@/lib/pagination";
+import { maskUnavailableReception } from "@/server/market/reception-availability";
 
 export const dynamic = "force-dynamic";
 
@@ -25,6 +26,9 @@ const RANGE_DAYS: Record<Exclude<ObservationRange, "ALL">, number> = {
 const CACHE_HEADERS = { "Cache-Control": "public, max-age=30, s-maxage=60, stale-while-revalidate=300" };
 
 const SERIES_DEFINITIONS: Record<string, { label: string; unit: string }> = {
+  "youtube_comments:classified_comment_count": { label: "Identifiable YouTube reactions", unit: "comments" },
+  "youtube_comments:reception_available": { label: "YouTube reception availability", unit: "boolean" },
+  "bluesky:reception_available": { label: "Social reception availability", unit: "boolean" },
   "apple_charts:chart_points": { label: "Apple song chart points", unit: "rank_points" },
   "apple_charts:album_chart_points": { label: "Apple album chart points", unit: "rank_points" },
   "lastfm:listeners": {
@@ -316,7 +320,7 @@ async function loadObservationSeries({
     return memo;
   }, {});
 
-  return Object.values(grouped).sort((first, second) => first.label.localeCompare(second.label));
+  return maskUnavailableReception(Object.values(grouped)).sort((first, second) => first.label.localeCompare(second.label));
 }
 
 function normalizeRange(value: string | null): ObservationRange {

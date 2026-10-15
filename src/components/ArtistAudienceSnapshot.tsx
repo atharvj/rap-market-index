@@ -24,6 +24,7 @@ const preferredSeries = [
   { key: "youtube_comments:positive_comment_share", label: "Sampled Positive Reactions" },
   { key: "youtube_comments:negative_comment_share", label: "Sampled Negative Reactions" },
   { key: "youtube_comments:comment_count", label: "Recent Comments Sampled" },
+  { key: "youtube_comments:classified_comment_count", label: "Identifiable YouTube Reactions" },
   { key: "bluesky:reaction_count", label: "Social Reactions Sampled" },
   { key: "bluesky:reaction_sentiment", label: "Sampled Social Sentiment" }
 ];
@@ -97,7 +98,8 @@ export function ArtistAudienceSnapshot({ artistId }: { artistId: string }) {
       .filter((item): item is NonNullable<typeof item> => Boolean(item));
   }, [series]);
 
-  if (!metrics.length && !refreshFailed) {
+  const unavailableReception = series.some(item => item.key.endsWith(":reception_available") && item.latestValue === 0);
+  if (!metrics.length && !refreshFailed && !unavailableReception) {
     return null;
   }
 
@@ -121,6 +123,7 @@ export function ArtistAudienceSnapshot({ artistId }: { artistId: string }) {
         ))}
       </div>
       {metrics.some(metric => metric.key.startsWith("youtube_comments:")) ? <p className="border-t border-line px-4 py-3 text-xs text-paper/48">Reactions come from a limited sample of recent YouTube comments, not all fans. Unclassified comments are included in the sample count. Listening and touring can remain strong despite negative reactions.</p> : null}
+      {unavailableReception ? <p className="border-t border-line px-4 py-3 text-xs text-paper/48">Some recent reaction samples are insufficient or unavailable. Older reception estimates are withheld until enough evidence returns.</p> : null}
       {metrics.some(metric => metric.key.startsWith("bluesky:")) ? <p className="border-t border-line px-4 py-3 text-xs text-paper/48">Social sentiment samples identifiable reactions, not all fans. Scores range from −100 to +100. Announcements without an opinion do not count as approval.</p> : null}
       {metrics.some(metric => metric.key.startsWith("apple_charts:")) ? <p className="border-t border-line px-4 py-3 text-xs text-paper/48">Chart points summarize US, UK, and Canada rank positions, not stream counts. Song and album charts share one provider.</p> : null}
     </section>

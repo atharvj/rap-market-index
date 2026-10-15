@@ -14,6 +14,8 @@ import type { MarketEvent } from "@/server/market/market-data";
 import { expandRecordingEvents, isOfficialRecordingSource } from "@/server/market/recording-credits";
 import { getYoutubeVideoId } from "@/server/market/watch-now-videos";
 import { TRUSTED_YOUTUBE_EDITORIAL_CHANNELS } from "@/server/market/youtube-editorial-events-source";
+import { createArtistReceptionSelector, getLongReactionCopyKey } from "@/server/market/artist-reception";
+import { unavailableReception } from "@/server/market/reception-availability";
 
 type YoutubeCommentsCollectOptions = {
   artists: MarketUpdateArtist[];
@@ -104,6 +106,7 @@ type YoutubeComment = {
 type VideoCommentSample = {
   video: YoutubeVideo;
   comments: YoutubeComment[];
+  duplicateCopyCount?: number;
 };
 
 export type YoutubeCommentMarketSignals = {
@@ -125,7 +128,7 @@ const DEFAULT_VIDEOS_PER_ARTIST = 2;
 const DEFAULT_COMMENTS_PER_VIDEO = 50;
 const MIN_COMMENTS_FOR_SIGNAL = 12;
 const CLASSIFICATION_THRESHOLD = 12;
-const SAMPLING_VERSION = 4;
+const SAMPLING_VERSION = 5;
 
 export async function collectYoutubeCommentMarketSignals({
   artists,
@@ -145,7 +148,7 @@ export async function collectYoutubeCommentMarketSignals({
   if (!cleanApiKey) {
     return {
       signals: {},
-      observations: [],
+      observations: artists.map(artist => unavailableReception(artist.id, SOURCE, runDate)),
       warnings: ["YOUTUBE_API_KEY is not configured; skipped YouTube comment reaction signals."]
     };
   }
@@ -153,6 +156,7 @@ export async function collectYoutubeCommentMarketSignals({
   const signals: AdapterSignals = {};
   const observations: MarketObservation[] = [];
   const warnings: string[] = [];
+  const selectReception = createArtistReceptionSelector(artists, externalIds, runDate);
   if (events) {
     // Candidate identity and performing credits come from verified discovery;
     // recheck the actual uploader before reading any audience reactions.
@@ -171,22 +175,23 @@ export async function collectYoutubeCommentMarketSignals({
           if (!pending) {
             pending = (async () => {
               const identity = await verifyVideoUploader(video, cleanApiKey, timeoutMs, fetchImpl);
-              const result = identity ? await fetchBalancedVideoComments({ apiKey: cleanApiKey, videoId: video.id, maxResults: maxCommentsPerVideo, timeoutMs, fetchImpl }) : { ok: false as const, error: "Comment video uploader could not be verified." };
+              const result = identity ? await fetchBalancedVideoComments({ apiKey: cleanApiKey, videoId: video.id, maxResults: maxCommentsPerVideo, runDate, timeoutMs, fetchImpl }) : { ok: false as const, error: "Comment video uploader could not be verified." };
               if (delayMs > 0) await sleep(delayMs);
               return result;
             })();
             commentCache.set(cacheKey, pending);
           }
           const comments = await pending;
-          if (comments.ok) samples.push({ video, comments: comments.comments });
+          if (comments.ok) samples.push({ video, comments: comments.comments, duplicateCopyCount: comments.duplicateCopyCount });
           else { failures++; warnings.push(`${artist.ticker}: ${comments.error}`); }
         }
         if (candidates.length && failures === candidates.length) {
           signals[artist.id] = buildErrorSignal("", "All verified comment samples were unavailable.");
           observations.push(createErrorObservation(artist.id, runDate, "All verified comment samples were unavailable.", {}));
+          observations.push(unavailableReception(artist.id, SOURCE, runDate));
           continue;
         }
-        const result = buildYoutubeCommentSignal({ artist, runDate, channelId: "", videos: candidates, samples, baseline: baselines[artist.id] ?? {} });
+        const result = buildYoutubeCommentSignal({ artist, runDate, channelId: "", videos: candidates, samples, baseline: baselines[artist.id] ?? {}, selectReception, maxCommentsPerVideo });
         signals[artist.id] = result.signal;
         observations.push(...result.observations);
       }
@@ -199,6 +204,7 @@ export async function collectYoutubeCommentMarketSignals({
     const channelId = normalizeYoutubeChannelId(externalIds[artist.id]?.youtubeChannelId);
 
     if (!channelId) {
+      observations.push(unavailableReception(artist.id, SOURCE, runDate));
       signals[artist.id] = {
         stats: {},
         rawPayload: {
@@ -230,6 +236,7 @@ export async function collectYoutubeCommentMarketSignals({
     for (const lookup of channelLookups) {
       signals[lookup.artist.id] = buildErrorSignal(lookup.channelId, uploads.error);
       observations.push(createErrorObservation(lookup.artist.id, runDate, uploads.error, { channelId: lookup.channelId }));
+      observations.push(unavailableReception(lookup.artist.id, SOURCE, runDate));
     }
 
     return {
@@ -250,6 +257,7 @@ export async function collectYoutubeCommentMarketSignals({
       const error = "YouTube uploads playlist was not found for this artist channel.";
       signals[lookup.artist.id] = buildErrorSignal(lookup.channelId, error, "missing_uploads_playlist");
       observations.push(createErrorObservation(lookup.artist.id, runDate, error, { channelId: lookup.channelId }));
+      observations.push(unavailableReception(lookup.artist.id, SOURCE, runDate));
       continue;
     }
 
@@ -269,12 +277,19 @@ export async function collectYoutubeCommentMarketSignals({
           uploadPlaylistId
         })
       );
+      observations.push(unavailableReception(lookup.artist.id, SOURCE, runDate));
       continue;
     }
 
     const samples: VideoCommentSample[] = [];
 
     for (const [videoIndex, video] of videos.videos.entries()) {
+      video.channelId = lookup.channelId;
+      video.audience = "official";
+      if (!await verifyVideoUploader(video, cleanApiKey, timeoutMs, fetchImpl)) {
+        warnings.push(`${lookup.artist.ticker}: Comment video uploader could not be verified.`);
+        continue;
+      }
       if (videoIndex > 0 && delayMs > 0) {
         await sleep(Math.max(100, Math.floor(delayMs / 2)));
       }
@@ -283,6 +298,7 @@ export async function collectYoutubeCommentMarketSignals({
         apiKey: cleanApiKey,
         videoId: video.id,
         maxResults: maxCommentsPerVideo,
+        runDate,
         timeoutMs,
         fetchImpl
       });
@@ -290,20 +306,28 @@ export async function collectYoutubeCommentMarketSignals({
       if (comments.ok) {
         samples.push({
           video,
-          comments: comments.comments
+          comments: comments.comments,
+          duplicateCopyCount: comments.duplicateCopyCount
         });
       } else {
         warnings.push(`${lookup.artist.ticker}: ${comments.error}`);
       }
     }
 
+    if (videos.videos.length && samples.length === 0) {
+      signals[lookup.artist.id] = buildErrorSignal(lookup.channelId, "All comment samples were unavailable.");
+      observations.push(unavailableReception(lookup.artist.id, SOURCE, runDate));
+      continue;
+    }
     const signal = buildYoutubeCommentSignal({
       artist: lookup.artist,
       runDate,
       channelId: lookup.channelId,
       videos: videos.videos,
       samples,
-      baseline: baselines[lookup.artist.id] ?? {}
+      baseline: baselines[lookup.artist.id] ?? {},
+      selectReception,
+      maxCommentsPerVideo
     });
 
     signals[lookup.artist.id] = signal.signal;
@@ -343,7 +367,9 @@ function buildYoutubeCommentSignal({
   channelId,
   videos,
   samples,
-  baseline
+  baseline,
+  selectReception,
+  maxCommentsPerVideo
 }: {
   artist: MarketUpdateArtist;
   runDate: string;
@@ -351,24 +377,30 @@ function buildYoutubeCommentSignal({
   videos: YoutubeVideo[];
   samples: VideoCommentSample[];
   baseline: Record<string, number>;
+  selectReception: ReturnType<typeof createArtistReceptionSelector>;
+  maxCommentsPerVideo: number;
 }): {
   signal: AdapterSignal;
   observations: MarketObservation[];
 } {
-  const seenComments = new Set<string>(), seenAuthors = new Set<string>();
+  const seenComments = new Set<string>(), seenAuthors = new Set<string>(), seenCopies = new Set<string>();
+  let duplicateCopyCount = samples.reduce((sum, sample) => sum + (sample.duplicateCopyCount ?? 0), 0);
   const comments = samples.flatMap((sample) => sample.comments)
     .filter(comment => isRecentDate(comment.publishedAt, runDate, 7))
     .sort((a, b) => (b.publishedAt ?? "").localeCompare(a.publishedAt ?? ""))
     .filter(comment => {
       const id = comment.id ?? `${comment.authorId ?? ""}:${comment.publishedAt}:${comment.text}`;
       if (seenComments.has(id) || (comment.authorId && seenAuthors.has(comment.authorId))) return false;
+      const copy = getLongReactionCopyKey(comment.text);
+      if (copy && seenCopies.has(copy)) { duplicateCopyCount++; return false; }
+      if (copy) seenCopies.add(copy);
       seenComments.add(id);
       if (comment.authorId) seenAuthors.add(comment.authorId);
       return true;
     });
   const scored = comments
     .map((comment) => ({
-      sentiment: scoreCommentSentiment(comment.text),
+      sentiment: scoreCommentSentiment(selectReception(comment.text, artist)),
       weight: getCommentWeight(comment.likeCount),
       likeCount: comment.likeCount,
       replyCount: comment.replyCount
@@ -388,7 +420,7 @@ function buildYoutubeCommentSignal({
   const negativeShare = commentCount
     ? scored.filter((item) => item.sentiment <= -CLASSIFICATION_THRESHOLD).length / commentCount * 100
     : 0;
-  const sampleScope = getSampleScope(samples.map(sample => sample.video.id));
+  const sampleScope = getSampleScope([...samples.map(sample => sample.video.id), `limit:${maxCommentsPerVideo}`]);
   const hasBaseline = baseline.sampling_version === SAMPLING_VERSION && baseline.sample_scope === sampleScope &&
     typeof baseline[COMMENT_SENTIMENT] === "number" &&
     typeof baseline[COMMENT_LIKE_COUNT] === "number" &&
@@ -437,6 +469,9 @@ function buildYoutubeCommentSignal({
     unclassifiedCommentCount: commentCount - classifiedCommentCount,
     uniqueAuthorCount: seenAuthors.size,
     samplingVersion: SAMPLING_VERSION,
+    duplicateCopyCount,
+    candidatesPerOrder: 100,
+    maxCommentsPerVideo,
     sampleScope,
     commentLookbackDays: 7,
     sampleOrders: ["time", "relevance"],
@@ -469,7 +504,9 @@ function buildYoutubeCommentSignal({
     createObservation(artist.id, runDate, POSITIVE_COMMENT_SHARE, positiveShare, "percent", rawPayload),
     createObservation(artist.id, runDate, NEGATIVE_COMMENT_SHARE, negativeShare, "percent", rawPayload),
     createObservation(artist.id, runDate, "sampling_version", SAMPLING_VERSION, "version", rawPayload),
-    createObservation(artist.id, runDate, "sample_scope", sampleScope, "cohort", rawPayload)
+    createObservation(artist.id, runDate, "sample_scope", sampleScope, "cohort", rawPayload),
+    createObservation(artist.id, runDate, "classified_comment_count", classifiedCommentCount, "comments", rawPayload),
+    createObservation(artist.id, runDate, "reception_available", hasEnoughComments ? 1 : 0, "boolean", rawPayload)
   ];
 
   return {
@@ -478,7 +515,7 @@ function buildYoutubeCommentSignal({
       rawPayload,
       confidence: hasEnoughComments ? getSignalConfidence(classifiedCommentCount, commentLikeCount) : 0
     },
-    observations: hasEnoughComments ? observations : observations.filter(observation => observation.metric === COMMENT_COUNT)
+    observations: hasEnoughComments ? observations : observations.filter(observation => [COMMENT_COUNT, "classified_comment_count", "reception_available", "sampling_version", "sample_scope"].includes(observation.metric))
   };
 }
 
@@ -560,17 +597,38 @@ async function verifyVideoUploader(video: YoutubeVideo, apiKey: string, timeoutM
   return Array.isArray(payload?.items) && payload.items.some(item => item.id === video.id && item.snippet?.channelId === video.channelId);
 }
 
-async function fetchBalancedVideoComments(options: Parameters<typeof fetchVideoComments>[0]) {
+async function fetchBalancedVideoComments(options: Parameters<typeof fetchVideoComments>[0] & { runDate: string }) {
   const limit = clampInteger(options.maxResults, 1, 100);
-  const results = await Promise.all(["time", "relevance"].map(order => fetchVideoComments({ ...options, maxResults: Math.max(1, Math.ceil(limit / 2)), order: order as "time" | "relevance" })));
+  // Request the API's full page in the same two calls. Apply the configured cap
+  // after freshness and duplication checks so old top comments do not crowd out
+  // recent reactions. Interleave the two orders to retain balanced selection.
+  const results = await Promise.all(["time", "relevance"].map(order => fetchVideoComments({ ...options, maxResults: 100, order: order as "time" | "relevance" })));
   const successful = results.filter((result): result is { ok: true; comments: YoutubeComment[] } => result.ok);
   if (successful.length !== results.length) return { ok: false as const, error: results.find(result => !result.ok)?.error ?? "Comments unavailable." };
-  return { ok: true as const, comments: successful.flatMap(result => result.comments) };
+  const lists = successful.map(result => result.comments.filter(comment => isRecentDate(comment.publishedAt, options.runDate, 7)));
+  const selected: YoutubeComment[] = [], seen = new Set<string>(), authors = new Set<string>(), copies = new Set<string>();
+  let duplicateCopyCount = 0;
+  for (let index = 0; index < Math.max(...lists.map(list => list.length)) && selected.length < limit; index++) {
+    for (const list of lists) {
+      const comment = list[index];
+      if (!comment || selected.length >= limit) continue;
+      const id = comment.id ?? `${comment.authorId}:${comment.publishedAt}:${comment.text}`;
+      if (seen.has(id)) continue;
+      seen.add(id);
+      if (comment.authorId && authors.has(comment.authorId)) continue;
+      const copy = getLongReactionCopyKey(comment.text);
+      if (copy && copies.has(copy)) { duplicateCopyCount++; continue; }
+      if (copy) copies.add(copy);
+      if (comment.authorId) authors.add(comment.authorId);
+      selected.push(comment);
+    }
+  }
+  return { ok: true as const, comments: selected, duplicateCopyCount };
 }
 
 function isRecentDate(value: string | undefined, runDate: string, days: number) {
-  const observed = Date.parse(value ?? ""), end = Date.parse(`${runDate}T23:59:59.999Z`);
-  return Number.isFinite(observed) && Number.isFinite(end) && observed <= end && observed >= end - (days + 1) * 86400000;
+  const observed = Date.parse(value ?? ""), end = Math.min(Date.now(), Date.parse(`${runDate}T23:59:59.999Z`));
+  return Number.isFinite(observed) && Number.isFinite(end) && observed <= end && observed >= end - days * 86400000;
 }
 
 function getSampleScope(ids: string[]) {

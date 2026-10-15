@@ -18,7 +18,7 @@ concurrency:
 jobs:
   refresh:
     runs-on: ubuntu-latest
-    timeout-minutes: 8
+    timeout-minutes: 10
     steps:
       - name: Discover catalysts and refresh affected quotes
         env:
@@ -61,3 +61,14 @@ jobs:
             quoteChangeCount: .marketUpdate.quoteChangeCount,
             priceTickCount: .marketUpdate.priceTickCount,
             error, warningCount: ((.warnings // .marketUpdate.warnings // []) | length)}' "$rmi_response_file"
+
+          # Recover incomplete chart observations independently of pricing.
+          # The endpoint skips complete rosters and limits retries to once/hour.
+          curl --output "$rmi_response_file" --fail-with-body --silent --show-error --max-time 120 \
+            --header "x-market-update-secret: $MARKET_UPDATE_SECRET" \
+            https://rap-market-index.vercel.app/api/cron/chart-recovery
+          if ! jq -e 'type == "object" and .ok == true' "$rmi_response_file" > /dev/null; then
+            echo "Chart observation recovery did not return a verified success response."
+            exit 1
+          fi
+          jq '{ok, skipped, attemptedArtists, completedArtists, warningCount: ((.warnings // []) | length)}' "$rmi_response_file"
