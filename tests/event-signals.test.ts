@@ -435,6 +435,27 @@ describe("stored media revalidation", () => {
 });
 
 describe("project announcement classification", () => {
+  it("withholds an obsolete positive classification on a disappointing-debut story", () => {
+    const performer = { ...artist, id: "quavo", name: "Quavo", ticker: "QUAVO" };
+    const title = 'Quavo Announces New Solo Album After “QRÖMELIFE” Disappointing Billboard Debut';
+    const event: MarketEvent = { artistId: performer.id, eventDate: "2026-10-13", eventType: "release", title,
+      sentimentScore: 34, impactScore: 52, confidence: 0.735, sourceUrl: "https://www.hotnewhiphop.com/quavo-album",
+      rawPayload: { source: "media_rss_item", sourceTier: 1, domain: "hotnewhiphop.com", releaseKind: "album" } };
+    const signal = buildEventMarketSignals({ artists: [performer], runDate: "2026-10-18", eventsByArtist: { quavo: [event] } }).quavo;
+    expect(signal.stats.newsScore).not.toBeGreaterThan(50);
+    expect(signal.modifiers).toEqual([]);
+  });
+  it("corrects a stored single with stale album-kind metadata", () => {
+    const performer = { ...artist, id: "doechii", name: "Doechii", ticker: "DOECHII" };
+    const title = 'Doechii Returns With New Song ‘BOMBS’ Ahead Of Anticipated Album';
+    const event: MarketEvent = { artistId: performer.id, eventDate: "2026-10-13", eventType: "release", title,
+      sentimentScore: 34, impactScore: 52, confidence: 0.8, sourceUrl: "https://www.iheart.com/content/doechii-bombs/",
+      rawPayload: { source: "media_rss_item", sourceTier: 2, domain: "iheart.com", releaseKind: "album" } };
+    const signal = buildEventMarketSignals({ artists: [performer], runDate: "2026-10-13", eventsByArtist: { doechii: [event] } }).doechii;
+    const scored = signal.rawPayload.events as Array<{ eventSubtype: string }>;
+    expect(scored[0].eventSubtype).toBe("single_video_release");
+    expect(signal.modifiers?.every(modifier => !modifier.reason.includes("project release"))).toBe(true);
+  });
   function projectSignal(title: string) {
     const event: MarketEvent = {
       artistId: artist.id,

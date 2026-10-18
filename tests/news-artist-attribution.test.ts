@@ -14,6 +14,17 @@ const raw = { source: "media_rss_item", searchQuery: '"Cardi B" (album OR song)'
   publisherHeadlineVerified: true, publisherHeadline: title, relatedArtistIds: ["dc-the-don"] };
 
 describe("news artist attribution", () => {
+  it("rejects another person's complete name even behind a legacy synthesized artist prefix", () => {
+    const headline = "Lizzy McAlpine Got Stella Lefty’d Over Nick Drake Soundalike On Her New Album";
+    expect(mentionsArtist(headline, "Drake")).toBe(false);
+    expect(hasNewsArtistAttribution({ artistName: "Drake", title: "Drake - Plagiarism in music is always a hot topic",
+      rawPayload: { publisherArticleVerified: true, publisherHeadlineVerified: true, publisherHeadline: headline,
+        textMatchedArtist: true, publisherDescription: "Lizzy McAlpine credited Nick Drake on her new song." } })).toBe(false);
+    expect(hasNewsArtistAttribution({ artistName: "Drake", title: "Drake discusses Nick Drake's influence on his new song", rawPayload: {} })).toBe(true);
+    for (const headline of ["Drake Bell releases a new song", "Drake Maye attends a concert"]) {
+      expect(mentionsArtist(headline, "Drake")).toBe(false);
+    }
+  });
   it("rejects DC The Don on the Cardi B story despite the search query and claimed match flags", () => {
     expect(mentionsArtist(title, "DC The Don", raw.searchQuery)).toBe(false);
     expect(hasRequiredArtistEventDisambiguation({ artistName: "DC The Don", text: title, query: raw.searchQuery, sourceTier: 3 })).toBe(false);

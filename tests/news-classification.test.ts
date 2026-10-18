@@ -8,6 +8,17 @@ import {
 import { classifyArticleEvent, mentionsArtist } from "@/server/market/gdelt-source";
 
 describe("market news classification", () => {
+  it("does not reward disappointing chart debuts as album announcements", () => {
+    const result = classifyArticleEvent('Quavo Announces New Solo Album After “QRÖMELIFE” Disappointing Billboard Debut', "hotnewhiphop.com");
+    expect(result?.eventType).toBe("news");
+    expect(result?.reason).toBe("decline_terms");
+    expect(result?.impactScore).toBeLessThan(0);
+  });
+
+  it("distinguishes a new song ahead of an album from releasing that album", () => {
+    expect(classifyArticleEvent('Doechii Returns With New Song ‘BOMBS’ Ahead Of Anticipated Album', "iheart.com")?.releaseKind).toBe("single");
+    expect(classifyArticleEvent('Doechii releases a new album', "iheart.com")?.releaseKind).toBe("album");
+  });
   it("classifies branded tour announcements with words between the action and tour", () => {
     const result = classifyArticleEvent(
       "Young Thug Announces YSL Tour",

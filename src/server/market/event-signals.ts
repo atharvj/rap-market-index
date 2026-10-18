@@ -13,7 +13,7 @@ import {
 } from "@/server/market/artist-event-disambiguation";
 import { isMarketEventSourceIntegrityValid } from "@/server/market/event-integrity";
 import { getNewsAttributionText } from "@/server/market/news-artist-attribution";
-import { classifyArticleEvent, normalizeDomain } from "@/server/market/gdelt-source";
+import { classifyArticleEvent, hasSingleReleaseAheadOfProject, normalizeDomain } from "@/server/market/gdelt-source";
 
 export type ManualMarketEventInput = {
   artistId?: string;
@@ -2167,6 +2167,8 @@ function getEventSubtype(event: MarketEvent, artist?: MarketUpdateArtist) {
   }
 
   if (event.eventType === "release") {
+    // Correct stored album-kind metadata as well as newly collected stories.
+    if (hasSingleReleaseAheadOfProject(event.title)) return "single_video_release";
     const releaseKind = getRawString(event.rawPayload.releaseKind);
     const hasProjectLanguage =
       Boolean(releaseKind && hasAnyTerm(releaseKind, ["album", "ep", "mixtape", "project"])) ||
@@ -2364,6 +2366,9 @@ function getEventSubtype(event: MarketEvent, artist?: MarketUpdateArtist) {
     hasAnyTerm(text, [
       "dead crowd",
       "decline",
+      "disappointing billboard debut",
+      "disappointing chart debut",
+      "disappointing first week sales",
       "empty crowd",
       "fell off",
       "fall off",

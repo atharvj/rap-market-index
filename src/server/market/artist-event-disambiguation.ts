@@ -112,7 +112,7 @@ export function hasRequiredArtistEventDisambiguation({
     aliases.some((alias) =>
       !isAmbiguousAlias(alias) &&
       !isCommonWordAlias(alias) &&
-      containsNormalizedPhrase(normalizedText, alias)
+      containsNormalizedArtistPhrase(normalizedText, alias)
     )
   ) {
     return true;
@@ -198,7 +198,7 @@ export function hasArtistControversySubjectContext({
   const aliases = getArtistAliases(artistName, query);
 
   return aliases.some((alias) => {
-    if (!alias || !containsNormalizedPhrase(normalizedText, alias)) {
+    if (!alias || !containsNormalizedArtistPhrase(normalizedText, alias)) {
       return false;
     }
 
@@ -226,7 +226,7 @@ export function hasArtistFeatureCreditContext({
   const aliases = getArtistAliases(artistName, query);
 
   return aliases.some((normalizedAlias) => {
-    if (!normalizedAlias || !containsNormalizedPhrase(normalizedText, normalizedAlias)) {
+    if (!normalizedAlias || !containsNormalizedArtistPhrase(normalizedText, normalizedAlias)) {
       return false;
     }
 
@@ -364,7 +364,7 @@ function getArtistAliases(artistName: string, _query?: string) {
 }
 
 function hasStrongArtistCatalystContext(normalizedText: string, normalizedAlias: string) {
-  if (!normalizedAlias || !containsNormalizedPhrase(normalizedText, normalizedAlias)) {
+  if (!normalizedAlias || !containsNormalizedArtistPhrase(normalizedText, normalizedAlias)) {
     return false;
   }
 
@@ -412,7 +412,7 @@ function hasDirectStatusSubject(
   normalizedAlias: string,
   statusSubtype?: ArtistStatusSubtype | null
 ) {
-  if (!normalizedAlias || !containsNormalizedPhrase(normalizedText, normalizedAlias)) {
+  if (!normalizedAlias || !containsNormalizedArtistPhrase(normalizedText, normalizedAlias)) {
     return false;
   }
 
@@ -467,7 +467,7 @@ function hasCreditObjectContext(normalizedText: string, normalizedAlias: string)
 }
 
 function hasDirectReleaseSubject(normalizedText: string, normalizedAlias: string) {
-  if (!normalizedAlias || !containsNormalizedPhrase(normalizedText, normalizedAlias)) {
+  if (!normalizedAlias || !containsNormalizedArtistPhrase(normalizedText, normalizedAlias)) {
     return false;
   }
 
@@ -632,7 +632,12 @@ function isCommonWordAlias(normalizedAlias: string) {
   return COMMON_WORD_ARTIST_KEYS.has(getArtistTextKey(normalizedAlias));
 }
 
-function containsNormalizedPhrase(normalizedText: string, normalizedPhrase: string) {
+export function containsNormalizedArtistPhrase(normalizedText: string, normalizedPhrase: string) {
+  // A complete name belonging to someone else cannot supply a shorter alias.
+  // Preserve a separate genuine mention when a story discusses both people.
+  if (normalizedPhrase === "drake") {
+    normalizedText = normalizedText.replace(/\b(?:nick drake|drake bell|drake maye)\b/g, " ");
+  }
   return ` ${normalizedText} `.includes(` ${normalizedPhrase} `);
 }
 

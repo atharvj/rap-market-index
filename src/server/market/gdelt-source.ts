@@ -2,6 +2,7 @@ import { isHistoricalRetrospective } from "@/server/market/article-timeliness";
 import { clamp } from "@/lib/pricing";
 import type { MarketUpdateArtist } from "@/server/market/daily-update";
 import {
+  containsNormalizedArtistPhrase,
   hasArtistControversySubjectContext,
   hasArtistReleaseSubjectContext,
   hasArtistStatusSubjectContext,
@@ -1053,6 +1054,7 @@ function hasNonMusicProductDropSignal(title: string) {
 }
 
 function getArticleReleaseKind(title: string): ArticleReleaseKind | null {
+  if (hasSingleReleaseAheadOfProject(title)) return "single";
   if (
     hasAny(title, [
       "album",
@@ -1082,6 +1084,11 @@ function getArticleReleaseKind(title: string): ArticleReleaseKind | null {
   }
 
   return null;
+}
+
+/** The available song and its parent project's rollout are distinct events. */
+export function hasSingleReleaseAheadOfProject(title: string) {
+  return /\b(?:new\s+(?:single|song|track)|music\s+video)\b.{0,160}\b(?:ahead\s+of|from|off)\b.{0,60}\b(?:album|mixtape|ep|project)\b/i.test(title);
 }
 
 function hasReviewSignal(title: string) {
@@ -1185,7 +1192,7 @@ export function mentionsArtist(title: string, artistName: string, _query?: strin
   for (const candidate of candidateNames) {
     const normalizedArtist = normalizeSearchText(candidate);
 
-    if (normalizedArtist && containsNormalizedPhrase(normalizedTitle, normalizedArtist)) {
+    if (normalizedArtist && containsNormalizedArtistPhrase(normalizedTitle, normalizedArtist)) {
       return true;
     }
 
@@ -1199,10 +1206,6 @@ export function mentionsArtist(title: string, artistName: string, _query?: strin
   }
 
   return false;
-}
-
-function containsNormalizedPhrase(normalizedText: string, normalizedPhrase: string) {
-  return ` ${normalizedText} `.includes(` ${normalizedPhrase} `);
 }
 
 function normalizeSearchText(value: string) {
@@ -1797,6 +1800,9 @@ const DECLINE_TERMS = [
   "booed",
   "crowd booed",
   "dead crowd",
+  "disappointing billboard debut",
+  "disappointing chart debut",
+  "disappointing first week sales",
   "decline",
   "declines",
   "fall off",
