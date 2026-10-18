@@ -29,6 +29,8 @@ type LastfmArtistInfo = LastfmArtistStats & {
   returnedName?: string;
   url?: string;
   matchedBy: "musicbrainz_id" | "name_search";
+  requestedMusicbrainzId?: string;
+  returnedMusicbrainzId?: string;
 };
 
 type LastfmCollectOptions = {
@@ -155,15 +157,18 @@ function buildLastfmSignal({
 } {
   const listenerBaselineAgeDays = getBaselineAgeDays(baseline, LISTENERS);
   const playcountBaselineAgeDays = getBaselineAgeDays(baseline, PLAYCOUNT);
+  const verifiedExternalId = Boolean(info.requestedMusicbrainzId && info.returnedMusicbrainzId &&
+    info.requestedMusicbrainzId.toLowerCase() === info.returnedMusicbrainzId.toLowerCase());
+  const conflictingExternalId = Boolean(info.requestedMusicbrainzId && info.returnedMusicbrainzId && !verifiedExternalId);
   const nameMatch =
-    info.matchedBy === "musicbrainz_id"
+    verifiedExternalId
       ? {
           ...scoreArtistNameMatch(info.requestedName, info.returnedName ?? info.requestedName),
           confidence: 1,
           status: "trusted_external_id" as const
         }
       : scoreArtistNameMatch(info.requestedName, info.returnedName);
-  const trustedIdentity = info.matchedBy === "musicbrainz_id" || nameMatch.confidence >= 0.58;
+  const trustedIdentity = !conflictingExternalId && (verifiedExternalId || nameMatch.confidence >= 0.94);
   const listeners = trustedIdentity ? info.listeners : undefined;
   const playcount = trustedIdentity ? info.playcount : undefined;
   const listenerMomentum = calculateSnapshotMomentum({
@@ -225,6 +230,9 @@ function buildLastfmSignal({
     requestedName: info.requestedName,
     returnedName: info.returnedName ?? null,
     matchedBy: info.matchedBy,
+    musicbrainzIdVerified: verifiedExternalId,
+    requestedMusicbrainzId: info.requestedMusicbrainzId ?? null,
+    returnedMusicbrainzId: info.returnedMusicbrainzId ?? null,
     nameMatchConfidence: nameMatch.confidence,
     nameMatchStatus: nameMatch.status,
     url: info.url ?? null,
@@ -301,7 +309,11 @@ async function fetchLastfmArtistInfo({
     fetchImpl
   });
 
-  if (primary.ok || !musicbrainzId?.trim()) {
+  const identityMatches = primary.ok && (
+    primary.info.returnedMusicbrainzId ? primary.info.returnedMusicbrainzId.toLowerCase() === musicbrainzId?.trim().toLowerCase()
+      : scoreArtistNameMatch(artistName, primary.info.returnedName).confidence >= 0.94
+  );
+  if ((primary.ok && identityMatches) || !musicbrainzId?.trim()) {
     return primary;
   }
 
@@ -316,7 +328,7 @@ async function fetchLastfmArtistInfo({
     ? fallback
     : {
         ok: false,
-        error: `${primary.error} Safe artist-name fallback also failed: ${fallback.error}`
+        error: `${primary.ok ? "The returned artist identity did not match the requested ID." : primary.error} Safe artist-name fallback also failed: ${fallback.error}`
       };
 }
 
@@ -402,6 +414,8 @@ async function requestLastfmArtistInfo({
         returnedName: typeof artist?.name === "string" ? artist.name : undefined,
         url: typeof artist?.url === "string" ? artist.url : undefined,
         matchedBy: musicbrainzId?.trim() ? "musicbrainz_id" : "name_search",
+        requestedMusicbrainzId: musicbrainzId?.trim(),
+        returnedMusicbrainzId: typeof artist?.mbid === "string" && artist.mbid.trim() ? artist.mbid.trim() : undefined,
         listeners,
         playcount
       }

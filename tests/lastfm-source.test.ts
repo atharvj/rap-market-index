@@ -24,6 +24,22 @@ function artist(name: string, ticker: string): MarketUpdateArtist {
 }
 
 describe("Last.fm identity fallback", () => {
+  it("checks the returned ID and safely falls back instead of trusting the fact that an ID was requested", async () => {
+    const performer = artist("Artist", "ARTIST"); let calls = 0;
+    const result = await collectLastfmMarketSignals({ artists: [performer], runDate: "2026-10-18", apiKey: "test", delayMs: 0,
+      externalIds: { artist: { artistId: "artist", musicbrainzId: "expected-id" } }, fetchImpl: async () => {
+        calls++; return Response.json({ artist: { name: calls === 1 ? "Wrong Artist" : "Artist", mbid: calls === 1 ? "wrong-id" : "",
+          stats: { listeners: calls === 1 ? "99999999" : "12345", playcount: "100000" } } });
+      } });
+    expect(calls).toBe(2); expect(result.observations.find(row => row.metric === "listeners")?.value).toBe(12345);
+    expect(result.signals.artist.rawPayload.musicbrainzIdVerified).toBe(false);
+  });
+  it("rejects a similarly named catalogue instead of accepting a loose contains match", async () => {
+    const performer = artist("Drake", "DRAKE");
+    const result = await collectLastfmMarketSignals({ artists: [performer], runDate: "2026-10-18", apiKey: "test", delayMs: 0,
+      fetchImpl: async () => Response.json({ artist: { name: "Drake Bell", stats: { listeners: "500000", playcount: "1000000" } } }) });
+    expect(result.observations).toHaveLength(0); expect(result.signals.drake.rawPayload.status).toBe("name_mismatch");
+  });
   it("uses the provider's canonical catalogue when a renamed artist's external ID fails", async () => {
     const ye = artist("Ye", "YE");
     const result = await collectLastfmMarketSignals({

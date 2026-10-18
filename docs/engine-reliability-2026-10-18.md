@@ -55,6 +55,11 @@ not establish that source interpretation or predictive evaluation was correct.
 - Live collectors cannot assign today's source responses to a historical/future
   market session, and mock/manual price signals cannot publish live quotes.
   Malformed request bodies and invalid pricing inputs fail before mutation.
+- Last.fm ID lookups now verify the returned ID, or require a near-exact returned
+  catalogue name when the ID is absent. A loose contains match or the fact that
+  an ID was requested is not proof of artist identity. Conflicting responses can
+  try the safe canonical-name lookup; unrelated catalogues never become audience
+  observations for a roster artist.
 
 ## Corrected validation
 
