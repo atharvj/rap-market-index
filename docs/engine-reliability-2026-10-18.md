@@ -129,6 +129,18 @@ intraday run cannot replace the original daily evidence. `atomicPublication`
 reports the transaction result; successful installation alone is separate from
 verification of an actual live publication.
 
+Production verification at 20:04 UTC confirmed a successful all-89-artist live
+refresh with `atomicPublication: true`, 89 atomic evidence states and 89 atomic
+completion records. Every artist's public history endpoint defaults to `3M`,
+returns real, positive, ordered prices, and ends at its current quote. The 7,434
+recorded prices from July 10–October 17 remain unchanged (canonical SHA-256
+`3a2933a3afcd5da807c019c92477c12e593a606e28b2c6c2299721ec8eceec2a`).
+Today's 89 original daily evidence snapshots also retained their complete-row
+MD5 digest `cfb658e64b09f8ba8f4f8c276654102c` across the intraday refresh.
+The shared automation cooldown was respected throughout. Quality CI passed all
+736 tests across 107 files, 33 browser/authorization checks, type-checking, the
+production build and dependency checks.
+
 PostgreSQL tests execute the real migration in PGlite against table definitions
 from this repository. They cover successful publication, complete rollback after
 a late constraint failure, stale input rejection, original snapshot preservation,
