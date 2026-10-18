@@ -32,7 +32,7 @@ function mockDatabase(tables: Record<string, unknown[]>, ranges: number[]) {
     const builder = {
       select: () => builder, in: () => builder, eq: () => builder, gte: () => builder,
       lt: () => builder, lte: () => builder, not: () => builder, order: () => builder,
-      range: async (from: number, to: number) => { ranges.push(from); return { data: tables[table].slice(from, to + 1), error: null }; }
+      range: async (from: number, to: number) => { ranges.push(from); return { data: (tables[table] ?? []).slice(from, to + 1), error: null }; }
     };
     return builder;
   } } as never;

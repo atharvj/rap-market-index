@@ -1070,3 +1070,30 @@ test("public indicators keep full labels readable and isolate unavailable reacti
     await panel.screenshot({ path: test.info().outputPath(`indicators-${theme}.png`) });
   }
 });
+
+
+test("account signup clearly offers Google and existing email users can still sign in", async ({ page }) => {
+  await page.goto("/account?mode=signup");
+  await expect(page.getByRole("button", { name: "Create account with Google", exact: true })).toBeVisible();
+  await expect(page.getByText(/start with \$25,000 in fantasy cash/)).toBeVisible();
+  await expect(page.getByText(/RMI requests only your name, email address and profile picture/)).toBeVisible();
+  await expect(page.getByText(/Public-beta signup/)).toHaveCount(0);
+  await page.getByRole("button", { name: "Already have an account?", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Continue with Google", exact: true })).toBeVisible();
+  await expect(page.getByPlaceholder("Email", { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Log in", exact: true })).toBeVisible();
+});
+
+test("a failed session verification recovers to sign in instead of an endless account skeleton", async ({ page }) => {
+  await installPortfolioFixture(page);
+  await page.route("https://example.supabase.co/auth/v1/user", route => route.fulfill({ status: 401, contentType: "application/json", body: JSON.stringify({ message: "Session could not be verified" }) }));
+  await page.goto("/account");
+  await expect(page.getByRole("button", { name: "Continue with Google", exact: true })).toBeVisible();
+});
+
+test("a valuation correction is identified independently of market performance", async ({ page }) => {
+  await page.route("**/api/market/snapshot", route => route.fulfill({ contentType: "application/json", body: JSON.stringify({ ok: true, source: "supabase",
+    state: { ...marketState, valuationNotice: { date: marketState.lastUpdatedAt, artistCount: 16 } } }) }));
+  await page.goto("/markets");
+  await expect(page.getByRole("status").filter({ hasText: "Quotes were recalibrated today" })).toContainText("portfolio values include this correction");
+});

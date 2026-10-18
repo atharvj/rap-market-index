@@ -59,18 +59,25 @@ export async function GET() {
 
     const typedArtists = (artists ?? []) as ArtistRow[];
     const artistIds = typedArtists.map((artist) => artist.id);
-    const [statsByArtist, historyByArtist, imageByArtistId] = await Promise.all([
+    const [statsByArtist, historyByArtist, imageByArtistId, currentCorrections] = await Promise.all([
       loadStatsByArtist(artistIds, supabase),
       loadHistoryByArtist(artistIds, supabase),
       loadArtistImageUrls(
         supabase,
         artistIds,
         Object.fromEntries(typedArtists.map((artist) => [artist.id, artist.name]))
-      )
+      ),
+      loadAllPages(async (from, to) => {
+        const result = await supabase.from("market_valuation_boundaries").select("artist_id")
+          .in("artist_id", artistIds).eq("effective_date", getMarketDate()).order("artist_id").range(from, to);
+        if (result.error) throw new Error(`Could not verify today's valuation notice: ${result.error.message}`);
+        return result.data ?? [];
+      })
     ]);
     const fallback = createInitialGameState();
     const state: GameState = {
       ...fallback,
+      ...(currentCorrections.length ? { valuationNotice: { date: getMarketDate(), artistCount: currentCorrections.length } } : {}),
       artists: typedArtists.map((artist) =>
         mapArtist(
           artist,

@@ -68,6 +68,11 @@ export async function GET(request: Request) {
       if (!payload || payload.version !== 1 || payload.runDate !== row.observed_date || typeof payload.modelVersion !== "string") {
         throw new Error("Could not verify the executed pricing evidence identity.");
       }
+      // A change of valuation units is not a prediction of audience demand.
+      if (payload.audienceRevaluation) {
+        snapshotsByKey.delete(`${row.artist_id}:${row.observed_date}`);
+        continue;
+      }
       const executed = typeof payload.executedReturnPercent === "number" ? payload.executedReturnPercent : payload.pricingSignalPercent;
       if (typeof executed !== "number" || !Number.isFinite(executed)) throw new Error("Could not verify an executed pricing signal.");
       const previous = snapshotsByKey.get(`${row.artist_id}:${row.observed_date}`);

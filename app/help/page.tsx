@@ -31,7 +31,8 @@ const topics = [
     summary: "Email confirmation, profile setup, password resets, privacy, and account deletion.",
     icon: CircleUserRound,
     answers: [
-      "Confirm your email before completing onboarding or placing an order.",
+      "Create an account with Google, then choose your username and complete setup. Existing email accounts can still sign in with their password.",
+      "RMI requires a verified account before onboarding or trading. Email accounts must confirm their email address.",
       "Use Account Settings to change your display name, password, theme, and public-profile visibility.",
       "A deleted account permanently removes its profile, watchlist, holdings, and trade records."
     ]

@@ -301,6 +301,11 @@ export function Shell({ children }: { children: React.ReactNode }) {
             {marketError}
           </div>
         ) : null}
+        {state.valuationNotice?.date === state.lastUpdatedAt ? (
+          <div className="mb-5 rounded border border-cyan/40 bg-cyan/5 px-4 py-3 text-sm leading-relaxed text-paper/80" role="status">
+            Quotes were recalibrated today using the same audience-based valuation for every artist. Today’s changes and portfolio values include this correction.
+          </div>
+        ) : null}
         {marketReady ? <>{children}</> : <MarketBootPlaceholder pathname={pathname} />}
       </main>
       <SiteFooter />

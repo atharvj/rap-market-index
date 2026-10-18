@@ -16,7 +16,7 @@ function database(record: object = boundary, tick: object | null = { observed_at
       lte: (...args: unknown[]) => { filters.push([table, "lte", ...args]); return builder; },
       not: () => builder,
       contains: (...args: unknown[]) => { filters.push([table, "contains", ...args]); return builder; },
-      range: async () => ({ data: [{ artist_id: "example", source_date: date, model_version: "v34", raw_payload: { audienceRevaluation: record, priceBeforeRevaluation: 10.1 } }], error: null }),
+      range: async () => ({ data: table === "market_valuation_boundaries" ? [] : [{ artist_id: "example", source_date: date, model_version: "v34", raw_payload: { audienceRevaluation: record, priceBeforeRevaluation: 10.1 } }], error: null }),
       maybeSingle: async () => ({ data: tick, error: null })
     };
     return builder;
@@ -41,7 +41,7 @@ describe("stored chart corrections", () => {
   });
 
   it("rejects a corrupted saved factor", async () => {
-    expect(await loadChartAdjustments({ ...database({ ...boundary, factor: 99 }), artistIds: ["example"] })).toEqual({});
+    await expect(loadChartAdjustments({ ...database({ ...boundary, factor: 99 }), artistIds: ["example"] })).rejects.toThrow("verify a legacy");
   });
 
   it("reads daily adjustments without requiring intraday data", async () => {

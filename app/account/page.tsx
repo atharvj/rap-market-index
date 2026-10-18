@@ -8,6 +8,7 @@ import { UserAvatar } from "@/components/UserAvatar";
 import { RmiButton, RmiNotice, type NoticeTone } from "@/components/RmiPrimitives";
 import { TurnstileWidget } from "@/components/TurnstileWidget";
 import { formatCurrency } from "@/lib/formatters";
+import { STARTING_CASH } from "@/lib/trading";
 import { formatAuthErrorMessage } from "@/lib/auth-errors";
 import { getEmailDomainWarning } from "@/lib/email-address";
 import { getUsernameValidationError, normalizeUsernameInput, USERNAME_REQUIREMENTS } from "@/lib/username";
@@ -206,23 +207,25 @@ function AccountPageContent() {
         authMethod: "email"
       });
     }
-    const result =
-      mode === "signin"
+    try {
+      const result = mode === "signin"
         ? await signIn(normalizedEmail, password, captchaToken ?? undefined)
         : await signUp(normalizedEmail, password, normalizedUsername, captchaToken ?? undefined);
-    if (mode === "signup" && /username/i.test(result.message)) {
-      setUsernameMessage(result.message);
-    }
-    setMessage(result.message);
-    setMessageTone(result.ok ? "success" : "error");
-    setConfirmationPending(mode === "signup" && result.ok);
-    setSubmitting(false);
-    setCaptchaToken(null);
-    setCaptchaResetKey((current) => current + 1);
-
-    if (result.ok && mode === "signin") {
-      await refreshServerState(username || undefined);
-      router.replace("/");
+      if (mode === "signup" && /username/i.test(result.message)) setUsernameMessage(result.message);
+      setMessage(result.message);
+      setMessageTone(result.ok ? "success" : "error");
+      setConfirmationPending(mode === "signup" && result.ok);
+      if (result.ok && mode === "signin") {
+        await refreshServerState(username || undefined);
+        router.replace("/");
+      }
+    } catch {
+      setMessage("Could not connect to sign in. Check your connection and try again.");
+      setMessageTone("error");
+    } finally {
+      setSubmitting(false);
+      setCaptchaToken(null);
+      setCaptchaResetKey(current => current + 1);
     }
   }
 
@@ -299,11 +302,14 @@ function AccountPageContent() {
         authMethod: "google"
       });
     }
-    const result = await signInWithGoogle();
-    setMessage(result.message);
-    setMessageTone(result.ok ? "info" : "error");
-
-    if (!result.ok) {
+    try {
+      const result = await signInWithGoogle();
+      setMessage(result.message);
+      setMessageTone(result.ok ? "info" : "error");
+      if (!result.ok) setSubmitting(false);
+    } catch {
+      setMessage("Could not connect to Google. Check your connection and try again.");
+      setMessageTone("error");
       setSubmitting(false);
     }
   }
@@ -493,7 +499,7 @@ function AccountPageContent() {
           </h1>
           <p className="mx-auto mt-2 max-w-md text-sm text-paper/60">
             {mode === "signup"
-              ? "Create a verified profile, build a watchlist, and start with fantasy cash."
+              ? `Create your profile, build a watchlist, and start with ${formatCurrency(STARTING_CASH)} in fantasy cash.`
               : "Access your portfolio, watchlist, and saved market activity."}
           </p>
         </header>
@@ -514,7 +520,7 @@ function AccountPageContent() {
           </button>
           {mode === "signup" && !emailSignupEnabled ? (
             <p className="text-center text-xs leading-5 text-paper/45">
-              Public-beta signup uses Google for reliable account verification. RMI requests only basic profile information.
+              Create your account with Google. RMI requests only your name, email address and profile picture.
             </p>
           ) : (
             <>

@@ -38,8 +38,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     const supabase = getBrowserSupabaseClient();
+    let active = true;
 
     supabase.auth.getSession().then(async ({ data }) => {
+      if (!active) return;
       if (!data.session) {
         setSession(null);
         setLoading(false);
@@ -47,6 +49,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       const { data: verified, error } = await supabase.auth.getUser();
+      if (!active) return;
       const verifiedUser = verified.user;
       const verifiedSession = error || !verifiedUser ? null : data.session;
 
@@ -67,6 +70,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setSession(verifiedSession);
       }
       setLoading(false);
+    }).catch(() => {
+      if (active) { setSession(null); setLoading(false); }
     });
 
     const {
@@ -90,7 +95,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setSession(nextSession);
     });
 
-    return () => subscription.unsubscribe();
+    return () => { active = false; subscription.unsubscribe(); };
   }, [configured]);
 
   const signIn = useCallback(

@@ -1,6 +1,7 @@
+import { loadValuationBoundaries } from "@/server/market/valuation-boundaries";
 import { VERIFIED_SPOTIFY_ARTISTS } from "@/data/spotifyArtistIds";
 import { applyTrackingExternalIds } from "@/server/market/artist-tracking";
-import { priceForTrendAnalysis, readAudienceRevaluation, type AudienceRevaluation } from "@/server/market/audience-revaluation";
+import { priceForTrendAnalysis, type AudienceRevaluation } from "@/server/market/audience-revaluation";
 import { loadAllPages } from "@/lib/pagination";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database, Json } from "@/lib/supabase/database.types";
@@ -289,19 +290,11 @@ export async function loadPriceTrendContexts({
       if (result.error) throw new Error(`Could not load price trend contexts: ${result.error.message}`);
       return result.data ?? [];
     }),
-    loadAllPages(async (from, to) => {
-      const result = await supabase.from("market_signal_snapshots").select("artist_id,source_date,raw_payload")
-        .in("artist_id", artistIds).gte("source_date", startDate).lt("source_date", runDate)
-        .not("raw_payload->audienceRevaluation", "is", null).order("source_date").order("artist_id").range(from, to);
-      if (result.error) throw new Error(`Could not load valuation history: ${result.error.message}`);
-      return result.data ?? [];
-    })
+    loadValuationBoundaries({ supabase, artistIds, startDate, endDate: shiftDate(runDate, -1) })
   ]);
   const adjustments: Record<string, AudienceRevaluation[]> = {};
   for (const row of boundaries) {
-    const raw = row.raw_payload as Record<string, unknown> | null;
-    const record = readAudienceRevaluation(raw?.audienceRevaluation, row.source_date);
-    if (record) (adjustments[row.artist_id] ??= []).push(record);
+    (adjustments[row.artistId] ??= []).push(row.record);
   }
 
   const grouped = ((data ?? []) as Pick<
@@ -1313,7 +1306,9 @@ async function persistUpdateBatch(
       raw_payload: { version: 1, runDate, modelVersion: update.modelVersion, atomic: false,
         pricingSignalPercent: update.signalDelta * 100, executedReturnPercent: update.dailyChangePercent,
         marketEvents: (update.rawPayload.market_events ?? null) as Json,
-        receptionPricingBaseline: (update.rawPayload.receptionPricingBaseline ?? {}) as Json } as Json
+        receptionPricingBaseline: (update.rawPayload.receptionPricingBaseline ?? {}) as Json,
+        audienceRevaluation: (update.rawPayload.audienceRevaluation ?? null) as Json,
+        priceBeforeRevaluation: (update.rawPayload.priceBeforeRevaluation ?? null) as Json } as Json
     }));
   // Migration 046 is installed in production. Every live publication now
   // requires its transaction; missing inputs or RPCs must never permit partial writes.

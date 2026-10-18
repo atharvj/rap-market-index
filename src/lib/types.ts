@@ -75,6 +75,7 @@ export type Transaction = {
 };
 
 export type GameState = {
+  valuationNotice?: { date: string; artistCount: number };
   userId: string;
   username: string;
   cashBalance: number;

@@ -1,9 +1,10 @@
+import { loadValuationBoundaries } from "@/server/market/valuation-boundaries";
 import { collectAppleChartSignals, restoreAppleChartSignals } from "@/server/market/apple-charts-source";
 import { collectYoutubeTrackSignals, getTrackedVideoMetrics, selectTrackedVideos } from "@/server/market/youtube-tracks-source";
 import { expandRecordingEvents } from "@/server/market/recording-credits";
 import { restoreDailySources } from "@/server/market/daily-source-cache";
 import { getBaselineAgeDays } from "@/server/market/source-quality";
-import { createAudienceRevaluation, readAudienceRevaluation, type AudienceRevaluation } from "@/server/market/audience-revaluation";
+import { createAudienceRevaluation, type AudienceRevaluation } from "@/server/market/audience-revaluation";
 import { NextResponse } from "next/server";
 import { createServiceRoleClient, getSupabaseConfigStatus } from "@/lib/supabase/server";
 import type { HypeStats } from "@/lib/types";
@@ -197,7 +198,8 @@ export async function POST(request: Request) {
       runDate,
       supabase,
       dryRun,
-      intraday: body.intraday === true
+      intraday: body.intraday === true,
+      revalueAudience: body.revalueAudience === true
     });
     const eventSignals = await collectEventSignals({
       source,
@@ -222,18 +224,13 @@ export async function POST(request: Request) {
     ];
     const audienceRevaluations: Record<string, AudienceRevaluation> = {};
     if (supabase && isRealExternalSource(source)) {
-      const { data, error } = await supabase.from("market_signal_snapshots")
-        .select("artist_id,raw_payload").in("artist_id", artists.map(artist => artist.id)).eq("source_date", runDate);
-      if (error) throw new Error(`Could not load valuation boundaries: ${error.message}`);
-      for (const row of data ?? []) {
-        const payload = row.raw_payload as Record<string, unknown> | null;
-        const record = readAudienceRevaluation(payload?.audienceRevaluation, runDate);
-        if (record) audienceRevaluations[row.artist_id] = record;
+      for (const row of await loadValuationBoundaries({ supabase, artistIds: artists.map(artist => artist.id), startDate: runDate, endDate: runDate })) {
+        audienceRevaluations[row.artistId] = row.record;
       }
     }
     if (body.revalueAudience === true) {
-      if (body.intraday || !["core", "blended"].includes(source) || runDate !== getMarketDate()) {
-        throw new Error("Audience repricing requires a current-date daily core or blended run.");
+      if (!["core", "blended"].includes(source) || runDate !== getMarketDate()) {
+        throw new Error("Audience repricing requires a current-date core or blended run.");
       }
       for (const artist of artists) {
         audienceRevaluations[artist.id] ??= createAudienceRevaluation(
@@ -630,7 +627,8 @@ async function collectRealSignals({
   runDate,
   supabase,
   dryRun,
-  intraday
+  intraday,
+  revalueAudience = false
 }: {
   source: MarketUpdateSource;
   artists: ReturnType<typeof getMockMarketArtists>;
@@ -638,6 +636,7 @@ async function collectRealSignals({
   supabase: ReturnType<typeof createServiceRoleClient> | null;
   dryRun: boolean;
   intraday: boolean;
+  revalueAudience?: boolean;
 }): Promise<{
   adapterSignals?: AdapterSignals;
   adapterSignalSources: AdapterSignals[];
@@ -657,7 +656,7 @@ async function collectRealSignals({
     (source === "lastfm" || source === "core" || source === "blended");
   const useSpotify =
     !intraday && (source === "spotify" || ((source === "core" || source === "blended") && hasSpotifyCredentials()));
-  const useSpotifyPublic = !intraday && (source === "spotify" || source === "core" || source === "blended");
+  const useSpotifyPublic = (!intraday || revalueAudience) && (source === "spotify" || source === "core" || source === "blended");
   const useYoutube = intraday || source === "youtube" || source === "core" || source === "blended";
   const useWikimedia = shouldCollectWikimediaSource(source, intraday);
   const useReddit = !intraday && isRedditAccessEnabled() && (source === "reddit" || ((source === "core" || source === "blended") && hasRedditCredentials()));
@@ -1161,7 +1160,8 @@ async function collectRealSignals({
       if (error) throw new Error(`Daily source context could not be loaded: ${error.message}`);
       const recovered = restoreAppleChartSignals({ artists, runDate, current: currentCharts, previous: priorCharts });
       sources.push(...restoreDailySources(data ?? [], runDate).map(bucket => Object.fromEntries(Object.entries(bucket)
-        .filter(([id, signal]) => signal.rawPayload.source !== "apple_charts" || !recovered[id]))), recovered);
+        .filter(([id, signal]) => (signal.rawPayload.source !== "apple_charts" || !recovered[id]) &&
+          (signal.rawPayload.source !== "spotify_public" || !useSpotifyPublic)))), recovered);
     })());
   }
 

@@ -3,6 +3,14 @@ export type Json = string | number | boolean | null | { [key: string]: Json | un
 export type Database = {
   public: {
     Tables: {
+      market_valuation_boundaries: {
+        Row: { artist_id: string; effective_date: string; effective_at: string; model_version: string;
+          reference_price: number; anchor_price: number; factor: number; calibration: Json };
+        Insert: { artist_id: string; effective_date: string; effective_at?: string; model_version: string;
+          reference_price: number; anchor_price: number; factor: number; calibration: Json };
+        Update: Partial<Database["public"]["Tables"]["market_valuation_boundaries"]["Insert"]>;
+        Relationships: [];
+      };
       artists: {
         Row: {
           id: string;

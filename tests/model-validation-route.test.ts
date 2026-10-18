@@ -28,6 +28,12 @@ describe("validation cohorts and latest executed evidence", () => {
     expect(data.validation.sampleCount).toBe(1); expect(data.validation.directionalAccuracyPercent).toBe(100);
     expect(data.validation.predictionSources.executed_return).toBe(1);
   });
+  it("does not score a valuation-model correction as a successful price prediction", async () => {
+    state.pricingStates = [{ artist_id: "a", observed_date: "2026-10-01", raw_payload: {
+      version: 1, runDate: "2026-10-01", modelVersion: "rmi-core-v46", executedReturnPercent: -30, audienceRevaluation: { factor: 0.7 } } }];
+    const data = await (await GET(new Request("https://example.test/api/admin/model-validation?runDate=2026-10-18"))).json();
+    expect(data.snapshotRowCount).toBe(0); expect(data.validation.sampleCount).toBe(0);
+  });
   it("rejects corrupt pricing-state identity instead of silently assigning it to a cohort", async () => {
     state.pricingStates = [{ artist_id: "a", observed_date: "2026-10-01", raw_payload: { version: 1, runDate: "2026-10-02", modelVersion: "rmi-core-v46", executedReturnPercent: 1 } }];
     const response = await GET(new Request("https://example.test/api/admin/model-validation?runDate=2026-10-18"));
