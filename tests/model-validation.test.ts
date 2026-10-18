@@ -35,6 +35,20 @@ function observations(artistId: string, acceleration: number): ValidationAudienc
 }
 
 describe("market model validation", () => {
+  it("does not use a later same-day counter as evidence available when the quote was made", () => {
+    const points = observations("a", 5).map(row => ({ ...row, observedAt: row.observedDate + "T18:00:00Z" }));
+    const result = evaluateMarketModel({ snapshots: [{ ...snapshot("a", 10), pricedAt: "2026-06-15T12:00:00Z" }], observations: points });
+    expect(result.sampleCount).toBe(0);
+  });
+  it("uses exact elapsed outcome times so constant daily consumption stays neutral", () => {
+    const points = [
+      { observedDate: "2026-06-08", observedAt: "2026-06-08T00:00:00Z", value: 1000 },
+      { observedDate: "2026-06-15", observedAt: "2026-06-15T12:00:00Z", value: 1750 },
+      { observedDate: "2026-06-22", observedAt: "2026-06-22T00:00:00Z", value: 2400 }
+    ].map(row => ({ ...row, artistId: "a", source: "lastfm", metric: "playcount" }));
+    const result = evaluateMarketModel({ snapshots: [{ ...snapshot("a", 10), pricedAt: "2026-06-15T18:00:00Z" }], observations: points });
+    expect(result.sampleCount).toBe(1); expect(result.directionalSampleCount).toBe(0); expect(result.asOfVerifiedSampleCount).toBe(1);
+  });
   it("does not call steady cumulative consumption a slowdown because the lifetime denominator increased", () => {
     const ids = ["a", "b", "c", "d"];
     const result = evaluateMarketModel({ snapshots: ids.map((id, i) => snapshot(id, i + 1)), observations: ids.flatMap((id, i) =>

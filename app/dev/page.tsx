@@ -2945,6 +2945,12 @@ function ModelValidationPanel({
           detail: `${validation.minimumRecommendedIndependentDates} recommended; adjacent weekly windows are correlated`
         },
         {
+          key: "validation:asof",
+          label: "Verified observation cutoff",
+          value: `${validation.asOfVerifiedSampleCount}/${validation.sampleCount}`,
+          detail: "Samples with timed quote evidence that excludes later same-day observations; legacy untimed data is unverified"
+        },
+        {
           key: "validation:lift",
           label: "Top / bottom lift",
           value:

@@ -54,7 +54,7 @@ export async function GET(request: Request) {
       loadAudienceObservations({ supabase, artistIds, startDate: observationStartDate, endDate: runDate }),
       artistIds.length && signalEndDate >= signalStartDate ? loadPagedRows(async (from, to) => {
         const { data, error } = await supabase.from("market_observations")
-          .select("artist_id,observed_date,raw_payload").in("artist_id", artistIds)
+          .select("artist_id,observed_date,observed_at,raw_payload").in("artist_id", artistIds)
           .eq("source", "market_pricing").eq("metric", "evidence_state")
           .gte("observed_date", signalStartDate).lte("observed_date", signalEndDate)
           .order("observed_date").order("artist_id").range(from, to);
@@ -76,6 +76,7 @@ export async function GET(request: Request) {
         searchGrowth: previous?.searchGrowth ?? 0, socialGrowth: previous?.socialGrowth ?? 0,
         newsScore: previous?.newsScore ?? 50, traderDemand: previous?.traderDemand ?? 0,
         priceSignalPercent: executed, modelVersion: payload.modelVersion,
+        pricedAt: typeof row.observed_at === "string" ? row.observed_at : undefined,
         predictionSource: typeof payload.executedReturnPercent === "number" ? "executed_return" : "model_signal" });
     }
     const snapshots = [...snapshotsByKey.values()];
@@ -172,7 +173,7 @@ async function loadAudienceObservations({
   const rows = await loadPagedRows(async (from, to) => {
     const { data, error } = await supabase
       .from("market_observations")
-      .select("artist_id,source,metric,observed_date,value")
+      .select("artist_id,source,metric,observed_date,observed_at,value")
       .in("artist_id", artistIds)
       .or(VALIDATION_SERIES.map(series => `and(source.eq.${series.source},metric.eq.${series.metric})`).join(","))
       .gte("observed_date", startDate)
@@ -196,6 +197,7 @@ async function loadAudienceObservations({
     metric: row.metric,
     observedDate: row.observed_date,
     value: Number(row.value)
+    , observedAt: typeof row.observed_at === "string" ? row.observed_at : undefined
   }));
 }
 

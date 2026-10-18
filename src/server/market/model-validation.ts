@@ -7,6 +7,7 @@ export type ValidationSignalSnapshot = HypeStats & {
   priceSignalPercent?: number;
   modelVersion?: string;
   predictionSource?: "executed_return" | "model_signal" | "hype_proxy";
+  pricedAt?: string;
 };
 
 export type ValidationAudienceObservation = {
@@ -15,6 +16,7 @@ export type ValidationAudienceObservation = {
   metric: string;
   observedDate: string;
   value: number;
+  observedAt?: string;
 };
 
 export type MarketModelValidation = {
@@ -35,6 +37,7 @@ export type MarketModelValidation = {
   nonOverlappingSignalDateCount: number;
   minimumRecommendedIndependentDates: number;
   predictionSources: Record<string, number>;
+  asOfVerifiedSampleCount: number;
   topBottomAudienceLift: number | null;
   averageMetricsPerSample: number;
   sourceMetricSampleCounts: Record<string, number>;
@@ -51,6 +54,7 @@ type ValidationSample = {
   metricCount: number;
   sourceMetrics: string[];
   predictionSource: string;
+  asOfVerified: boolean;
 };
 
 const MINIMUM_RECOMMENDED_SAMPLES = 200;
@@ -124,6 +128,7 @@ export function evaluateMarketModel({
     nonOverlappingSignalDateCount: independentDates.length,
     minimumRecommendedIndependentDates: MINIMUM_INDEPENDENT_DATES,
     predictionSources: samples.reduce<Record<string, number>>((counts, sample) => { counts[sample.predictionSource] = (counts[sample.predictionSource] ?? 0) + 1; return counts; }, {}),
+    asOfVerifiedSampleCount: samples.filter(sample => sample.asOfVerified).length,
     topBottomAudienceLift: getTopBottomLift(samples),
     averageMetricsPerSample: samples.length
       ? round(samples.reduce((total, sample) => total + sample.metricCount, 0) / samples.length, 2)
@@ -150,18 +155,22 @@ function buildValidationSample(
       continue;
     }
 
-    const previous = findClosestObservation(points, previousTargetDate, previousTargetDate);
-    const current = findClosestObservation(points, snapshot.sourceDate, snapshot.sourceDate);
+    const pricedAt = snapshot.pricedAt ? Date.parse(snapshot.pricedAt) : undefined;
+    const previous = findClosestObservation(points, previousTargetDate, previousTargetDate, pricedAt);
+    const current = findClosestObservation(points, snapshot.sourceDate, snapshot.sourceDate, pricedAt);
     const future = findClosestObservation(points, futureTargetDate);
 
     if (!previous || !current || !future) {
       continue;
     }
 
-    const previousDays = getDateDistanceDays(previous.observedDate, current.observedDate);
-    const futureDays = getDateDistanceDays(current.observedDate, future.observedDate);
+    const elapsed = (start: ValidationAudienceObservation, end: ValidationAudienceObservation) =>
+      start.observedAt && end.observedAt ? (Date.parse(end.observedAt) - Date.parse(start.observedAt)) / 86400000
+        : getDateDistanceDays(start.observedDate, end.observedDate);
+    const previousDays = elapsed(previous, current);
+    const futureDays = elapsed(current, future);
 
-    if (previousDays <= 0 || futureDays <= 0) {
+    if (!Number.isFinite(previousDays) || !Number.isFinite(futureDays) || previousDays <= 0 || futureDays <= 0) {
       continue;
     }
 
@@ -206,7 +215,8 @@ function buildValidationSample(
       median(metricTargets.filter(item => item.key.startsWith(source + ":")).map(item => item.value)))),
     metricCount: metricTargets.length,
     sourceMetrics: metricTargets.map((item) => item.key),
-    predictionSource: snapshot.predictionSource ?? (typeof snapshot.priceSignalPercent === "number" ? "model_signal" : "hype_proxy")
+    predictionSource: snapshot.predictionSource ?? (typeof snapshot.priceSignalPercent === "number" ? "model_signal" : "hype_proxy"),
+    asOfVerified: Boolean(snapshot.pricedAt && Number.isFinite(Date.parse(snapshot.pricedAt)))
   };
 }
 
@@ -214,7 +224,8 @@ function buildObservationSeries(observations: ValidationAudienceObservation[]) {
   const series = new Map<string, ValidationAudienceObservation[]>();
 
   for (const observation of observations) {
-    if (!OUTCOME_METRICS.has(`${observation.source}:${observation.metric}`) || !Number.isFinite(observation.value) || observation.value < 0 || !isValidDate(observation.observedDate)) {
+    if (!OUTCOME_METRICS.has(`${observation.source}:${observation.metric}`) || !Number.isFinite(observation.value) || observation.value < 0 || !isValidDate(observation.observedDate) ||
+      (observation.observedAt !== undefined && !Number.isFinite(Date.parse(observation.observedAt)))) {
       continue;
     }
 
@@ -231,12 +242,13 @@ function buildObservationSeries(observations: ValidationAudienceObservation[]) {
   return series;
 }
 
-function findClosestObservation(points: ValidationAudienceObservation[], targetDate: string, notAfter?: string) {
+function findClosestObservation(points: ValidationAudienceObservation[], targetDate: string, notAfter?: string, pricedAt?: number) {
   let closest: ValidationAudienceObservation | null = null;
   let closestDistance = Number.POSITIVE_INFINITY;
 
   for (const point of points) {
     if (notAfter && point.observedDate > notAfter) continue;
+    if (pricedAt !== undefined && (!Number.isFinite(pricedAt) || !point.observedAt || Date.parse(point.observedAt) > pricedAt)) continue;
     const distance = Math.abs(getDateDistanceDays(targetDate, point.observedDate));
 
     if (distance <= DATE_TOLERANCE_DAYS && distance < closestDistance) {

@@ -76,6 +76,10 @@ Attention-only metrics cannot enter consumption outcomes. It reports balanced
 directional accuracy, the same-sample majority-direction benchmark, within-date
 rank correlation, and non-overlapping outcome windows. These are diagnostics,
 not calibrated confidence probabilities or proof of fair dollar prices.
+Elapsed outcome intervals use exact observation timestamps when available. Timed
+executed evidence excludes observations collected later on the signal date; the
+scorecard separately counts samples with that verified cutoff. Legacy untimed
+snapshots cannot be described as verified as-of evidence.
 
 The default admin scorecard shows the current model. Original daily snapshots
 are preserved, while later executed price evidence can supply the correct
@@ -83,6 +87,10 @@ model cohort and actual return. A newly deployed model cannot inherit old models
 outcomes. Historical cohorts remain separately selectable.
 
 Rechecking the existing frozen evidence (2,225 samples, 89 artists, 25 dates):
+
+The original frozen observation export contains calendar dates, not exact
+collection timestamps. This historical recheck retains that limitation; it does
+not claim the same timestamp verification as subsequent live evaluations.
 
 | Diagnostic | Recorded historical returns | Saved v45 shadow returns |
 | --- | ---: | ---: |
