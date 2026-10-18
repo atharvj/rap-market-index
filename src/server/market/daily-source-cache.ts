@@ -38,10 +38,29 @@ export function restoreDailySources(rows: Array<{
       if (!DAILY_SOURCES.has(source) || !isSignal(value, source)) continue;
       if (source === "bluesky" && value.rawPayload.samplingVersion !== 5) continue;
       if (source === "youtube_comments" && value.rawPayload.samplingVersion !== 6) continue;
+      let stats = value.stats;
+      let rawPayload = value.rawPayload;
+      const calibration = value.rawPayload.marketWideCalibration as { version?: number; metrics?: Record<string, { rawValue?: number }> } | undefined;
+      if (calibration?.version === 1 && calibration.metrics) {
+        stats = { ...stats };
+        for (const [key, metric] of Object.entries(calibration.metrics)) {
+          if (key in stats && typeof metric.rawValue === "number" && Number.isFinite(metric.rawValue)) stats[key as keyof typeof stats] = metric.rawValue;
+        }
+        rawPayload = { ...rawPayload, marketWideCalibration: { ...calibration, version: 2, applied: false, reason: "broad_shift_requires_provider_verification" } };
+      }
+      if (source === "youtube_comments" && value.rawPayload.pricingInputVersion !== 2) {
+        // Migrate the verified cached sample's absolute reception; do not reuse
+        // its old mixture of level and momentum after changing the engine.
+        const raw = value.rawPayload;
+        if (typeof raw.sentimentAverage !== "number" || typeof raw.netShare !== "number") continue;
+        stats = Object.keys(value.stats).length ? { socialGrowth: Math.max(-45, Math.min(45, raw.sentimentAverage * 0.34 + raw.netShare * 0.2)) } : {};
+        rawPayload = { ...raw, pricingInputVersion: 2 };
+      }
       restored[source] ??= {};
       restored[source][row.artist_id] = {
         ...value,
-        rawPayload: { ...value.rawPayload, dailySourceAsOf: row.source_date }
+        stats,
+        rawPayload: { ...rawPayload, dailySourceAsOf: row.source_date }
       };
     }
   }

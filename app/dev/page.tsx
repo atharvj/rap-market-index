@@ -3,6 +3,7 @@
 import { useAuth } from "@/components/AuthProvider";
 import { formatCurrency, formatDate, formatPercent } from "@/lib/formatters";
 import { STARTING_CASH } from "@/lib/trading";
+import type { MarketModelValidation } from "@/server/market/model-validation";
 import {
   AlertTriangle,
   BarChart3,
@@ -661,21 +662,9 @@ type ModelValidationState =
         lookbackDays: number;
         snapshotRowCount: number;
         observationRowCount: number;
-        validation: {
-          status: "collecting" | "provisional" | "measured";
-          horizonDays: number;
-          sampleCount: number;
-          distinctArtistCount: number;
-          distinctSignalDateCount: number;
-          rankCorrelation: number | null;
-          directionalAccuracyPercent: number | null;
-          directionalSampleCount: number;
-          topBottomAudienceLift: number | null;
-          averageMetricsPerSample: number;
-          minimumRecommendedSamples: number;
-          minimumRecommendedDates: number;
-          note: string;
-        };
+        configuredModelVersion: string;
+        validation: MarketModelValidation;
+        validationByModel: Record<string, MarketModelValidation>;
       };
     }
   | {
@@ -2816,9 +2805,9 @@ function MarketHealthPanel({ data }: { data: MarketHealth }) {
           },
           {
             key: "latest-run:quality",
-            label: "Market quality",
+            label: "Input health",
             value: `${Math.round(data.latestRun.summary.marketQualityScore ?? 0)}/100`,
-            detail: `Signal ${Math.round(data.latestRun.summary.signalCoverageScore ?? 0)}/100, reliability ${Math.round(data.latestRun.summary.reliabilityScore ?? 0)}/100, balance ${Math.round(data.latestRun.summary.movementBalanceScore ?? 0)}/100`
+            detail: "Coverage and input reliability only. This score does not measure predictive accuracy."
           },
           {
             key: "latest-run:source-quality",
@@ -2872,16 +2861,23 @@ function ModelValidationPanel({
 }: {
   data: Extract<ModelValidationState, { status: "ready" }>["data"];
 }) {
-  const validation = data.validation;
+  const [selectedVersion, setSelectedVersion] = useState(data.configuredModelVersion);
+  const validation = data.validationByModel[selectedVersion] ?? data.validation;
   const statusClassName =
     validation.status === "measured"
-      ? "text-mint"
+      ? "text-paper"
       : validation.status === "provisional"
         ? "text-brass"
         : "text-paper/55";
 
   return (
     <div className="space-y-4">
+      <label className="flex flex-wrap items-center gap-3 text-sm font-bold text-paper/65">
+        Model cohort
+        <select value={selectedVersion} onChange={event => setSelectedVersion(event.target.value)} className="rounded-md border border-line bg-panel px-3 py-2 text-paper">
+          {Object.keys(data.validationByModel).map(version => <option key={version} value={version}>{version}{version === data.configuredModelVersion ? " (current engine)" : " (historical)"}</option>)}
+        </select>
+      </label>
       <div className="rounded-md border border-line bg-black/20 p-4">
         <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
           <div>
@@ -2916,6 +2912,12 @@ function ModelValidationPanel({
           detail: "Whether stronger signals rank ahead of later audience acceleration"
         },
         {
+          key: "validation:date-ranks",
+          label: "Within-date rank correlation",
+          value: validation.meanDateRankCorrelation === null ? "--" : validation.meanDateRankCorrelation.toFixed(3),
+          detail: `${validation.rankedDateCount} dates; avoids mistaking broad time trends for artist ranking skill`
+        },
+        {
           key: "validation:direction",
           label: "Directional accuracy",
           value:
@@ -2923,6 +2925,24 @@ function ModelValidationPanel({
               ? "--"
               : formatPercent(validation.directionalAccuracyPercent),
           detail: `${validation.directionalSampleCount} non-trivial up/down predictions`
+        },
+        {
+          key: "validation:balanced-direction",
+          label: "Balanced directional accuracy",
+          value: validation.balancedDirectionalAccuracyPercent === null ? "--" : `${validation.balancedDirectionalAccuracyPercent.toFixed(1)}%`,
+          detail: "Weights rising and falling outcomes equally; 50% is no directional discrimination"
+        },
+        {
+          key: "validation:majority",
+          label: "Majority-direction benchmark",
+          value: validation.majorityDirectionBaselinePercent === null ? "--" : `${validation.majorityDirectionBaselinePercent.toFixed(1)}%`,
+          detail: `${validation.positiveOutcomeCount} positive and ${validation.negativeOutcomeCount} negative outcomes in the evaluated sample`
+        },
+        {
+          key: "validation:independent-dates",
+          label: "Non-overlapping outcome windows",
+          value: String(validation.nonOverlappingSignalDateCount),
+          detail: `${validation.minimumRecommendedIndependentDates} recommended; adjacent weekly windows are correlated`
         },
         {
           key: "validation:lift",
@@ -3086,18 +3106,18 @@ function buildLaunchReadinessChecks(data: MarketHealth): LaunchReadinessCheck[] 
     },
     {
       id: "market-quality",
-      label: "Latest run quality is defensible",
+      label: "Latest run has input coverage",
       ok: marketQualityScore >= 55,
       severity: "warning",
-      detail: `Latest market quality score is ${Math.round(marketQualityScore)}/100.`
+      detail: `Latest input health is ${Math.round(marketQualityScore)}/100. Predictive skill requires the separate outcome scorecard.`
     },
     {
       id: "movement-balance",
-      label: "Price moves include decliners",
-      ok: latestArtistCount < 10 || downMoveCount > 0,
+      label: "Price direction is observed, not required",
+      ok: true,
       severity: "warning",
       detail: latestArtistCount
-        ? `${downMoveCount} decliner${downMoveCount === 1 ? "" : "s"} in the latest ${latestArtistCount}-artist run.`
+        ? `${downMoveCount} decliner${downMoveCount === 1 ? "" : "s"} in the latest ${latestArtistCount}-artist run; no up/down quota is imposed.`
         : "No latest run summary yet."
     },
     {

@@ -91,6 +91,7 @@ const topics = [
     icon: Newspaper,
     answers: [
       "RMI ranks stories by relevance, evidence quality, likely reach, confidence, and recency.",
+      "The evidence score describes source strength and verified attribution. It is not a probability of truth or a predicted price return.",
       "Routine uploads, duplicate coverage, rumors, and isolated low-signal posts are filtered out.",
       "A headline can inform a quote, but no single story determines an artist price by itself."
     ]

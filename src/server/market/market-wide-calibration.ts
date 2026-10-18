@@ -1,4 +1,3 @@
-import { clamp } from "@/lib/pricing";
 import type { HypeStats } from "@/lib/types";
 import type { AdapterSignal, AdapterSignals } from "@/server/market/market-data";
 
@@ -44,8 +43,9 @@ const MINIMUM_DIRECTIONAL_BREADTH = 0.85;
 const DIRECTION_EPSILON = 0.0001;
 
 /**
- * Removes a shared source-wide shift while preserving artist-to-artist differences.
- * This protects relative artist signals from provider delays and reporting-window changes.
+ * Detects broad source shifts for inspection. Directional breadth alone cannot
+ * distinguish a provider fault from a real industry-wide rise or slowdown.
+ * Never turn that diagnostic into a median subtraction or invented reversal.
  */
 export function calibrateMarketWideAdapterSignals(
   sources: Array<AdapterSignals | undefined>
@@ -77,8 +77,7 @@ export function calibratePersistedMarketStats<T extends { id: string; stats: Hyp
 
       for (const [key, adjustment] of adjustments) {
         const rawValue = stats[key];
-        const rule = CALIBRATION_RULES[key];
-        const adjustedValue = clamp(rawValue - adjustment.marketMedian, rule.min, rule.max);
+        const adjustedValue = rawValue;
         stats[key] = adjustedValue;
         audits[artist.id] ??= {};
         audits[artist.id][key] = {
@@ -178,8 +177,7 @@ function applySignalCalibration(
       continue;
     }
 
-    const rule = CALIBRATION_RULES[key];
-    const adjustedValue = clamp(rawValue - adjustment.marketMedian, rule.min, rule.max);
+    const adjustedValue = rawValue;
     stats[key] = adjustedValue;
     metricAudits[key] = {
       ...adjustment,
@@ -198,8 +196,9 @@ function applySignalCalibration(
     rawPayload: {
       ...signal.rawPayload,
       marketWideCalibration: {
-        version: 1,
-        reason: "source_wide_directional_shift",
+        version: 2,
+        applied: false,
+        reason: "broad_shift_requires_provider_verification",
         metrics: metricAudits
       }
     }

@@ -121,15 +121,23 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
+  const auth = await requireAdminRequest(request, { allowMarketSecret: true });
+  if (!auth.ok) return auth.response;
   const body = await parseBody(request);
+  if (!body) return NextResponse.json({ ok: false, error: "A JSON object is required." }, { status: 400 });
   const dryRun = body.dryRun !== false;
   const source = normalizeSource(body.source);
   const runDate = body.runDate ?? getMarketDate();
   const config = getSupabaseConfigStatus();
-  const auth = await requireAdminRequest(request, { allowMarketSecret: true });
-
-  if (!auth.ok) {
-    return auth.response;
+  if (typeof runDate !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(runDate) ||
+    !Number.isFinite(Date.parse(runDate)) || new Date(runDate).toISOString().slice(0, 10) !== runDate) {
+    return NextResponse.json({ ok: false, error: "A valid market date is required." }, { status: 400 });
+  }
+  if (isRealExternalSource(source) && runDate !== getMarketDate()) {
+    return NextResponse.json({ ok: false, error: "Live source collection can only price today's market date; historical research must use dated saved evidence." }, { status: 400 });
+  }
+  if (!dryRun && !isRealExternalSource(source)) {
+    return NextResponse.json({ ok: false, error: "Mock and manual price signals are available only as dry runs." }, { status: 400 });
   }
 
   if (!dryRun) {
@@ -259,6 +267,7 @@ export async function POST(request: Request) {
       : result.updates.length;
 
     let priceTickCount = 0;
+    let atomicPublication: boolean | null = null;
 
     if (!dryRun) {
       const eventsToPersist = flattenEvents(
@@ -281,14 +290,17 @@ export async function POST(request: Request) {
         summary,
         recordRun: body.intraday !== true && !Array.isArray(body.artistIds),
         intraday: body.intraday === true,
-        tickComparisonPrices: body.intraday === true ? tickComparisonPrices : undefined,
+        tickComparisonPrices,
         forceTickArtistIds
       });
       priceTickCount = persistence.priceTickCount;
+      atomicPublication = persistence.atomic;
+      if (!persistence.atomic) warnings.push("Quote transaction migration 046 is not installed; this publication used the legacy non-atomic writer.");
     }
 
     return NextResponse.json({
       ok: true,
+      atomicPublication,
       dryRun,
       persisted: !dryRun,
       config,
@@ -316,11 +328,12 @@ export async function POST(request: Request) {
   }
 }
 
-async function parseBody(request: Request): Promise<DailyUpdateBody> {
+async function parseBody(request: Request): Promise<DailyUpdateBody | null> {
   try {
-    return (await request.json()) as DailyUpdateBody;
+    const value = await request.json();
+    return value && typeof value === "object" && !Array.isArray(value) ? value as DailyUpdateBody : null;
   } catch {
-    return {};
+    return null;
   }
 }
 
@@ -606,7 +619,7 @@ async function applyMarketHistoryBaselines({
       // blending a previous refresh's result again compounds unchanged inputs.
       stats: previousSignalStats[artist.id] ?? artist.stats,
       previousEventPricing: state?.marketEvents ?? previousSignalStats[artist.id]?.previousEventPricing,
-      previousReceptionBaseline: state ? state.receptionPricingBaseline as Record<string, number> : previousSignalStats[artist.id]?.previousReceptionBaseline,
+      previousReceptionBaseline: { ...previousSignalStats[artist.id]?.previousReceptionBaseline, ...state?.receptionPricingBaseline as Record<string, number> | undefined },
       priceTrend
     };
   });

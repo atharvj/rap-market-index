@@ -189,10 +189,7 @@ describe("Last.fm listening velocity", () => {
       currentDailyRate: number;
     };
 
-    expect(signal.stats.streamingGrowth).toBeLessThan(0);
-    expect(quality).toMatchObject({
-      rateObservationSource: "latest_completed_interval",
-      currentDailyRate: 70_000
-    });
+    expect(signal.stats.streamingGrowth).toBeUndefined();
+    expect(quality.rateObservationSource).toBeNull();
   });
 });

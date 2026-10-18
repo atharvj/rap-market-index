@@ -187,7 +187,7 @@ export async function loadPreviousSignalStats({
   let pending = [...new Set(artistIds)];
   while (pending.length) {
     const { data, error } = await supabase.from("market_signal_snapshots")
-      .select("artist_id,source_date,streaming_growth,youtube_growth,search_growth,social_growth,news_score,trader_demand,event_pricing:raw_payload->market_events,source_values:raw_payload->sourceValues,reception_pricing:raw_payload->receptionPricingBaseline")
+      .select("artist_id,source_date,streaming_growth,youtube_growth,search_growth,social_growth,news_score,trader_demand,event_pricing:raw_payload->market_events,source_values:raw_payload->sourceValues,reception_pricing:raw_payload->receptionPricingBaseline,comment_reception:raw_payload->youtube_comments")
       .in("artist_id", pending).lt("source_date", runDate)
       .order("source_date", { ascending: false }).order("artist_id").limit(1000);
     if (error) throw new Error(`Could not load previous signal snapshots: ${error.message}`);
@@ -198,7 +198,7 @@ export async function loadPreviousSignalStats({
         searchGrowth: Number(row.search_growth), socialGrowth: Number(row.social_growth),
         newsScore: Number(row.news_score), traderDemand: Number(row.trader_demand),
         previousEventPricing: row.event_pricing,
-        previousReceptionBaseline: readReceptionBaseline(row.reception_pricing, row.source_values)
+        previousReceptionBaseline: readReceptionBaseline(row.reception_pricing, row.source_values, row.comment_reception)
       };
     }
     const remaining = pending.filter(id => !result[id]);
@@ -209,7 +209,7 @@ export async function loadPreviousSignalStats({
   return result;
 }
 
-function readReceptionBaseline(saved: unknown, legacy: unknown) {
+function readReceptionBaseline(saved: unknown, legacy: unknown, commentReception?: unknown) {
   const record = saved && typeof saved === "object" ? saved as Record<string, unknown> : {};
   const values = legacy && typeof legacy === "object" ? legacy as Record<string, unknown> : {};
   const result: Record<string, number> = {};
@@ -217,6 +217,12 @@ function readReceptionBaseline(saved: unknown, legacy: unknown) {
     const entry = values[source] as Record<string, unknown> | undefined;
     const value = record[source] ?? entry?.socialGrowth;
     if (typeof value === "number" && Number.isFinite(value)) result[source] = value;
+  }
+  const comments = commentReception && typeof commentReception === "object" ? commentReception as Record<string, unknown> : {};
+  if (typeof record.youtube_comments_v2 === "number" && Number.isFinite(record.youtube_comments_v2)) result.youtube_comments_v2 = record.youtube_comments_v2;
+  else if (typeof comments.sentimentAverage === "number" && Number.isFinite(comments.sentimentAverage) &&
+    typeof comments.netShare === "number" && Number.isFinite(comments.netShare) && typeof result.youtube_comments === "number") {
+    result.youtube_comments_v2 = Math.max(-45, Math.min(45, comments.sentimentAverage * 0.34 + comments.netShare * 0.2));
   }
   return result;
 }
@@ -1170,12 +1176,11 @@ export async function persistMarketUpdates({
   forceTickArtistIds?: string[];
 }) {
   if (!recordRun) {
-    const priceTickCount = await persistUpdateBatch(supabase, runDate, updates, {
+    return await persistUpdateBatch(supabase, runDate, updates, {
       intraday,
       tickComparisonPrices,
       forceTickArtistIds
     });
-    return { priceTickCount };
   }
 
   const started = await supabase
@@ -1201,7 +1206,7 @@ export async function persistMarketUpdates({
   }
 
   try {
-    const priceTickCount = await persistUpdateBatch(supabase, runDate, updates);
+    const publication = await persistUpdateBatch(supabase, runDate, updates, { tickComparisonPrices, forceTickArtistIds });
 
     const completed = await supabase
       .from("market_update_runs")
@@ -1216,7 +1221,7 @@ export async function persistMarketUpdates({
     if (completed.error) {
       throw new Error(`Could not complete market update run: ${completed.error.message}`);
     }
-    return { priceTickCount };
+    return publication;
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown market update failure.";
     await supabase
@@ -1243,7 +1248,7 @@ async function persistUpdateBatch(
   } = {}
 ) {
   if (!updates.length) {
-    return 0;
+    return { priceTickCount: 0, atomic: false };
   }
 
   const forcedTickArtistIds = new Set(options.forceTickArtistIds ?? []);
@@ -1301,6 +1306,39 @@ async function persistUpdateBatch(
       } as Json
     }));
 
+  const pricingStates = updates.filter(update => typeof update.rawPayload.source === "string" &&
+    !["manual", "mock"].includes(update.rawPayload.source)).map(update => ({
+      artist_id: update.artistId, source: "market_pricing", metric: "evidence_state", observed_date: runDate,
+      observed_at: new Date().toISOString(), value: 1, unit: "state",
+      raw_payload: { version: 1, runDate, modelVersion: update.modelVersion, atomic: false,
+        pricingSignalPercent: update.signalDelta * 100, executedReturnPercent: update.dailyChangePercent,
+        marketEvents: (update.rawPayload.market_events ?? null) as Json,
+        receptionPricingBaseline: (update.rawPayload.receptionPricingBaseline ?? {}) as Json } as Json
+    }));
+  // The migration is independently installable before or after this deploy.
+  // Only an explicitly absent RPC permits the legacy path during rollout.
+  // Transaction failures, permissions and stale inputs never fall back to it.
+  if (typeof supabase.rpc === "function" && pricingStates.length === updates.length &&
+    updates.every(update => Number.isFinite(options.tickComparisonPrices?.[update.artistId]))) {
+    const publication = await supabase.rpc("persist_market_quote_batch", {
+      p_run_date: runDate, p_intraday: options.intraday === true,
+      p_stats: statsRows, p_signals: signalRows, p_history: historyRows,
+      p_quotes: updates.map(update => ({ id: update.artistId, previous_close: update.previousClose,
+        current_price: update.currentPrice, daily_change_percent: update.dailyChangePercent,
+        hype_score: update.hypeScore, last_move_explanation: update.explanation })),
+      p_ticks: tickRows, p_pricing_state: pricingStates, p_comparison_prices: options.tickComparisonPrices as Json
+    });
+    if (publication.error && publication.error.code !== "PGRST202") throw new Error(`Atomic quote publication failed: ${publication.error.message}`);
+    if (!publication.error) {
+      const result = publication.data as { atomic?: boolean; artistCount?: number; priceTickCount?: number } | null;
+      if (!result || result.atomic !== true || result.artistCount !== updates.length || result.priceTickCount !== tickRows.length) {
+        throw new Error("Could not verify atomic quote publication completion.");
+      }
+      return { priceTickCount: result.priceTickCount, atomic: true };
+    }
+    if (process.env.MARKET_REQUIRE_ATOMIC_QUOTES === "true") throw new Error("Atomic quote publication migration is required but unavailable.");
+  }
+
   const [statsUpsert, signalUpsert, historyUpsert] = await Promise.all([
     supabase.from("artist_stats").upsert(statsRows, { onConflict: "artist_id" }),
     options.intraday
@@ -1355,15 +1393,6 @@ async function persistUpdateBatch(
   // Intraday jobs deliberately preserve the original daily signal snapshot.
   // Save the latest pricing ledger separately so tomorrow knows which stories
   // and reception changes were actually priced later in today's session.
-  const pricingStates = updates.filter(update => typeof update.rawPayload.source === "string" &&
-    !["manual", "mock"].includes(update.rawPayload.source)).map(update => ({
-      artist_id: update.artistId, source: "market_pricing", metric: "evidence_state", observed_date: runDate,
-      observed_at: new Date().toISOString(), value: 1, unit: "state",
-      raw_payload: { version: 1, runDate, modelVersion: update.modelVersion,
-        pricingSignalPercent: update.signalDelta * 100,
-        marketEvents: (update.rawPayload.market_events ?? null) as Json,
-        receptionPricingBaseline: (update.rawPayload.receptionPricingBaseline ?? {}) as Json } as Json
-    }));
   if (pricingStates.length) {
     const savedState = await supabase.from("market_observations").upsert(pricingStates, { onConflict: "artist_id,source,metric,observed_date" });
     if (savedState.error) throw new Error(`Could not save pricing evidence state: ${savedState.error.message}`);
@@ -1382,7 +1411,7 @@ async function persistUpdateBatch(
     raw_payload: { modelVersion: update.modelVersion, intraday: options.intraday === true }
   })), { onConflict: "artist_id,source,metric,observed_date" });
   if (completion.error) throw new Error(`Could not record quote refresh completion: ${completion.error.message}`);
-  return tickRows.length;
+  return { priceTickCount: tickRows.length, atomic: false };
 }
 
 function mapStats(stats: ArtistStatsRow | null): HypeStats {

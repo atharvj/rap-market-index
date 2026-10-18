@@ -212,7 +212,7 @@ function buildSpotifySignal({
     multiplier: 6,
     min: -25,
     max: 75,
-    monotonic: true
+    monotonic: false
   });
   const annualPopularityMomentum = calculateAnnualPointMomentum({
     current: info.popularity,
@@ -226,13 +226,11 @@ function buildSpotifySignal({
   if (typeof popularityMomentum.value === "number" || typeof followerMomentum.value === "number") {
     const streamingGrowth = weightedAverage([
       { value: popularityMomentum.value, weight: 0.6 },
-      { value: followerMomentum.value, weight: 0.22 },
-      { value: annualPopularityMomentum.value, weight: 0.18 }
+      { value: followerMomentum.value, weight: 0.22 }
     ]);
     const searchGrowth = weightedAverage([
       { value: popularityMomentum.value, weight: 0.42 },
-      { value: followerMomentum.value, weight: 0.32 },
-      { value: annualPopularityMomentum.value, weight: 0.18 }
+      { value: followerMomentum.value, weight: 0.32 }
     ]);
 
     if (typeof streamingGrowth === "number") {

@@ -170,6 +170,7 @@ export type MarketUpdateSummary = {
   reliabilityScore: number;
   movementBalanceScore: number;
   marketQualityScore: number;
+  qualityScoreScope: "coverage_and_input_reliability_only";
   signalSourceCoverage: Record<string, { artistCount: number; statCount: number }>;
   topGainer: Pick<ArtistMarketUpdate, "artistId" | "ticker" | "dailyChangePercent"> | null;
   topLoser: Pick<ArtistMarketUpdate, "artistId" | "ticker" | "dailyChangePercent"> | null;
@@ -184,6 +185,13 @@ export type MarketUpdateSummary = {
 };
 
 export function calculateDailyMarketUpdates(input: MarketUpdateInput) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(input.runDate) || !Number.isFinite(Date.parse(input.runDate)) || new Date(input.runDate).toISOString().slice(0, 10) !== input.runDate) throw new Error("Invalid market pricing date.");
+  for (const artist of input.artists) {
+    if (![artist.currentPrice, artist.previousClose, artist.volatility].every(value => Number.isFinite(value) && value > 0) ||
+      !getHypeStatKeys().every(key => typeof artist.stats[key] === "number" && Number.isFinite(artist.stats[key]))) {
+      throw new Error(`Cannot price invalid market inputs for ${artist.id}.`);
+    }
+  }
   input = { ...input, artists: input.artists.map(artist => prepareRevaluedArtist(artist, input.audienceRevaluations?.[artist.id])) };
   const modelVersion = input.modelVersion ?? getMarketModelVersion();
   const persistedCalibration = calibratePersistedMarketStats(input.artists);
@@ -274,6 +282,7 @@ export function calculateDailyMarketUpdates(input: MarketUpdateInput) {
       reliabilityScore: quality.reliabilityScore,
       movementBalanceScore: quality.movementBalanceScore,
       marketQualityScore: quality.marketQualityScore,
+      qualityScoreScope: "coverage_and_input_reliability_only",
       signalSourceCoverage: buildSignalSourceCoverage(updates),
       topGainer: sorted[0]
         ? pickLeaderboardMove(sorted[0])
@@ -602,7 +611,7 @@ function calculateMarketRunQuality({
   const movementDisciplineScore = clamp(100 - Math.max(0, averageAbsMovePercent - 3) * 10, 45, 100);
   const movementBalanceScore = clamp(directionBalance * 0.72 + movementDisciplineScore * 0.28, 0, 100);
   const marketQualityScore = clamp(
-    signalCoverageScore * 0.34 + reliabilityScore * 0.36 + movementBalanceScore * 0.3,
+    signalCoverageScore * 0.5 + reliabilityScore * 0.5,
     0,
     100
   );
@@ -695,8 +704,11 @@ function getFreshPricingEvidence(signals: ResolvedMarketSignal, previousReceptio
       if (key === "socialGrowth" && ["youtube_comments", "bluesky"].includes(source)) {
         // A persistently positive/negative selected sample is a level of
         // reception, not fresh approval/disapproval to charge every day.
-        value -= previousReception[source] ?? 0;
-        receptionBaseline[source] = input;
+        const v2 = source === "youtube_comments" && getObjectRecord(signals.rawPayload[source]).pricingInputVersion === 2;
+        const baselineKey = v2 ? "youtube_comments_v2" : source;
+        const baseline = previousReception[baselineKey] ?? (v2 && previousReception[source] !== undefined ? input : 0);
+        value -= baseline;
+        receptionBaseline[baselineKey] = input;
       }
       pricingSourceValues[source] ??= {};
       pricingSourceValues[source][key] = value;
@@ -1280,6 +1292,10 @@ export function mergeAdapterSignals(...sources: Array<AdapterSignals | undefined
     for (const [artistId, signal] of Object.entries(source)) {
       const sourceName = getSignalSourceName(signal);
       const confidence = getSignalConfidence(signal, sourceName);
+      if (Object.values(signal.stats).some(value => typeof value !== "number" || !Number.isFinite(value))) throw new Error(`Invalid ${sourceName} evidence for ${artistId}.`);
+      if (Object.values(buckets[artistId]?.rawPayload ?? {}).length && buckets[artistId]?.rawPayload[sourceName]) {
+        throw new Error(`Duplicate ${sourceName} evidence for ${artistId}; merge each provider once.`);
+      }
       const payload =
         typeof signal.rawPayload.source === "string" && signal.rawPayload.source
           ? { [signal.rawPayload.source]: signal.rawPayload }
@@ -1318,8 +1334,33 @@ export function mergeAdapterSignals(...sources: Array<AdapterSignals | undefined
         ...bucket.rawPayload,
         ...payload
       };
-      bucket.modifiers.push(...(signal.modifiers ?? []));
+      if (confidence > 0) {
+        for (const modifier of signal.modifiers ?? []) {
+          if ((modifier.priceShock !== undefined && !Number.isFinite(modifier.priceShock)) ||
+            (modifier.priceMultiplier !== undefined && (!Number.isFinite(modifier.priceMultiplier) || modifier.priceMultiplier < 0))) {
+            throw new Error(`Invalid ${sourceName} price modifier for ${artistId}.`);
+          }
+          bucket.modifiers.push(modifier);
+        }
+      }
       buckets[artistId] = bucket;
+    }
+  }
+
+  // Correlated endpoints within a provider share a weight budget for each
+  // metric. More YouTube endpoints cannot manufacture independent confidence.
+  for (const bucket of Object.values(buckets)) {
+    for (const key of getHypeStatKeys()) {
+      for (const family of ["youtube", "spotify"]) {
+        const names = Object.keys(bucket.sourceWeights).filter(name => name === family || name.startsWith(family + "_"));
+        const total = names.reduce((sum, name) => sum + (bucket.sourceWeights[name][key] ?? 0), 0);
+        const maximum = Math.max(0, ...names.map(name => bucket.sourceWeights[name][key] ?? 0));
+        if (total <= maximum || total <= 0) continue;
+        for (const name of names) if (bucket.sourceWeights[name][key] !== undefined) bucket.sourceWeights[name][key] *= maximum / total;
+        const contributions = Object.entries(bucket.sourceValues).filter(([, values]) => typeof values[key] === "number");
+        bucket.stats[key] = { total: contributions.reduce((sum, [name, values]) => sum + values[key]! * bucket.sourceWeights[name][key], 0),
+          weight: contributions.reduce((sum, [name]) => sum + bucket.sourceWeights[name][key], 0) };
+      }
     }
   }
 
@@ -1393,6 +1434,7 @@ function getSignalSourceName(signal: AdapterSignal) {
 }
 
 function getSignalConfidence(signal: AdapterSignal, sourceName: string) {
+  if (signal.confidence !== undefined && (typeof signal.confidence !== "number" || !Number.isFinite(signal.confidence))) throw new Error(`Invalid ${sourceName} evidence confidence.`);
   if (typeof signal.confidence === "number" && Number.isFinite(signal.confidence)) {
     return clamp(signal.confidence, 0, 1);
   }
@@ -1510,6 +1552,7 @@ function buildExplicitSignal(
   modifiers: MarketSignalModifier[] = [],
   fallback: "existing" | "neutral" = "existing"
 ): ResolvedMarketSignal {
+  if (Object.values(incoming).some(value => typeof value !== "number" || !Number.isFinite(value))) throw new Error("Invalid explicit market evidence.");
   const base = fallback === "neutral" ? getNeutralStats() : existing;
   const reliability = calculateSignalReliability(incoming, rawPayload, modifiers);
 
@@ -1541,9 +1584,14 @@ function calculateSignalReliability(
   const sourceCount = new Set(sourceNames.map(name =>
     name.startsWith("youtube") ? "youtube" : name.startsWith("spotify") ? "spotify" : name
   )).size;
-  const flattenedWeights = sourceWeights
-    ? Object.values(sourceWeights).flatMap((weights) => Object.values(weights).filter(isFiniteNumber))
-    : [];
+  const familyWeights: Record<string, number> = {};
+  for (const [source, weights] of Object.entries(sourceWeights ?? {})) {
+    const family = source.startsWith("youtube") ? "youtube" : source.startsWith("spotify") ? "spotify" : source;
+    for (const [stat, weight] of Object.entries(weights)) if (Number.isFinite(weight) && weight > 0) {
+      familyWeights[`${family}:${stat}`] = (familyWeights[`${family}:${stat}`] ?? 0) + weight;
+    }
+  }
+  const flattenedWeights = Object.values(familyWeights);
   const averageSourceWeight = flattenedWeights.length
     ? flattenedWeights.reduce((total, value) => total + value, 0) / flattenedWeights.length
     : getDefaultSignalConfidence(sourceNames[0] ?? "adapter");
@@ -1593,7 +1641,11 @@ function calculateSignalReliability(
 }
 
 function getDataQualityDiagnostics(rawPayload: Record<string, unknown>) {
-  const qualityObjects = collectMomentumQualityObjects(rawPayload);
+  const weights = getSourceWeights(rawPayload);
+  const qualityObjects = weights ? Object.keys(weights).flatMap(source => {
+    const payload = getObjectRecord(rawPayload[source]);
+    return collectMomentumQualityObjects(payload.pricingQuality ?? payload);
+  }) : collectMomentumQualityObjects(rawPayload);
   const flags = new Set<string>();
   let multiplierTotal = 0;
   let multiplierCount = 0;
@@ -1648,7 +1700,8 @@ function isMissingBaselineFlag(flag: string) {
 }
 
 function collectMomentumQualityObjects(value: unknown): Record<string, unknown>[] {
-  if (!value || typeof value !== "object" || Array.isArray(value)) {
+  if (Array.isArray(value)) return value.flatMap(collectMomentumQualityObjects);
+  if (!value || typeof value !== "object") {
     return [];
   }
 
@@ -1950,6 +2003,7 @@ function getMarketWideCalibratedStatKeys(rawPayload: Record<string, unknown>) {
   for (const value of Object.values(rawPayload)) {
     const sourcePayload = getObjectRecord(value);
     const calibration = getObjectRecord(sourcePayload.marketWideCalibration);
+    if (calibration.applied === false) continue;
     const metrics = getObjectRecord(calibration.metrics);
 
     for (const key of getHypeStatKeys()) {

@@ -253,13 +253,13 @@ function buildYoutubeSignal({
     monotonic: true
   });
   const subscriberMomentum = calculateSnapshotMomentum({
-    current: info.subscriberCount,
+    current: getConservativeSubscriberCount(info.subscriberCount, baseline[SUBSCRIBERS]),
     baseline: baseline[SUBSCRIBERS],
     baselineAgeDays: subscriberBaselineAgeDays,
     multiplier: 4.5,
     min: -20,
     max: 65,
-    monotonic: true
+    monotonic: false
   });
   const viewRateMomentum = calculateRateMomentum({
     current: info.viewCount,
@@ -320,35 +320,18 @@ function buildYoutubeSignal({
   });
   const stats: Partial<HypeStats> = {};
 
-  if (
-    typeof validatedViewMomentum.snapshot.value === "number" ||
-    typeof subscriberMomentum.value === "number" ||
-    typeof uploadAudienceValidation.value === "number"
-  ) {
-    const youtubeGrowth = weightedAverage([
-      { value: validatedViewMomentum.rate.value, weight: 0.58 },
-      { value: subscriberRateMomentum.value, weight: 0.14 },
-      { value: validatedViewMomentum.snapshot.value, weight: 0.18 },
-      { value: subscriberMomentum.value, weight: 0.08 },
-      { value: uploadAudienceValidation.value, weight: 0.02 }
-    ]);
-    const socialGrowth = weightedAverage([
-      { value: subscriberRateMomentum.value, weight: 0.64 },
-      { value: subscriberMomentum.value, weight: 0.36 }
-    ]);
-
-    if (typeof youtubeGrowth === "number") {
-      stats.youtubeGrowth = clamp(youtubeGrowth, -25, 70);
-    }
-
-    if (typeof socialGrowth === "number") {
-      stats.socialGrowth = clamp(socialGrowth, -35, 120);
-    }
-
-  }
+  // View totals and upload counts are not independent growth evidence. Verified
+  // releases enter the event layer; viewing demand uses measured acceleration.
+  if (typeof validatedViewMomentum.rate.value === "number") stats.youtubeGrowth = clamp(validatedViewMomentum.rate.value, -25, 70);
+  // Public subscribers are rounded down to three significant figures. A bin
+  // crossing cannot establish a precise daily subscriber acquisition rate.
+  if (typeof subscriberMomentum.value === "number") stats.socialGrowth = clamp(subscriberMomentum.value, -35, 120);
 
   const rawPayload = {
     source: SOURCE,
+    pricingInputVersion: 2,
+    pricingQuality: [subscriberMomentum, validatedViewMomentum.rate].filter(item => typeof item.value === "number").map(buildMomentumQualityPayload),
+    subscriberMeasurement: "conservative_three_significant_figure_bounds",
     runDate,
     requestedChannelId: info.requestedChannelId,
     channelId: info.id,
@@ -406,18 +389,8 @@ function buildYoutubeSignal({
       confidence: clamp(
         0.84 *
           getCombinedConfidenceMultiplier([
-            validatedViewMomentum.snapshot,
             subscriberMomentum,
             validatedViewMomentum.rate,
-            subscriberRateMomentum,
-            {
-              ...uploadMomentum,
-              value: uploadAudienceValidation.value,
-              confidenceMultiplier: Math.min(
-                uploadMomentum.confidenceMultiplier,
-                uploadAudienceValidation.confidenceMultiplier
-              )
-            }
           ]),
         0.3,
         0.84
@@ -426,6 +399,15 @@ function buildYoutubeSignal({
     },
     observations
   };
+}
+
+/** Use the change guaranteed by both rounded count intervals. */
+export function getConservativeSubscriberCount(current: number | undefined, baseline: number | undefined) {
+  if (typeof current !== "number" || typeof baseline !== "number" || !Number.isFinite(current) || !Number.isFinite(baseline) || current < 0 || baseline < 0) return undefined;
+  const width = (value: number) => 10 ** Math.max(0, Math.floor(Math.log10(Math.max(1, value))) - 2);
+  const delta = current > baseline ? Math.max(0, current - (baseline + width(baseline) - 1))
+    : current < baseline ? Math.min(0, current + width(current) - 1 - baseline) : 0;
+  return baseline + delta;
 }
 
 function validateUploadMomentumAgainstAudience({

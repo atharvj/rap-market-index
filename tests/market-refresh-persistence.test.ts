@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { persistMarketUpdates } from "@/server/market/supabase-repository";
 const update = { artistId: "artist", ticker: "ART", currentPrice: 50, previousClose: 50, dailyChangePercent: 0, hypeScore: 50, signalDelta: 0,
   modelVersion: "test", stats: {}, rawPayload: {}, explanation: "Unchanged" };
@@ -16,9 +16,26 @@ function setup(failTable?: string, comparisonPrice = 50, pricingState = false) {
   return { run, writes };
 }
 describe("successful quote refresh tracking", () => {
+  it("publishes through one transaction without issuing legacy table writes", async () => {
+    const from = vi.fn(() => { throw new Error("Unexpected legacy write"); });
+    const rpc = vi.fn(async () => ({ data: { atomic: true, artistCount: 1, priceTickCount: 0 }, error: null }));
+    const result = await persistMarketUpdates({ supabase: { from, rpc }, runDate: "2026-10-18", source: "core", recordRun: false,
+      intraday: true, tickComparisonPrices: { artist: 50 }, updates: [{ ...update, rawPayload: { source: "core" } }], summary: {} } as never);
+    expect(result).toEqual({ atomic: true, priceTickCount: 0 }); expect(from).not.toHaveBeenCalled();
+    expect(rpc).toHaveBeenCalledWith("persist_market_quote_batch", expect.objectContaining({ p_intraday: true, p_comparison_prices: { artist: 50 } }));
+  });
+  it("does not fall back to partial writes after an atomic conflict, permission error or unverifiable response", async () => {
+    for (const response of [{ error: { code: "40001", message: "stale quote" }, data: null },
+      { error: { code: "42501", message: "permission denied" }, data: null }, { error: null, data: { atomic: false } }]) {
+      const from = vi.fn();
+      await expect(persistMarketUpdates({ supabase: { from, rpc: async () => response }, runDate: "2026-10-18", source: "core", recordRun: false,
+        intraday: true, tickComparisonPrices: { artist: 50 }, updates: [{ ...update, rawPayload: { source: "core" } }], summary: {} } as never)).rejects.toThrow();
+      expect(from).not.toHaveBeenCalled();
+    }
+  });
   it("retains intraday pricing state for tomorrow without replacing original daily evidence or fabricating ticks", async () => {
     const { run, writes } = setup(undefined, 50, true);
-    expect(await run()).toEqual({ priceTickCount: 0 });
+    expect(await run()).toEqual({ priceTickCount: 0, atomic: false });
     expect(writes.some(write => write.table === "market_signal_snapshots")).toBe(false);
     const observations = writes.filter(write => write.table === "market_observations");
     expect(observations[0].rows).toEqual([expect.objectContaining({ source: "market_pricing", metric: "evidence_state",
@@ -30,7 +47,7 @@ describe("successful quote refresh tracking", () => {
   });
   it("records unchanged refreshes without fabricating chart ticks or replacing daily signals", async () => {
     const { run, writes } = setup();
-    expect(await run()).toEqual({ priceTickCount: 0 });
+    expect(await run()).toEqual({ priceTickCount: 0, atomic: false });
     expect(writes.map(write => write.table)).toEqual(["artist_stats", "price_history", "market_observations"]);
     expect(writes.at(-1)?.rows).toEqual([expect.objectContaining({ source: "market_refresh", metric: "completed", artist_id: "artist" })]);
   });

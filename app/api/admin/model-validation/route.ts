@@ -8,6 +8,7 @@ import {
   type ValidationSignalSnapshot
 } from "@/server/market/model-validation";
 import { loadActiveArtists } from "@/server/market/supabase-repository";
+import { getMarketModelVersion } from "@/server/market/model-version";
 
 export const dynamic = "force-dynamic";
 
@@ -48,13 +49,42 @@ export async function GET(request: Request) {
     const signalStartDate = shiftMarketDate(runDate, -lookbackDays);
     const signalEndDate = shiftMarketDate(runDate, -horizonDays - 2);
     const observationStartDate = shiftMarketDate(signalStartDate, -horizonDays - 2);
-    const [snapshots, observations] = await Promise.all([
+    const [dailySnapshots, observations, pricingStates] = await Promise.all([
       loadSignalSnapshots({ supabase, artistIds, startDate: signalStartDate, endDate: signalEndDate }),
-      loadAudienceObservations({ supabase, artistIds, startDate: observationStartDate, endDate: runDate })
+      loadAudienceObservations({ supabase, artistIds, startDate: observationStartDate, endDate: runDate }),
+      artistIds.length && signalEndDate >= signalStartDate ? loadPagedRows(async (from, to) => {
+        const { data, error } = await supabase.from("market_observations")
+          .select("artist_id,observed_date,raw_payload").in("artist_id", artistIds)
+          .eq("source", "market_pricing").eq("metric", "evidence_state")
+          .gte("observed_date", signalStartDate).lte("observed_date", signalEndDate)
+          .order("observed_date").order("artist_id").range(from, to);
+        if (error) throw new Error(`Could not load executed pricing evidence: ${error.message}`);
+        return data ?? [];
+      }) : Promise.resolve([])
     ]);
-    const validation = evaluateMarketModel({ snapshots, observations, horizonDays });
+    const snapshotsByKey = new Map(dailySnapshots.map(row => [`${row.artistId}:${row.sourceDate}`, row]));
+    for (const row of pricingStates) {
+      const payload = row.raw_payload as Record<string, unknown> | null;
+      if (!payload || payload.version !== 1 || payload.runDate !== row.observed_date || typeof payload.modelVersion !== "string") {
+        throw new Error("Could not verify the executed pricing evidence identity.");
+      }
+      const executed = typeof payload.executedReturnPercent === "number" ? payload.executedReturnPercent : payload.pricingSignalPercent;
+      if (typeof executed !== "number" || !Number.isFinite(executed)) throw new Error("Could not verify an executed pricing signal.");
+      const previous = snapshotsByKey.get(`${row.artist_id}:${row.observed_date}`);
+      snapshotsByKey.set(`${row.artist_id}:${row.observed_date}`, { ...previous, artistId: row.artist_id, sourceDate: row.observed_date,
+        streamingGrowth: previous?.streamingGrowth ?? 0, youtubeGrowth: previous?.youtubeGrowth ?? 0,
+        searchGrowth: previous?.searchGrowth ?? 0, socialGrowth: previous?.socialGrowth ?? 0,
+        newsScore: previous?.newsScore ?? 50, traderDemand: previous?.traderDemand ?? 0,
+        priceSignalPercent: executed, modelVersion: payload.modelVersion,
+        predictionSource: typeof payload.executedReturnPercent === "number" ? "executed_return" : "model_signal" });
+    }
+    const snapshots = [...snapshotsByKey.values()];
+    const historicalValidation = evaluateMarketModel({ snapshots, observations, horizonDays });
     const validationByModel = Object.fromEntries([...new Set(snapshots.map(row => row.modelVersion ?? "unknown"))].map(version =>
       [version, evaluateMarketModel({ snapshots: snapshots.filter(row => (row.modelVersion ?? "unknown") === version), observations, horizonDays })]));
+    const configuredModelVersion = getMarketModelVersion();
+    const validation = validationByModel[configuredModelVersion] ?? evaluateMarketModel({ snapshots: [], observations, horizonDays });
+    validationByModel[configuredModelVersion] = validation;
 
     return NextResponse.json({
       ok: true,
@@ -64,6 +94,8 @@ export async function GET(request: Request) {
       snapshotRowCount: snapshots.length,
       observationRowCount: observations.length,
       validation,
+      configuredModelVersion,
+      historicalValidation,
       validationByModel
     });
   } catch (error) {
@@ -112,6 +144,7 @@ async function loadSignalSnapshots({
     sourceDate: row.source_date,
     priceSignalPercent: typeof row.pricing_signal === "number" ? row.pricing_signal * 100 : undefined,
     modelVersion: typeof row.model_version === "string" ? row.model_version : "unknown",
+    predictionSource: typeof row.pricing_signal === "number" ? "model_signal" : "hype_proxy",
     streamingGrowth: Number(row.streaming_growth),
     youtubeGrowth: Number(row.youtube_growth),
     searchGrowth: Number(row.search_growth),

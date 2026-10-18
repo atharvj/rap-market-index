@@ -6,6 +6,7 @@ export type ValidationSignalSnapshot = HypeStats & {
   sourceDate: string;
   priceSignalPercent?: number;
   modelVersion?: string;
+  predictionSource?: "executed_return" | "model_signal" | "hype_proxy";
 };
 
 export type ValidationAudienceObservation = {
@@ -25,6 +26,15 @@ export type MarketModelValidation = {
   rankCorrelation: number | null;
   directionalAccuracyPercent: number | null;
   directionalSampleCount: number;
+  balancedDirectionalAccuracyPercent: number | null;
+  majorityDirectionBaselinePercent: number | null;
+  positiveOutcomeCount: number;
+  negativeOutcomeCount: number;
+  meanDateRankCorrelation: number | null;
+  rankedDateCount: number;
+  nonOverlappingSignalDateCount: number;
+  minimumRecommendedIndependentDates: number;
+  predictionSources: Record<string, number>;
   topBottomAudienceLift: number | null;
   averageMetricsPerSample: number;
   sourceMetricSampleCounts: Record<string, number>;
@@ -40,11 +50,15 @@ type ValidationSample = {
   target: number;
   metricCount: number;
   sourceMetrics: string[];
+  predictionSource: string;
 };
 
 const MINIMUM_RECOMMENDED_SAMPLES = 200;
 const MINIMUM_RECOMMENDED_DATES = 21;
 const DATE_TOLERANCE_DAYS = 2;
+const MINIMUM_INDEPENDENT_DATES = 8;
+const OUTCOME_METRICS = new Set(["spotify_public:monthly_listeners", "lastfm:listeners", "lastfm:playcount",
+  "listenbrainz:listener_count", "listenbrainz:listen_count", "youtube:channel_views", "youtube:subscriber_count"]);
 
 export function evaluateMarketModel({
   snapshots,
@@ -57,7 +71,10 @@ export function evaluateMarketModel({
 }): MarketModelValidation {
   const safeHorizonDays = Math.max(3, Math.min(30, Math.round(horizonDays)));
   const series = buildObservationSeries(observations);
-  const samples = snapshots
+  const uniqueSnapshots = [...new Map(snapshots.filter(snapshot => isValidDate(snapshot.sourceDate) &&
+    Object.values(snapshot).every(value => typeof value !== "number" || Number.isFinite(value)))
+    .map(snapshot => [`${snapshot.artistId}:${snapshot.sourceDate}`, snapshot])).values()];
+  const samples = uniqueSnapshots
     .map((snapshot) => buildValidationSample(snapshot, series, safeHorizonDays))
     .filter((sample): sample is ValidationSample => Boolean(sample));
   const distinctArtistCount = new Set(samples.map((sample) => sample.artistId)).size;
@@ -75,7 +92,17 @@ export function evaluateMarketModel({
 
     return counts;
   }, {});
-  const status = getValidationStatus(samples.length, distinctSignalDateCount);
+  const dates = [...new Set(samples.map(sample => sample.sourceDate))].sort();
+  const independentDates: string[] = [];
+  for (const date of dates) if (!independentDates.length || getDateDistanceDays(independentDates.at(-1)!, date) >= 2 * (safeHorizonDays + DATE_TOLERANCE_DAYS)) independentDates.push(date);
+  const dateCorrelations = dates.map(date => getSpearmanCorrelation(samples.filter(sample => sample.sourceDate === date)))
+    .filter((value): value is number => value !== null);
+  const positiveOutcomes = directionalSamples.filter(sample => sample.target > 0);
+  const negativeOutcomes = directionalSamples.filter(sample => sample.target < 0);
+  const balancedAccuracy = positiveOutcomes.length && negativeOutcomes.length ? 50 * (
+    positiveOutcomes.filter(sample => sample.prediction > 0).length / positiveOutcomes.length +
+    negativeOutcomes.filter(sample => sample.prediction < 0).length / negativeOutcomes.length) : null;
+  const status = getValidationStatus(samples.length, distinctSignalDateCount, independentDates.length);
 
   return {
     status,
@@ -88,6 +115,15 @@ export function evaluateMarketModel({
       ? round((directionalMatches / directionalSamples.length) * 100, 1)
       : null,
     directionalSampleCount: directionalSamples.length,
+    balancedDirectionalAccuracyPercent: balancedAccuracy === null ? null : round(balancedAccuracy, 1),
+    majorityDirectionBaselinePercent: directionalSamples.length ? round(Math.max(positiveOutcomes.length, negativeOutcomes.length) / directionalSamples.length * 100, 1) : null,
+    positiveOutcomeCount: positiveOutcomes.length,
+    negativeOutcomeCount: negativeOutcomes.length,
+    meanDateRankCorrelation: dateCorrelations.length ? round(average(dateCorrelations), 3) : null,
+    rankedDateCount: dateCorrelations.length,
+    nonOverlappingSignalDateCount: independentDates.length,
+    minimumRecommendedIndependentDates: MINIMUM_INDEPENDENT_DATES,
+    predictionSources: samples.reduce<Record<string, number>>((counts, sample) => { counts[sample.predictionSource] = (counts[sample.predictionSource] ?? 0) + 1; return counts; }, {}),
     topBottomAudienceLift: getTopBottomLift(samples),
     averageMetricsPerSample: samples.length
       ? round(samples.reduce((total, sample) => total + sample.metricCount, 0) / samples.length, 2)
@@ -95,7 +131,8 @@ export function evaluateMarketModel({
     sourceMetricSampleCounts,
     minimumRecommendedSamples: MINIMUM_RECOMMENDED_SAMPLES,
     minimumRecommendedDates: MINIMUM_RECOMMENDED_DATES,
-    note: getValidationNote(status, samples.length, distinctSignalDateCount)
+    note: getValidationNote(status, samples.length, distinctSignalDateCount) +
+      ` ${independentDates.length} non-overlapping outcome windows; ${MINIMUM_INDEPENDENT_DATES} recommended. Measurement is not proof of predictive skill; compare the balanced result and majority-direction benchmark. Adjacent weekly outcomes overlap.`
   };
 }
 
@@ -135,9 +172,23 @@ function buildValidationSample(
       continue;
     }
 
+    const sourceMetric = key.slice(snapshot.artistId.length + 1);
+    let target = (futureRate - previousRate) * horizonDays;
+    if (sourceMetric !== "spotify_public:monthly_listeners") {
+      // These are cumulative counters, not rolling active audiences. Constant
+      // daily consumption has zero acceleration even as the lifetime total grows.
+      const pastIncrement = current.value - previous.value, nextIncrement = future.value - current.value;
+      if (pastIncrement <= 0 || nextIncrement <= 0) continue; // cached/rounded counts or resets are unknown
+      if (sourceMetric === "youtube:subscriber_count") {
+        const width = (n: number) => 10 ** Math.max(0, Math.floor(Math.log10(Math.max(1, n))) - 2);
+        if (pastIncrement <= Math.max(width(previous.value), width(current.value)) ||
+          nextIncrement <= Math.max(width(current.value), width(future.value))) continue;
+      }
+      target = Math.log((nextIncrement / futureDays) / (pastIncrement / previousDays)) * 100;
+    }
     metricTargets.push({
-      key: key.slice(snapshot.artistId.length + 1),
-      value: (futureRate - previousRate) * horizonDays
+      key: sourceMetric,
+      value: target
     });
   }
 
@@ -150,9 +201,12 @@ function buildValidationSample(
     sourceDate: snapshot.sourceDate,
     prediction: typeof snapshot.priceSignalPercent === "number" && Number.isFinite(snapshot.priceSignalPercent)
       ? snapshot.priceSignalPercent : calculateSignalDelta(snapshot) * 100,
-    target: median(metricTargets.map((item) => item.value)),
+    // Several metrics from one provider are not several independent outcomes.
+    target: median([...new Set(metricTargets.map(item => item.key.split(":")[0]))].map(source =>
+      median(metricTargets.filter(item => item.key.startsWith(source + ":")).map(item => item.value)))),
     metricCount: metricTargets.length,
-    sourceMetrics: metricTargets.map((item) => item.key)
+    sourceMetrics: metricTargets.map((item) => item.key),
+    predictionSource: snapshot.predictionSource ?? (typeof snapshot.priceSignalPercent === "number" ? "model_signal" : "hype_proxy")
   };
 }
 
@@ -160,7 +214,7 @@ function buildObservationSeries(observations: ValidationAudienceObservation[]) {
   const series = new Map<string, ValidationAudienceObservation[]>();
 
   for (const observation of observations) {
-    if (!Number.isFinite(observation.value) || observation.value < 0 || !isValidDate(observation.observedDate)) {
+    if (!OUTCOME_METRICS.has(`${observation.source}:${observation.metric}`) || !Number.isFinite(observation.value) || observation.value < 0 || !isValidDate(observation.observedDate)) {
       continue;
     }
 
@@ -276,12 +330,12 @@ function getPearsonCorrelation(first: number[], second: number[]) {
   return denominator > 0 ? numerator / denominator : null;
 }
 
-function getValidationStatus(sampleCount: number, distinctDateCount: number): MarketModelValidation["status"] {
+function getValidationStatus(sampleCount: number, distinctDateCount: number, independentDates: number): MarketModelValidation["status"] {
   if (sampleCount < 50 || distinctDateCount < 7) {
     return "collecting";
   }
 
-  if (sampleCount < MINIMUM_RECOMMENDED_SAMPLES || distinctDateCount < MINIMUM_RECOMMENDED_DATES) {
+  if (sampleCount < MINIMUM_RECOMMENDED_SAMPLES || distinctDateCount < MINIMUM_RECOMMENDED_DATES || independentDates < MINIMUM_INDEPENDENT_DATES) {
     return "provisional";
   }
 

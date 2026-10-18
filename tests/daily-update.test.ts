@@ -25,6 +25,29 @@ function artist(): MarketUpdateArtist {
 }
 
 describe("daily market valuation pressure", () => {
+  it("rejects invalid evidence and duplicate providers instead of silently manufacturing a quote", () => {
+    for (const value of [NaN, Infinity]) expect(() => mergeAdapterSignals({ artist: { stats: { streamingGrowth: value }, rawPayload: { source: "lastfm" } } })).toThrow("Invalid");
+    const provider = { artist: { stats: { streamingGrowth: 10 }, rawPayload: { source: "lastfm" } } };
+    expect(() => mergeAdapterSignals(provider, provider)).toThrow("Duplicate");
+    expect(() => calculateDailyMarketUpdates({ artists: [{ ...artist(), currentPrice: NaN }], runDate: "2026-10-18", source: "core" })).toThrow("invalid market inputs");
+    expect(() => calculateDailyMarketUpdates({ artists: [{ ...artist(), stats: { ...neutralStats, previousEventPricing: { events: [] } } as typeof neutralStats }], runDate: "2026-10-18", source: "core" })).not.toThrow();
+  });
+  it("cannot price a zero-confidence modifier", () => {
+    const merged = mergeAdapterSignals({ artist: { stats: {}, confidence: 0, rawPayload: { source: "market_events" }, modifiers: [{ reason: "unverified", priceShock: 0.5 }] } });
+    expect(calculateDailyMarketUpdates({ artists: [artist()], runDate: "2026-10-18", source: "core", adapterSignals: merged }).updates[0].currentPrice).toBe(5);
+  });
+  it("shares confidence across correlated YouTube inputs instead of rewarding duplicate endpoints", () => {
+    const source = (name: string) => ({ artist: { stats: { youtubeGrowth: 12 }, confidence: 0.9, rawPayload: { source: name } } });
+    const price = (inputs: ReturnType<typeof source>[]) => calculateDailyMarketUpdates({ artists: [{ ...artist(), currentPrice: 100, previousClose: 100 }],
+      runDate: "2026-10-18", source: "core", adapterSignals: mergeAdapterSignals(...inputs) }).updates[0];
+    expect(price([source("youtube"), source("youtube_tracks"), source("youtube_comments")]).currentPrice).toBe(price([source("youtube")]).currentPrice);
+  });
+  it("does not punish a healthy all-up or all-down market to satisfy a movement quota", () => {
+    const summarize = (direction: number) => calculateDailyMarketUpdates({ artists: [{ ...artist(), currentPrice: 100, previousClose: 100 }],
+      runDate: "2026-10-18", source: "manual", manualSignals: { artist: { streamingGrowth: direction * 10 } } }).summary;
+    expect(summarize(1).marketQualityScore).toBe(summarize(-1).marketQualityScore);
+    expect(summarize(1).qualityScoreScope).toBe("coverage_and_input_reliability_only");
+  });
   it("does not charge stored hype or its own previous price trend as fresh evidence", () => {
     const current = { ...artist(), currentPrice: 100, previousClose: 100, stats: {
       ...neutralStats, searchGrowth: 80, newsScore: 95, socialGrowth: 60 }, priceTrend: {

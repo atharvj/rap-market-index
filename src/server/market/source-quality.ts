@@ -44,7 +44,7 @@ export function calculateSnapshotMomentum({
 }): SnapshotMomentumResult {
   const baselineAgeFactor = getBaselineAgeFactor(baselineAgeDays);
 
-  if (typeof current !== "number" || typeof baseline !== "number" || baseline <= 0) {
+  if (!isValidCounter(current) || !isValidCounter(baseline) || baseline <= 0) {
     return {
       value: undefined,
       baselineAgeDays,
@@ -59,13 +59,12 @@ export function calculateSnapshotMomentum({
   const rawChangePercent = ((current - baseline) / baseline) * 100;
   const normalizedChangePercent = rawChangePercent / baselineAgeFactor;
   const anomalyFlags: string[] = [];
-  let adjustedChangePercent = normalizedChangePercent;
+  const adjustedChangePercent = normalizedChangePercent;
   let anomalyMultiplier = 1;
 
   if (monotonic && rawChangePercent < -counterDropPercent) {
-    anomalyFlags.push("counter_drop");
-    adjustedChangePercent = clamp(normalizedChangePercent * 0.22, -1.6, 0);
-    anomalyMultiplier *= 0.55;
+    return { value: undefined, baselineAgeDays, baselineAgeFactor, rawChangePercent, normalizedChangePercent,
+      confidenceMultiplier: 0, anomalyFlags: ["counter_drop"] };
   }
 
   if (Math.abs(rawChangePercent) >= extremeJumpPercent && baselineAgeFactor <= 2) {
@@ -103,7 +102,7 @@ export function calculatePointDeltaMomentum({
 }): SnapshotMomentumResult {
   const baselineAgeFactor = getBaselineAgeFactor(baselineAgeDays);
 
-  if (typeof current !== "number" || typeof baseline !== "number") {
+  if (!isValidCounter(current) || !isValidCounter(baseline)) {
     return {
       value: undefined,
       baselineAgeDays,
@@ -139,8 +138,6 @@ export function calculateRateMomentum({
   baselineAgeDays,
   recentDailyRate,
   recentRateSamples = 0,
-  latestCompletedDailyRate,
-  useCompletedIntervalFallback = false,
   yearAgoDailyRate,
   yearAgoRateSamples = 0,
   multiplier,
@@ -153,6 +150,7 @@ export function calculateRateMomentum({
   baselineAgeDays: number | undefined;
   recentDailyRate: number | undefined;
   recentRateSamples?: number;
+  /** Legacy options are accepted for stored callers; completed intervals are never reused. */
   latestCompletedDailyRate?: number;
   useCompletedIntervalFallback?: boolean;
   yearAgoDailyRate?: number;
@@ -162,10 +160,13 @@ export function calculateRateMomentum({
   max: number;
   monotonic?: boolean;
 }): RateMomentumResult {
-  const baselineAgeFactor = getBaselineAgeFactor(baselineAgeDays);
+  // A rate needs elapsed time, not the day-normalization floor used for
+  // stock changes. Very short intervals are too sensitive to provider caches.
+  const baselineAgeFactor = baselineAgeDays ?? Number.NaN;
   const hasInputs =
-    typeof current === "number" &&
-    typeof baseline === "number" &&
+    isValidCounter(current) &&
+    isValidCounter(baseline) &&
+    Number.isFinite(baselineAgeFactor) && baselineAgeFactor >= 0.25 &&
     typeof recentDailyRate === "number" &&
     Number.isFinite(recentDailyRate) &&
     recentDailyRate > 0;
@@ -190,18 +191,10 @@ export function calculateRateMomentum({
     };
   }
 
-  const sampledCurrentDailyRate = (current - baseline) / baselineAgeFactor;
-  const canUseCompletedInterval =
-    useCompletedIntervalFallback &&
-    typeof latestCompletedDailyRate === "number" &&
-    Number.isFinite(latestCompletedDailyRate) &&
-    latestCompletedDailyRate >= 0 &&
-    recentRateSamples > 0 &&
-    ((baselineAgeDays ?? 1) < 0.5 || sampledCurrentDailyRate === 0);
-  const currentDailyRate = canUseCompletedInterval ? latestCompletedDailyRate : sampledCurrentDailyRate;
-  const rateObservationSource = canUseCompletedInterval
-    ? "latest_completed_interval" as const
-    : "current_interval" as const;
+  // Never substitute yesterday's completed interval for new activity. That
+  // interval may already have affected yesterday's quote.
+  const currentDailyRate = (current - baseline) / baselineAgeFactor;
+  const rateObservationSource = "current_interval" as const;
   const recentRateChangePercent = ((currentDailyRate - recentDailyRate) / recentDailyRate) * 100;
   const hasAnnualRate =
     typeof yearAgoDailyRate === "number" &&
@@ -236,23 +229,18 @@ export function calculateRateMomentum({
   }
 
   const anomalyFlags: string[] = [];
-  let adjustedRecentChange = clamp(recentRateChangePercent, -100, 250);
-  let adjustedAnnualChange =
-    typeof annualRateChangePercent === "number" ? clamp(annualRateChangePercent, -100, 250) : undefined;
-  let anomalyMultiplier = 1;
+  const adjustedRecentChange = clamp(recentRateChangePercent, -100, 250);
 
   if (monotonic && currentDailyRate < 0) {
-    anomalyFlags.push("counter_drop");
-    adjustedRecentChange = clamp(adjustedRecentChange * 0.08, -4, 0);
-    adjustedAnnualChange =
-      typeof adjustedAnnualChange === "number" ? clamp(adjustedAnnualChange * 0.08, -4, 0) : undefined;
-    anomalyMultiplier *= 0.42;
+    return { value: undefined, baselineAgeDays, baselineAgeFactor, rawChangePercent: currentDailyRate,
+      normalizedChangePercent: undefined, confidenceMultiplier: 0, anomalyFlags: ["counter_drop"],
+      currentDailyRate, recentDailyRate, yearAgoDailyRate, recentRateSamples, yearAgoRateSamples,
+      recentRateChangePercent, annualRateChangePercent, rateObservationSource };
   }
 
-  const combinedRateChange =
-    typeof adjustedAnnualChange === "number"
-      ? adjustedRecentChange * 0.75 + adjustedAnnualChange * 0.25
-      : adjustedRecentChange;
+  // Annual comparisons describe context. Repeating the same year-on-year gap
+  // must not create fresh daily returns when the measured recent pace is flat.
+  const combinedRateChange = adjustedRecentChange;
   const sampleMultiplier = recentRateSamples >= 5 ? 1 : recentRateSamples >= 2 ? 0.9 : 0.72;
 
   return {
@@ -262,7 +250,7 @@ export function calculateRateMomentum({
     rawChangePercent: currentDailyRate,
     normalizedChangePercent: combinedRateChange,
     confidenceMultiplier: clamp(
-      getBaselineFreshnessMultiplier(baselineAgeDays) * sampleMultiplier * anomalyMultiplier,
+      getBaselineFreshnessMultiplier(baselineAgeDays) * sampleMultiplier,
       0.22,
       1
     ),
@@ -291,7 +279,7 @@ export function calculateAnnualPointMomentum({
   min: number;
   max: number;
 }): SnapshotMomentumResult {
-  if (typeof current !== "number" || typeof baseline !== "number") {
+  if (!Number.isFinite(current) || !Number.isFinite(baseline)) {
     return {
       value: undefined,
       baselineAgeDays: undefined,
@@ -303,7 +291,7 @@ export function calculateAnnualPointMomentum({
     };
   }
 
-  const pointChange = current - baseline;
+  const pointChange = current! - baseline!;
 
   return {
     value: clamp(pointChange * multiplier, min, max),
@@ -333,7 +321,11 @@ export function getBaselineAgeDays(baseline: Record<string, number>, metric: str
 }
 
 export function getBaselineAgeFactor(value: number | undefined) {
-  return Math.max(1, Math.min(30, value ?? 1));
+  return typeof value === "number" && Number.isFinite(value) && value > 0 ? Math.max(1, value) : 1;
+}
+
+function isValidCounter(value: number | undefined): value is number {
+  return typeof value === "number" && Number.isFinite(value) && value >= 0;
 }
 
 export function getCombinedConfidenceMultiplier(results: SnapshotMomentumResult[]) {

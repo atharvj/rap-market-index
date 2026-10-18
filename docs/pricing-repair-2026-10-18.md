@@ -1,5 +1,11 @@
 # Pricing repair — October 18, 2026
 
+**Superseded accuracy assessment:** the v46 audit found errors in the cumulative
+counter outcome calculation and missing majority-direction comparisons. The
+49.5%/56.9% diagnostic below is retained as the original historical report, but
+must not be used as evidence of predictive accuracy. See the
+[corrected reliability review](engine-reliability-2026-10-18.md).
+
 Model: **rmi-core-v45**. This implements the corrections identified in the
 [89-artist review](price-review-2026-10-18.md), with shared rules for every artist.
 No artist receives a hand-picked return or dollar target.

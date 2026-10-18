@@ -276,7 +276,7 @@ function HomeLeadStory({ item }: { item: MarketNewsItem }) {
           <div className="grid gap-3 sm:grid-cols-[1fr_auto] sm:items-end">
             <div className="grid grid-cols-2 gap-3 text-xs font-semibold uppercase tracking-wide text-paper/45">
               <ImpactGauge label="Impact" value={item.impactScore} positive={positive} />
-              <ImpactGauge label="Confidence" value={item.confidence * 100} positive />
+              <ImpactGauge label="Evidence" value={item.confidence * 100} positive />
             </div>
             <div className="flex items-center gap-3">
               <MediaLink item={item} />
@@ -382,8 +382,8 @@ function MarketNewsArticle({
             </div>
             {meta}
             <h3 className="mt-2 text-xl font-bold leading-tight text-paper">{title}</h3>
-            <p className="mt-3 text-xs font-semibold uppercase tracking-wide text-paper/40">
-              Impact {Math.round(item.impactScore)} · Confidence {Math.round(item.confidence * 100)}%
+            <p className="mt-3 text-xs font-semibold uppercase tracking-wide text-paper/40" title="Evidence is a source-strength score, not a probability of truth or an expected price return.">
+              Impact {Math.round(item.impactScore)} · Evidence {Math.round(item.confidence * 100)}/100
             </p>
           </div>
         </div>

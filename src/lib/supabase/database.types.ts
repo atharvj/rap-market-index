@@ -595,6 +595,11 @@ export type Database = {
       };
     };
     Functions: {
+      persist_market_quote_batch: {
+        Args: { p_run_date: string; p_stats: Json; p_signals: Json; p_history: Json; p_quotes: Json;
+          p_ticks: Json; p_pricing_state: Json; p_comparison_prices: Json; p_intraday?: boolean };
+        Returns: Json;
+      };
       admin_reset_user_portfolio: {
         Args: {
           p_target_user_id: string;

@@ -494,15 +494,10 @@ function buildYoutubeCommentSignal({
     // first sample was forced flat, so an overwhelmingly disliked new song
     // established a negative baseline without displaying that reaction.
     const absoluteReaction = weightedSentiment * 0.34 + netShare * 0.2;
-    const momentumReaction = hasBaseline
-      ? sentimentChange * 0.35 + netShareChange * 0.12
-      : 0;
-    let reactionScore = absoluteReaction + momentumReaction;
-    // More likes/replies on criticism are not approval, searches or video views.
-    // Improving but still strongly negative reception remains a negative input.
-    if (weightedSentiment <= -18) reactionScore = Math.min(reactionScore, absoluteReaction * 0.5);
-    if (weightedSentiment >= 18) reactionScore = Math.max(reactionScore, absoluteReaction * 0.5);
-    stats.socialGrowth = clamp(reactionScore, -45, 45);
+    // The pricing engine differences this level once. Including a precomputed
+    // change here would difference momentum twice and create a false reversal
+    // tomorrow when an unchanged audience opinion loses today's momentum term.
+    stats.socialGrowth = clamp(absoluteReaction, -45, 45);
   }
 
   const rawPayload = {
@@ -518,6 +513,7 @@ function buildYoutubeCommentSignal({
     unclassifiedCommentCount: commentCount - classifiedCommentCount,
     uniqueAuthorCount,
     samplingVersion: SAMPLING_VERSION,
+    pricingInputVersion: 2,
     duplicateCopyCount,
     candidatesPerOrder: 100,
     maxCommentsPerVideo,

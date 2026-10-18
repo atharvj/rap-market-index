@@ -61,6 +61,8 @@ describe("ListenBrainz market source", () => {
           listen_count: 90000,
           listener_count: 4800,
           listen_count__age_days: 1,
+          listen_count__recent_daily_rate: 5000,
+          listen_count__recent_rate_samples: 5,
           listener_count__age_days: 1
         }
       },

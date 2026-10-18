@@ -21,7 +21,7 @@ function sourceSignals(
 }
 
 describe("market-wide source calibration", () => {
-  it("cleans a stored market-wide bias so it cannot linger after the source recovers", () => {
+  it("does not assume a broad stored slowdown is a provider error", () => {
     const artists = Array.from({ length: 20 }, (_, index) => ({
       id: `artist-${index}`,
       stats: {
@@ -36,7 +36,8 @@ describe("market-wide source calibration", () => {
     const result = calibratePersistedMarketStats(artists);
     const listening = result.artists.map((artist) => artist.stats.streamingGrowth).sort((a, b) => a - b);
 
-    expect((listening[9] + listening[10]) / 2).toBeCloseTo(0, 8);
+    expect(result.artists).toEqual(artists);
+    expect((listening[9] + listening[10]) / 2).toBeLessThan(0);
     expect(result.audits["artist-0"].streamingGrowth).toMatchObject({
       rawValue: -10,
       sampleCount: 20,
@@ -46,22 +47,23 @@ describe("market-wide source calibration", () => {
     expect(result.audits["artist-0"].youtubeGrowth).toBeUndefined();
   });
 
-  it("removes an all-market provider shift while preserving artist differences", () => {
+  it("records a broad provider shift without inventing opposite-direction movements", () => {
     const rawValues = Array.from({ length: 20 }, (_, index) => -10 + index * 0.4);
     const merged = mergeAdapterSignals(sourceSignals("lastfm", rawValues));
     const adjusted = Object.values(merged).map((signal) => signal.stats.streamingGrowth ?? 0);
     const sorted = [...adjusted].sort((left, right) => left - right);
     const median = (sorted[9] + sorted[10]) / 2;
 
-    expect(median).toBeCloseTo(0, 8);
-    expect(adjusted.some((value) => value > 0)).toBe(true);
+    expect(median).toBeLessThan(0);
+    expect(adjusted.some((value) => value > 0)).toBe(false);
     expect(adjusted.some((value) => value < 0)).toBe(true);
     expect(adjusted[19] - adjusted[0]).toBeCloseTo(rawValues[19] - rawValues[0], 8);
     expect(merged["artist-0"].rawPayload).toMatchObject({
       lastfm: {
         marketWideCalibration: {
-          version: 1,
-          reason: "source_wide_directional_shift",
+          version: 2,
+          applied: false,
+          reason: "broad_shift_requires_provider_verification",
           metrics: {
             streamingGrowth: {
               rawValue: rawValues[0],
@@ -79,8 +81,8 @@ describe("market-wide source calibration", () => {
     const values = [...Array(18).fill(-5), 1, 2];
     const merged = mergeAdapterSignals(sourceSignals("lastfm", values));
 
-    expect(merged["artist-0"].stats.streamingGrowth).toBeCloseTo(0, 8);
-    expect(merged["artist-19"].stats.streamingGrowth).toBeCloseTo(7, 8);
+    expect(merged["artist-0"].stats.streamingGrowth).toBeCloseTo(-5, 8);
+    expect(merged["artist-19"].stats.streamingGrowth).toBeCloseTo(2, 8);
     expect(merged["artist-0"].rawPayload).toHaveProperty("lastfm.marketWideCalibration");
   });
 

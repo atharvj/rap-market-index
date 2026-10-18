@@ -7,11 +7,13 @@ describe("same-day source continuity", () => {
   it("does not replay reception calculated before the sampling repair", () => {
     const row = { artist_id: "artist", source_date: "2026-10-14", raw_payload: { dailySourceInputs: {
       bluesky: { stats: { socialGrowth: 130 }, rawPayload: { source: "bluesky" } },
-      youtube_comments: { stats: { socialGrowth: 90 }, rawPayload: { source: "youtube_comments", samplingVersion: 6 } }
+      youtube_comments: { stats: { socialGrowth: 90 }, rawPayload: { source: "youtube_comments", samplingVersion: 6, sentimentAverage: 50, netShare: 60 } }
     } } };
     const sources = restoreDailySources([row], row.source_date);
     expect(sources).toHaveLength(1);
     expect(sources[0].artist.rawPayload.source).toBe("youtube_comments");
+    expect(sources[0].artist.stats.socialGrowth).toBe(29);
+    expect(row.raw_payload.dailySourceInputs.youtube_comments.stats.socialGrowth).toBe(90);
     row.raw_payload.dailySourceInputs.youtube_comments.rawPayload.samplingVersion = 5;
     expect(restoreDailySources([row], row.source_date)).toEqual([]);
   });

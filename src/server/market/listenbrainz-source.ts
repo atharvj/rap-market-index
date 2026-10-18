@@ -152,11 +152,7 @@ export async function collectListenBrainzMarketSignals({
       monotonic: true
     });
     const stats: Partial<HypeStats> = {};
-    const streamingGrowth = weightedAverage([
-      { value: listenRateMomentum.value, weight: 0.55 },
-      { value: listenMomentum.value, weight: 0.25 },
-      { value: listenerMomentum.value, weight: 0.2 }
-    ]);
+    const streamingGrowth = listenRateMomentum.value;
 
     if (typeof streamingGrowth === "number") {
       stats.streamingGrowth = clamp(streamingGrowth, -20, 55);
@@ -164,6 +160,8 @@ export async function collectListenBrainzMarketSignals({
 
     const rawPayload = {
       source: SOURCE,
+      pricingInputVersion: 2,
+      pricingQuality: typeof listenRateMomentum.value === "number" ? [buildRateMomentumQualityPayload(listenRateMomentum)] : [],
       runDate,
       musicbrainzId: mbid,
       listenCount: listenCount ?? null,
@@ -188,7 +186,7 @@ export async function collectListenBrainzMarketSignals({
     signals[artist.id] = {
       stats,
       confidence: clamp(
-        0.62 * getCombinedConfidenceMultiplier([listenMomentum, listenerMomentum, listenRateMomentum]),
+        0.62 * getCombinedConfidenceMultiplier([listenRateMomentum]),
         0.15,
         0.62
       ),

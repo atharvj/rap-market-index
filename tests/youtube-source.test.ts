@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { collectYoutubeMarketSignals } from "@/server/market/youtube-source";
+import { collectYoutubeMarketSignals, getConservativeSubscriberCount } from "@/server/market/youtube-source";
 import type { MarketUpdateArtist } from "@/server/market/daily-update";
 
 const testArtist: MarketUpdateArtist = {
@@ -73,6 +73,15 @@ async function collect(viewCount: number, extraBaseline: Record<string, number> 
 }
 
 describe("YouTube audience velocity", () => {
+  it("does not make steady daily viewing a permanent positive signal", async () => {
+    expect((await collect(1_010_000)).signals.artist.stats.youtubeGrowth).toBe(0);
+  });
+  it("uses the guaranteed change between rounded subscriber ranges, including real losses", () => {
+    expect(getConservativeSubscriberCount(1_010_000, 1_000_000)).toBe(1_000_001);
+    expect(getConservativeSubscriberCount(990_000, 1_000_000)).toBe(990_999);
+    expect(getConservativeSubscriberCount(1_000_000, 1_010_000)).toBe(1_009_999);
+    expect(getConservativeSubscriberCount(1_020_000, 1_000_000)).toBe(1_010_001);
+  });
   it("marks growth below the artist's usual pace as negative even when total views rise", async () => {
     const result = await collect(1_005_000);
     const signal = result.signals[testArtist.id];
@@ -91,7 +100,7 @@ describe("YouTube audience velocity", () => {
     expect(signal.rawPayload.viewRateMomentum).toBeGreaterThan(0);
   });
 
-  it("uses year-over-year velocity when a real annual comparison exists", async () => {
+  it("retains year-over-year context without charging an unchanged annual gap as a daily return", async () => {
     const withoutAnnual = await collect(1_010_000);
     const withAnnual = await collect(1_010_000, {
       channel_views__year_ago_daily_rate: 20_000,
@@ -102,7 +111,7 @@ describe("YouTube audience velocity", () => {
     };
 
     expect(annualQuality.annualRateChangePercent).toBe(-50);
-    expect(withAnnual.signals[testArtist.id].stats.youtubeGrowth).toBeLessThan(
+    expect(withAnnual.signals[testArtist.id].stats.youtubeGrowth).toBe(
       withoutAnnual.signals[testArtist.id].stats.youtubeGrowth ?? 0
     );
   });

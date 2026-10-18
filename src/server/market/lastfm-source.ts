@@ -199,13 +199,20 @@ function buildLastfmSignal({
     max: 55,
     monotonic: true
   });
+  const listenerRateMomentum = calculateRateMomentum({
+    current: listeners, baseline: baseline[LISTENERS], baselineAgeDays: listenerBaselineAgeDays,
+    recentDailyRate: baseline[`${LISTENERS}__recent_daily_rate`],
+    recentRateSamples: baseline[`${LISTENERS}__recent_rate_samples`],
+    multiplier: 0.18, min: -25, max: 55
+  });
   const stats: Partial<HypeStats> = {};
 
-  if (typeof playcountMomentum.value === "number" || typeof listenerMomentum.value === "number") {
+  // Both Last.fm counters are cumulative. Steady consumption must not earn a
+  // positive return merely because lifetime totals necessarily keep increasing.
+  if (typeof playcountRateMomentum.value === "number" || typeof listenerRateMomentum.value === "number") {
     const streamingGrowth = weightedAverage([
-      { value: playcountRateMomentum.value, weight: 0.55 },
-      { value: playcountMomentum.value, weight: 0.25 },
-      { value: listenerMomentum.value, weight: 0.2 }
+      { value: playcountRateMomentum.value, weight: 0.8 },
+      { value: listenerRateMomentum.value, weight: 0.2 }
     ]);
     if (typeof streamingGrowth === "number") {
       stats.streamingGrowth = clamp(streamingGrowth, -25, 75);
@@ -230,9 +237,13 @@ function buildLastfmSignal({
     listenerMomentum: listenerMomentum.value,
     playcountMomentum: playcountMomentum.value,
     playcountRateMomentum: playcountRateMomentum.value,
+    listenerRateMomentum: listenerRateMomentum.value,
+    pricingInputVersion: 2,
+    pricingQuality: [listenerRateMomentum, playcountRateMomentum].filter(item => typeof item.value === "number").map(buildRateMomentumQualityPayload),
     listenerMomentumQuality: buildMomentumQualityPayload(listenerMomentum),
     playcountMomentumQuality: buildMomentumQualityPayload(playcountMomentum),
     playcountRateMomentumQuality: buildRateMomentumQualityPayload(playcountRateMomentum),
+    listenerRateMomentumQuality: buildRateMomentumQualityPayload(listenerRateMomentum),
     velocityMinimumTickEligible:
       typeof playcountRateMomentum.value === "number" &&
       Math.abs(playcountRateMomentum.value) >= 1 &&
@@ -257,7 +268,7 @@ function buildLastfmSignal({
       confidence: trustedIdentity
         ? clamp(
             0.86 *
-              getCombinedConfidenceMultiplier([listenerMomentum, playcountMomentum, playcountRateMomentum]) *
+              getCombinedConfidenceMultiplier([listenerRateMomentum, playcountRateMomentum]) *
               nameMatch.confidence,
             0.18,
             0.86
