@@ -68,6 +68,22 @@ function evidenceMultiplier(event: MarketEvent) {
 }
 
 describe("feature evidence safeguards", () => {
+  it("does not use unrelated same-day articles as corroboration for one another", () => {
+    const performer = { ...artist, id: "drake", name: "Drake", ticker: "DRAKE" };
+    const events: MarketEvent[] = ["Drake announces a European arena tour", "Drake releases a new mixtape"].map((title, i) => ({
+      artistId: "drake", eventDate: "2026-10-12", eventType: "news", title, sourceName: `Publisher ${i}`,
+      sourceUrl: `https://publisher${i}.test/story`, sentimentScore: 40, impactScore: 45, confidence: 0.8,
+      rawPayload: { source: "manual_event" } }));
+    const signal = buildEventMarketSignals({ artists: [performer], runDate: "2026-10-12", eventsByArtist: { drake: events } }).drake;
+    const scored = signal.rawPayload.events as Array<{ clusterSourceCount: number; clusterConfirmationMultiplier: number }>;
+    expect(scored).toHaveLength(2);
+    expect(scored.every(event => event.clusterSourceCount === 1 && event.clusterConfirmationMultiplier === 1)).toBe(true);
+  });
+
+  it("does not price future-dated event records as completed events today", () => {
+    const event = featureEvent({});
+    expect(buildEventMarketSignals({ artists: [artist], runDate: "2026-07-09", eventsByArtist: { [artist.id]: [event] } })).toEqual({});
+  });
   it("keeps verified homecoming-performance coverage eligible when stored news is rescored", () => {
     const performer = { ...artist, id: "ye", name: "Ye", ticker: "YE" };
     const title = "Ye Brings Out Big Sean, 2 Chainz & Twista During Homecoming Show In Chicago";
@@ -442,7 +458,7 @@ describe("project announcement classification", () => {
       sentimentScore: 34, impactScore: 52, confidence: 0.735, sourceUrl: "https://www.hotnewhiphop.com/quavo-album",
       rawPayload: { source: "media_rss_item", sourceTier: 1, domain: "hotnewhiphop.com", releaseKind: "album" } };
     const signal = buildEventMarketSignals({ artists: [performer], runDate: "2026-10-18", eventsByArtist: { quavo: [event] } }).quavo;
-    expect(signal.stats.newsScore).not.toBeGreaterThan(50);
+    expect(signal.stats.newsScore ?? 50).not.toBeGreaterThan(50);
     expect(signal.modifiers).toEqual([]);
   });
   it("corrects a stored single with stale album-kind metadata", () => {

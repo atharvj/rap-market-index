@@ -176,40 +176,49 @@ export async function loadPreviousSignalStats({
   supabase: Supabase;
   artistIds: string[];
   runDate: string;
-}): Promise<Record<string, HypeStats>> {
+}): Promise<Record<string, HypeStats & { previousEventPricing?: unknown; previousReceptionBaseline?: Record<string, number> }>> {
   if (!artistIds.length) {
     return {};
   }
 
-  const { data, error } = await supabase
-    .from("market_signal_snapshots")
-    .select(
-      "artist_id,source_date,streaming_growth,youtube_growth,search_growth,social_growth,news_score,trader_demand"
-    )
-    .in("artist_id", artistIds)
-    .lt("source_date", runDate)
-    .order("source_date", { ascending: false });
-
-  if (error) {
-    throw new Error(`Could not load previous signal snapshots: ${error.message}`);
-  }
-
-  return (data ?? []).reduce<Record<string, HypeStats>>((statsByArtist, row) => {
-    if (statsByArtist[row.artist_id]) {
-      return statsByArtist;
+  const result: Record<string, HypeStats & { previousEventPricing?: unknown; previousReceptionBaseline?: Record<string, number> }> = {};
+  // Query unresolved artists again: a busy artist must not crowd an older
+  // artist's baseline out of PostgREST's first 1,000 rows.
+  let pending = [...new Set(artistIds)];
+  while (pending.length) {
+    const { data, error } = await supabase.from("market_signal_snapshots")
+      .select("artist_id,source_date,streaming_growth,youtube_growth,search_growth,social_growth,news_score,trader_demand,event_pricing:raw_payload->market_events,source_values:raw_payload->sourceValues,reception_pricing:raw_payload->receptionPricingBaseline")
+      .in("artist_id", pending).lt("source_date", runDate)
+      .order("source_date", { ascending: false }).order("artist_id").limit(1000);
+    if (error) throw new Error(`Could not load previous signal snapshots: ${error.message}`);
+    for (const row of data ?? []) {
+      if (result[row.artist_id]) continue;
+      result[row.artist_id] = {
+        streamingGrowth: Number(row.streaming_growth), youtubeGrowth: Number(row.youtube_growth),
+        searchGrowth: Number(row.search_growth), socialGrowth: Number(row.social_growth),
+        newsScore: Number(row.news_score), traderDemand: Number(row.trader_demand),
+        previousEventPricing: row.event_pricing,
+        previousReceptionBaseline: readReceptionBaseline(row.reception_pricing, row.source_values)
+      };
     }
+    const remaining = pending.filter(id => !result[id]);
+    if ((data ?? []).length < 1000) break;
+    if (remaining.length === pending.length) throw new Error("Could not resolve previous signal snapshots completely.");
+    pending = remaining;
+  }
+  return result;
+}
 
-    statsByArtist[row.artist_id] = {
-      streamingGrowth: Number(row.streaming_growth),
-      youtubeGrowth: Number(row.youtube_growth),
-      searchGrowth: Number(row.search_growth),
-      socialGrowth: Number(row.social_growth),
-      newsScore: Number(row.news_score),
-      traderDemand: Number(row.trader_demand)
-    };
-
-    return statsByArtist;
-  }, {});
+function readReceptionBaseline(saved: unknown, legacy: unknown) {
+  const record = saved && typeof saved === "object" ? saved as Record<string, unknown> : {};
+  const values = legacy && typeof legacy === "object" ? legacy as Record<string, unknown> : {};
+  const result: Record<string, number> = {};
+  for (const source of ["youtube_comments", "bluesky"]) {
+    const entry = values[source] as Record<string, unknown> | undefined;
+    const value = record[source] ?? entry?.socialGrowth;
+    if (typeof value === "number" && Number.isFinite(value)) result[source] = value;
+  }
+  return result;
 }
 
 export async function loadCurrentSignalStats({
@@ -1341,6 +1350,23 @@ async function persistUpdateBatch(
     if (tickInsert.error) {
       throw new Error(`Could not save market price ticks: ${tickInsert.error.message}`);
     }
+  }
+
+  // Intraday jobs deliberately preserve the original daily signal snapshot.
+  // Save the latest pricing ledger separately so tomorrow knows which stories
+  // and reception changes were actually priced later in today's session.
+  const pricingStates = updates.filter(update => typeof update.rawPayload.source === "string" &&
+    !["manual", "mock"].includes(update.rawPayload.source)).map(update => ({
+      artist_id: update.artistId, source: "market_pricing", metric: "evidence_state", observed_date: runDate,
+      observed_at: new Date().toISOString(), value: 1, unit: "state",
+      raw_payload: { version: 1, runDate, modelVersion: update.modelVersion,
+        pricingSignalPercent: update.signalDelta * 100,
+        marketEvents: (update.rawPayload.market_events ?? null) as Json,
+        receptionPricingBaseline: (update.rawPayload.receptionPricingBaseline ?? {}) as Json } as Json
+    }));
+  if (pricingStates.length) {
+    const savedState = await supabase.from("market_observations").upsert(pricingStates, { onConflict: "artist_id,source,metric,observed_date" });
+    if (savedState.error) throw new Error(`Could not save pricing evidence state: ${savedState.error.message}`);
   }
 
   // Completion is independent of movement. Record only after every quote write succeeds.

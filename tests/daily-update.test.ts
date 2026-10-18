@@ -25,6 +25,37 @@ function artist(): MarketUpdateArtist {
 }
 
 describe("daily market valuation pressure", () => {
+  it("does not charge stored hype or its own previous price trend as fresh evidence", () => {
+    const current = { ...artist(), currentPrice: 100, previousClose: 100, stats: {
+      ...neutralStats, searchGrowth: 80, newsScore: 95, socialGrowth: 60 }, priceTrend: {
+      sampleCount: 30, return7dPercent: 15, return30dPercent: 45, realizedVolatilityPercent: 1,
+      upDayCount: 29, downDayCount: 0, latestPriceDate: "2026-10-17" } };
+    const noSignal = calculateDailyMarketUpdates({ artists: [current], source: "core", runDate: "2026-10-18" }).updates[0];
+    expect(noSignal.currentPrice).toBe(100);
+    const flatEvidence = mergeAdapterSignals({ artist: { stats: { streamingGrowth: 0, youtubeGrowth: 0 },
+      confidence: 0.9, rawPayload: { source: "lastfm" } } });
+    expect(calculateDailyMarketUpdates({ artists: [current], source: "core", runDate: "2026-10-18", adapterSignals: flatEvidence }).updates[0].currentPrice).toBe(100);
+  });
+
+  it("uses reception changes while keeping a steady positive or negative sample from creating daily drift", () => {
+    for (const level of [-30, 30]) {
+      const current = { ...artist(), currentPrice: 100, previousClose: 100, previousReceptionBaseline: { youtube_comments: level } };
+      const signals = (value: number) => mergeAdapterSignals({ artist: { stats: { socialGrowth: value },
+        confidence: 0.4, rawPayload: { source: "youtube_comments" } } });
+      const calculate = (value: number) => calculateDailyMarketUpdates({ artists: [current], source: "core", runDate: "2026-10-18", adapterSignals: signals(value) }).updates[0];
+      expect(calculate(level).currentPrice).toBe(100);
+      expect(calculate(level + 10).currentPrice).toBeGreaterThan(100);
+      expect(calculate(level - 10).currentPrice).toBeLessThan(100);
+    }
+  });
+
+  it("does not promote a lone tiny-confidence reaction to a full-strength price input", () => {
+    const update = calculateDailyMarketUpdates({ artists: [{ ...artist(), currentPrice: 100, previousClose: 100 }],
+      source: "core", runDate: "2026-10-18", adapterSignals: mergeAdapterSignals({ artist: {
+        stats: { socialGrowth: 40 }, confidence: 0.01, rawPayload: { source: "bluesky" } } }) }).updates[0];
+    expect((update.rawPayload.pricingEvidence as { stats: { socialGrowth: number } }).stats.socialGrowth).toBeLessThan(0.1);
+    expect(update.currentPrice).toBe(100);
+  });
   it("counts YouTube metrics as one provider when estimating independent coverage", () => {
     const youtube = ["youtube", "youtube_tracks", "youtube_comments"].map(source => ({
       artist: { stats: { youtubeGrowth: 12 }, confidence: 0.9, rawPayload: { source, status: "ok" } }
@@ -352,8 +383,8 @@ describe("daily market valuation pressure", () => {
       adapterSignals: {
         artist: {
           stats: {
-            youtubeGrowth: -0.2,
-            socialGrowth: -0.2
+            youtubeGrowth: -0.25,
+            socialGrowth: -0.25
           },
           rawPayload: {
             youtube: {
@@ -363,10 +394,10 @@ describe("daily market valuation pressure", () => {
               youtube: { youtubeGrowth: 0.8, socialGrowth: 0.4 }
             },
             sourceValues: {
-              youtube: { youtubeGrowth: -0.2, socialGrowth: -0.2 }
+              youtube: { youtubeGrowth: -0.25, socialGrowth: -0.25 }
             },
             sourceDirectionalScores: {
-              youtube: -0.2
+              youtube: -0.25
             }
           }
         }

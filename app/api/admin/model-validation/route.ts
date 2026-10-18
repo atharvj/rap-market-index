@@ -12,17 +12,17 @@ import { loadActiveArtists } from "@/server/market/supabase-repository";
 export const dynamic = "force-dynamic";
 
 const VALIDATION_SERIES = [
+  { source: "spotify_public", metric: "monthly_listeners" },
   { source: "lastfm", metric: "listeners" },
   { source: "lastfm", metric: "playcount" },
   { source: "listenbrainz", metric: "listener_count" },
   { source: "listenbrainz", metric: "listen_count" },
   { source: "youtube", metric: "channel_views" },
-  { source: "youtube", metric: "subscriber_count" },
-  { source: "wikimedia", metric: "pageviews_7d" }
+  { source: "youtube", metric: "subscriber_count" }
 ] as const;
 
 const PAGE_SIZE = 1000;
-const MAX_ROWS = 30000;
+const MAX_ROWS = 200000;
 
 export async function GET(request: Request) {
   const auth = await requireAdminRequest(request);
@@ -53,6 +53,8 @@ export async function GET(request: Request) {
       loadAudienceObservations({ supabase, artistIds, startDate: observationStartDate, endDate: runDate })
     ]);
     const validation = evaluateMarketModel({ snapshots, observations, horizonDays });
+    const validationByModel = Object.fromEntries([...new Set(snapshots.map(row => row.modelVersion ?? "unknown"))].map(version =>
+      [version, evaluateMarketModel({ snapshots: snapshots.filter(row => (row.modelVersion ?? "unknown") === version), observations, horizonDays })]));
 
     return NextResponse.json({
       ok: true,
@@ -61,7 +63,8 @@ export async function GET(request: Request) {
       signalWindow: { startDate: signalStartDate, endDate: signalEndDate },
       snapshotRowCount: snapshots.length,
       observationRowCount: observations.length,
-      validation
+      validation,
+      validationByModel
     });
   } catch (error) {
     return NextResponse.json(
@@ -89,11 +92,12 @@ async function loadSignalSnapshots({
   const rows = await loadPagedRows(async (from, to) => {
     const { data, error } = await supabase
       .from("market_signal_snapshots")
-      .select("artist_id,source_date,streaming_growth,youtube_growth,search_growth,social_growth,news_score,trader_demand")
+      .select("artist_id,source_date,streaming_growth,youtube_growth,search_growth,social_growth,news_score,trader_demand,pricing_signal:raw_payload->signalDeltaBeforeTechnicals,model_version")
       .in("artist_id", artistIds)
       .gte("source_date", startDate)
       .lte("source_date", endDate)
       .order("source_date", { ascending: true })
+      .order("artist_id")
       .range(from, to);
 
     if (error) {
@@ -106,6 +110,8 @@ async function loadSignalSnapshots({
   return rows.map<ValidationSignalSnapshot>((row) => ({
     artistId: row.artist_id,
     sourceDate: row.source_date,
+    priceSignalPercent: typeof row.pricing_signal === "number" ? row.pricing_signal * 100 : undefined,
+    modelVersion: typeof row.model_version === "string" ? row.model_version : "unknown",
     streamingGrowth: Number(row.streaming_growth),
     youtubeGrowth: Number(row.youtube_growth),
     searchGrowth: Number(row.search_growth),
@@ -130,18 +136,16 @@ async function loadAudienceObservations({
     return [];
   }
 
-  const sourceNames = Array.from(new Set(VALIDATION_SERIES.map((series) => series.source)));
-  const metricNames = Array.from(new Set(VALIDATION_SERIES.map((series) => series.metric)));
   const rows = await loadPagedRows(async (from, to) => {
     const { data, error } = await supabase
       .from("market_observations")
       .select("artist_id,source,metric,observed_date,value")
       .in("artist_id", artistIds)
-      .in("source", sourceNames)
-      .in("metric", metricNames)
+      .or(VALIDATION_SERIES.map(series => `and(source.eq.${series.source},metric.eq.${series.metric})`).join(","))
       .gte("observed_date", startDate)
       .lte("observed_date", endDate)
       .order("observed_date", { ascending: true })
+      .order("artist_id").order("source").order("metric")
       .range(from, to);
 
     if (error) {
@@ -172,6 +176,7 @@ async function loadPagedRows<T>(loadPage: (from: number, to: number) => Promise<
     if (page.length < PAGE_SIZE) {
       break;
     }
+    if (rows.length >= MAX_ROWS) throw new Error("Validation data exceeded the complete-history limit; use a shorter lookback.");
   }
 
   return rows;

@@ -6,6 +6,7 @@ import type { HypeStats } from "@/lib/types";
 import { areNewsStoryEventsEquivalent } from "@/server/market/news-story-groups";
 import {
   hasArtistControversySubjectContext,
+  hasArtistFeatureCreditContext,
   hasArtistReleaseSubjectContext,
   hasArtistStatusSubjectContext,
   hasRequiredArtistEventDisambiguation,
@@ -13,7 +14,9 @@ import {
 } from "@/server/market/artist-event-disambiguation";
 import { isMarketEventSourceIntegrityValid } from "@/server/market/event-integrity";
 import { getNewsAttributionText } from "@/server/market/news-artist-attribution";
-import { classifyArticleEvent, hasSingleReleaseAheadOfProject, normalizeDomain } from "@/server/market/gdelt-source";
+import { priceNewEventEvidence } from "@/server/market/event-pricing-history";
+import { classifyStoredMediaEvent, getStoredMediaHeadline } from "@/server/market/stored-media-classification";
+import { hasSingleReleaseAheadOfProject } from "@/server/market/gdelt-source";
 
 export type ManualMarketEventInput = {
   artistId?: string;
@@ -43,9 +46,9 @@ export function buildEventMarketSignals({
   const signals: AdapterSignals = {};
 
   for (const artist of artists) {
-    const events = (eventsByArtist[artist.id] ?? []).filter(isMarketEventSourceIntegrityValid);
+    const events = (eventsByArtist[artist.id] ?? []).filter(event => event.eventDate <= runDate && isMarketEventSourceIntegrityValid(event));
 
-    if (!events.length) {
+    if (!events.length && !artist.previousEventPricing) {
       continue;
     }
 
@@ -154,10 +157,13 @@ export function flattenEvents(eventsByArtist: Record<string, MarketEvent[]>) {
 
 function buildArtistEventSignal(artist: MarketUpdateArtist, runDate: string, events: MarketEvent[]) {
   const uniqueEvents = dedupeSemanticallyEquivalentEvents(events);
-  const scoredEvents = applyEventClusterCaps(
+  const evidenceEvents = applyEventClusterCaps(
     uniqueEvents.map((event) => scoreEvent(event, runDate, artist)),
     artist
   );
+  const pricing = priceNewEventEvidence(evidenceEvents, artist.previousEventPricing, runDate, artist.id);
+  const scoredEvents = pricing.events;
+  const newEvidence = scoredEvents.some(event => Math.max(Math.abs(event.weightedImpact), Math.abs(event.shockWeightedImpact)) > 0.000001);
   const totalSignal = scoredEvents.reduce((total, event) => total + event.weightedImpact, 0);
   const reviewSignal = scoredEvents
     .filter((event) => event.event.eventType === "review")
@@ -195,11 +201,13 @@ function buildArtistEventSignal(artist: MarketUpdateArtist, runDate: string, eve
   const modifiers = buildPriceModifiers(scoredEvents);
 
   return {
-    stats,
+    stats: newEvidence ? stats : {},
     modifiers,
-    confidence: getEventSignalConfidence(scoredEvents),
+    confidence: newEvidence ? getEventSignalConfidence(scoredEvents.filter(event => Math.max(Math.abs(event.weightedImpact), Math.abs(event.shockWeightedImpact)) > 0.000001)) : 0,
     rawPayload: {
       source: "market_events",
+      pricingHistory: pricing.history,
+      evidenceTotalSignal: evidenceEvents.reduce((sum, event) => sum + event.weightedImpact, 0),
       eventCount: uniqueEvents.length,
       rawEventCount: events.length,
       totalSignal,
@@ -241,7 +249,10 @@ function buildArtistEventSignal(artist: MarketUpdateArtist, runDate: string, eve
         evidenceSafetyMultiplier: event.evidenceSafetyMultiplier,
         uncappedWeightedImpact: event.uncappedWeightedImpact,
         shockWeightedImpact: event.shockWeightedImpact,
-        weightedImpact: event.weightedImpact
+        weightedImpact: event.weightedImpact,
+        pricingInnovationMultiplier: event.pricingInnovationMultiplier,
+        shockInnovationMultiplier: event.shockInnovationMultiplier,
+        alreadyPricedImpact: event.alreadyPricedImpact
       }))
     }
   };
@@ -404,7 +415,7 @@ function isGenericProjectReleaseHeadline(event: ScoredMarketEvent) {
 }
 
 function getEventModifierReason(event: ScoredMarketEvent) {
-  const title = event.event.title;
+  const title = getStoredMediaHeadline(event.event);
   const labels: Record<string, string> = {
     project_release: "project release",
     project_announcement: "project announcement",
@@ -482,7 +493,7 @@ function getEventReasonPriority(subtype: string) {
   return priorities[subtype] ?? 0;
 }
 
-function scoreEvent(event: MarketEvent, runDate: string, artist: MarketUpdateArtist) {
+function scoreEvent(event: MarketEvent & { observedStorySources?: string[] }, runDate: string, artist: MarketUpdateArtist) {
   const ageDays = Math.max(0, daysBetween(event.eventDate, runDate));
   const decay = getEventDecay(event.eventType, ageDays);
   const typeWeight = getEventTypeWeight(event.eventType);
@@ -1116,12 +1127,14 @@ function applyEventClusterCaps(
   for (const [key, events] of Object.entries(groups)) {
     const eventType = events[0]?.event.eventType ?? "news";
     const cap = getEventClusterCap(eventType);
-    const sourceCount = countDistinctEventSources(events);
-    const confirmationMultiplier = getClusterConfirmationMultiplier(sourceCount);
+    // A daily bucket enforces an impact cap; unrelated stories in that bucket
+    // cannot corroborate one another or multiply each other's price impact.
+    const confirmationMultiplier = 1;
     const total = events.reduce((sum, event) => sum + event.weightedImpact * confirmationMultiplier, 0);
     const multiplier = Math.abs(total) > cap ? cap / Math.abs(total) : 1;
 
     for (const event of events) {
+      const sourceCount = event.event.observedStorySources?.length ?? 1;
       multipliers.set(event, { key, multiplier, sourceCount, confirmationMultiplier });
     }
   }
@@ -1304,13 +1317,9 @@ function getStoredMediaEvidenceAdjustment(event: ScoredMarketEvent, artist: Mark
     };
   }
 
-  const domain = normalizeDomain(
-    getRawString(rawPayload.domain) ?? undefined,
-    event.event.sourceUrl
-  ) ?? "";
   const query = getRawString(rawPayload.searchQuery) ?? undefined;
   const sourceTier = getRawOptionalNumber(rawPayload.sourceTier) ?? 0;
-  const title = event.event.title;
+  const title = getNewsAttributionText(event.event.title, rawPayload);
 
   if (!hasRequiredArtistEventDisambiguation({
     artistName: artist.name,
@@ -1324,9 +1333,7 @@ function getStoredMediaEvidenceAdjustment(event: ScoredMarketEvent, artist: Mark
     };
   }
 
-  const classification = classifyArticleEvent(title, domain, rawPayload.tone, {
-    allowLowTierRelease: true
-  });
+  const classification = classifyStoredMediaEvent(event.event, artist.name);
 
   if (!classification || classification.eventType !== event.event.eventType) {
     return {
@@ -2009,8 +2016,15 @@ function countDistinctScoredSources(events: ScoredMarketEvent[]) {
 
 function countDistinctEventSources(events: Array<ReturnType<typeof scoreEvent>>) {
   return new Set(
-    events.map((event) => normalizeEventSource(event.event.sourceName ?? getRawString(event.event.rawPayload.source) ?? "unknown"))
+    events.flatMap(event => event.event.observedStorySources ?? [getObservedStorySource(event.event)])
   ).size;
+}
+
+function getObservedStorySource(event: MarketEvent) {
+  const label = normalizeEventSource(event.sourceName ?? getRawString(event.rawPayload.source) ?? "unknown");
+  if (["youtube", "bluesky", "musicbrainz"].includes(label) || label.startsWith("reddit/")) return label;
+  try { return new URL(event.sourceUrl!).hostname.toLowerCase().replace(/^(?:www|ca|au)\./, ""); }
+  catch { return label; }
 }
 
 function normalizeEventSource(value: string) {
@@ -2052,18 +2066,6 @@ function normalizeEventSource(value: string) {
   }
 }
 
-function getClusterConfirmationMultiplier(sourceCount: number) {
-  if (sourceCount >= 3) {
-    return 1.18;
-  }
-
-  if (sourceCount === 2) {
-    return 1.1;
-  }
-
-  return 1;
-}
-
 function normalizeOneManualEvent(
   input: ManualMarketEventInput,
   artist: MarketUpdateArtist,
@@ -2101,7 +2103,8 @@ function getEventSubtype(event: MarketEvent, artist?: MarketUpdateArtist) {
     getRawString(event.rawPayload.classificationReason) ??
     getRawString(event.rawPayload.reason) ??
     getRawString(event.rawPayload.eventReason);
-  const text = normalizeEventText(`${rawReason ?? ""} ${event.title}`);
+  const headline = getStoredMediaHeadline(event);
+  const text = normalizeEventText(`${rawReason ?? ""} ${headline}`);
   const statusSubtype = getArtistStatusSubtype(event.rawPayload.statusSubtype);
   const artistRole = getRawString(event.rawPayload.artistRole);
 
@@ -2109,7 +2112,9 @@ function getEventSubtype(event: MarketEvent, artist?: MarketUpdateArtist) {
     return `status_${statusSubtype}`;
   }
 
-  if (artistRole === "featured") {
+  const mediaSource = ["media_rss_item", "gdelt_article"].includes(getRawString(event.rawPayload.source) ?? "");
+  if ((mediaSource && artist && hasArtistFeatureCreditContext({ artistName: artist.name, text: getNewsAttributionText(event.title, event.rawPayload) })) ||
+    (!mediaSource && artistRole === "featured")) {
     return "feature";
   }
 
@@ -2168,7 +2173,7 @@ function getEventSubtype(event: MarketEvent, artist?: MarketUpdateArtist) {
 
   if (event.eventType === "release") {
     // Correct stored album-kind metadata as well as newly collected stories.
-    if (hasSingleReleaseAheadOfProject(event.title)) return "single_video_release";
+    if (hasSingleReleaseAheadOfProject(headline)) return "single_video_release";
     const releaseKind = getRawString(event.rawPayload.releaseKind);
     const hasProjectLanguage =
       Boolean(releaseKind && hasAnyTerm(releaseKind, ["album", "ep", "mixtape", "project"])) ||
@@ -2389,6 +2394,7 @@ function getEventSubtype(event: MarketEvent, artist?: MarketUpdateArtist) {
 
   return event.eventType;
 }
+
 
 function getEventSubtypePriceProfile(subtype: string) {
   const profiles: Record<string, { divisor: number; minShock: number; maxShock: number }> = {
@@ -2654,7 +2660,7 @@ function isMarketEventType(value: string): value is MarketEvent["eventType"] {
 }
 
 function dedupeSemanticallyEquivalentEvents(events: MarketEvent[]) {
-  const selected: MarketEvent[] = [];
+  const selected: Array<MarketEvent & { observedStorySources: string[] }> = [];
 
   for (const event of events) {
     const existingIndex = selected.findIndex((existing) =>
@@ -2662,9 +2668,11 @@ function dedupeSemanticallyEquivalentEvents(events: MarketEvent[]) {
     );
 
     if (existingIndex === -1) {
-      selected.push(event);
-    } else if (getEventEvidencePreference(event) > getEventEvidencePreference(selected[existingIndex])) {
-      selected[existingIndex] = event;
+      selected.push({ ...event, observedStorySources: [getObservedStorySource(event)] });
+    } else {
+      const previous = selected[existingIndex];
+      const sources = [...new Set([...previous.observedStorySources, getObservedStorySource(event)])];
+      selected[existingIndex] = { ...(getEventEvidencePreference(event) > getEventEvidencePreference(previous) ? event : previous), observedStorySources: sources };
     }
   }
 
@@ -2677,7 +2685,7 @@ function toNewsStoryEvent(event: MarketEvent) {
     artist_id: event.artistId,
     event_date: event.eventDate,
     event_type: event.eventType,
-    title: event.title,
+    title: getStoredMediaHeadline(event),
     source_url: event.sourceUrl ?? null
   };
 }

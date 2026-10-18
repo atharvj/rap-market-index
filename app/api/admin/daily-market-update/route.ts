@@ -1,4 +1,4 @@
-import { collectAppleChartSignals } from "@/server/market/apple-charts-source";
+import { collectAppleChartSignals, restoreAppleChartSignals } from "@/server/market/apple-charts-source";
 import { collectYoutubeTrackSignals, getTrackedVideoMetrics, selectTrackedVideos } from "@/server/market/youtube-tracks-source";
 import { expandRecordingEvents } from "@/server/market/recording-credits";
 import { restoreDailySources } from "@/server/market/daily-source-cache";
@@ -34,11 +34,7 @@ import {
   normalizeManualMarketEvents,
   type ManualMarketEvents
 } from "@/server/market/event-signals";
-import {
-  classifyArticleEvent,
-  collectGdeltMarketSignals,
-  normalizeDomain
-} from "@/server/market/gdelt-source";
+import { collectGdeltMarketSignals } from "@/server/market/gdelt-source";
 import { collectLastfmMarketSignals } from "@/server/market/lastfm-source";
 import { collectListenBrainzMarketSignals } from "@/server/market/listenbrainz-source";
 import { collectMusicbrainzReleaseEvents } from "@/server/market/musicbrainz-releases";
@@ -55,6 +51,7 @@ import { collectYoutubeUploadEvents } from "@/server/market/youtube-upload-event
 import { collectYoutubeEditorialEvents } from "@/server/market/youtube-editorial-events-source";
 import { getMarketDate, shiftMarketDate } from "@/server/market/market-date";
 import { getMarketModelVersion } from "@/server/market/model-version";
+import { classifyStoredMediaEvent, getStoredMediaHeadline } from "@/server/market/stored-media-classification";
 import { shouldRecordIntradayPriceTick } from "@/server/market/intraday-refresh";
 import { isVideoDiscoveryDue, shouldCollectWikimediaSource } from "@/server/market/source-refresh-policy";
 import { getMockMarketArtists } from "@/server/market/mock-source";
@@ -555,7 +552,7 @@ async function applyMarketHistoryBaselines({
   runDate: string;
 }) {
   const artistIds = artists.map((artist) => artist.id);
-  const [previousCloses, priceTrends, existingPriceHistoryArtistIds, previousSignalStats] = await Promise.all([
+  const [previousCloses, priceTrends, existingPriceHistoryArtistIds, previousSignalStats, previousPricingState] = await Promise.all([
     loadPreviousClosePrices({
       supabase,
       artistIds,
@@ -575,10 +572,17 @@ async function applyMarketHistoryBaselines({
       supabase,
       artistIds,
       runDate
-    })
+    }),
+    loadLatestObservationPayloads({ supabase, artistIds, source: "market_pricing", metric: "evidence_state", beforeDate: runDate, lookbackDays: 45 })
   ]);
 
   return artists.map((artist) => {
+    const state = previousPricingState[artist.id];
+    if (state && (state.version !== 1 || typeof state.runDate !== "string" || state.runDate >= runDate ||
+      !state.receptionPricingBaseline || typeof state.receptionPricingBaseline !== "object" ||
+      !Object.values(state.receptionPricingBaseline).every(value => typeof value === "number" && Number.isFinite(value)))) {
+      throw new Error(`Could not verify previous pricing state for ${artist.ticker}.`);
+    }
     const previousClose = previousCloses[artist.id];
     const priceTrend = priceTrends[artist.id];
     const isSameDayRecalculation = existingPriceHistoryArtistIds.has(artist.id);
@@ -601,6 +605,8 @@ async function applyMarketHistoryBaselines({
       // Reuse the same opening evidence for daily and intraday calculations;
       // blending a previous refresh's result again compounds unchanged inputs.
       stats: previousSignalStats[artist.id] ?? artist.stats,
+      previousEventPricing: state?.marketEvents ?? previousSignalStats[artist.id]?.previousEventPricing,
+      previousReceptionBaseline: state ? state.receptionPricingBaseline as Record<string, number> : previousSignalStats[artist.id]?.previousReceptionBaseline,
       priceTrend
     };
   });
@@ -1135,10 +1141,15 @@ async function collectRealSignals({
 
   if (intraday && supabase) {
     sourceTasks.push((async () => {
-      const { data, error } = await supabase.from("market_signal_snapshots")
-        .select("artist_id,source_date,raw_payload").eq("source_date", runDate).in("artist_id", artistIds);
+      const [{ data, error }, currentCharts, priorCharts] = await Promise.all([
+        supabase.from("market_signal_snapshots").select("artist_id,source_date,raw_payload").eq("source_date", runDate).in("artist_id", artistIds),
+        loadLatestObservationPayloads({ supabase, artistIds, source: "apple_charts", metric: "chart_snapshot", beforeDate: shiftMarketDate(runDate, 1), lookbackDays: 1 }),
+        loadLatestObservationPayloads({ supabase, artistIds, source: "apple_charts", metric: "chart_snapshot", beforeDate: runDate, lookbackDays: 7 })
+      ]);
       if (error) throw new Error(`Daily source context could not be loaded: ${error.message}`);
-      sources.push(...restoreDailySources(data ?? [], runDate));
+      const recovered = restoreAppleChartSignals({ artists, runDate, current: currentCharts, previous: priorCharts });
+      sources.push(...restoreDailySources(data ?? [], runDate).map(bucket => Object.fromEntries(Object.entries(bucket)
+        .filter(([id, signal]) => signal.rawPayload.source !== "apple_charts" || !recovered[id]))), recovered);
     })());
   }
 
@@ -1441,17 +1452,12 @@ function isStoredEventEligibleForPricing(
     return true;
   }
 
-  if (isLowValueMarketArticleTitle(event.title)) {
+  const headline = getStoredMediaHeadline(event);
+  if (isLowValueMarketArticleTitle(headline)) {
     return false;
   }
 
-  const domain =
-    (typeof event.rawPayload.domain === "string" ? event.rawPayload.domain : "") ||
-    normalizeDomain(undefined, event.sourceUrl) ||
-    "";
-  const classification = classifyArticleEvent(event.title, domain, undefined, {
-    allowLowTierRelease: true
-  });
+  const classification = classifyStoredMediaEvent(event, artist.name);
   const storedReason =
     typeof event.rawPayload.classificationReason === "string"
       ? event.rawPayload.classificationReason
@@ -1493,7 +1499,7 @@ function isStoredEventEligibleForPricing(
   if (classification.reason === "release_terms") {
     return hasArtistReleaseSubjectContext({
       artistName: artist.name,
-      text: event.title,
+      text: headline,
       query
     });
   }
@@ -1501,7 +1507,7 @@ function isStoredEventEligibleForPricing(
   if (classification.reason === "controversy_terms") {
     return hasArtistControversySubjectContext({
       artistName: artist.name,
-      text: event.title,
+      text: headline,
       query
     });
   }

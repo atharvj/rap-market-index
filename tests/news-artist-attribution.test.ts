@@ -14,6 +14,11 @@ const raw = { source: "media_rss_item", searchQuery: '"Cardi B" (album OR song)'
   publisherHeadlineVerified: true, publisherHeadline: title, relatedArtistIds: ["dc-the-don"] };
 
 describe("news artist attribution", () => {
+  it("does not give financiers or label owners another artist's solo release", () => {
+    expect(hasArtistReleaseSubjectContext({ artistName: "Drake", text: "K-Os Announces New Drake-Backed Full-Length Album, Shares New Single" })).toBe(false);
+    expect(hasArtistReleaseSubjectContext({ artistName: "Jay-Z", text: "Jackson Wang Signs With Jay-Z's Roc Nation, Drops Video for New Track" })).toBe(false);
+    expect(hasArtistReleaseSubjectContext({ artistName: "Drake", text: "Drake announces a new album" })).toBe(true);
+  });
   it("rejects another person's complete name even behind a legacy synthesized artist prefix", () => {
     const headline = "Lizzy McAlpine Got Stella Lefty’d Over Nick Drake Soundalike On Her New Album";
     expect(mentionsArtist(headline, "Drake")).toBe(false);

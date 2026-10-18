@@ -28,6 +28,19 @@ const googleUrl = "https://news.google.com/rss/articles/CBMiTestArticle?oc=5";
 const canonicalUrl = "https://www.billboard.com/music/rb-hip-hop/baby-keem-casino-123/";
 
 describe("media RSS publisher-date verification", () => {
+  it("dates an upcoming-album announcement when it was published while retaining the future release date as metadata", async () => {
+    const headline = "Baby Keem Announces New Album Ca$ino for July 25", publisherUrl = "https://www.billboard.com/music/baby-keem-casino/";
+    const result = await collectMediaRssMarketEvents({ artists: [artist], runDate: "2026-07-13", includeGoogleNews: false,
+      feedUrls: ["https://feeds.example.com/music.xml"], delayMs: 0,
+      fetchImpl: async input => String(input).includes("feeds.example.com") ? new Response(`<rss><channel><item><title>${headline}</title>
+        <link>${publisherUrl}</link><pubDate>Mon, 13 Jul 2026 12:00:00 GMT</pubDate><description>Baby Keem announces the new album.</description>
+        </item></channel></rss>`, { headers: { "content-type": "application/xml" } }) : new Response(`<html><head>
+        <link rel="canonical" href="${publisherUrl}"/><meta property="og:type" content="article"/>
+        <script type="application/ld+json">${JSON.stringify({ "@type": "NewsArticle", url: publisherUrl, headline, datePublished: "2026-07-13T12:00:00Z" })}</script>
+        </head></html>`, { headers: { "content-type": "text/html" } }) });
+    expect(result.eventsByArtist[artist.id][0]).toMatchObject({ eventDate: "2026-07-13", title: headline,
+      rawPayload: { releaseDate: "2026-07-25", publisherPublishedDate: "2026-07-13" } });
+  });
   it("does not share Cardi B's story with DC The Don or trust a false artist mention in the RSS summary", async () => {
     const headline = "Cardi B Makes a Splash on ‘GTA VI: The Album’ Soundtrack With Cocky ‘Don’t Chart’: Listen";
     const publisherUrl = "https://www.billboard.com/music/rb-hip-hop/cardi-b-dont-chart/";

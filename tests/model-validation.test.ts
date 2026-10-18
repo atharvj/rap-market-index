@@ -35,6 +35,16 @@ function observations(artistId: string, acceleration: number): ValidationAudienc
 }
 
 describe("market model validation", () => {
+  it("does not borrow a future listener observation for the signal-date baseline", () => {
+    const points = observations("artist", 10).map(row => row.observedDate === "2026-06-15" ? { ...row, observedDate: "2026-06-16" } : row);
+    expect(evaluateMarketModel({ snapshots: [snapshot("artist", 10)], observations: points }).sampleCount).toBe(0);
+  });
+  it("evaluates the executed price signal when supplied rather than substituting a hype-score proxy", () => {
+    const ids = ["a", "b", "c", "d"];
+    const result = evaluateMarketModel({ snapshots: ids.map((id, i) => ({ ...snapshot(id, 100 - i), priceSignalPercent: i })),
+      observations: ids.flatMap((id, i) => observations(id, i + 1)) });
+    expect(result.rankCorrelation).toBeGreaterThan(0.9);
+  });
   it("measures whether stronger signals rank with subsequent audience acceleration", () => {
     const artistIds = Array.from({ length: 12 }, (_, index) => `artist-${index}`);
     const result = evaluateMarketModel({

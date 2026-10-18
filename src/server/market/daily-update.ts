@@ -101,6 +101,8 @@ export type MarketUpdateArtist = {
   category: ArtistCategory;
   stats: HypeStats;
   priceTrend?: PriceTrendContext;
+  previousEventPricing?: unknown;
+  previousReceptionBaseline?: Record<string, number>;
 };
 
 export type ManualSignals = Record<string, Partial<HypeStats>>;
@@ -648,53 +650,15 @@ function applyTechnicalPriceContext({
     };
   }
 
+  // Prices produced by this model are not independent demand evidence.
+  // Technical context can reduce risk, but cannot create a continuation,
+  // reversal or breakout return from the model's own earlier quotes.
   const reasons: string[] = [];
-  let adjustment = 0;
-  const overextendedMove = Math.max(
-    clamp((priceTrend.return7dPercent - 12) / 100, 0, 0.018),
-    clamp((priceTrend.return30dPercent - 35) / 100, 0, 0.018)
-  );
-  const downtrendPressure = Math.max(
-    clamp((-priceTrend.return7dPercent - 8) / 140, 0, 0.012),
-    clamp((-priceTrend.return30dPercent - 24) / 150, 0, 0.016)
-  );
-  const strongPositiveSignal = signalDelta >= 0.035 && reliability >= 0.64;
-  const weakPositiveSignal = signalDelta > 0 && reliability < 0.58;
-
-  if (overextendedMove > 0 && (!strongPositiveSignal || !hasMomentumSignal)) {
-    const pullback = overextendedMove * (hasMomentumSignal ? 0.55 : 0.9);
-    adjustment -= pullback;
-    reasons.push("overextended_price_action");
-  }
-
-  if (downtrendPressure > 0 && weakPositiveSignal) {
-    adjustment -= downtrendPressure;
-    reasons.push("weak_signal_against_downtrend");
-  } else if (downtrendPressure > 0 && !hasMomentumSignal) {
-    adjustment -= Math.min(0.007, downtrendPressure * 0.75);
-    reasons.push("downtrend_continuation");
-  } else if (downtrendPressure > 0 && strongPositiveSignal) {
-    adjustment += Math.min(0.006, downtrendPressure * 0.45);
-    reasons.push("confirmed_reversal_support");
-  }
-
-  if (
-    hasMomentumSignal &&
-    reliability >= 0.72 &&
-    signalDelta > 0.025 &&
-    priceTrend.return7dPercent > 3 &&
-    priceTrend.return30dPercent > -10 &&
-    overextendedMove <= 0.006
-  ) {
-    adjustment += Math.min(0.005, signalDelta * 0.08);
-    reasons.push("confirmed_breakout_follow_through");
-  }
-
   const volatilityMultiplier =
     priceTrend.realizedVolatilityPercent > 10 && reliability < 0.7
       ? clamp(1 - (priceTrend.realizedVolatilityPercent - 10) * 0.018, 0.78, 1)
       : 1;
-  const adjustedSignalDelta = clamp((signalDelta + adjustment) * volatilityMultiplier, -0.75, 0.75);
+  const adjustedSignalDelta = clamp(signalDelta * volatilityMultiplier, -0.75, 0.75);
 
   if (volatilityMultiplier < 1) {
     reasons.push("high_recent_volatility");
@@ -703,11 +667,52 @@ function applyTechnicalPriceContext({
   return {
     signalDelta: adjustedSignalDelta,
     adjustment: adjustedSignalDelta - signalDelta,
-    rawAdjustment: adjustment,
+    rawAdjustment: 0,
     volatilityMultiplier,
     reasons,
     priceTrend
   };
+}
+
+function getFreshPricingEvidence(signals: ResolvedMarketSignal, previousReception: Record<string, number> = {}) {
+  const values = getObjectRecord(signals.rawPayload.sourceValues);
+  const weights = getSourceWeights(signals.rawPayload);
+  const receptionBaseline = { ...previousReception };
+  if (!weights || !Object.keys(values).length) {
+    return { stats: signals.stats, receptionBaseline, rawPayload: signals.rawPayload,
+      reliability: { score: signals.reliability, details: signals.reliabilityDetails }, application: "fresh_explicit_signal" };
+  }
+  const stats = getNeutralStats();
+  const incoming: Partial<HypeStats> = {};
+  const pricingSourceValues: Record<string, Partial<HypeStats>> = {};
+  for (const key of getHypeStatKeys()) {
+    let total = 0, totalWeight = 0;
+    for (const [source, record] of Object.entries(values)) {
+      const input = getObjectRecord(record)[key];
+      const weight = weights[source]?.[key];
+      if (typeof input !== "number" || !Number.isFinite(input) || !Number.isFinite(weight) || weight <= 0) continue;
+      let value = input;
+      if (key === "socialGrowth" && ["youtube_comments", "bluesky"].includes(source)) {
+        // A persistently positive/negative selected sample is a level of
+        // reception, not fresh approval/disapproval to charge every day.
+        value -= previousReception[source] ?? 0;
+        receptionBaseline[source] = input;
+      }
+      pricingSourceValues[source] ??= {};
+      pricingSourceValues[source][key] = value;
+      total += (key === "newsScore" ? value - 50 : value) * weight;
+      totalWeight += weight;
+    }
+    // Neutral evidence fills missing weight. Normalizing a lone weak sample
+    // by its own tiny weight would otherwise promote it to full-strength input.
+    stats[key] = (key === "newsScore" ? 50 : 0) + total / Math.max(1, totalWeight);
+    if (totalWeight > 0) incoming[key] = stats[key];
+  }
+  const rawPayload = { ...signals.rawPayload, sourceValues: pricingSourceValues,
+    sourceDirectionalScores: buildSourceDirectionalScores(pricingSourceValues, weights) };
+  return { stats, receptionBaseline, rawPayload,
+    reliability: calculateSignalReliability(incoming, rawPayload, signals.modifiers),
+    application: "new_evidence_with_neutral_confidence_prior" };
 }
 
 function calculateArtistUpdate({
@@ -737,19 +742,20 @@ function calculateArtistUpdate({
   const stats = signals.hasMomentumSignal
     ? blendStats(eventMemoryAdjustedStats, signals.stats, marketCalibratedStats)
     : eventMemoryAdjustedStats;
-  const staleMomentumDecayDelta = signals.hasMomentumSignal ? 0 : getStaleMomentumDecayDelta(artist.stats, source);
-  const conflictMoveMultiplier = getConflictMoveMultiplier(signals.reliabilityDetails);
+  const staleMomentumDecayDelta = 0;
+  const pricingEvidence = getFreshPricingEvidence(signals, artist.previousReceptionBaseline);
+  const conflictMoveMultiplier = getConflictMoveMultiplier(pricingEvidence.reliability.details);
   const rawSignalDelta = signals.hasMomentumSignal
-    ? calculateSignalDelta(stats) * artist.volatility
+    ? calculateSignalDelta(pricingEvidence.stats) * artist.volatility
     : staleMomentumDecayDelta * artist.volatility;
   const measuredSignalDelta = signals.hasMomentumSignal
-    ? calculateSignalDelta(signals.stats) * artist.volatility
+    ? calculateSignalDelta(pricingEvidence.stats) * artist.volatility
     : 0;
   // Primary audience measurements can move in either direction without a news
   // headline. Identity checks, source quality, reliability and daily caps apply
   // equally; a separate positive-only ceiling suppressed legitimate growth.
   const evidenceAdjustedRawSignalDelta = rawSignalDelta;
-  const reliabilityMultiplier = signals.hasMomentumSignal ? getReliabilityPriceMultiplier(signals.reliability) : 0;
+  const reliabilityMultiplier = signals.hasMomentumSignal ? getReliabilityPriceMultiplier(pricingEvidence.reliability.score) : 0;
   const reliabilityAdjustedDelta = evidenceAdjustedRawSignalDelta * reliabilityMultiplier;
   const modifierImpact = signals.hasMomentumSignal
     ? applySignalModifiers(reliabilityAdjustedDelta * conflictMoveMultiplier, signals.modifiers, reliabilityMultiplier)
@@ -759,16 +765,10 @@ function calculateArtistUpdate({
     signalDelta: signalDeltaBeforeTechnicals,
     priceTrend: artist.priceTrend,
     hasMomentumSignal: signals.hasMomentumSignal,
-    reliability: signals.reliability
+    reliability: pricingEvidence.reliability.score
   });
   const previousClose = getValidPrice(artist.previousClose, artist.currentPrice);
-  const unsupportedEventMemoryAdjustment = getUnsupportedEventMemoryAdjustment({
-    credibleEventSupport,
-    decayedExistingStats,
-    eventMemoryAdjustedStats,
-    previousClose,
-    oldPrice: artist.currentPrice
-  });
+  const unsupportedEventMemoryAdjustment = 0;
   const audienceScaleAdjustment = getAudienceScaleAdjustment(signals.rawPayload, artist.currentPrice);
   const audienceScaleDominant =
     Math.abs(audienceScaleAdjustment.adjustment) >= 0.008 &&
@@ -782,7 +782,7 @@ function calculateArtistUpdate({
   const categoryDailyCap = getCategoryDailyCap(artist.category);
   const dailyCap = getEffectiveDailyCap({
     categoryDailyCap,
-    reliability: signals.reliability,
+    reliability: pricingEvidence.reliability.score,
     conflictMoveMultiplier,
     hasMomentumSignal: signals.hasMomentumSignal
   });
@@ -797,7 +797,7 @@ function calculateArtistUpdate({
   const dailyChangePercent = getDailyChangePercent(currentPrice, previousClose);
   const hypeScore = calculateHypeScore(stats);
   const catalystDiagnostics = buildCatalystDiagnostics(signals.modifiers, dailyChangePercent);
-  const sourceAttribution = buildSourceAttribution(signals.rawPayload, dailyChangePercent);
+  const sourceAttribution = buildSourceAttribution(pricingEvidence.rawPayload, dailyChangePercent);
 
   return {
     artistId: artist.id,
@@ -828,14 +828,17 @@ function calculateArtistUpdate({
         : {}),
       modelVersion,
       hasMomentumSignal: signals.hasMomentumSignal,
-      signalReliability: signals.reliability,
+      signalReliability: pricingEvidence.reliability.score,
       reliabilityMultiplier,
-      reliabilityDetails: signals.reliabilityDetails,
+      reliabilityDetails: pricingEvidence.reliability.details,
       conflictMoveMultiplier,
       decayedExistingStats,
       eventMemoryAdjustedStats,
       staleMomentumDecayDelta,
       measuredSignalDelta,
+      pricingEvidence: { stats: pricingEvidence.stats, application: pricingEvidence.application },
+      pricingSourceValues: pricingEvidence.rawPayload.sourceValues,
+      receptionPricingBaseline: pricingEvidence.receptionBaseline,
       rawSignalDelta,
       evidenceAdjustedRawSignalDelta,
       reliabilityAdjustedDelta,
@@ -1106,41 +1109,6 @@ function dampStaleEventMemory(stats: HypeStats, credibleEventSupport: boolean): 
   };
 }
 
-function getUnsupportedEventMemoryAdjustment({
-  credibleEventSupport,
-  decayedExistingStats,
-  eventMemoryAdjustedStats,
-  previousClose,
-  oldPrice
-}: {
-  credibleEventSupport: boolean;
-  decayedExistingStats: HypeStats;
-  eventMemoryAdjustedStats: HypeStats;
-  previousClose: number;
-  oldPrice: number;
-}) {
-  if (credibleEventSupport || previousClose <= 0 || oldPrice <= 0) {
-    return 0;
-  }
-
-  const wasEventMemoryDamped =
-    Math.abs(decayedExistingStats.searchGrowth - eventMemoryAdjustedStats.searchGrowth) >= 0.75 ||
-    Math.abs(decayedExistingStats.socialGrowth - eventMemoryAdjustedStats.socialGrowth) >= 0.75 ||
-    Math.abs(decayedExistingStats.newsScore - eventMemoryAdjustedStats.newsScore) >= 1;
-
-  if (!wasEventMemoryDamped) {
-    return 0;
-  }
-
-  const stalePriceGap = (oldPrice - previousClose) / previousClose;
-
-  if (Math.abs(stalePriceGap) < 0.004) {
-    return 0;
-  }
-
-  return -clamp(stalePriceGap * 5, -0.22, 0.22);
-}
-
 function hasCredibleEventSupport(rawPayload: Record<string, unknown>, modifiers: MarketSignalModifier[]) {
   if (
     modifiers.some((modifier) => {
@@ -1182,20 +1150,6 @@ function hasCredibleEventSupport(rawPayload: Record<string, unknown>, modifiers:
   });
 
   return hasCredibleEvent || (totalSignal >= 12 && sourceConfirmedEventCount > 0);
-}
-
-function getStaleMomentumDecayDelta(stats: HypeStats, source: MarketUpdateSource) {
-  if (!isRealExternalSource(source)) {
-    return 0;
-  }
-
-  const staleSignalDelta = calculateSignalDelta(stats);
-
-  if (staleSignalDelta <= 0.01) {
-    return 0;
-  }
-
-  return -clamp(staleSignalDelta * 0.16, 0.001, 0.01);
 }
 
 function decayToward(value: number, neutral: number, rate: number, min: number, max: number) {

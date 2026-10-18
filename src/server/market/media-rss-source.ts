@@ -508,9 +508,10 @@ async function buildArtistEvents({
 
     return {
       artistId: artist.id,
-      eventDate: releaseDate ?? item.publishedDate ?? runDate,
+      eventDate: releaseDate && releaseDate <= runDate && !/\b(?:announces?|upcoming|forthcoming|will release)\b/i.test(item.title)
+        ? releaseDate : item.publishedDate ?? runDate,
       eventType: classification.eventType,
-      title: (inferredTitle ?? item.title).slice(0, 160),
+      title: item.title.slice(0, 160),
       sourceName: item.sourceName || item.domain,
       sourceUrl: item.url,
       sentimentScore: classification.sentimentScore,

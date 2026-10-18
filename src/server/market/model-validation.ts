@@ -4,6 +4,8 @@ import type { HypeStats } from "@/lib/types";
 export type ValidationSignalSnapshot = HypeStats & {
   artistId: string;
   sourceDate: string;
+  priceSignalPercent?: number;
+  modelVersion?: string;
 };
 
 export type ValidationAudienceObservation = {
@@ -111,8 +113,8 @@ function buildValidationSample(
       continue;
     }
 
-    const previous = findClosestObservation(points, previousTargetDate);
-    const current = findClosestObservation(points, snapshot.sourceDate);
+    const previous = findClosestObservation(points, previousTargetDate, previousTargetDate);
+    const current = findClosestObservation(points, snapshot.sourceDate, snapshot.sourceDate);
     const future = findClosestObservation(points, futureTargetDate);
 
     if (!previous || !current || !future) {
@@ -146,7 +148,8 @@ function buildValidationSample(
   return {
     artistId: snapshot.artistId,
     sourceDate: snapshot.sourceDate,
-    prediction: calculateSignalDelta(snapshot) * 100,
+    prediction: typeof snapshot.priceSignalPercent === "number" && Number.isFinite(snapshot.priceSignalPercent)
+      ? snapshot.priceSignalPercent : calculateSignalDelta(snapshot) * 100,
     target: median(metricTargets.map((item) => item.value)),
     metricCount: metricTargets.length,
     sourceMetrics: metricTargets.map((item) => item.key)
@@ -174,11 +177,12 @@ function buildObservationSeries(observations: ValidationAudienceObservation[]) {
   return series;
 }
 
-function findClosestObservation(points: ValidationAudienceObservation[], targetDate: string) {
+function findClosestObservation(points: ValidationAudienceObservation[], targetDate: string, notAfter?: string) {
   let closest: ValidationAudienceObservation | null = null;
   let closestDistance = Number.POSITIVE_INFINITY;
 
   for (const point of points) {
+    if (notAfter && point.observedDate > notAfter) continue;
     const distance = Math.abs(getDateDistanceDays(targetDate, point.observedDate));
 
     if (distance <= DATE_TOLERANCE_DAYS && distance < closestDistance) {

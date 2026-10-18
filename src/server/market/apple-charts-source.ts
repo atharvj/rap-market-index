@@ -12,6 +12,45 @@ type PreviousCharts = Record<string, Record<string, unknown>>;
 type Chart = { storefront: string; kind: ChartKind; updated: string; entries: ChartEntry[] };
 const STOREFRONTS = ["us", "gb", "ca"];
 
+/** Use a recovered, verified chart snapshot on the next intraday quote refresh.
+ * Recovery writes observations independently of the daily signal cache.
+ */
+export function restoreAppleChartSignals({ artists, runDate, current, previous }: {
+  artists: MarketUpdateArtist[]; runDate: string; current: PreviousCharts; previous: PreviousCharts;
+}): AdapterSignals {
+  const signals: AdapterSignals = {};
+  const keys = STOREFRONTS.flatMap(region => [region, `${region}:albums`]);
+  for (const artist of artists) {
+    const snapshot = current[artist.id];
+    if (!snapshot || snapshot.runDate !== runDate || snapshot.schemaVersion !== 2) continue;
+    const scores = snapshot.scores as Record<string, unknown> | undefined;
+    const timestamps = snapshot.chartUpdatedAt as Record<string, string> | undefined;
+    const prior = previous[artist.id];
+    const priorScores = prior?.scores as Record<string, unknown> | undefined;
+    const priorTimes = prior?.chartUpdatedAt as Record<string, string> | undefined;
+    const deltas: number[] = [];
+    let validCount = 0;
+    for (const key of keys) {
+      const value = scores?.[key], stamp = timestamps?.[key], time = Date.parse(stamp ?? "");
+      const date = Number.isFinite(time) ? getMarketDate(new Date(time)) : "";
+      const age = Date.parse(runDate) - Date.parse(date);
+      if (typeof value !== "number" || !Number.isFinite(value) || value < 0 || value > 5050 ||
+        !Number.isFinite(age) || age < 0 || age > 3 * 86400000) continue;
+      validCount++;
+      const before = priorScores?.[key], priorTime = Date.parse(priorTimes?.[key] ?? "");
+      if (typeof before === "number" && Number.isFinite(before) && before >= 0 && before <= 5050 &&
+        Number.isFinite(priorTime) && priorTime <= time && (value > 0 || before > 0)) {
+        deltas.push(clamp((value - before) * 0.12, -25, 25));
+      }
+    }
+    if (!validCount) continue;
+    signals[artist.id] = { stats: deltas.length ? { streamingGrowth: deltas.reduce((a, b) => a + b, 0) / deltas.length } : {},
+      confidence: 0.82, rawPayload: { ...snapshot, source: "apple_charts", restoredFromChartSnapshot: true,
+        status: deltas.length ? "ok" : "baseline_only" } };
+  }
+  return signals;
+}
+
 export async function collectAppleChartSignals({ artists, runDate, previous = {}, currentSnapshots = {}, includeAlbums = true, fetchImpl = fetch }: {
   artists: MarketUpdateArtist[]; runDate: string; previous?: PreviousCharts; currentSnapshots?: PreviousCharts; includeAlbums?: boolean; fetchImpl?: typeof fetch;
 }) {
@@ -25,7 +64,7 @@ export async function collectAppleChartSignals({ artists, runDate, previous = {}
     while (nextSpec < specs.length) {
       const { storefront, kind } = specs[nextSpec++];
       try {
-        const payload = await fetchChart(storefront, kind, fetchImpl);
+        const payload = await fetchChart(storefront, kind, runDate, fetchImpl);
         const entries = payload.feed?.results, updated = payload.feed?.updated;
         const updatedTime = Date.parse(updated);
         const chartDate = Number.isFinite(updatedTime) ? getMarketDate(new Date(updatedTime)) : "";
@@ -114,12 +153,25 @@ function validEntry(entry: ChartEntry, kind: ChartKind) {
   } catch { return false; }
 }
 
-async function fetchChart(storefront: string, kind: ChartKind, fetchImpl: typeof fetch) {
+async function fetchChart(storefront: string, kind: ChartKind, runDate: string, fetchImpl: typeof fetch) {
   for (let attempt = 0; ; attempt++) {
     try {
       const response = await fetchImpl(`https://rss.marketingtools.apple.com/api/v2/${storefront}/music/most-played/100/${kind}.json`, { signal: AbortSignal.timeout(15000) });
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      return await response.json();
-    } catch (error) { if (attempt >= 1) throw error; }
+      const payload = await response.json();
+      const entries = payload.feed?.results, updated = payload.feed?.updated;
+      const chartDate = Number.isFinite(Date.parse(updated)) ? getMarketDate(new Date(updated)) : "";
+      const age = Date.parse(runDate) - Date.parse(chartDate);
+      if (!Array.isArray(entries) || entries.length !== 100 || !Number.isFinite(age) || age < 0 || age > 3 * 86400000 ||
+        !entries.every((entry: ChartEntry) => validEntry(entry, kind)) || new Set(entries.map((entry: ChartEntry) => entry.id)).size !== 100) {
+        throw new Error("Incomplete, stale or invalid chart");
+      }
+      return payload;
+    } catch (error) {
+      if (attempt >= 1) throw error;
+      // Pace recovery requests as well as the two feed workers. Transient HTML
+      // and partial/stale replicas need the same bounded retry as HTTP failures.
+      await new Promise(resolve => setTimeout(resolve, 150));
+    }
   }
 }

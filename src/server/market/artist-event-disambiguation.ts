@@ -480,6 +480,11 @@ function hasDirectReleaseSubject(normalizedText: string, normalizedAlias: string
     "(?:album|deluxe|ep|full\\s+length|mixtape|music\\s+video|project|single|song|track|tracklist|video|visualizer)";
   const releaseActions =
     "(?:announces|announced|drops|dropped|delivers|previews|previewed|releases|released|returns\\s+with|shares|shared|stream|teases|teased|unveils|unveiled|watch)";
+  // Financing a release or owning the label does not make it this artist's
+  // recording. The artist can still qualify through an explicit own action.
+  const ownAction = new RegExp(`\\b${alias}\\s+(?:${releaseActions})\\b`).test(normalizedText);
+  if (!ownAction && (new RegExp(`\\b${alias}\\s+(?:backed|financed|funded|produced)\\b`).test(normalizedText) ||
+    new RegExp(`\\bsigns?\\s+(?:with|to)\\s+${alias}(?:\\s+s)?\\b`).test(normalizedText))) return false;
   const patterns = [
     new RegExp(`\\b${alias}\\b(?:\\s+\\S+){0,5}\\s+${releaseActions}\\b`),
     // Keep ownership adjacent. The old eight-word window turned headlines such

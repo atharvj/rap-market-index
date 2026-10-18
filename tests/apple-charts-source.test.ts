@@ -76,6 +76,19 @@ const combinedFetch = (songRank = 10, albumRank = 10): typeof fetch => async inp
   Response.json(String(input).endsWith("/albums.json") ? albumChart(albumRank) : chart(songRank));
 
 describe("album chart coverage", () => {
+  it("recovers a transient partial replica without publishing a partial total", async () => {
+    const calls = new Map<string, number>();
+    const result = await collectAppleChartSignals({ artists, runDate: "2026-09-14", fetchImpl: async input => {
+      const url = String(input), count = (calls.get(url) ?? 0) + 1; calls.set(url, count);
+      const payload = url.endsWith("/albums.json") ? albumChart() : chart();
+      if (count === 1) payload.feed.results.pop();
+      return Response.json(payload);
+    } });
+    expect(result.warnings).toEqual([]);
+    expect((result.signals.Skrilla.rawPayload.scores as Record<string, number>)).toHaveProperty("ca:albums");
+    expect(result.observations.find(row => row.artistId === "Skrilla" && row.metric === "album_chart_points")?.value).toBe(273);
+    expect([...calls.values()]).toEqual(Array(6).fill(2));
+  });
   it("adds a separate album baseline without changing song points or inventing an album rally", async () => {
     const result = await collectAppleChartSignals({ artists, runDate: "2026-09-14", previous: prior, fetchImpl: combinedFetch() });
     expect(result.signals.Skrilla.stats.streamingGrowth).toBe(0);
