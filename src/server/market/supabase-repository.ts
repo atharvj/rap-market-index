@@ -1206,7 +1206,7 @@ export async function persistMarketUpdates({
   }
 
   try {
-    const publication = await persistUpdateBatch(supabase, runDate, updates, { tickComparisonPrices, forceTickArtistIds });
+    const publication = await persistUpdateBatch(supabase, runDate, updates, { intraday, tickComparisonPrices, forceTickArtistIds });
 
     const completed = await supabase
       .from("market_update_runs")
@@ -1248,7 +1248,7 @@ async function persistUpdateBatch(
   } = {}
 ) {
   if (!updates.length) {
-    return { priceTickCount: 0, atomic: false };
+    throw new Error("Cannot publish an empty market quote batch.");
   }
 
   const forcedTickArtistIds = new Set(options.forceTickArtistIds ?? []);
@@ -1315,103 +1315,27 @@ async function persistUpdateBatch(
         marketEvents: (update.rawPayload.market_events ?? null) as Json,
         receptionPricingBaseline: (update.rawPayload.receptionPricingBaseline ?? {}) as Json } as Json
     }));
-  // The migration is independently installable before or after this deploy.
-  // Only an explicitly absent RPC permits the legacy path during rollout.
-  // Transaction failures, permissions and stale inputs never fall back to it.
-  if (typeof supabase.rpc === "function" && pricingStates.length === updates.length &&
-    updates.every(update => Number.isFinite(options.tickComparisonPrices?.[update.artistId]))) {
-    const publication = await supabase.rpc("persist_market_quote_batch", {
-      p_run_date: runDate, p_intraday: options.intraday === true,
-      p_stats: statsRows, p_signals: signalRows, p_history: historyRows,
-      p_quotes: updates.map(update => ({ id: update.artistId, previous_close: update.previousClose,
-        current_price: update.currentPrice, daily_change_percent: update.dailyChangePercent,
-        hype_score: update.hypeScore, last_move_explanation: update.explanation })),
-      p_ticks: tickRows, p_pricing_state: pricingStates, p_comparison_prices: options.tickComparisonPrices as Json
-    });
-    if (publication.error && publication.error.code !== "PGRST202") throw new Error(`Atomic quote publication failed: ${publication.error.message}`);
-    if (!publication.error) {
-      const result = publication.data as { atomic?: boolean; artistCount?: number; priceTickCount?: number } | null;
-      if (!result || result.atomic !== true || result.artistCount !== updates.length || result.priceTickCount !== tickRows.length) {
-        throw new Error("Could not verify atomic quote publication completion.");
-      }
-      return { priceTickCount: result.priceTickCount, atomic: true };
-    }
-    if (process.env.MARKET_REQUIRE_ATOMIC_QUOTES === "true") throw new Error("Atomic quote publication migration is required but unavailable.");
+  // Migration 046 is installed in production. Every live publication now
+  // requires its transaction; missing inputs or RPCs must never permit partial writes.
+  if (typeof supabase.rpc !== "function" || pricingStates.length !== updates.length ||
+    !updates.every(update => Number.isFinite(options.tickComparisonPrices?.[update.artistId]) &&
+      Number(options.tickComparisonPrices?.[update.artistId]) > 0)) {
+    throw new Error("Atomic quote publication requires live evidence and original comparison prices for every artist.");
   }
-
-  const [statsUpsert, signalUpsert, historyUpsert] = await Promise.all([
-    supabase.from("artist_stats").upsert(statsRows, { onConflict: "artist_id" }),
-    options.intraday
-      ? Promise.resolve({ error: null })
-      : supabase.from("market_signal_snapshots").upsert(signalRows, {
-          onConflict: "artist_id,source_date"
-        }),
-    supabase.from("price_history").upsert(historyRows, {
-      onConflict: "artist_id,price_date"
-    })
-  ]);
-
-  if (statsUpsert.error) {
-    throw new Error(`Could not save market stats: ${statsUpsert.error.message}`);
+  const publication = await supabase.rpc("persist_market_quote_batch", {
+    p_run_date: runDate, p_intraday: options.intraday === true,
+    p_stats: statsRows, p_signals: signalRows, p_history: historyRows,
+    p_quotes: updates.map(update => ({ id: update.artistId, previous_close: update.previousClose,
+      current_price: update.currentPrice, daily_change_percent: update.dailyChangePercent,
+      hype_score: update.hypeScore, last_move_explanation: update.explanation })),
+    p_ticks: tickRows, p_pricing_state: pricingStates, p_comparison_prices: options.tickComparisonPrices as Json
+  });
+  if (publication.error) throw new Error(`Atomic quote publication failed: ${publication.error.message}`);
+  const result = publication.data as { atomic?: boolean; artistCount?: number; priceTickCount?: number } | null;
+  if (!result || result.atomic !== true || result.artistCount !== updates.length || result.priceTickCount !== tickRows.length) {
+    throw new Error("Could not verify atomic quote publication completion.");
   }
-  if (signalUpsert.error) {
-    throw new Error(`Could not save signal snapshots: ${signalUpsert.error.message}`);
-  }
-  if (historyUpsert.error) {
-    throw new Error(`Could not save price history: ${historyUpsert.error.message}`);
-  }
-
-  for (let offset = 0; offset < updates.length; offset += 12) {
-    const chunk = updates.slice(offset, offset + 12);
-    await Promise.all(
-      chunk.map(async (update) => {
-        const { error } = await supabase
-          .from("artists")
-          .update({
-            previous_close: update.previousClose,
-            current_price: update.currentPrice,
-            daily_change_percent: update.dailyChangePercent,
-            hype_score: update.hypeScore,
-            last_move_explanation: update.explanation
-          })
-          .eq("id", update.artistId);
-
-        if (error) {
-          throw new Error(`Could not update ${update.ticker}: ${error.message}`);
-        }
-      })
-    );
-  }
-
-  if (tickRows.length) {
-    const tickInsert = await supabase.from("price_ticks").insert(tickRows);
-    if (tickInsert.error) {
-      throw new Error(`Could not save market price ticks: ${tickInsert.error.message}`);
-    }
-  }
-
-  // Intraday jobs deliberately preserve the original daily signal snapshot.
-  // Save the latest pricing ledger separately so tomorrow knows which stories
-  // and reception changes were actually priced later in today's session.
-  if (pricingStates.length) {
-    const savedState = await supabase.from("market_observations").upsert(pricingStates, { onConflict: "artist_id,source,metric,observed_date" });
-    if (savedState.error) throw new Error(`Could not save pricing evidence state: ${savedState.error.message}`);
-  }
-
-  // Completion is independent of movement. Record only after every quote write succeeds.
-  const completedAt = new Date().toISOString();
-  const completion = await supabase.from("market_observations").upsert(updates.map(update => ({
-    artist_id: update.artistId,
-    source: "market_refresh",
-    metric: "completed",
-    observed_date: runDate,
-    observed_at: completedAt,
-    value: 1,
-    unit: "refresh",
-    raw_payload: { modelVersion: update.modelVersion, intraday: options.intraday === true }
-  })), { onConflict: "artist_id,source,metric,observed_date" });
-  if (completion.error) throw new Error(`Could not record quote refresh completion: ${completion.error.message}`);
-  return { priceTickCount: tickRows.length, atomic: false };
+  return { priceTickCount: result.priceTickCount, atomic: true };
 }
 
 function mapStats(stats: ArtistStatsRow | null): HypeStats {

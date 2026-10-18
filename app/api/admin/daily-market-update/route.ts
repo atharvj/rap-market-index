@@ -295,7 +295,6 @@ export async function POST(request: Request) {
       });
       priceTickCount = persistence.priceTickCount;
       atomicPublication = persistence.atomic;
-      if (!persistence.atomic) warnings.push("Quote transaction migration 046 is not installed; this publication used the legacy non-atomic writer.");
     }
 
     return NextResponse.json({

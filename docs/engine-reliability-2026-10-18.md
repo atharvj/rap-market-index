@@ -117,15 +117,17 @@ publication. A failed late write rolls the entire publication back. The function
 does not accept arbitrary SQL. Execution is revoked from public, anon and
 authenticated roles.
 
-The application uses this transaction when installed. During migration rollout,
-only an explicitly absent function permits the existing legacy writer; transaction
-conflicts, permission failures or unverifiable responses never fall back to partial
-writes. `atomicPublication` and a warning identify a legacy publication. Setting
-`MARKET_REQUIRE_ATOMIC_QUOTES=true` also forbids the migration-missing fallback.
-**Do not call production publication atomic until the migration is installed and
-a live result confirms `atomicPublication: true`.** The supplied connection can
-write rows but cannot install SQL functions; applying the migration requires SQL
-access. No application credential was exposed or broadened to bypass that limit.
+Migration 046 was installed in the production project on October 18 through
+Supabase's authenticated SQL connection. Database privilege checks confirm that
+`service_role` can execute it and `anon`/`authenticated` cannot.
+
+The application now requires this transaction for every live quote publication.
+Missing functions, missing comparison prices, simulated evidence, transaction
+conflicts, permission failures and unverifiable responses fail without a legacy
+table-write fallback. Run tracking also preserves intraday mode, so recording an
+intraday run cannot replace the original daily evidence. `atomicPublication`
+reports the transaction result; successful installation alone is separate from
+verification of an actual live publication.
 
 PostgreSQL tests execute the real migration in PGlite against table definitions
 from this repository. They cover successful publication, complete rollback after
