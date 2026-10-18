@@ -1037,3 +1037,36 @@ test("insufficient current reactions cannot leave an older positive estimate loo
   await expect(indicators).not.toContainText("85.0%");
   await expect(indicators).not.toContainText("Sampled Positive Reactions");
 });
+
+
+test("public indicators keep full labels readable and isolate unavailable reaction sources", async ({ page }) => {
+  const artist = marketState.artists[0];
+  await page.route("**/api/market/observations/**", route => route.fulfill({ contentType: "application/json", body: JSON.stringify({ ok: true,
+    series: [
+      ["spotify_public:monthly_listeners", 2800000], ["youtube:subscriber_count", 59800], ["youtube:channel_views", 32500000],
+      ["wikimedia:pageviews_7d", 248], ["apple_charts:chart_points", 0], ["apple_charts:album_chart_points", 0],
+      ["youtube_comments:positive_comment_share", 28], ["youtube_comments:negative_comment_share", 2],
+      ["youtube_comments:comment_count", 50], ["youtube_comments:classified_comment_count", 15],
+      ["youtube_comments:reception_available", 1], ["bluesky:reaction_count", 0], ["bluesky:reception_available", 0]
+    ].map(([key, value]) => ({ key, source: String(key).split(":")[0], metric: String(key).split(":")[1], latestValue: value, latestDate: "2026-10-18", points: [] }))
+  }) }));
+  await page.goto(`/artists/${artist.id}`);
+  const panel = page.getByRole("region", { name: "Public Market Indicators", exact: true });
+  await expect(panel.getByText("Spotify Monthly Listeners", { exact: true })).toBeVisible();
+  await expect(panel.getByRole("article", { name: "YouTube reception" })).toContainText("28.0%");
+  await expect(panel.getByRole("article", { name: "YouTube reception" })).not.toContainText("insufficient or unavailable");
+  await expect(panel.getByRole("article", { name: "Social reception" })).toContainText("Not enough data");
+  for (const width of [1440, 1024, 390]) {
+    await page.setViewportSize({ width, height: 1000 });
+    await expect.poll(() => panel.locator("dt").evaluateAll(labels => labels.every(label =>
+      label.scrollWidth <= label.clientWidth + 1 && getComputedStyle(label).textOverflow !== "ellipsis"))).toBe(true);
+    const bounds = await panel.boundingBox();
+    expect(bounds!.x).toBeGreaterThanOrEqual(0);
+    expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(width);
+  }
+  await page.setViewportSize({ width: 1024, height: 1000 });
+  for (const theme of ["light", "dark"]) {
+    await page.evaluate(theme => document.documentElement.dataset.theme = theme, theme);
+    await panel.screenshot({ path: test.info().outputPath(`indicators-${theme}.png`) });
+  }
+});

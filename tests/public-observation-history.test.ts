@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { GET } from "../app/api/market/observations/[artistId]/route";
 
-const state = vi.hoisted(() => ({ failSecondPage: false, ranges: [] as number[], rows: null as null | Array<{source: string; metric: string; unit: string; value: number; observed_date: string}> }));
+const state = vi.hoisted(() => ({ failSecondPage: false, ranges: [] as number[], rows: null as null | Array<{source: string; metric: string; unit: string; value: number | null | string; observed_date: string}> }));
 vi.mock("@/server/observability", () => ({ reportServerError: vi.fn() }));
 vi.mock("@/lib/supabase/server", () => ({
   getSupabaseConfigStatus: () => ({ readyForPublicReads: true, serviceRoleConfigured: true }),
@@ -66,4 +66,16 @@ it("withholds stale reception estimates after an insufficient same-day collectio
   expect(old.points).toEqual([{ date: "2026-10-15", value: 85 }]);
   expect(payload.series.find((s: {key: string}) => s.key === "youtube_comments:comment_count").latestValue).toBe(2);
   expect(payload.series.find((s: {key: string}) => s.key === "bluesky:reaction_sentiment").latestValue).toBe(-30);
+});
+
+
+it("preserves measured chart zero without turning missing or invalid observations into zero", async () => {
+  state.rows = [
+    { source: "apple_charts", metric: "chart_points", unit: "rank_points", value: 0, observed_date: "2026-10-18" },
+    { source: "youtube", metric: "subscriber_count", unit: "subscribers", value: null, observed_date: "2026-10-18" },
+    { source: "youtube", metric: "channel_views", unit: "views", value: "NaN", observed_date: "2026-10-18" }
+  ];
+  const payload = await (await request()).json();
+  expect(payload.series).toHaveLength(1);
+  expect(payload.series[0]).toMatchObject({ key: "apple_charts:chart_points", latestValue: 0 });
 });

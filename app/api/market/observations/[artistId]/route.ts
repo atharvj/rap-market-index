@@ -298,7 +298,7 @@ async function loadObservationSeries({
     const key = `${row.source}:${row.metric}`;
     const definition = SERIES_DEFINITIONS[key];
 
-    if (!definition) {
+    if (!definition || row.value == null || !Number.isFinite(Number(row.value))) {
       return memo;
     }
 
