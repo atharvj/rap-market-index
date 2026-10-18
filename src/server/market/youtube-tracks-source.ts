@@ -51,7 +51,7 @@ export async function collectYoutubeTrackSignals({ artists, events, runDate, api
       const old = baseline[metric];
       // A reset/deletion is not audience rejection. A first observation cannot
       // reveal acceleration, so it seeds a baseline without moving the quote.
-      if (typeof old === "number" && views < old) continue;
+      const counterReset = typeof old === "number" && views < old;
       const rate = calculateRateMomentum({ current: views, baseline: old, baselineAgeDays: getBaselineAgeDays(baseline, metric),
         recentDailyRate: baseline[`${metric}__recent_daily_rate`], recentRateSamples: baseline[`${metric}__recent_rate_samples`],
         latestCompletedDailyRate: baseline[`${metric}__latest_completed_daily_rate`], useCompletedIntervalFallback: true,
@@ -60,7 +60,7 @@ export async function collectYoutubeTrackSignals({ artists, events, runDate, api
       const raw = { source: "youtube_tracks", runDate, videoId: id, channelId: video.snippet.channelId, title: event.title,
         views, likes: readCounter(video.statistics?.likeCount), comments: readCounter(video.statistics?.commentCount),
         recentDailyRate: rate.recentDailyRate ?? null, currentDailyRate: rate.currentDailyRate ?? null,
-        momentum: rate.value ?? null, rateQuality: rate, status: typeof rate.value === "number" ? "ok" : "baseline_only" };
+        momentum: rate.value ?? null, rateQuality: rate, status: counterReset ? "counter_reset" : typeof rate.value === "number" ? "ok" : "baseline_only" };
       metrics.push(raw);
       observations.push({ artistId: artist.id, source: "youtube_tracks", metric, observedDate: runDate,
         observedAt: new Date().toISOString(), value: views, unit: "views", rawPayload: raw });

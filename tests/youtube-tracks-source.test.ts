@@ -51,8 +51,10 @@ describe("recording-level audience velocity", () => {
     const sparse = await collect(120000, { Skrilla: { ...baseline, views_abcdefghijk__recent_rate_samples: 1 } });
     expect(sparse.signals.Skrilla.confidence).toBeLessThan(full.signals.Skrilla.confidence!);
   });
-  it("rejects counter resets and mismatched channels", async () => {
-    expect((await collect(90000)).observations).toHaveLength(0);
+  it("retains verified reset observations as a new baseline without pricing rejection, and rejects mismatched channels", async () => {
+    const reset = await collect(90000);
+    expect(reset.signals.Skrilla.stats).toEqual({});
+    expect(reset.observations.find(row => row.metric.startsWith("views_"))).toMatchObject({ value: 90000, rawPayload: { status: "counter_reset", momentum: null } });
     expect((await collect(120000, {}, "UCunrelated")).observations).toHaveLength(0);
   });
   it("does not convert unavailable videos into zero views", async () => {

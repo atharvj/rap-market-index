@@ -21,6 +21,8 @@ not establish that source interpretation or predictive evaluation was correct.
   withheld because provider caches make them unstable. Yesterday's completed
   interval is never substituted as today's new evidence. Counter resets are
   withheld instead of being classified as listener rejection.
+  Verified track resets still save a new baseline, so a corrected counter does
+  not leave a recording excluded indefinitely behind its pre-reset total.
 - YouTube public subscribers are rounded down to three significant figures.
   A bin crossing cannot establish precise daily subscriber acquisition. Pricing
   now uses only the change guaranteed by the two rounded ranges, including
