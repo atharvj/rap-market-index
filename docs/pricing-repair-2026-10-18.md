@@ -55,6 +55,12 @@ No artist receives a hand-picked return or dollar target.
   calculations read newer verified chart observations, so recovery is no longer
   stranded behind the morning's incomplete source cache. Missing countries do not
   create exits or smaller regional totals, and all six feeds remain one provider.
+- **Slow discovery cannot stall measured quotes.** Scheduled intraday work now
+  refreshes the whole roster's known evidence before scanning publishers, then
+  refreshes newly pending catalysts. Known pending events receive their pricing
+  acknowledgement, and failed discovery is still reported as a failure. The
+  initial worker must confirm a persisted result for the returned artist count;
+  a dry run or malformed response cannot be called a completed live refresh.
 - **Evaluation measures the intended thing.** The scorecard includes Spotify
   monthly listeners and the executed pricing signal, separates model versions,
   and prevents borrowing a future observation as today's baseline. Attention is

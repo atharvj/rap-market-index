@@ -77,6 +77,22 @@ export async function GET(request: Request) {
   } catch {
     return NextResponse.json({ ok: false, runDate, error: "Market automation locking is unavailable; retry shortly." }, { status: 503 });
   }
+  // Fresh audience measurements and already verified events must not wait
+  // behind publisher discovery, which can use most of the execution window.
+  const knownPending = await loadPendingCatalysts();
+  const initialResponse = await fetch(new URL("/api/admin/daily-market-update", request.url), {
+    method: "POST", headers: { "content-type": "application/json", "x-market-update-secret": secret },
+    body: JSON.stringify({ dryRun: false, source: "core", runDate, artistLimit: FAST_SCAN_ARTIST_CAP,
+      forceTickArtistIds: knownPending.map(event => event.artistId), intraday: true })
+  });
+  const initialUpdate = await readAutomationResponse(initialResponse);
+  const initialSummary = initialUpdate.summary && typeof initialUpdate.summary === "object" ? initialUpdate.summary as Record<string, unknown> : {};
+  const refreshedArtistCount = typeof initialSummary.artistCount === "number" ? initialSummary.artistCount : 0;
+  if (!initialResponse.ok || initialUpdate.ok !== true || initialUpdate.persisted !== true || refreshedArtistCount < 1 ||
+    !Array.isArray(initialUpdate.updates) || initialUpdate.updates.length !== refreshedArtistCount) {
+    return NextResponse.json({ ok: false, runDate, stage: "repricing", error: initialUpdate.error ?? "The initial quote refresh failed.", marketUpdate: initialUpdate },
+      { status: automationFailureStatus(initialResponse) });
+  }
   const eventScanResponse = await fetch(new URL("/api/admin/market-event-scan", request.url), {
     method: "POST",
     headers: {
@@ -106,18 +122,20 @@ export async function GET(request: Request) {
         runDate,
         stage: "event-scan",
         error: eventScan.error ?? "Fast catalyst discovery failed.",
-        eventScan
+        eventScan,
+        pricesRefreshed: true,
+        recalculatedArtistCount: refreshedArtistCount,
+        marketUpdate: initialUpdate
       },
       { status: automationFailureStatus(eventScanResponse) }
     );
   }
 
   const pending = await loadPendingCatalysts();
-  const scannedArtistIds = getScannedArtistIds(eventScan);
   const pendingArtistIds = pending.map((candidate) => candidate.artistId);
   const artistIds = buildIntradayArtistBatch({
     pendingArtistIds,
-    scannedArtistIds,
+    scannedArtistIds: [],
     limit: FAST_SCAN_ARTIST_CAP
   });
 
@@ -125,10 +143,13 @@ export async function GET(request: Request) {
     return NextResponse.json({
       ok: true,
       runDate,
-      repriced: false,
-      recalculated: false,
-      reason: "The scan returned no artists to recalculate.",
-      eventScan
+      repriced: true,
+      recalculated: true,
+      recalculatedArtistCount: refreshedArtistCount,
+      catalystRepriced: knownPending.length > 0,
+      reason: "All artists were refreshed; the scan found no additional pending catalysts.",
+      eventScan,
+      marketUpdate: initialUpdate
     });
   }
 
@@ -169,26 +190,11 @@ export async function GET(request: Request) {
     runDate,
     repriced: true,
     recalculated: true,
-    recalculatedArtistCount: artistIds.length,
+    recalculatedArtistCount: refreshedArtistCount,
     catalystRepriced: pending.length > 0,
     affectedArtists: pending,
     eventScan,
     marketUpdate
-  });
-}
-
-function getScannedArtistIds(eventScan: AutomationResponse) {
-  if (!Array.isArray(eventScan.artists)) {
-    return [];
-  }
-
-  return eventScan.artists.flatMap((artist) => {
-    if (!artist || typeof artist !== "object" || Array.isArray(artist)) {
-      return [];
-    }
-
-    const id = (artist as Record<string, unknown>).id;
-    return typeof id === "string" ? [id] : [];
   });
 }
 
