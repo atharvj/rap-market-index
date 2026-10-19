@@ -101,8 +101,9 @@ invocation can still delay recovery; no constant scheduling cadence is guarantee
 
 ## September 27 chart display window
 
-Artist price and observation charts default to 3M (93 days); explicit shorter ranges
-remain available. The shared public snapshot now supplies the same window to home,
+Artist price and observation charts default to 1M (31 days), updated October 18
+from the earlier 3M default. Three months and the other ranges remain selectable.
+The shared public snapshot retains 93 days for home,
 market-board and sidebar sparklines. Market Pulse, Scout and current-holdings trend
 builders retain up to 94 inclusive daily points instead of cutting them to 28.
 Only existing recorded sessions are displayed: a new listing need not have a full

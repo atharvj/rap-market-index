@@ -65,8 +65,8 @@ describe("public price history", () => {
   });
 });
 
-it("defaults price history to three months while retaining an explicit one-month request", async () => {
+it("defaults price history to one month while retaining an explicit three-month request", async () => {
   const result = await (await GET(new Request("http://localhost/api/market/history/example"), { params: Promise.resolve({ artistId: "example" }) })).json();
-  expect(result.range).toBe("3M");
-  expect((await (await request("1M")).json()).range).toBe("1M");
+  expect(result.range).toBe("1M");
+  expect((await (await request("3M")).json()).range).toBe("3M");
 });

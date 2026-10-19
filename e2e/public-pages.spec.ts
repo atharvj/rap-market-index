@@ -194,7 +194,7 @@ async function installPublicFixtures(page: Page) {
     const artist = marketState.artists.find(item => item.id === requestUrl.pathname.split("/").at(-1));
     const points = artist?.priceHistory ?? [];
     return route.fulfill({ contentType: "application/json", body: JSON.stringify({
-      ok: true, range: requestUrl.searchParams.get("range") ?? "3M", points,
+      ok: true, range: requestUrl.searchParams.get("range") ?? "1M", points,
       hasRealHistory: points.length > 0, recordedCloseCount: points.length, granularity: "daily"
     }) });
   });
@@ -560,7 +560,7 @@ test("artist pages include related markets without repeating the current artist"
   const section = page.locator("section").filter({ has: heading }).first();
   await expect(section.locator('a[href^="/artists/"]')).toHaveCount(4);
   await expect(section.locator(`a[href="/artists/${currentArtist.id}"]`)).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "3M", exact: true })).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByRole("button", { name: "1M", exact: true })).toHaveAttribute("aria-pressed", "true");
   await expect(page.getByText(/The chart shows market quotes, not individual order fills\./)).toBeVisible();
 });
 
@@ -592,7 +592,7 @@ test("artist history shows one continuous graph with inspectable market quotes",
   }));
   await page.goto(`/artists/${artist.id}`);
   const section = page.locator("section").filter({ has: page.getByRole("heading", { name: "Price History", exact: true }) });
-  await expect(section.getByRole("button", { name: "3M", exact: true })).toHaveAttribute("aria-pressed", "true");
+  await expect(section.getByRole("button", { name: "1M", exact: true })).toHaveAttribute("aria-pressed", "true");
   await expect(section.getByRole("button", { name: "Adjusted", exact: true })).toHaveCount(0);
   await expect(section.getByRole("button", { name: "Original quotes", exact: true })).toHaveCount(0);
   await expect(section).toContainText("5 recorded daily closes");
@@ -626,7 +626,7 @@ test("failed history range never displays another range's prices", async ({ page
   await page.goto(`/artists/${artist.id}`);
   const section = page.locator("section").filter({ has: page.getByRole("heading", { name: "Price History", exact: true }) });
   await expect(section.locator("path.recharts-area-curve")).toHaveCount(1);
-  expect(requests[0]).toBe("3M");
+  expect(requests[0]).toBe("1M");
   await section.getByRole("button", { name: "1D", exact: true }).click();
   await expect(section).toContainText("Price history unavailable");
   await expect(section.locator("path.recharts-area-curve")).toHaveCount(0);
