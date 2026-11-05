@@ -43,3 +43,8 @@ patched URI and glob dependencies are included. The glob override affects Sentry
 build tooling and is validated by the production build. References:
 [Next.js advisory](https://github.com/vercel/next.js/security/advisories/GHSA-2464-fhr4-w9xw),
 [Sentry advisory](https://github.com/getsentry/sentry-javascript/security/advisories/GHSA-mchm-gjx6-7h55).
+
+The market tape now says “Market Quotes” instead of an unconditional “Market
+Live” indicator. Its old label appeared even when trading was paused or scheduled
+source updates were delayed. This copy change does not imply tick-by-tick feeds
+or alter trading availability.

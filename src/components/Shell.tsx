@@ -356,8 +356,8 @@ function MarketTape({ artists }: { artists: Artist[] }) {
           href="/markets"
           className="z-10 flex shrink-0 items-center gap-2.5 pr-5 text-[10px] font-semibold uppercase tracking-[0.12em]"
         >
-          <span className="rmi-live-dot" aria-hidden="true" />
-          Market Live
+          <Activity className="h-3 w-3 text-cyan" aria-hidden="true" />
+          Market Quotes
         </Link>
         <div className="market-tape-viewport min-w-0 flex-1 overflow-hidden pl-3 sm:pl-4">
           <div className="market-tape-track flex h-full w-max items-center">
