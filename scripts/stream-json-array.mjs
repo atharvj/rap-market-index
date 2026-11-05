@@ -26,3 +26,19 @@ export async function writeJsonArray(path, pages) {
     throw error;
   }
 }
+
+// Retrying a read-only page cannot publish or duplicate backup rows: a page is
+// yielded only after its successful response. Authorization/schema errors fail.
+export async function readBackupPage(load, retryDelayMs = 1000) {
+  for (let attempt = 0; ; attempt++) {
+    const result = await load();
+    if (!result.error) return result.data ?? [];
+    const transient = result.status >= 500 || result.status === 0 || result.error.code === "57014";
+    if (!transient || attempt >= 2) {
+      const message = /<html|<!doctype/i.test(result.error.message ?? "")
+        ? `Database endpoint unavailable (HTTP ${result.status}).` : result.error.message;
+      throw new Error(message || "Database backup read failed.");
+    }
+    await new Promise(resolve => setTimeout(resolve, retryDelayMs * (attempt + 1)));
+  }
+}

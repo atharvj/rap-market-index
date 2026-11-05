@@ -1,6 +1,6 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
-import { writeJsonArray } from "./stream-json-array.mjs";
+import { writeJsonArray, readBackupPage } from "./stream-json-array.mjs";
 import { createClient } from "@supabase/supabase-js";
 
 const exportDirectory = process.env.BACKUP_EXPORT_DIR?.trim();
@@ -105,10 +105,14 @@ process.stdout.write(
 
 async function* exportTable(table) {
   for (let offset = 0; ; offset += pageSize) {
-    let query = supabase.from(table).select("*");
-    for (const column of TABLE_ORDER[table] ?? ["id"]) query = query.order(column);
-    const { data, error } = await query.range(offset, offset + pageSize - 1);
-    if (error) throw new Error(`Could not export public.${table}: ${error.message}`);
+    let data;
+    try {
+      data = await readBackupPage(async () => {
+        let query = supabase.from(table).select("*");
+        for (const column of TABLE_ORDER[table] ?? ["id"]) query = query.order(column);
+        return await query.range(offset, offset + pageSize - 1);
+      });
+    } catch (error) { throw new Error(`Could not export public.${table}: ${error.message}`); }
     yield data ?? [];
     if (!data || data.length < pageSize) return;
   }

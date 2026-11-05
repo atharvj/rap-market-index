@@ -1,9 +1,9 @@
-import { expect, it } from "vitest";
+import { expect, it, vi } from "vitest";
 import { mkdtemp, readFile, rm, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createHash } from "node:crypto";
-import { writeJsonArray } from "../scripts/stream-json-array.mjs";
+import { writeJsonArray, readBackupPage } from "../scripts/stream-json-array.mjs";
 
 it("writes pages before requesting the next page and preserves JSON and checksum", async () => {
   const dir = await mkdtemp(join(tmpdir(), "rmi-stream-test-")); const file = join(dir, "rows.json");
@@ -26,4 +26,14 @@ it("removes a partial table when a later source page fails", async () => {
     await expect(writeJsonArray(file, pages())).rejects.toThrow("source unavailable");
     await expect(stat(file)).rejects.toMatchObject({ code: "ENOENT" });
   } finally { await rm(dir, { recursive: true, force: true }); }
+});
+
+it("retries transient backup pages and fails immediately on access errors", async () => {
+  const load = vi.fn().mockResolvedValueOnce({ status: 521, error: { message: "<html>unavailable</html>" } })
+    .mockResolvedValueOnce({ status: 200, error: null, data: [{ id: 1 }] });
+  expect(await readBackupPage(load, 0)).toEqual([{ id: 1 }]); expect(load).toHaveBeenCalledTimes(2);
+  const denied = vi.fn().mockResolvedValue({ status: 403, error: { message: "Access denied" } });
+  await expect(readBackupPage(denied, 0)).rejects.toThrow("Access denied"); expect(denied).toHaveBeenCalledTimes(1);
+  const unavailable = vi.fn().mockResolvedValue({ status: 521, error: { message: "<html>unavailable</html>" } });
+  await expect(readBackupPage(unavailable, 0)).rejects.toThrow("HTTP 521"); expect(unavailable).toHaveBeenCalledTimes(3);
 });

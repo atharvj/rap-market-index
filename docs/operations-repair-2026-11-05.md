@@ -31,3 +31,15 @@ Regression tests cover latest prior selection across uneven histories, private
 function permissions, failed baseline reads, streamed pagination and partial-file
 cleanup, and the legacy scheduler configuration. Actual SQL and production
 verification results are recorded in the workspace handoff after deployment.
+
+The first live retry encountered a transient HTTP 521 from the database provider
+before exporting any table. Backup page reads now retry transient connection/server
+failures twice, without retrying authorization or schema errors. Failed HTML
+responses are summarized instead of dumping the page into the workflow log.
+
+The current dependency audit also flagged patches published since the prior
+release. Next.js is updated to 15.5.29, Sentry to 10.78.0, and Vitest to 4.1.12;
+patched URI and glob dependencies are included. The glob override affects Sentry's
+build tooling and is validated by the production build. References:
+[Next.js advisory](https://github.com/vercel/next.js/security/advisories/GHSA-2464-fhr4-w9xw),
+[Sentry advisory](https://github.com/getsentry/sentry-javascript/security/advisories/GHSA-mchm-gjx6-7h55).
