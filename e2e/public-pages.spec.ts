@@ -1097,3 +1097,17 @@ test("a valuation correction is identified independently of market performance",
   await page.goto("/markets");
   await expect(page.getByRole("status").filter({ hasText: "Quotes were recalibrated today" })).toContainText("portfolio values include this correction");
 });
+
+test("delayed quote coverage is visible without inventing a fresh update", async ({ page }) => {
+  await page.route("**/api/market/snapshot", route => route.fulfill({ contentType:"application/json",body:JSON.stringify({ok:true,source:"supabase",state:{...marketState,quoteFreshness:{artistCount:marketState.artists.length,staleArtistCount:2,asOf:"2026-11-05T12:00:00Z",checkedAt:"2026-11-05T13:00:00Z"}}}) }));
+  await page.goto("/markets");
+  await expect(page.getByText(/Quotes are awaiting a refresh for 2/)).toBeVisible();
+  await expect(page.getByRole("link",{name:"Market Quotes",exact:true})).toBeVisible();
+});
+
+test("an empty real leaderboard never substitutes a demo guest rank", async ({ page }) => {
+  await page.route("**/api/leaderboard**", route => route.fulfill({contentType:"application/json",body:JSON.stringify({ok:true,source:"supabase",leaderboard:[]})}));
+  await page.goto("/leaderboard");
+  await expect(page.getByText("No public portfolios are ranked yet.")).toBeVisible();
+  await expect(page.locator('a[href^="/users/"]')).toHaveCount(0);
+});
