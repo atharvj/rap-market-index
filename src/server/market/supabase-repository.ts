@@ -771,27 +771,14 @@ export async function loadLatestSourceObservationTimes({
     return {};
   }
 
-  const data = await loadAllPages(async (from, to) => {
-    const { data, error } = await supabase.from("market_observations")
-      .select("artist_id,observed_date,observed_at")
-      .in("artist_id", artistIds).eq("source", source)
-      .gte("observed_date", shiftDate(runDate, -lookbackDays)).lte("observed_date", runDate)
-      .order("observed_at", { ascending: false }).order("artist_id").order("metric").range(from, to);
-    if (error) throw new Error(`Could not load latest ${source} observation times: ${error.message}`);
-    return data ?? [];
+  const { data, error } = await supabase.rpc("get_latest_source_observation_times", {
+    p_artist_ids: artistIds,
+    p_source: source,
+    p_start_date: shiftDate(runDate, -lookbackDays),
+    p_end_date: runDate
   });
-
-  return ((data ?? []) as Pick<MarketObservationRow, "artist_id" | "observed_date" | "observed_at">[]).reduce<
-    Record<string, string>
-  >((latest, row) => {
-    const observedAt = row.observed_at || `${row.observed_date}T00:00:00.000Z`;
-
-    if (!latest[row.artist_id] || observedAt > latest[row.artist_id]) {
-      latest[row.artist_id] = observedAt;
-    }
-
-    return latest;
-  }, {});
+  if (error) throw new Error(`Could not load latest ${source} observation times: ${error.message}`);
+  return Object.fromEntries((data ?? []).map(row => [row.artist_id, row.observed_at]));
 }
 
 function getBaselineAgeMetric(metric: string) {

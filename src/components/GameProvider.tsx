@@ -1,5 +1,6 @@
 "use client";
 
+import { createLatestRequest } from "@/lib/latest-request";
 import { useAuth } from "@/components/AuthProvider";
 import {
   STARTING_CASH,
@@ -15,7 +16,7 @@ import {
 import { MARKET_CONTENT_REFRESH_MS, MARKET_SNAPSHOT_REFRESH_MS } from "@/lib/refresh-policy";
 import { estimateMarketMakerQuote, getRemainingDailyArtistBuyValue } from "@/lib/trading";
 import type { Artist, GameState, HoldingView, LeaderboardEntry, ShortPositionView, TradeResult } from "@/lib/types";
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 
 type SyncMode = "demo" | "supabase";
@@ -96,6 +97,9 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const { configured: authConfigured, loading: authLoading, session } = useAuth();
+  const activeUserId = useRef(session?.user.id ?? null);
+  activeUserId.current = session?.user.id ?? null;
+  const profileSequence = useRef(0);
   // Never present bundled seed quotes as live data while the Supabase snapshot loads.
   const [state, setState] = useState<GameState>(() => clearMarketQuotes(createInitialGameState()));
   const hydrated = true;
@@ -113,6 +117,17 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
   const [profileLoaded, setProfileLoaded] = useState(false);
 
   useEffect(() => {
+    setState(current => clearPrivateGameState(current));
+    setWatchlistArtistIds([]);
+    setIsAdminUser(false);
+    setAvatarUrl("");
+    setServerLeaderboard(null);
+    setLeaderboardError("");
+    setProfileLoaded(false);
+    setServerRefreshing(false);
+  }, [session?.user.id]);
+
+  useEffect(() => {
     if (!hydrated || !authConfigured) {
       if (!authConfigured) {
         setMarketReady(true);
@@ -123,9 +138,11 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
 
     let active = true;
 
-    const controller = new AbortController();
+    const requests = createLatestRequest();
     let hasVerifiedSnapshot = false;
-    const loadMarketSnapshot = () => fetch("/api/market/snapshot", { signal: controller.signal })
+    const loadMarketSnapshot = () => {
+      const request = requests.start();
+      return fetch("/api/market/snapshot", { signal: request.signal })
       .then(async (response) => {
         const payload = await response.json() as MarketSnapshotResponse;
 
@@ -136,7 +153,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
         return payload;
       })
       .then((payload) => {
-        if (!active) {
+        if (!active || !request.isCurrent()) {
           return;
         }
 
@@ -160,7 +177,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
         setMarketReady(true);
       })
       .catch(() => {
-        if (active && !controller.signal.aborted) {
+        if (active && request.isCurrent()) {
           if (hasVerifiedSnapshot) {
             setMarketError("Live quote refresh is temporarily delayed. The last verified quote is still shown.");
             setSyncStatus("Market refresh delayed");
@@ -172,7 +189,8 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
           setSyncStatus("Market feed unavailable");
           setMarketReady(true);
         }
-      });
+      }).finally(request.finish);
+    };
 
     void loadMarketSnapshot();
 
@@ -191,7 +209,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
 
     return () => {
       active = false;
-      controller.abort();
+      requests.dispose();
       window.clearInterval(interval);
       window.removeEventListener("focus", refreshVisibleMarket);
       document.removeEventListener("visibilitychange", refreshVisibleMarket);
@@ -247,6 +265,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
         return false;
       }
 
+      const owner = activeUserId.current;
       try {
         const response = await fetch("/api/leaderboard", {
           headers: accessToken ? { authorization: `Bearer ${accessToken}` } : undefined
@@ -257,10 +276,12 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
           throw new Error(payload.error ?? "Could not load leaderboard.");
         }
 
+        if (activeUserId.current !== owner) return false;
         setServerLeaderboard(markCurrentLeaderboardUser(payload.leaderboard, currentUserId));
         setLeaderboardError("");
         return true;
       } catch {
+        if (activeUserId.current !== owner) return false;
         setLeaderboardError("Rankings are temporarily unavailable. Try again shortly.");
         return false;
       }
@@ -275,6 +296,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
         return false;
       }
 
+      const owner = activeUserId.current;
       try {
         const response = await fetch("/api/watchlist", {
           headers: {
@@ -287,9 +309,11 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
           throw new Error(payload.error ?? "Could not load watchlist.");
         }
 
+        if (activeUserId.current !== owner) return false;
         setWatchlistArtistIds(payload.watchlist);
         return true;
       } catch {
+        if (activeUserId.current !== owner) return false;
         setWatchlistArtistIds([]);
         return false;
       }
@@ -299,6 +323,9 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
 
   const refreshServerState = useCallback(
     async (preferredUsername?: string) => {
+      const requestId = ++profileSequence.current;
+      const owner = session?.user.id ?? null;
+      const isCurrent = () => requestId === profileSequence.current && activeUserId.current === owner;
       if (!authConfigured || authLoading || !session) {
         setSyncMode("demo");
         setSyncStatus(authConfigured ? "Signed out; unsaved demo mode" : "Unsaved demo mode");
@@ -333,6 +360,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
           throw new Error(profile.error ?? "Could not load server profile.");
         }
 
+        if (!isCurrent()) return false;
         const profileData = profile.profile;
         setIsAdminUser(Boolean(profileData.isAdmin));
         setAvatarUrl(profileData.avatarUrl ?? "");
@@ -342,6 +370,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
         void refreshWatchlist(session.access_token);
 
         setState((current) => {
+          if (!isCurrent()) return current;
           return {
             ...current,
             userId: profileData.id,
@@ -356,11 +385,12 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
         setSyncStatus("Server profile synced");
         return true;
       } catch (error) {
+        if (!isCurrent()) return false;
         setSyncStatus(error instanceof Error ? error.message : "Server sync failed");
         setProfileLoaded(false);
         return false;
       } finally {
-        setServerRefreshing(false);
+        if (isCurrent()) setServerRefreshing(false);
       }
     },
     [authConfigured, authLoading, refreshLeaderboard, refreshWatchlist, session]

@@ -603,6 +603,10 @@ export type Database = {
       };
     };
     Functions: {
+      get_latest_source_observation_times: {
+        Args: { p_artist_ids: string[]; p_source: string; p_start_date: string; p_end_date: string };
+        Returns: Array<{ artist_id: string; observed_at: string }>;
+      };
       get_previous_market_signals: {
         Args: { p_artist_ids: string[]; p_before_date: string };
         Returns: Array<{ artist_id: string; source_date: string; streaming_growth: number;

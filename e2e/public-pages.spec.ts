@@ -1111,3 +1111,50 @@ test("an empty real leaderboard never substitutes a demo guest rank", async ({ p
   await expect(page.getByText("No public portfolios are ranked yet.")).toBeVisible();
   await expect(page.locator('a[href^="/users/"]')).toHaveCount(0);
 });
+
+test("a slower market response cannot overwrite a newer refresh",async({page})=>{
+  let requests=0;let releaseOld!:()=>void;const held=new Promise<void>(resolve=>{releaseOld=resolve;});
+  let finishedOld!:()=>void;const oldFinished=new Promise<void>(resolve=>{finishedOld=resolve;});
+  const updated={...marketState,artists:marketState.artists.map((a,i)=>i===0?{...a,currentPrice:777.77}:a)};
+  await page.route("**/api/market/snapshot",async route=>{
+    requests++;
+    if(requests===2){await held;await route.fulfill({contentType:"application/json",body:JSON.stringify({ok:true,source:"supabase",state:marketState})}).catch(()=>{});finishedOld();return;}
+    await route.fulfill({contentType:"application/json",body:JSON.stringify({ok:true,source:"supabase",state:requests>=3?updated:marketState})});
+  });
+  try{
+    await page.goto("/markets");await expect(page.getByRole("link",{name:"Market Quotes",exact:true})).toBeVisible();
+    await page.evaluate(()=>window.dispatchEvent(new Event("focus")));await expect.poll(()=>requests).toBeGreaterThanOrEqual(2);
+    await page.evaluate(()=>window.dispatchEvent(new Event("focus")));await expect(page.getByText("$777.77",{exact:true}).first()).toBeVisible();
+    releaseOld();await oldFinished;await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+    await expect(page.getByText("$777.77",{exact:true}).first()).toBeVisible();
+  }finally{releaseOld();}
+});
+
+test("a previous account's delayed profile cannot replace the current account",async({page})=>{
+  await installPortfolioFixture(page);
+  const userB="33333333-3333-4333-8333-333333333333";const tokenB=createTestAccessToken(userB);
+  let releaseA!:()=>void;const held=new Promise<void>(resolve=>{releaseA=resolve;});
+  let startedA!:()=>void;const firstStarted=new Promise<void>(resolve=>{startedA=resolve;});
+  let finishedA!:()=>void;const firstFinished=new Promise<void>(resolve=>{finishedA=resolve;});
+  await page.route("**/api/profile/bootstrap",async route=>{
+    const isB=route.request().headers().authorization===`Bearer ${tokenB}`;
+    if(!isB){startedA();await held;}
+    await route.fulfill({contentType:"application/json",body:JSON.stringify({ok:true,profile:{id:isB?userB:"22222222-2222-4222-8222-222222222222",username:isB?"SecondUser":"PreviousPrivateUser",cashBalance:isB?25000:17500,onboardingCompleted:true,isAdmin:false},holdings:[],shortPositions:[],transactions:[]})}).catch(()=>{});
+    if(!isB)finishedA();
+  });
+  try{
+    await page.goto("/portfolio");await firstStarted;
+    await page.route("https://example.supabase.co/auth/v1/user",route=>route.fulfill({contentType:"application/json",body:JSON.stringify({id:userB,aud:"authenticated",role:"authenticated",email:"second@example.com",email_confirmed_at:"2026-07-21T12:00:00Z",created_at:"2026-07-21T12:00:00Z",app_metadata:{provider:"email"},user_metadata:{username:"SecondUser"}})}));
+    await page.evaluate(({id,token})=>{
+      const key="sb-example-auth-token";const oldValue=localStorage.getItem(key);const previous=JSON.parse(oldValue!);
+      const next={...previous,access_token:token,user:{...previous.user,id,email:"second@example.com",user_metadata:{username:"SecondUser"}}};
+      const newValue=JSON.stringify(next);localStorage.setItem(key,newValue);
+      const channel=new BroadcastChannel(key);channel.postMessage({event:"SIGNED_IN",session:next});channel.close();
+    },{id:userB,token:tokenB});
+    await page.getByRole("button",{name:"Open account menu",exact:true}).click();
+    await expect(page.getByText("SecondUser",{exact:true}).first()).toBeVisible();
+    releaseA();await firstFinished;await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+    await expect(page.getByText("SecondUser",{exact:true}).first()).toBeVisible();
+    await expect(page.getByText("PreviousPrivateUser",{exact:true})).toHaveCount(0);
+  }finally{releaseA();}
+});

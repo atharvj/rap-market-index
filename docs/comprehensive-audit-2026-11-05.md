@@ -29,6 +29,8 @@ preserve an archive and define new account/quote boundaries before implementatio
 | --- | --- |
 | Pricing evidence | Read saved v47 executed returns and subsequent audience data without changing prices. Results below are provisional. |
 | Public data | Production can no longer silently serve demo quotes, news, rankings, history or open status after a missing configuration. Temporary errors have no-store headers. |
+| Client sessions | Superseded market requests cannot overwrite newer quotes. Account switches clear private state immediately, and late profile/watchlist/ranking responses are scoped to the active user. |
+| Source scheduling | A scheduled catalyst run exposed another growing-history timeout. Source freshness now uses an indexed private lookup returning one timestamp per requested artist instead of paging through every historical source row. |
 | Concurrent publication | Snapshot and artist-history reads verify quote revisions after loading dependent data, retry once after a change, and reject a repeatedly changing result. |
 | Freshness | Public snapshots report verified refresh coverage; the UI identifies delayed artists and the last complete refresh rather than implying a fresh update. Missing/invalid/future timestamps do not establish freshness. |
 | Trading readiness | Failed catalyst/tick reads prevent execution. SQL requires a close for every active artist and fails closed with missing controls. Inactive closes cannot replace missing active ones. |
