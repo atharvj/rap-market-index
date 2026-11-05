@@ -3,7 +3,7 @@ import { mkdtemp, readFile, rm, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createHash } from "node:crypto";
-import { writeJsonArray, readBackupPage } from "../scripts/stream-json-array.mjs";
+import { writeJsonArray, readBackupPage, backupCursorFilter } from "../scripts/stream-json-array.mjs";
 
 it("writes pages before requesting the next page and preserves JSON and checksum", async () => {
   const dir = await mkdtemp(join(tmpdir(), "rmi-stream-test-")); const file = join(dir, "rows.json");
@@ -36,4 +36,11 @@ it("retries transient backup pages and fails immediately on access errors", asyn
   await expect(readBackupPage(denied, 0)).rejects.toThrow("Access denied"); expect(denied).toHaveBeenCalledTimes(1);
   const unavailable = vi.fn().mockResolvedValue({ status: 521, error: { message: "<html>unavailable</html>" } });
   await expect(readBackupPage(unavailable, 0)).rejects.toThrow("HTTP 521"); expect(unavailable).toHaveBeenCalledTimes(3);
+});
+
+it("uses lexicographic cursors and quotes reserved characters in composite keys", () => {
+  expect(backupCursorFilter(["id"], { id: "abc" })).toBe('id.gt."abc"');
+  expect(backupCursorFilter(["artist_id", "effective_date"], { artist_id: 'a,"b', effective_date: "2026-10-18" }))
+    .toBe('artist_id.gt."a,\\"b",and(artist_id.eq."a,\\"b",effective_date.gt."2026-10-18")');
+  expect(() => backupCursorFilter(["id"], { id: null })).toThrow("non-null");
 });

@@ -42,3 +42,19 @@ export async function readBackupPage(load, retryDelayMs = 1000) {
     await new Promise(resolve => setTimeout(resolve, retryDelayMs * (attempt + 1)));
   }
 }
+
+// Lexicographic primary-key cursor. OFFSET would repeatedly scan an increasing
+// prefix of a large evidence table and can shift underneath concurrent inserts.
+export function backupCursorFilter(columns, row) {
+  const literal = value => {
+    if (typeof value === "string") return JSON.stringify(value);
+    if (typeof value === "boolean" || (typeof value === "number" && Number.isFinite(value))) return String(value);
+    throw new Error("Backup cursor requires non-null primary-key values.");
+  };
+  return columns.map((column, index) => {
+    if (!/^[a-z_]+$/.test(column)) throw new Error("Invalid backup cursor column.");
+    const term = `${column}.gt.${literal(row[column])}`;
+    if (!index) return term;
+    return `and(${columns.slice(0, index).map(key => `${key}.eq.${literal(row[key])}`).join(",")},${term})`;
+  }).join(",");
+}

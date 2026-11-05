@@ -1,6 +1,6 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
-import { writeJsonArray, readBackupPage } from "./stream-json-array.mjs";
+import { writeJsonArray, readBackupPage, backupCursorFilter } from "./stream-json-array.mjs";
 import { createClient } from "@supabase/supabase-js";
 
 const exportDirectory = process.env.BACKUP_EXPORT_DIR?.trim();
@@ -47,7 +47,7 @@ const TABLE_ORDER = {
   watchlist: ["user_id", "artist_id"], api_rate_limits: ["scope", "key_hash"]
 };
 
-const pageSize = 1_000;
+const pageSize = 250;
 const outputRoot = resolve(exportDirectory);
 const supabase = createClient(supabaseUrl, serviceRoleKey, {
   auth: { autoRefreshToken: false, persistSession: false }
@@ -105,17 +105,21 @@ process.stdout.write(
 
 
 async function* exportTable(table) {
-  for (let offset = 0; ; offset += pageSize) {
+  const columns = TABLE_ORDER[table] ?? ["id"];
+  let cursor = null;
+  for (;;) {
     let data;
     try {
       data = await readBackupPage(async () => {
         let query = supabase.from(table).select("*");
-        for (const column of TABLE_ORDER[table] ?? ["id"]) query = query.order(column);
-        return await query.range(offset, offset + pageSize - 1);
+        for (const column of columns) query = query.order(column);
+        if (cursor) query = query.or(backupCursorFilter(columns, cursor));
+        return await query.limit(pageSize);
       });
     } catch (error) { throw new Error(`Could not export public.${table}: ${error.message}`); }
     yield data ?? [];
     if (!data || data.length < pageSize) return;
+    cursor = data[data.length - 1];
   }
 }
 

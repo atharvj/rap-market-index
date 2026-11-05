@@ -15,7 +15,8 @@ concurrency:
 jobs:
   backup:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    # Stream the growing evidence archive in small indexed pages on free runners.
+    timeout-minutes: 25
     env:
       NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.RMI_SUPABASE_URL }}
       SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.RMI_SUPABASE_SERVICE_ROLE_KEY }}

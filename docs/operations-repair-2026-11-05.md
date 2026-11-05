@@ -48,3 +48,8 @@ The market tape now says “Market Quotes” instead of an unconditional “Mark
 Live” indicator. Its old label appeared even when trading was paused or scheduled
 source updates were delayed. This copy change does not imply tick-by-tick feeds
 or alter trading availability.
+
+The complete backup trial also exposed OFFSET pagination timeouts in the large
+observations table. Exports now seek forward from each table's last primary key,
+including composite keys, instead of rescanning an increasingly large prefix.
+Sort columns are checked against the migration schemas in a regression test.
