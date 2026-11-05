@@ -41,6 +41,7 @@ const tables = [
 
 const TABLE_ORDER = {
   artist_stats: ["artist_id"], artist_external_ids: ["artist_id"],
+  artist_trading_halts: ["artist_id"], blocked_signup_email_domains: ["domain"],
   market_valuation_boundaries: ["artist_id", "effective_date"],
   holdings: ["user_id", "artist_id"], short_positions: ["user_id", "artist_id"],
   watchlist: ["user_id", "artist_id"], api_rate_limits: ["scope", "key_hash"]
