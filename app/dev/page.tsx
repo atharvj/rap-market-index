@@ -1,5 +1,7 @@
 "use client";
 
+import { MARKET_TIME_ZONE } from "@/lib/market-time";
+
 import { useAuth } from "@/components/AuthProvider";
 import { formatCurrency, formatDate, formatPercent } from "@/lib/formatters";
 import { STARTING_CASH } from "@/lib/trading";
@@ -9,7 +11,6 @@ import {
   BarChart3,
   CheckCircle2,
   Cloud,
-  Database,
   FileWarning,
   LockKeyhole,
   PlayCircle,
@@ -778,9 +779,6 @@ export default function DevPage() {
   const [sourceIds, setSourceIds] = useState<AsyncState<SourceIdDirectory>>({ status: "loading" });
   const [manualSourceForm, setManualSourceForm] = useState<ManualSourceIdForm>(emptyManualSourceIdForm);
   const [manualSourceSave, setManualSourceSave] = useState<ManualSourceIdSaveState>({ status: "idle" });
-  const [resetConfirm, setResetConfirm] = useState("");
-  const [resetStartingCash, setResetStartingCash] = useState(String(STARTING_CASH));
-  const [prelaunchReset, setPrelaunchReset] = useState<AdminActionState>({ status: "idle" });
   const [adminCashValue, setAdminCashValue] = useState(String(STARTING_CASH));
   const [adminCashAction, setAdminCashAction] = useState<AdminActionState>({ status: "idle" });
   const [userSupport, setUserSupport] = useState<AsyncState<UserSupportDirectory>>({ status: "loading" });
@@ -1366,49 +1364,6 @@ export default function DevPage() {
     }
   }
 
-  async function resetPrelaunchMarket() {
-    setPrelaunchReset({ status: "loading", label: "Resetting prelaunch market" });
-
-    try {
-      const startingCash = Number(resetStartingCash);
-      const response = await fetch("/api/admin/prelaunch-reset", {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
-          ...adminHeaders
-        },
-        body: JSON.stringify({
-          confirm: resetConfirm,
-          startingCash,
-          resetWatchlists: false,
-          clearHalts: true
-        })
-      });
-      const payload = await readJsonResponse(response);
-
-      if (!response.ok || !payload.ok) {
-        throw new Error(payload.error ?? "Prelaunch reset failed.");
-      }
-
-      setPrelaunchReset({
-        status: "success",
-        message: `Reset ${payload.resetArtistCount ?? 0} artists and ${payload.resetProfileCount ?? 0} profile(s). Run market now to seed fresh charts.`
-      });
-      setResetConfirm("");
-      await Promise.all([
-        refreshMarketHealth(),
-        refreshMarketControls(),
-        refreshMarketIntegrity(),
-        refreshArtistRoster(),
-        refreshSourceIds()
-      ]);
-    } catch (error) {
-      setPrelaunchReset({
-        status: "error",
-        message: error instanceof Error ? error.message : "Prelaunch reset failed."
-      });
-    }
-  }
 
   async function setMyAdminCash() {
     setAdminCashAction({ status: "loading", label: "Setting cash" });
@@ -2073,48 +2028,13 @@ export default function DevPage() {
       </Panel>
 
       <section className="grid gap-6 xl:grid-cols-2">
-        <section className="rounded-md border border-ember/30 bg-panel/88 p-5 shadow-market">
-          <div className="flex items-start gap-3">
-            <AlertTriangle className="mt-1 h-5 w-5 shrink-0 text-ember" />
-            <div>
-              <p className="text-xs font-bold uppercase tracking-wide text-paper/45">Prelaunch reset</p>
-              <h2 className="mt-1 text-2xl font-black">Start the market fresh</h2>
-              <p className="mt-2 text-sm leading-6 text-paper/55">
-                Clears trades, holdings, shorts, chart history, observations, market events, runs, and halts. This is
-                for prelaunch only after you decide the engine is ready.
-              </p>
-            </div>
-          </div>
-          <div className="mt-4 grid gap-3 sm:grid-cols-[1fr_180px]">
-            <label className="space-y-2">
-              <span className="text-xs font-black uppercase tracking-wide text-paper/45">Type RESET RMI</span>
-              <input
-                value={resetConfirm}
-                onChange={(event) => setResetConfirm(event.target.value)}
-                className="h-11 w-full rounded-md border border-line bg-ink px-3 text-sm font-bold outline-hidden focus:border-ember"
-                placeholder="RESET RMI"
-              />
-            </label>
-            <label className="space-y-2">
-              <span className="text-xs font-black uppercase tracking-wide text-paper/45">Starting cash</span>
-              <input
-                value={resetStartingCash}
-                onChange={(event) => setResetStartingCash(event.target.value)}
-                inputMode="numeric"
-                className="h-11 w-full rounded-md border border-line bg-ink px-3 text-sm font-bold outline-hidden focus:border-ember"
-              />
-            </label>
-          </div>
-          <button
-            type="button"
-            onClick={resetPrelaunchMarket}
-            disabled={prelaunchReset.status === "loading" || resetConfirm !== "RESET RMI"}
-            className="mt-4 inline-flex min-h-10 items-center justify-center gap-2 rounded-md border border-ember/45 bg-ember/10 px-4 text-sm font-black text-ember disabled:cursor-not-allowed disabled:opacity-45"
-          >
-            <Database className="h-4 w-4" />
-            Reset prelaunch state
-          </button>
-          <AdminActionResult state={prelaunchReset} />
+        <section className="rounded-md border border-line bg-panel/88 p-5 shadow-market">
+          <p className="text-xs font-bold uppercase tracking-wide text-paper/45">Market history</p>
+          <h2 className="mt-1 text-2xl font-black">History is preserved</h2>
+          <p className="mt-2 text-sm leading-6 text-paper/55">
+            The prelaunch reset tool is retired. Model changes are tracked separately so historical
+            quotes, source observations and existing portfolios remain available for review.
+          </p>
         </section>
 
         <section className="rounded-md border border-line bg-panel/88 p-5 shadow-market">
@@ -4809,7 +4729,7 @@ function formatOperatorTime(value: string) {
     day: "numeric",
     hour: "numeric",
     minute: "2-digit",
-    timeZone: "America/Los_Angeles"
+    timeZone: MARKET_TIME_ZONE
   }).format(date);
 }
 

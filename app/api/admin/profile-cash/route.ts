@@ -1,3 +1,4 @@
+import { readJsonObject } from "@/server/request-body";
 import { NextResponse } from "next/server";
 import { createServiceRoleClient, getSupabaseConfigStatus } from "@/lib/supabase/server";
 import { requireAdminRequest } from "@/server/admin-auth";
@@ -104,7 +105,7 @@ export async function POST(request: Request) {
 
 async function parseBody(request: Request): Promise<ProfileCashBody> {
   try {
-    return (await request.json()) as ProfileCashBody;
+    return await readJsonObject(request) as ProfileCashBody;
   } catch {
     return {};
   }

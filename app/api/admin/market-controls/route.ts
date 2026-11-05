@@ -1,3 +1,4 @@
+import { readJsonObject } from "@/server/request-body";
 import { NextResponse } from "next/server";
 import { createServiceRoleClient, getSupabaseConfigStatus } from "@/lib/supabase/server";
 import type { Database, Json } from "@/lib/supabase/database.types";
@@ -217,7 +218,7 @@ async function recordMarketControlAction({
 
 async function parseBody(request: Request): Promise<MarketControlBody> {
   try {
-    return (await request.json()) as MarketControlBody;
+    return await readJsonObject(request) as MarketControlBody;
   } catch {
     return {};
   }

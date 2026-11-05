@@ -301,6 +301,12 @@ export function Shell({ children }: { children: React.ReactNode }) {
             {marketError}
           </div>
         ) : null}
+        {state.quoteFreshness && state.quoteFreshness.staleArtistCount > 0 ? (
+          <div className="mb-5 rounded border border-ember/40 bg-ember/5 px-4 py-3 text-sm leading-relaxed text-paper/80" role="status">
+            Quotes are awaiting a refresh for {state.quoteFreshness.staleArtistCount} of {state.quoteFreshness.artistCount} artists.
+            {state.quoteFreshness.asOf ? <> Last complete refresh: <time dateTime={state.quoteFreshness.asOf}>{new Date(state.quoteFreshness.asOf).toLocaleString("en-US", { timeZone: "America/New_York", timeZoneName: "short" })}</time>.</> : null}
+          </div>
+        ) : null}
         {state.valuationNotice?.date === state.lastUpdatedAt ? (
           <div className="mb-5 rounded border border-cyan/40 bg-cyan/5 px-4 py-3 text-sm leading-relaxed text-paper/80" role="status">
             Quotes were recalibrated today using the same audience-based valuation for every artist. Today’s changes and portfolio values include this correction.

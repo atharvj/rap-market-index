@@ -1,3 +1,4 @@
+import { readJsonObject } from "@/server/request-body";
 import { parseTradingStatus, type TradingStatusRow } from "@/server/market/trading-status";
 import { NextResponse } from "next/server";
 import { createAnonServerClient, createServiceRoleClient, getSupabaseConfigStatus } from "@/lib/supabase/server";
@@ -172,10 +173,14 @@ export async function POST(request: Request) {
     );
   }
 
-  const pendingCatalyst = await loadPendingCatalyst(
-    serviceSupabase,
-    artistId
-  );
+  let pendingCatalyst: PendingCatalyst | null;
+  try {
+    pendingCatalyst = await loadPendingCatalyst(serviceSupabase, artistId);
+  } catch (error) {
+    reportServerError(error, "trade.pending-catalyst");
+    return NextResponse.json({ ok: false, error: "Trading is temporarily unavailable while quote readiness is verified." },
+      { status: 503, headers: { "Cache-Control": "no-store" } });
+  }
 
   if (pendingCatalyst) {
     return NextResponse.json(
@@ -257,6 +262,7 @@ const SAFE_TRADE_ERRORS = [
   "confirm your email before trading",
   "complete account setup before trading",
   "trading is currently paused",
+  "trading is paused",
   "trading is halted for this artist",
   "newly detected catalyst",
   "shares must be greater than zero",
@@ -332,11 +338,10 @@ async function loadPendingCatalyst(
       .maybeSingle()
   ]);
 
-  // Older projects may not have the event or tick migrations yet. In that case,
-  // preserve trading and let the existing market-status RPC remain authoritative.
-  if (eventResult.error || quoteResult.error || !eventResult.data?.length) {
-    return null;
+  if (eventResult.error || quoteResult.error) {
+    throw new Error("Could not verify pending market catalysts.");
   }
+  if (!eventResult.data?.length) return null;
 
   const quotedAt = quoteResult.data?.observed_at ?? null;
   const event = eventResult.data.find((candidate) => {
@@ -433,7 +438,7 @@ function getMarketEligibilityReason({
 
 async function parseBody(request: Request): Promise<TradeBody> {
   try {
-    return (await request.json()) as TradeBody;
+    return await readJsonObject(request) as TradeBody;
   } catch {
     return {};
   }

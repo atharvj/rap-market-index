@@ -1,3 +1,4 @@
+import { readJsonObject } from "@/server/request-body";
 import { NextResponse } from "next/server";
 import { formatArtistDisplayName } from "@/lib/artist-display-name";
 import { calculateHypeScore, getDailyChangePercent } from "@/lib/pricing";
@@ -243,7 +244,7 @@ export async function DELETE(request: Request) {
 
 async function parseBody(request: Request): Promise<ArtistRosterBody> {
   try {
-    return (await request.json()) as ArtistRosterBody;
+    return await readJsonObject(request) as ArtistRosterBody;
   } catch {
     return {};
   }

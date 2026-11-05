@@ -9,7 +9,7 @@ import { Crown, Medal, Radio, ShieldCheck, Trophy, Users } from "lucide-react";
 import Link from "next/link";
 
 export default function LeaderboardPage() {
-  const { leaderboard, portfolioValue, gainPercent, state } = useGame();
+  const { leaderboard, leaderboardError, portfolioValue, gainPercent, state } = useGame();
   const current = leaderboard.find((entry) => entry.isCurrentUser);
   const currentRank = current ? current.rank ?? leaderboard.findIndex((entry) => entry.id === current.id) + 1 : null;
   const leader = leaderboard[0];
@@ -38,6 +38,8 @@ export default function LeaderboardPage() {
           <h1 className="mt-2 text-3xl font-bold sm:text-4xl">Leaderboard</h1>
           <p className="mt-1 text-sm text-paper/65">Global rankings by fantasy portfolio value, updated from current market quotes.</p>
         </header>
+
+        {leaderboardError && leaderboard.length > 0 ? <p className="text-sm text-ember" role="status">{leaderboardError} Showing the last loaded rankings.</p> : null}
 
         <section className="grid grid-cols-2 gap-3 lg:grid-cols-4">
           <RankingStat label="Traders Ranked" value={String(leaderboard.length)} />
@@ -72,6 +74,7 @@ export default function LeaderboardPage() {
           <span className="text-right">Invested</span>
           <span className="text-right">All-Time</span>
         </div>
+        {!leaderboard.length ? <p className="px-4 py-8 text-sm text-paper/60" role="status">{leaderboardError || "No public portfolios are ranked yet."}</p> : null}
         {leaderboard.map((entry, index) => (
           <div
             key={entry.id}

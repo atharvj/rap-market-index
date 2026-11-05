@@ -1,3 +1,4 @@
+import { readJsonObject } from "@/server/request-body";
 import { NextResponse } from "next/server";
 import { createServiceRoleClient, getSupabaseConfigStatus } from "@/lib/supabase/server";
 import { requireAdminRequest } from "@/server/admin-auth";
@@ -232,7 +233,7 @@ function getMissingSourceCount(
 
 async function parseBody(request: Request): Promise<SourceResolverBody> {
   try {
-    return (await request.json()) as SourceResolverBody;
+    return await readJsonObject(request) as SourceResolverBody;
   } catch {
     return {};
   }

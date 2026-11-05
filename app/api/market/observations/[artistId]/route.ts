@@ -1,3 +1,4 @@
+import { allowDemoMarket, MARKET_ERROR_HEADERS } from "@/server/market/public-response";
 import { DEFAULT_HISTORY_RANGE, DEFAULT_HISTORY_DAYS } from "@/lib/price-series";
 import { NextResponse } from "next/server";
 import { createServiceRoleClient, getSupabaseConfigStatus } from "@/lib/supabase/server";
@@ -203,6 +204,10 @@ export async function GET(request: Request, context: { params: Promise<{ artistI
   const config = getSupabaseConfigStatus();
 
   if (!config.readyForPublicReads) {
+    if (!allowDemoMarket()) {
+      return NextResponse.json({ ok: false, source: "supabase", error: "Market data is temporarily unavailable." },
+        { status: 503, headers: MARKET_ERROR_HEADERS });
+    }
     return NextResponse.json({
       ok: true,
       source: "mock",
@@ -218,7 +223,7 @@ export async function GET(request: Request, context: { params: Promise<{ artistI
   if (!config.serviceRoleConfigured) {
     return NextResponse.json(
       { ok: false, error: "Market observations are temporarily unavailable." },
-      { status: 503, headers: CACHE_HEADERS }
+      { status: 503, headers: MARKET_ERROR_HEADERS }
     );
   }
 
@@ -237,7 +242,7 @@ export async function GET(request: Request, context: { params: Promise<{ artistI
           ok: false,
           error: "Artist not found."
         },
-        { status: 404, headers: CACHE_HEADERS }
+        { status: 404, headers: MARKET_ERROR_HEADERS }
       );
     }
 
@@ -266,7 +271,7 @@ export async function GET(request: Request, context: { params: Promise<{ artistI
         source: "supabase",
         error: "Market observations are temporarily unavailable."
       },
-      { status: 500, headers: CACHE_HEADERS }
+      { status: 500, headers: MARKET_ERROR_HEADERS }
     );
   }
 }

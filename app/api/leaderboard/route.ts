@@ -1,3 +1,4 @@
+import { allowDemoMarket, MARKET_ERROR_HEADERS } from "@/server/market/public-response";
 import { NextResponse } from "next/server";
 import {
   createAnonServerClient,
@@ -19,6 +20,10 @@ export async function GET(request: Request) {
   const config = getSupabaseConfigStatus();
 
   if (!config.readyForPublicReads) {
+    if (!allowDemoMarket()) {
+      return NextResponse.json({ ok: false, source: "supabase", error: "Market data is temporarily unavailable." },
+        { status: 503, headers: MARKET_ERROR_HEADERS });
+    }
     return NextResponse.json({
       ok: true,
       source: "mock",
@@ -29,7 +34,7 @@ export async function GET(request: Request) {
   if (!config.serviceRoleConfigured) {
     return NextResponse.json(
       { ok: false, source: "supabase", error: "Rankings are temporarily unavailable." },
-      { status: 503, headers: CACHE_HEADERS }
+      { status: 503, headers: MARKET_ERROR_HEADERS }
     );
   }
 
@@ -126,7 +131,7 @@ export async function GET(request: Request) {
         source: "supabase",
         error: "Rankings are temporarily unavailable."
       },
-      { status: 500, headers: CACHE_HEADERS }
+      { status: 500, headers: MARKET_ERROR_HEADERS }
     );
   }
 }

@@ -67,6 +67,7 @@ type GameContextValue = {
   holdings: HoldingView[];
   shortPositions: ShortPositionView[];
   leaderboard: LeaderboardEntry[];
+  leaderboardError: string;
   portfolioValue: number;
   portfolioDayChange: number;
   gainPercent: number;
@@ -104,6 +105,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
   const [syncStatus, setSyncStatus] = useState("Unsaved demo mode");
   const [serverRefreshing, setServerRefreshing] = useState(false);
   const [serverLeaderboard, setServerLeaderboard] = useState<LeaderboardEntry[] | null>(null);
+  const [leaderboardError, setLeaderboardError] = useState("");
   const [watchlistArtistIds, setWatchlistArtistIds] = useState<string[]>([]);
   const [isAdminUser, setIsAdminUser] = useState(false);
   const [avatarUrl, setAvatarUrl] = useState("");
@@ -114,6 +116,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     if (!hydrated || !authConfigured) {
       if (!authConfigured) {
         setMarketReady(true);
+        if (process.env.NODE_ENV === "production") setMarketError("Market data is temporarily unavailable. Quotes and trading require a verified connection.");
       }
       return;
     }
@@ -201,13 +204,13 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
   const portfolioDayChange = useMemo(() => getPortfolioDayChange(state), [state]);
   const mockLeaderboard = useMemo(() => getMockLeaderboard(state), [state]);
   const leaderboard = useMemo(() => {
-    const source = serverLeaderboard?.length ? serverLeaderboard : mockLeaderboard;
+    const source = serverLeaderboard ?? ((authConfigured || process.env.NODE_ENV === "production") ? [] : mockLeaderboard);
 
     return source.map((entry) => ({
       ...entry,
       isCurrentUser: entry.id === state.userId || entry.isCurrentUser
     }));
-  }, [mockLeaderboard, serverLeaderboard, state.userId]);
+  }, [authConfigured, mockLeaderboard, serverLeaderboard, state.userId]);
   const gainPercent = ((portfolioValue - STARTING_CASH) / STARTING_CASH) * 100;
   const watchlistArtists = useMemo(
     () =>
@@ -255,9 +258,10 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
         }
 
         setServerLeaderboard(markCurrentLeaderboardUser(payload.leaderboard, currentUserId));
+        setLeaderboardError("");
         return true;
       } catch {
-        setServerLeaderboard(null);
+        setLeaderboardError("Rankings are temporarily unavailable. Try again shortly.");
         return false;
       }
     },
@@ -655,6 +659,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       holdings,
       shortPositions,
       leaderboard,
+      leaderboardError,
       portfolioValue,
       portfolioDayChange,
       gainPercent,
@@ -687,6 +692,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       holdings,
       shortPositions,
       leaderboard,
+      leaderboardError,
       portfolioValue,
       portfolioDayChange,
       gainPercent,

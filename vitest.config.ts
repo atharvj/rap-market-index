@@ -10,6 +10,7 @@ export default defineConfig({
   },
   test: {
     environment: "node",
+    maxWorkers: process.env.CI ? 2 : 4,
     include: ["tests/**/*.test.ts"]
   }
 });

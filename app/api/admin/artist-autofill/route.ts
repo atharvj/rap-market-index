@@ -1,3 +1,4 @@
+import { readJsonObject } from "@/server/request-body";
 import { buildAudienceScaleCalibration } from "@/server/market/audience-scale";
 import { collectSpotifyPublicSignals } from "@/server/market/spotify-public-source";
 import { collectYoutubeMarketSignals } from "@/server/market/youtube-source";
@@ -245,7 +246,7 @@ function getListingReadiness(record: {
 
 async function parseBody(request: Request): Promise<ArtistAutofillBody> {
   try {
-    return (await request.json()) as ArtistAutofillBody;
+    return await readJsonObject(request) as ArtistAutofillBody;
   } catch {
     return {};
   }

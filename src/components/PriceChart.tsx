@@ -1,5 +1,7 @@
 "use client";
 
+import { MARKET_TIME_ZONE } from "@/lib/market-time";
+
 import { formatCurrency, formatDate } from "@/lib/formatters";
 import type { PricePoint } from "@/lib/types";
 import { useId, useMemo, useState } from "react";
@@ -65,6 +67,7 @@ export function PriceChart({
   const lastTimestamp = normalized[normalized.length - 1]?.timestamp ?? 0;
   const intraday = timeScale === "intraday" || (
     timeScale === "auto" &&
+    normalized.some(point => point.date.includes("T")) &&
     Number.isFinite(firstTimestamp) &&
     Number.isFinite(lastTimestamp) &&
     lastTimestamp - firstTimestamp <= 48 * 60 * 60 * 1000
@@ -103,7 +106,7 @@ export function PriceChart({
         day: detailed ? "numeric" : undefined,
         hour: "numeric",
         minute: "2-digit",
-        timeZone: "America/Los_Angeles"
+        timeZone: MARKET_TIME_ZONE
       }).format(date);
     }
 

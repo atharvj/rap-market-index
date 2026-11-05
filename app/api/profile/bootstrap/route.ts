@@ -1,3 +1,4 @@
+import { readJsonObject } from "@/server/request-body";
 import { NextResponse } from "next/server";
 import { MAX_FAVORITE_ARTISTS, MAX_FAVORITE_GENRES, MIN_FAVORITE_ARTISTS } from "@/lib/onboarding";
 import { createServiceRoleClient, getSupabaseConfigStatus } from "@/lib/supabase/server";
@@ -432,7 +433,7 @@ async function loadTransactions(
 
 async function parseBody(request: Request): Promise<BootstrapBody> {
   try {
-    return (await request.json()) as BootstrapBody;
+    return await readJsonObject(request) as BootstrapBody;
   } catch {
     return {};
   }

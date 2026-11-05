@@ -1,3 +1,4 @@
+import { MARKET_TIME_ZONE } from "@/lib/market-time";
 export function formatCurrency(value: number) {
   return new Intl.NumberFormat("en-US", {
     style: "currency",
@@ -31,6 +32,6 @@ export function formatDate(value: string) {
   return new Intl.DateTimeFormat("en-US", {
     month: "short",
     day: "numeric",
-    timeZone: includesTime ? "America/Los_Angeles" : undefined
+    timeZone: includesTime ? MARKET_TIME_ZONE : undefined
   }).format(date);
 }

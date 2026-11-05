@@ -1,3 +1,5 @@
+import { sameQuoteRevisions } from "@/server/market/read-stability";
+import { allowDemoMarket, MARKET_ERROR_HEADERS } from "@/server/market/public-response";
 import { DEFAULT_HISTORY_RANGE, DEFAULT_HISTORY_DAYS } from "@/lib/price-series";
 import { NextResponse } from "next/server";
 import { createInitialGameState } from "@/lib/market";
@@ -20,7 +22,7 @@ export const dynamic = "force-dynamic";
 
 type HistoryRange = "1D" | "7D" | "1M" | "3M" | "6M" | "1Y" | "ALL";
 
-type ArtistRow = Pick<Database["public"]["Tables"]["artists"]["Row"], "id" | "current_price">;
+type ArtistRow = Pick<Database["public"]["Tables"]["artists"]["Row"], "id" | "current_price" | "updated_at">;
 type PriceHistoryRow = Pick<Database["public"]["Tables"]["price_history"]["Row"], "price_date" | "price">;
 type PriceTickRow = Pick<
   Database["public"]["Tables"]["price_ticks"]["Row"],
@@ -38,11 +40,19 @@ const RANGE_DAYS: Record<Exclude<HistoryRange, "ALL">, number> = {
 const CACHE_HEADERS = { "Cache-Control": "public, max-age=10, s-maxage=15, stale-while-revalidate=60" };
 
 export async function GET(request: Request, context: { params: Promise<{ artistId: string }> }) {
+  return readHistory(request, context);
+}
+
+async function readHistory(request: Request, context: { params: Promise<{ artistId: string }> }, attempt = 0): Promise<Response> {
   const { artistId } = await context.params;
   const range = normalizeRange(new URL(request.url).searchParams.get("range"));
   const config = getSupabaseConfigStatus();
 
   if (!config.readyForPublicReads) {
+    if (!allowDemoMarket()) {
+      return NextResponse.json({ ok: false, source: "supabase", error: "Market data is temporarily unavailable." },
+        { status: 503, headers: MARKET_ERROR_HEADERS });
+    }
     return NextResponse.json({
       ok: true,
       source: "mock",
@@ -55,7 +65,7 @@ export async function GET(request: Request, context: { params: Promise<{ artistI
   if (!config.serviceRoleConfigured) {
     return NextResponse.json(
       { ok: false, error: "Price history is temporarily unavailable." },
-      { status: 503, headers: CACHE_HEADERS }
+      { status: 503, headers: MARKET_ERROR_HEADERS }
     );
   }
 
@@ -63,7 +73,7 @@ export async function GET(request: Request, context: { params: Promise<{ artistI
     const supabase = createServiceRoleClient();
     const { data: artist, error: artistError } = await supabase
       .from("artists")
-      .select("id,current_price")
+      .select("id,current_price,updated_at")
       .eq("id", artistId)
       .eq("is_active", true)
       .single();
@@ -74,7 +84,7 @@ export async function GET(request: Request, context: { params: Promise<{ artistI
           ok: false,
           error: "Artist not found."
         },
-        { status: 404, headers: CACHE_HEADERS }
+        { status: 404, headers: MARKET_ERROR_HEADERS }
       );
     }
 
@@ -97,6 +107,13 @@ export async function GET(request: Request, context: { params: Promise<{ artistI
       earliestDate: range === "ALL" ? undefined : shiftMarketDate(getMarketDate(), -RANGE_DAYS[range]), intraday: range === "1D" });
     const points = adjustPriceHistory(recordedPoints, adjustments[artistId] ?? [], range === "1D" ? "intraday" : "daily");
 
+    const verified = await supabase.from("artists").select("id,current_price,updated_at")
+      .eq("id", artistId).eq("is_active", true).single();
+    if (verified.error || !verified.data) throw new Error("Could not verify artist quote revision.");
+    if (!sameQuoteRevisions([artist], [verified.data])) {
+      if (attempt < 1) return readHistory(request, context, attempt + 1);
+      throw new Error("The artist quote changed while history was loading.");
+    }
     return NextResponse.json({
       ok: true,
       source: "supabase",
@@ -119,7 +136,7 @@ export async function GET(request: Request, context: { params: Promise<{ artistI
         source: "supabase",
         error: "Price history is temporarily unavailable."
       },
-      { status: 500 }
+      { status: 500, headers: MARKET_ERROR_HEADERS }
     );
   }
 }

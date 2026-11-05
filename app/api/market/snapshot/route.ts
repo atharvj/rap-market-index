@@ -1,3 +1,6 @@
+import { summarizeQuoteFreshness } from "@/lib/quote-freshness";
+import { sameQuoteRevisions } from "@/server/market/read-stability";
+import { allowDemoMarket, MARKET_ERROR_HEADERS } from "@/server/market/public-response";
 import { after, NextResponse } from "next/server";
 import { createInitialGameState } from "@/lib/market";
 import { sanitizeMoveExplanation } from "@/lib/artist-explanations";
@@ -31,6 +34,10 @@ export async function GET() {
   const config = getSupabaseConfigStatus();
 
   if (!config.readyForPublicReads) {
+    if (!allowDemoMarket()) {
+      return NextResponse.json({ ok: false, source: "supabase", error: "Market data is temporarily unavailable." },
+        { status: 503, headers: MARKET_ERROR_HEADERS });
+    }
     return NextResponse.json({
       ok: true,
       source: "mock",
@@ -47,50 +54,7 @@ export async function GET() {
 
   try {
     const supabase = createServiceRoleClient();
-    const { data: artists, error: artistError } = await supabase
-      .from("artists")
-      .select("*")
-      .eq("is_active", true)
-      .order("ticker", { ascending: true });
-
-    if (artistError) {
-      throw new Error(`Could not load artists: ${artistError.message}`);
-    }
-
-    const typedArtists = (artists ?? []) as ArtistRow[];
-    const artistIds = typedArtists.map((artist) => artist.id);
-    const [statsByArtist, historyByArtist, imageByArtistId, currentCorrections] = await Promise.all([
-      loadStatsByArtist(artistIds, supabase),
-      loadHistoryByArtist(artistIds, supabase),
-      loadArtistImageUrls(
-        supabase,
-        artistIds,
-        Object.fromEntries(typedArtists.map((artist) => [artist.id, artist.name]))
-      ),
-      loadAllPages(async (from, to) => {
-        const result = await supabase.from("market_valuation_boundaries").select("artist_id")
-          .in("artist_id", artistIds).eq("effective_date", getMarketDate()).order("artist_id").range(from, to);
-        if (result.error) throw new Error(`Could not verify today's valuation notice: ${result.error.message}`);
-        return result.data ?? [];
-      })
-    ]);
-    const fallback = createInitialGameState();
-    const state: GameState = {
-      ...fallback,
-      ...(currentCorrections.length ? { valuationNotice: { date: getMarketDate(), artistCount: currentCorrections.length } } : {}),
-      artists: typedArtists.map((artist) =>
-        mapArtist(
-          artist,
-          statsByArtist[artist.id] ?? null,
-          historyByArtist[artist.id] ?? [],
-          imageByArtistId.get(artist.id)
-        )
-      ),
-      holdings: [],
-      shortPositions: [],
-      transactions: [],
-      lastUpdatedAt: getMarketDate()
-    };
+    const { state, artistIds } = await loadStableSnapshot(supabase);
 
     if (process.env.VERCEL_ENV === "production" && artistIds.length) {
       after(async () => {
@@ -217,4 +181,71 @@ function mapStats(stats: ArtistStatsRow | null): HypeStats {
     newsScore: Number(stats?.news_score ?? 50),
     traderDemand: Number(stats?.trader_demand ?? 0)
   };
+}
+
+async function loadStableSnapshot(supabase: ReturnType<typeof createServiceRoleClient>, attempt = 0): Promise<{ state: GameState; artistIds: string[] }> {
+  const { data: artists, error: artistError } = await supabase
+    .from("artists")
+    .select("*")
+    .eq("is_active", true)
+    .order("ticker", { ascending: true });
+
+  if (artistError) {
+    throw new Error(`Could not load artists: ${artistError.message}`);
+  }
+
+  const typedArtists = (artists ?? []) as ArtistRow[];
+  const artistIds = typedArtists.map((artist) => artist.id);
+  const [statsByArtist, historyByArtist, imageByArtistId, currentCorrections, completions] = await Promise.all([
+    loadStatsByArtist(artistIds, supabase),
+    loadHistoryByArtist(artistIds, supabase),
+    loadArtistImageUrls(
+      supabase,
+      artistIds,
+      Object.fromEntries(typedArtists.map((artist) => [artist.id, artist.name]))
+    ),
+    loadAllPages(async (from, to) => {
+      const result = await supabase.from("market_valuation_boundaries").select("artist_id")
+        .in("artist_id", artistIds).eq("effective_date", getMarketDate()).order("artist_id").range(from, to);
+      if (result.error) throw new Error(`Could not verify today's valuation notice: ${result.error.message}`);
+      return result.data ?? [];
+    }),
+    loadAllPages(async (from, to) => {
+      const result = await supabase.from("market_observations").select("artist_id,observed_at,observed_date")
+        .eq("source", "market_refresh").eq("metric", "completed").in("artist_id", artistIds)
+        .in("observed_date", [getMarketDate(), shiftMarketDate(getMarketDate(), -1)])
+        .order("artist_id").order("observed_date").range(from, to);
+      if (result.error) throw new Error("Could not verify quote freshness.");
+      return result.data ?? [];
+    })
+  ]);
+  const verified = await supabase.from("artists").select("id,current_price,updated_at")
+    .eq("is_active", true).order("ticker", { ascending: true });
+  if (verified.error) throw new Error("Could not verify market quote revisions.");
+  if (!sameQuoteRevisions(typedArtists, verified.data ?? [])) {
+    if (attempt < 1) return loadStableSnapshot(supabase, attempt + 1);
+    throw new Error("Quotes changed during the market read. Retry shortly.");
+  }
+  if (!typedArtists.length || typedArtists.some(row => !Number.isFinite(Number(row.current_price)) || Number(row.current_price) <= 0)) {
+    throw new Error("The market returned invalid current quotes.");
+  }
+  const fallback = createInitialGameState();
+  const state: GameState = {
+    ...fallback,
+    quoteFreshness: summarizeQuoteFreshness(artistIds, completions, getMarketDate()),
+    ...(currentCorrections.length ? { valuationNotice: { date: getMarketDate(), artistCount: currentCorrections.length } } : {}),
+    artists: typedArtists.map((artist) =>
+      mapArtist(
+        artist,
+        statsByArtist[artist.id] ?? null,
+        historyByArtist[artist.id] ?? [],
+        imageByArtistId.get(artist.id)
+      )
+    ),
+    holdings: [],
+    shortPositions: [],
+    transactions: [],
+    lastUpdatedAt: getMarketDate()
+  };
+  return { state, artistIds };
 }

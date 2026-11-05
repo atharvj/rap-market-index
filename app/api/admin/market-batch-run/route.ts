@@ -1,3 +1,4 @@
+import { readJsonObject } from "@/server/request-body";
 import { readAutomationResponse, automationFailureStatus } from "@/server/market/automation-response";
 import { NextResponse } from "next/server";
 import { createServiceRoleClient, getSupabaseConfigStatus } from "@/lib/supabase/server";
@@ -309,7 +310,7 @@ export async function POST(request: Request) {
 
 async function parseBody(request: Request): Promise<MarketBatchRunBody> {
   try {
-    return (await request.json()) as MarketBatchRunBody;
+    return await readJsonObject(request) as MarketBatchRunBody;
   } catch {
     return {};
   }

@@ -1,3 +1,4 @@
+import { readJsonObject } from "@/server/request-body";
 import { readAutomationResponse, automationFailureStatus } from "@/server/market/automation-response";
 import { NextResponse } from "next/server";
 import { createServiceRoleClient, getSupabaseConfigStatus } from "@/lib/supabase/server";
@@ -264,7 +265,7 @@ async function runEventScan({
 
 async function parseBody(request: Request): Promise<MarketRunNowBody> {
   try {
-    return (await request.json()) as MarketRunNowBody;
+    return await readJsonObject(request) as MarketRunNowBody;
   } catch {
     return {};
   }

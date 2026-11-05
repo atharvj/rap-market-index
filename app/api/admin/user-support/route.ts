@@ -1,3 +1,4 @@
+import { readJsonObject } from "@/server/request-body";
 import { NextResponse } from "next/server";
 import { getEmailDomainWarning } from "@/lib/email-address";
 import type { Json } from "@/lib/supabase/database.types";
@@ -195,7 +196,7 @@ export async function PATCH(request: Request) {
   }
 
   try {
-    const body = await request.json() as {
+    const body = await readJsonObject(request) as {
       action?: SupportAction;
       userId?: string;
       reason?: string;

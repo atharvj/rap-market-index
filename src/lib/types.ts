@@ -75,6 +75,7 @@ export type Transaction = {
 };
 
 export type GameState = {
+  quoteFreshness?: import("./quote-freshness").QuoteFreshness;
   valuationNotice?: { date: string; artistCount: number };
   userId: string;
   username: string;

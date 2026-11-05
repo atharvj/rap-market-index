@@ -1,6 +1,10 @@
 name: Quality and security
 
 on:
+  schedule:
+    # Exercise production and check new advisories even when no code is pushed.
+    - cron: "43 16 * * *"
+  workflow_dispatch:
   push:
     branches: [main]
   pull_request:
@@ -37,8 +41,8 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Audit production dependencies
-        run: npm audit --omit=dev --audit-level=high
+      - name: Audit dependencies
+        run: npm audit --audit-level=high
 
       - name: Validate operations scripts
         run: bash -n scripts/*.sh
@@ -57,6 +61,10 @@ jobs:
 
       - name: Run browser and authorization tests
         run: npm run test:e2e
+
+      - name: Verify public quotes and all artist graphs
+        if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+        run: node scripts/check-market-readiness.mjs
 
       - name: Upload browser failure artifacts
         if: failure()

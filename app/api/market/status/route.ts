@@ -1,3 +1,4 @@
+import { allowDemoMarket, MARKET_ERROR_HEADERS } from "@/server/market/public-response";
 import { parseTradingStatus, type TradingStatusRow } from "@/server/market/trading-status";
 import { NextResponse } from "next/server";
 import { createAnonServerClient, createServiceRoleClient, getSupabaseConfigStatus } from "@/lib/supabase/server";
@@ -16,11 +17,20 @@ export async function GET(request: Request) {
   const artistId = url.searchParams.get("artistId");
 
   if (!config.readyForPublicReads) {
+    if (!allowDemoMarket()) {
+      return NextResponse.json({ ok: false, source: "supabase", error: "Market data is temporarily unavailable." },
+        { status: 503, headers: MARKET_ERROR_HEADERS });
+    }
     return NextResponse.json({
       ok: true,
       source: "mock",
       status: buildFallbackStatus({ artistId })
     }, { headers: CACHE_HEADERS });
+  }
+
+  if (!config.serviceRoleConfigured) {
+    return NextResponse.json({ ok: false, source: "supabase", status: buildUnavailableStatus({ artistId }),
+      error: "Market status is temporarily unavailable." }, { status: 503, headers: MARKET_ERROR_HEADERS });
   }
 
   try {
@@ -61,7 +71,7 @@ export async function GET(request: Request) {
       source: "fallback",
       warning: "Market status is temporarily unavailable.",
       status: buildUnavailableStatus({ artistId })
-    }, { status: 503, headers: CACHE_HEADERS });
+    }, { status: 503, headers: MARKET_ERROR_HEADERS });
   }
 }
 

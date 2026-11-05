@@ -118,3 +118,17 @@ describe("market model validation", () => {
     expect(result.note).toContain("Do not claim measured predictive accuracy");
   });
 });
+
+it("does not call legacy unverified outcomes measured merely because they are numerous",()=>{
+  const signals:ValidationSignalSnapshot[]=[];const rows:ValidationAudienceObservation[]=[];
+  const day=(index:number)=>new Date(Date.UTC(2025,0,1+index)).toISOString().slice(0,10);
+  for(let i=0;i<30;i++)for(let j=0;j<10;j++){
+    const artistId=`artist-${i}-${j}`;signals.push({...snapshot(artistId,j+1),sourceDate:day(i*7)});
+    for(const [offset,value]of [[-7,100],[0,200],[7,400]])rows.push({artistId,source:"lastfm",metric:"playcount",observedDate:day(i*7+offset),value});
+  }
+  const legacy=evaluateMarketModel({snapshots:signals,observations:rows});
+  expect(legacy.sampleCount).toBe(300);expect(legacy.nonOverlappingSignalDateCount).toBeGreaterThanOrEqual(8);
+  expect(legacy.status).toBe("collecting");expect(legacy.asOfVerifiedSampleCount).toBe(0);
+  const verified=evaluateMarketModel({snapshots:signals.map(s=>({...s,pricedAt:s.sourceDate+"T18:00:00Z"})),observations:rows.map(r=>({...r,observedAt:r.observedDate+"T12:00:00Z"}))});
+  expect(verified.status).toBe("measured");expect(verified.asOfVerifiedSignalDateCount).toBe(30);
+});

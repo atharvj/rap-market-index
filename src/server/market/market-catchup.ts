@@ -1,3 +1,4 @@
+import { QUOTE_STALE_AFTER_MS } from "@/lib/quote-freshness";
 import "server-only";
 import type { createServiceRoleClient } from "@/lib/supabase/server";
 import { loadAllPages } from "@/lib/pagination";
@@ -8,7 +9,7 @@ import { readAutomationResponse } from "@/server/market/automation-response";
 import { reportServerError } from "@/server/observability";
 
 const PRODUCTION_ORIGIN = "https://rap-market-index.vercel.app";
-const STALE_AFTER_MS = 30 * 60 * 1000;
+
 
 export function hasStaleMarketCoverage(artistIds: string[], rows: Array<{ artist_id: string; observed_at: string }>, now = Date.now()) {
   const latest = new Map<string, number>();
@@ -18,7 +19,7 @@ export function hasStaleMarketCoverage(artistIds: string[], rows: Array<{ artist
   }
   return artistIds.some(id => {
     const time = latest.get(id);
-    return time === undefined || time > now + 60_000 || now - time >= STALE_AFTER_MS;
+    return time === undefined || time > now + 60_000 || now - time >= QUOTE_STALE_AFTER_MS;
   });
 }
 

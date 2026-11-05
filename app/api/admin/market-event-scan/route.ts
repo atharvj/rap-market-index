@@ -1,3 +1,4 @@
+import { readJsonObject } from "@/server/request-body";
 import { NextResponse } from "next/server";
 import { createServiceRoleClient, getSupabaseConfigStatus } from "@/lib/supabase/server";
 import { requireAdminRequest } from "@/server/admin-auth";
@@ -445,7 +446,7 @@ function mergedEventsPreview(
 
 async function parseBody(request: Request): Promise<MarketEventScanBody> {
   try {
-    return (await request.json()) as MarketEventScanBody;
+    return await readJsonObject(request) as MarketEventScanBody;
   } catch {
     return {};
   }

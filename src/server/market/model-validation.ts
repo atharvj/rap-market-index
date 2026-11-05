@@ -38,6 +38,8 @@ export type MarketModelValidation = {
   minimumRecommendedIndependentDates: number;
   predictionSources: Record<string, number>;
   asOfVerifiedSampleCount: number;
+  asOfVerifiedSignalDateCount: number;
+  verifiedNonOverlappingSignalDateCount: number;
   topBottomAudienceLift: number | null;
   averageMetricsPerSample: number;
   sourceMetricSampleCounts: Record<string, number>;
@@ -106,7 +108,13 @@ export function evaluateMarketModel({
   const balancedAccuracy = positiveOutcomes.length && negativeOutcomes.length ? 50 * (
     positiveOutcomes.filter(sample => sample.prediction > 0).length / positiveOutcomes.length +
     negativeOutcomes.filter(sample => sample.prediction < 0).length / negativeOutcomes.length) : null;
-  const status = getValidationStatus(samples.length, distinctSignalDateCount, independentDates.length);
+  const verifiedSamples = samples.filter(sample => sample.asOfVerified);
+  const verifiedDates = [...new Set(verifiedSamples.map(sample => sample.sourceDate))].sort();
+  const independentVerifiedDates: string[] = [];
+  for (const date of verifiedDates) {
+    if (!independentVerifiedDates.length || getDateDistanceDays(independentVerifiedDates.at(-1)!, date) >= 2 * (safeHorizonDays + DATE_TOLERANCE_DAYS)) independentVerifiedDates.push(date);
+  }
+  const status = getValidationStatus(verifiedSamples.length, verifiedDates.length, independentVerifiedDates.length);
 
   return {
     status,
@@ -128,7 +136,9 @@ export function evaluateMarketModel({
     nonOverlappingSignalDateCount: independentDates.length,
     minimumRecommendedIndependentDates: MINIMUM_INDEPENDENT_DATES,
     predictionSources: samples.reduce<Record<string, number>>((counts, sample) => { counts[sample.predictionSource] = (counts[sample.predictionSource] ?? 0) + 1; return counts; }, {}),
-    asOfVerifiedSampleCount: samples.filter(sample => sample.asOfVerified).length,
+    asOfVerifiedSampleCount: verifiedSamples.length,
+    asOfVerifiedSignalDateCount: verifiedDates.length,
+    verifiedNonOverlappingSignalDateCount: independentVerifiedDates.length,
     topBottomAudienceLift: getTopBottomLift(samples),
     averageMetricsPerSample: samples.length
       ? round(samples.reduce((total, sample) => total + sample.metricCount, 0) / samples.length, 2)
@@ -136,8 +146,8 @@ export function evaluateMarketModel({
     sourceMetricSampleCounts,
     minimumRecommendedSamples: MINIMUM_RECOMMENDED_SAMPLES,
     minimumRecommendedDates: MINIMUM_RECOMMENDED_DATES,
-    note: getValidationNote(status, samples.length, distinctSignalDateCount) +
-      ` ${independentDates.length} non-overlapping outcome windows; ${MINIMUM_INDEPENDENT_DATES} recommended. Measurement is not proof of predictive skill; compare the balanced result and majority-direction benchmark. Adjacent weekly outcomes overlap.`
+    note: getValidationNote(status, verifiedSamples.length, verifiedDates.length) +
+      ` Readiness uses only as-of-verified outcomes: ${independentVerifiedDates.length} non-overlapping verified windows; ${MINIMUM_INDEPENDENT_DATES} recommended. Measurement is not proof of predictive skill; compare the balanced result and majority-direction benchmark. Adjacent weekly outcomes overlap.`
   };
 }
 
@@ -398,7 +408,8 @@ function getDateDistanceDays(start: string, end: string) {
 }
 
 function isValidDate(value: string) {
-  return /^\d{4}-\d{2}-\d{2}$/.test(value) && !Number.isNaN(new Date(`${value}T00:00:00.000Z`).getTime());
+  const date = new Date(`${value}T00:00:00.000Z`);
+  return /^\d{4}-\d{2}-\d{2}$/.test(value) && Number.isFinite(date.getTime()) && date.toISOString().slice(0, 10) === value;
 }
 
 function round(value: number, digits: number) {

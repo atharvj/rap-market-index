@@ -1,3 +1,4 @@
+import { readJsonObject } from "@/server/request-body";
 import { NextResponse } from "next/server";
 import { createAnonServerClient, createServiceRoleClient, getSupabaseConfigStatus } from "@/lib/supabase/server";
 import { isAdminEmail } from "@/server/admin-auth";
@@ -165,7 +166,7 @@ function wasRecentlyAuthenticated(lastSignInAt: string | undefined) {
 
 async function parseBody(request: Request): Promise<DeleteProfileBody> {
   try {
-    return await request.json() as DeleteProfileBody;
+    return await readJsonObject(request) as DeleteProfileBody;
   } catch {
     return {};
   }

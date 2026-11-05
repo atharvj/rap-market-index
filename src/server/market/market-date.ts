@@ -1,4 +1,5 @@
-export const MARKET_TIME_ZONE = "America/New_York";
+import { MARKET_TIME_ZONE } from "@/lib/market-time";
+export { MARKET_TIME_ZONE };
 
 export function getMarketDate(now = new Date()) {
   const parts = new Intl.DateTimeFormat("en-US", {

@@ -1,3 +1,4 @@
+import { readJsonObject } from "@/server/request-body";
 import { NextResponse } from "next/server";
 import { getUsernameValidationError, normalizeUsernameInput, normalizeUsernameKey } from "@/lib/username";
 import { createServiceRoleClient, getSupabaseConfigStatus } from "@/lib/supabase/server";
@@ -68,7 +69,7 @@ export async function POST(request: Request) {
 
 async function parseBody(request: Request): Promise<{ username?: unknown }> {
   try {
-    return await request.json() as { username?: unknown };
+    return await readJsonObject(request) as { username?: unknown };
   } catch {
     return {};
   }

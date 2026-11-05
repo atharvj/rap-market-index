@@ -1,3 +1,4 @@
+import { readJsonObject } from "@/server/request-body";
 import { NextResponse } from "next/server";
 import {
   createServiceRoleClient,
@@ -213,7 +214,7 @@ async function getRequestContext(request: Request) {
 
 async function parseBody(request: Request): Promise<WatchlistBody> {
   try {
-    return (await request.json()) as WatchlistBody;
+    return await readJsonObject(request) as WatchlistBody;
   } catch {
     return {};
   }

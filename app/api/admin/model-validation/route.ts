@@ -196,7 +196,7 @@ async function loadAudienceObservations({
     );
   });
 
-  return rows.map<ValidationAudienceObservation>((row) => ({
+  return rows.filter(row => row.value !== null && Number.isFinite(Number(row.value))).map<ValidationAudienceObservation>((row) => ({
     artistId: row.artist_id,
     source: row.source,
     metric: row.metric,
