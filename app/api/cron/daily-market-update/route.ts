@@ -80,11 +80,14 @@ export async function GET(request: Request) {
   const dryRun = url.searchParams.get("dryRun") === "1";
   const runDate = normalizeDate(url.searchParams.get("runDate")) ?? getMarketDate();
   const source = normalizeSource(process.env.MARKET_CRON_SOURCE);
-  const artistLimit = getInteger(process.env.MARKET_CRON_ARTIST_LIMIT, DEFAULT_ARTIST_LIMIT, 1, 100);
+  const configuredArtistLimit = getInteger(process.env.MARKET_CRON_ARTIST_LIMIT, DEFAULT_ARTIST_LIMIT, 1, 100);
   const maxBatches = getInteger(process.env.MARKET_CRON_MAX_BATCHES, DEFAULT_MAX_BATCHES, 1, 10);
   const accountCooldownCleanup = await runAccountCooldownCleanup();
   const existing = await loadExistingRun(runDate);
   const coverage = await loadRunCoverage(runDate);
+  // Legacy 25-artist settings required several slow child requests and exceeded
+  // the outer function's five-minute limit. The current roster fits one batch.
+  const artistLimit = Math.max(configuredArtistLimit, Math.min(100, coverage.activeArtistCount));
 
   if (!dryRun && !force && existing) {
     const decision = getMarketRunSkipDecision({

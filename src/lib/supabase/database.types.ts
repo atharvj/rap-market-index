@@ -603,6 +603,13 @@ export type Database = {
       };
     };
     Functions: {
+      get_previous_market_signals: {
+        Args: { p_artist_ids: string[]; p_before_date: string };
+        Returns: Array<{ artist_id: string; source_date: string; streaming_growth: number;
+          youtube_growth: number; search_growth: number; social_growth: number;
+          news_score: number; trader_demand: number; event_pricing: Json;
+          source_values: Json; reception_pricing: Json; comment_reception: Json }>;
+      };
       persist_market_quote_batch: {
         Args: { p_run_date: string; p_stats: Json; p_signals: Json; p_history: Json; p_quotes: Json;
           p_ticks: Json; p_pricing_state: Json; p_comparison_prices: Json; p_intraday?: boolean };

@@ -1,5 +1,6 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
+import { writeJsonArray } from "./stream-json-array.mjs";
 import { createClient } from "@supabase/supabase-js";
 
 const exportDirectory = process.env.BACKUP_EXPORT_DIR?.trim();
@@ -25,6 +26,8 @@ const tables = [
   "market_events",
   "market_signal_snapshots",
   "market_update_runs",
+  "market_valuation_boundaries",
+  "product_analytics_events",
   "holdings",
   "short_positions",
   "transactions",
@@ -35,6 +38,13 @@ const tables = [
   "blocked_signup_email_domains",
   "user_feedback"
 ];
+
+const TABLE_ORDER = {
+  artist_stats: ["artist_id"], artist_external_ids: ["artist_id"],
+  market_valuation_boundaries: ["artist_id", "effective_date"],
+  holdings: ["user_id", "artist_id"], short_positions: ["user_id", "artist_id"],
+  watchlist: ["user_id", "artist_id"], api_rate_limits: ["scope", "key_hash"]
+};
 
 const pageSize = 1_000;
 const outputRoot = resolve(exportDirectory);
@@ -48,11 +58,13 @@ await mkdir(resolve(outputRoot, "storage", "files"), { recursive: true, mode: 0o
 await mkdir(resolve(outputRoot, "schema"), { recursive: true, mode: 0o700 });
 
 const tableCounts = {};
+const tableChecksums = {};
 
 for (const table of tables) {
-  const rows = await exportTable(table);
-  tableCounts[table] = rows.length;
-  await writePrivateJson(resolve(outputRoot, "tables", `${table}.json`), rows);
+  const exported = await writeJsonArray(resolve(outputRoot, "tables", `${table}.json`), exportTable(table));
+  tableCounts[table] = exported.rowCount;
+  tableChecksums[table] = exported.sha256;
+  process.stdout.write(`Exported ${table}: ${exported.rowCount} rows.\n`);
 }
 
 const authUsers = await exportAuthUsers();
@@ -73,10 +85,12 @@ const manifest = {
   projectHost: new URL(supabaseUrl).host,
   gitCommit: process.env.GITHUB_SHA?.trim() || null,
   tableCounts,
+  tableChecksums,
   authUserCount: authUsers.length,
   storageBucketCount: storage.buckets.length,
   storageObjectCount: storage.objects.length,
   limitations: [
+    "Rows are paginated from the live database, not a transactionally consistent point-in-time snapshot.",
     "Auth user records do not include password hashes or active sessions.",
     "Database functions, triggers, policies, and schema are restored from the tracked Supabase migrations."
   ]
@@ -88,24 +102,15 @@ process.stdout.write(
   + `${authUsers.length} auth users, and ${storage.objects.length} storage objects.\n`
 );
 
-async function exportTable(table) {
-  const rows = [];
 
+async function* exportTable(table) {
   for (let offset = 0; ; offset += pageSize) {
-    const { data, error } = await supabase
-      .from(table)
-      .select("*")
-      .range(offset, offset + pageSize - 1);
-
-    if (error) {
-      throw new Error(`Could not export public.${table}: ${error.message}`);
-    }
-
-    rows.push(...(data ?? []));
-
-    if (!data || data.length < pageSize) {
-      return rows;
-    }
+    let query = supabase.from(table).select("*");
+    for (const column of TABLE_ORDER[table] ?? ["id"]) query = query.order(column);
+    const { data, error } = await query.range(offset, offset + pageSize - 1);
+    if (error) throw new Error(`Could not export public.${table}: ${error.message}`);
+    yield data ?? [];
+    if (!data || data.length < pageSize) return;
   }
 }
 

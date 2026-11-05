@@ -183,29 +183,20 @@ export async function loadPreviousSignalStats({
   }
 
   const result: Record<string, HypeStats & { previousEventPricing?: unknown; previousReceptionBaseline?: Record<string, number> }> = {};
-  // Query unresolved artists again: a busy artist must not crowd an older
-  // artist's baseline out of PostgREST's first 1,000 rows.
-  let pending = [...new Set(artistIds)];
-  while (pending.length) {
-    const { data, error } = await supabase.from("market_signal_snapshots")
-      .select("artist_id,source_date,streaming_growth,youtube_growth,search_growth,social_growth,news_score,trader_demand,event_pricing:raw_payload->market_events,source_values:raw_payload->sourceValues,reception_pricing:raw_payload->receptionPricingBaseline,comment_reception:raw_payload->youtube_comments")
-      .in("artist_id", pending).lt("source_date", runDate)
-      .order("source_date", { ascending: false }).order("artist_id").limit(1000);
-    if (error) throw new Error(`Could not load previous signal snapshots: ${error.message}`);
-    for (const row of data ?? []) {
-      if (result[row.artist_id]) continue;
-      result[row.artist_id] = {
-        streamingGrowth: Number(row.streaming_growth), youtubeGrowth: Number(row.youtube_growth),
-        searchGrowth: Number(row.search_growth), socialGrowth: Number(row.social_growth),
-        newsScore: Number(row.news_score), traderDemand: Number(row.trader_demand),
-        previousEventPricing: row.event_pricing,
-        previousReceptionBaseline: readReceptionBaseline(row.reception_pricing, row.source_values, row.comment_reception)
-      };
-    }
-    const remaining = pending.filter(id => !result[id]);
-    if ((data ?? []).length < 1000) break;
-    if (remaining.length === pending.length) throw new Error("Could not resolve previous signal snapshots completely.");
-    pending = remaining;
+  // The database uses the (artist_id, source_date) unique index to select
+  // one prior row per artist before reading its JSON evidence.
+  const { data, error } = await supabase.rpc("get_previous_market_signals", {
+    p_artist_ids: [...new Set(artistIds)], p_before_date: runDate
+  });
+  if (error) throw new Error(`Could not load previous signal snapshots: ${error.message}`);
+  for (const row of data ?? []) {
+    result[row.artist_id] = {
+      streamingGrowth: Number(row.streaming_growth), youtubeGrowth: Number(row.youtube_growth),
+      searchGrowth: Number(row.search_growth), socialGrowth: Number(row.social_growth),
+      newsScore: Number(row.news_score), traderDemand: Number(row.trader_demand),
+      previousEventPricing: row.event_pricing,
+      previousReceptionBaseline: readReceptionBaseline(row.reception_pricing, row.source_values, row.comment_reception)
+    };
   }
   return result;
 }

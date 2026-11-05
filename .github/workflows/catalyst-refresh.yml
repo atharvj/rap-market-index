@@ -30,7 +30,7 @@ jobs:
           fi
 
           rmi_response_file="$(mktemp)"
-          trap 'rm -f "$rmi_response_file"' EXIT
+          trap 'rmi_exit=$?; if [ "$rmi_exit" -ne 0 ]; then jq -c "{ok,stage,error}" "$rmi_response_file" 2>/dev/null || true; fi; rm -f "$rmi_response_file"' EXIT
 
           # Recover a missed midnight opening before refreshing intraday quotes.
           # The endpoint skips immediately once today's verified daily run exists.

@@ -30,7 +30,7 @@ jobs:
           fi
 
           rmi_response_file="$(mktemp)"
-          trap 'rm -f "$rmi_response_file"' EXIT
+          trap 'rmi_exit=$?; if [ "$rmi_exit" -ne 0 ]; then jq -c "{ok,stage,error}" "$rmi_response_file" 2>/dev/null || true; fi; rm -f "$rmi_response_file"' EXIT
 
           curl --output "$rmi_response_file" --fail-with-body --silent --show-error --max-time 295 \
             --retry 3 \
