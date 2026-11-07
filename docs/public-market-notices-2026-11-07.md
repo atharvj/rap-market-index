@@ -36,3 +36,11 @@ snapshots that actually contain a correction. The reader now selects only the
 correction and pre-correction price instead of downloading whole evidence JSON.
 Legacy fallback, correction validation, conflict detection and permanent ledger
 records remain; no history is discarded to avoid the query.
+
+The next recovery exposed a five-minute release-window timeout before the daily
+worker started: publisher discovery was blocking the opening. The release-window
+wrapper now invokes the existing daily quote worker directly and verifies the
+completed run/roster coverage. Dedicated news and catalyst workers continue
+discovery; current daily prices still use recorded verified events and current
+audience measurements. The distributed automation guard and closed-on-failure
+trading behavior remain.

@@ -4,7 +4,7 @@ on:
   schedule:
     # These slots cover midnight Eastern across daylight and standard time.
     # The endpoint is idempotent, so later slots become recovery attempts and
-    # return immediately after a successful release scan and market update.
+    # return immediately after a successful verified market update.
     - cron: "7 4,5,6 * * *"
   workflow_dispatch:
 
@@ -20,7 +20,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 12
     steps:
-      - name: Scan releases, update quotes, and reopen trading
+      - name: Update daily quotes and reopen trading
         env:
           MARKET_UPDATE_SECRET: ${{ secrets.MARKET_UPDATE_SECRET }}
         run: |

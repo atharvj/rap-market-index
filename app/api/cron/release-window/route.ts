@@ -54,7 +54,7 @@ export async function GET(request: Request) {
       ok: true,
       skipped: true,
       runDate,
-      reason: "Today's release scan and market update already completed."
+      reason: "Today's verified market update already completed."
     });
   }
 
@@ -65,35 +65,14 @@ export async function GET(request: Request) {
   } catch {
     return NextResponse.json({ ok: false, runDate, error: "Market automation locking is unavailable; retry shortly." }, { status: 503 });
   }
-  const eventScanResponse = await fetch(new URL("/api/admin/market-event-scan", request.url), {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-      "x-market-update-secret": secret
-    },
-    body: JSON.stringify({
-      dryRun: false,
-      runDate,
-      artistLimit: 100,
-      includeGdelt: false,
-      includeMediaRss: true,
-      includeAiResearch: false
-    })
-  });
-  const eventScan = await readAutomationResponse(eventScanResponse);
-
-  if (!eventScanResponse.ok || eventScan.ok !== true) {
-    return NextResponse.json(
-      {
-        ok: false,
-        runDate,
-        stage: "release-scan",
-        error: eventScan.error ?? "The release scan failed; trading remains paused.",
-        eventScan
-      },
-      { status: automationFailureStatus(eventScanResponse) }
-    );
-  }
+  // Opening must not wait for publisher resolution across the whole roster.
+  // Dedicated news/catalyst workers collect and verify those events; the daily
+  // worker uses recorded verified events and current audience measurements.
+  const eventScan = {
+    ok: true,
+    disabled: true,
+    reason: "News discovery runs in the dedicated news and catalyst workers."
+  } as const;
 
   const marketUpdateResponse = await fetch(new URL("/api/cron/daily-market-update", request.url), {
     headers: { "x-market-update-secret": secret }
