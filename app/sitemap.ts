@@ -3,6 +3,7 @@ import { getInitialArtistIdentities } from "@/data/mockArtists";
 import { getSiteUrl } from "@/lib/site-metadata";
 
 const publicPages = [
+  { path: "/methodology", changeFrequency: "monthly", priority: 0.7 },
   { path: "/", changeFrequency: "daily", priority: 1 },
   { path: "/markets", changeFrequency: "daily", priority: 0.9 },
   { path: "/news", changeFrequency: "daily", priority: 0.9 },

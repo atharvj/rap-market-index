@@ -1,3 +1,4 @@
+import { readAnnouncedReleaseDate } from "@/lib/release-calendar";
 import { allowDemoMarket, MARKET_ERROR_HEADERS } from "@/server/market/public-response";
 import { NextResponse } from "next/server";
 import { isHistoricalRetrospective } from "@/server/market/article-timeliness";
@@ -75,6 +76,7 @@ type MarketNewsItem = {
     ticker: string;
   }>;
   eventDate: string;
+  announcedReleaseDate: string | null;
   publishedDate: string;
   eventType: string;
   eventLabel: string | null;
@@ -421,6 +423,7 @@ function mapMarketEventToNewsItem(
       getRawNumber(storyVideoPayload?.viewCount) ??
       getRawNumber(storyVideoPayload?.representativeViewCount) ??
       getRawNumber(storyVideoPayload?.clusterMaxViews),
+    announcedReleaseDate: readAnnouncedReleaseDate(sourcePayload),
     sentimentScore: Number(event.sentiment_score),
     impactScore: Number(event.impact_score),
     confidence: Number(event.confidence),

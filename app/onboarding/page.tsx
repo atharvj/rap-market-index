@@ -114,7 +114,7 @@ export default function OnboardingPage() {
     );
   }
 
-  async function finishOnboarding() {
+  async function finishOnboarding(destination: "trade" | "dashboard" = "trade") {
     if (!session || saving) {
       return;
     }
@@ -150,8 +150,9 @@ export default function OnboardingPage() {
         throw new Error(payload.error ?? "Could not finish onboarding.");
       }
 
-      await refreshServerState();
-      router.replace("/");
+      if (!await refreshServerState()) throw new Error("Your setup was saved. Try again to continue.");
+      const firstArtist = selectedArtists.find(id => state.artists.some(artist => artist.id === id));
+      router.replace(destination === "trade" && firstArtist ? `/artists/${encodeURIComponent(firstArtist)}?guide=first-trade&side=buy#trade` : "/");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Could not finish onboarding.");
       setSaving(false);
@@ -237,11 +238,11 @@ export default function OnboardingPage() {
       ) : null}
 
       {step === 2 ? (
-        <OnboardingStep eyebrow="Step 3 of 3" title="Start in global rankings" description="Private leagues are coming later. Your portfolio can compete globally from day one.">
+        <OnboardingStep eyebrow="Step 3 of 3" title="Review your first pick" description="Start with an artist you follow. You will review a real quote before deciding whether to place an order.">
           <div className="rmi-soft-card grid place-items-center gap-3 border-t-2 border-t-brass p-8 text-center sm:p-10">
             <Trophy className="h-8 w-8 text-brass" />
-            <p className="text-xl font-semibold">Global market access</p>
-            <p className="max-w-md text-sm leading-6 text-paper/60">Follow quotes, trade artists, and compare your fantasy return with the full RMI community.</p>
+            <p className="text-xl font-semibold">Your call, your portfolio</p>
+            <p className="max-w-md text-sm leading-6 text-paper/60">Read the quote explanation, choose a small quantity, and review trading costs. Opening the trade ticket does not place an order.</p>
           </div>
         </OnboardingStep>
       ) : null}
@@ -261,9 +262,10 @@ export default function OnboardingPage() {
           disabled={!canContinue || saving}
           className="rmi-button-primary min-h-10 text-sm disabled:opacity-40"
         >
-          {step === 2 ? saving ? "Finishing..." : "Enter RMI" : "Continue"}
+          {step === 2 ? saving ? "Finishing..." : "Review first trade" : "Continue"}
         </button>
       </div>
+      {step === 2 ? <button type="button" disabled={saving} onClick={() => void finishOnboarding("dashboard")} className="min-h-10 w-full text-sm font-semibold text-paper/60 hover:text-cyan disabled:opacity-40">Explore my dashboard first</button> : null}
     </div>
   );
 }

@@ -25,10 +25,12 @@ type TradeSide = "buy" | "sell" | "short" | "cover";
 
 export function TradeTicket({
   artist,
-  defaultSide = "buy"
+  defaultSide = "buy",
+  beginner = false
 }: {
   artist: Artist;
   defaultSide?: TradeSide;
+  beginner?: boolean;
 }) {
   const {
     buyShares,
@@ -46,7 +48,7 @@ export function TradeTicket({
   } = useGame();
   const { loading: authLoading, session } = useAuth();
   const [side, setSide] = useState<TradeSide>(defaultSide);
-  const [shares, setShares] = useState("10");
+  const [shares, setShares] = useState(() => beginner ? String(Math.max(1, Math.ceil(MIN_TRADE_VALUE / Math.max(1, artist.currentPrice)))) : "10");
   const [message, setMessage] = useState("");
   const [messageIsError, setMessageIsError] = useState(false);
   const [submitting, setSubmitting] = useState(false);

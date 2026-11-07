@@ -27,7 +27,7 @@ const navItems = [
 export function Shell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { portfolioValue, portfolioDayChange, state, isAdminUser, avatarUrl, marketReady } = useGame();
+  const { portfolioValue, portfolioDayChange, state, isAdminUser, avatarUrl, marketReady, profileLoaded } = useGame();
   const { loading: authLoading, session, user, signOut } = useAuth();
   const [accountOpen, setAccountOpen] = useState(false);
   const [appearanceOpen, setAppearanceOpen] = useState(false);
@@ -42,8 +42,10 @@ export function Shell({ children }: { children: React.ReactNode }) {
     [marketReady, state.artists]
   );
 
+  const canRenderBeforeQuotes = ["/", "/about", "/methodology", "/help", "/privacy", "/terms", "/account/confirmed", "/account/reset-password"].includes(pathname) || (!session && pathname === "/account");
+  const ownProfileReady = Boolean(session && profileLoaded && state.userId === session.user.id);
   const accountLabel =
-    session && state.username && state.username !== "Demo Guest" ? state.username : user?.email?.split("@")[0] ?? "Guest";
+    ownProfileReady && state.username && state.username !== "Demo Guest" ? state.username : user?.email?.split("@")[0] ?? "Guest";
   const portfolioDayChangePercent =
     portfolioValue - portfolioDayChange > 0 ? (portfolioDayChange / (portfolioValue - portfolioDayChange)) * 100 : 0;
 
@@ -155,7 +157,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
 
           <GlobalArtistSearch className="ml-auto hidden w-52 lg:block xl:w-72" />
 
-          {!authLoading && session ? (
+          {!authLoading && session && profileLoaded && state.userId === session.user.id ? (
             <Link
               href="/portfolio"
               className="rmi-metric hidden min-h-10 items-center gap-4 px-3 py-1.5 text-xs hover:border-cyan xl:flex"
@@ -186,7 +188,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
                 aria-haspopup="menu"
                 aria-expanded={accountOpen}
               >
-                <UserAvatar avatarUrl={avatarUrl} label={accountLabel} size="sm" />
+                <UserAvatar avatarUrl={ownProfileReady ? avatarUrl : ""} label={accountLabel} size="sm" />
               </button>
             ) : (
               <div className="flex items-center gap-1.5 sm:gap-2">
@@ -211,11 +213,11 @@ export function Shell({ children }: { children: React.ReactNode }) {
                 role="menu"
               >
                 <div className="flex items-center gap-3 border-b border-line pb-3">
-                  <UserAvatar avatarUrl={avatarUrl} label={accountLabel} />
+                  <UserAvatar avatarUrl={ownProfileReady ? avatarUrl : ""} label={accountLabel} />
                   <div className="min-w-0">
                     <div className="flex items-center gap-2">
                       <p className="truncate text-sm font-bold">{accountLabel}</p>
-                      {isAdminUser ? <AdminBadge compact /> : null}
+                      {ownProfileReady && isAdminUser ? <AdminBadge compact /> : null}
                     </div>
                     <p className="mt-0.5 text-xs font-medium text-paper/45">RMI Trader</p>
                   </div>
@@ -296,7 +298,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
       ) : null}
 
       <main className="mx-auto w-full max-w-[1440px] flex-1 px-4 py-6 sm:px-6 lg:px-8">
-        {marketReady ? <>{children}</> : <MarketBootPlaceholder pathname={pathname} />}
+        {marketReady || canRenderBeforeQuotes ? <>{children}</> : <MarketBootPlaceholder pathname={pathname} />}
       </main>
       <SiteFooter />
     </div>
@@ -399,6 +401,7 @@ function SiteFooter() {
             How the market works
           </Link>
           <div className="mt-3 flex gap-4 text-xs font-medium text-paper/50">
+            <Link href="/methodology" className="hover:text-cyan">Pricing rules</Link>
             <Link href="/help" className="hover:text-cyan">Help</Link>
             <Link href="/privacy" className="hover:text-cyan">Privacy</Link>
             <Link href="/terms" className="hover:text-cyan">Terms</Link>

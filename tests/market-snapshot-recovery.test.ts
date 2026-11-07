@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-const mocks = vi.hoisted(() => ({ after: vi.fn(), recover: vi.fn(), error: null as unknown, ready: true, revisions: [] as number[] }));
+const mocks = vi.hoisted(() => ({ after: vi.fn(), recover: vi.fn(), error: null as unknown, ready: true, revisions: [] as number[], completions: [] as Record<string, unknown>[] }));
 vi.mock("next/server", async original => ({ ...await original<typeof import("next/server")>(), after: mocks.after }));
 vi.mock("@/server/market/market-catchup", () => ({ recoverStaleMarket: mocks.recover }));
 vi.mock("@/server/observability", () => ({ reportServerError: vi.fn() }));
@@ -7,13 +7,13 @@ vi.mock("@/server/market/artist-images", () => ({ loadArtistImageUrls: async () 
 vi.mock("@/server/market/chart-adjustments", () => ({ loadChartAdjustments: async () => ({}) }));
 vi.mock("@/lib/supabase/server", () => ({ getSupabaseConfigStatus: () => ({ readyForPublicReads: mocks.ready, serviceRoleConfigured: true }), createServiceRoleClient: () => ({ from(table: string) {
   const revision = table === "artists" ? (mocks.revisions.shift() ?? 1) : 1;
-  const rows = table === "artists" ? [{ updated_at: String(revision), id: "a", name: "Artist", ticker: "ART", current_price: 49 + revision, previous_close: 49, daily_change_percent: 2, hype_score: 50, volatility: 1, category: "mainstream" }] : [];
+  const rows = table === "artists" ? [{ updated_at: String(revision), id: "a", name: "Artist", ticker: "ART", current_price: 49 + revision, previous_close: 49, daily_change_percent: 2, hype_score: 50, volatility: 1, category: "mainstream" }] : table === "market_observations" ? mocks.completions : [];
   const builder = { select: () => builder, eq: () => builder, in: () => builder, gte: () => builder, order: () => builder,
     range: async () => ({ data: rows, error: mocks.error }), then: (resolve: (value: unknown) => unknown) => Promise.resolve({ data: rows, error: mocks.error }).then(resolve) };
   return builder;
 } }) }));
 import { GET } from "../app/api/market/snapshot/route";
-beforeEach(() => { mocks.after.mockReset(); mocks.recover.mockReset().mockResolvedValue(undefined); mocks.error = null; mocks.ready = true; mocks.revisions = []; vi.stubEnv("VERCEL_ENV", "production"); });
+beforeEach(() => { mocks.after.mockReset(); mocks.recover.mockReset().mockResolvedValue(undefined); mocks.error = null; mocks.ready = true; mocks.revisions = []; mocks.completions = []; vi.stubEnv("VERCEL_ENV", "production"); });
 afterEach(() => vi.unstubAllEnvs());
 describe("public snapshot background recovery", () => {
   it("returns the verified market response before executing recovery", async () => {
@@ -45,4 +45,12 @@ it("does not cache or publish a mixed snapshot if quotes keep changing",async()=
   mocks.revisions=[1,2,3,4];
   const response=await GET();expect(response.status).toBe(500);expect(response.headers.get("cache-control")).toBe("no-store");
   expect(mocks.after).not.toHaveBeenCalled();
+});
+it("exposes the version actually recorded with a published artist quote", async () => {
+  const { getMarketDate } = await import("@/server/market/market-date");
+  const observedAt = new Date(Date.now() - 60_000).toISOString();
+  mocks.completions = [{ artist_id: "a", observed_date: getMarketDate(), observed_at: observedAt, model_version: "recorded-model-v1" }];
+  const response = await GET();
+  expect(response.status).toBe(200);
+  expect((await response.json()).state.artists[0]).toMatchObject({ quoteAsOf: observedAt, quoteModelVersion: "recorded-model-v1" });
 });
