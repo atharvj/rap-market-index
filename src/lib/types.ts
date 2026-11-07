@@ -47,8 +47,6 @@ export type Artist = {
   stats: HypeStats;
   priceHistory: PricePoint[];
   lastMoveExplanation: string;
-  quoteAsOf?: string;
-  quoteModelVersion?: string;
 };
 
 export type Holding = {

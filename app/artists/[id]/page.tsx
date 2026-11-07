@@ -1,6 +1,5 @@
 "use client";
 
-import { ArtistQuoteExplanation } from "@/components/ArtistQuoteExplanation";
 import { ArtistAvatar } from "@/components/ArtistAvatar";
 import { AverageFillInfo } from "@/components/AverageFillInfo";
 import { ArtistAudienceSnapshot } from "@/components/ArtistAudienceSnapshot";
@@ -103,8 +102,6 @@ export default function ArtistDetailPage() {
           </div>
         </section>
 
-        <ArtistQuoteExplanation artist={activeArtist} />
-
         <ArtistPriceHistoryPanel artistId={artist.id} fallbackData={artist.priceHistory} />
 
         <section className="grid grid-cols-2 gap-2 sm:grid-cols-4">
@@ -138,16 +135,15 @@ export default function ArtistDetailPage() {
           </RmiSection>
         ) : null}
 
-        <div id="artist-market-news" className="scroll-mt-24"><RmiSection title="Market News">
+        <RmiSection title="Market News">
           <div className="px-4">
             <MarketNewsFeed artistId={artist.id} limit={6} compact />
           </div>
-        </RmiSection></div>
+        </RmiSection>
       </main>
 
       <aside className="min-w-0 space-y-4 lg:sticky lg:top-4 lg:max-h-[calc(100vh-2rem)] lg:self-start lg:overflow-y-auto lg:pr-1 scrollbar-thin">
-        {searchParams.get("guide") === "first-trade" ? <section className="rmi-card p-4" aria-label="First trade guide"><h2 className="text-lg font-semibold">Review your first trade</h2><ol className="mt-3 list-decimal space-y-2 pl-4 text-sm leading-6 text-paper/65"><li>Read the quote explanation and public indicators.</li><li>Choose a small quantity and review the spread, commission and estimated total.</li><li>Submit only when you are ready. You can leave this screen without placing an order.</li></ol></section> : null}
-        <TradeTicket key={`${artist.id}:${searchParams.get("guide") === "first-trade" ? "first" : "normal"}`} artist={activeArtist} defaultSide={defaultTradeSide} beginner={searchParams.get("guide") === "first-trade"} />
+        <TradeTicket artist={activeArtist} defaultSide={defaultTradeSide} />
         {holding ? (
           <RmiSection title="Your Position">
             <div className="space-y-2 p-4 text-sm">
@@ -219,7 +215,7 @@ function SignalBreakdown({
       <p className="mb-3 text-xs leading-5 text-paper/45">
         {buildingBaseline
           ? "Building the first source baseline. The quote stays at its verified opening value until later observations provide a real change to measure."
-          : "Weighted contributions to current RMI Momentum. Audience response uses official-channel audience growth plus sampled public reaction when available; it is not a full-internet sentiment poll. A neutral input can reflect balanced evidence, an unchanged baseline or insufficient data. The dated indicators show what is available. These are score contributions, not exact percentages of the price change."}
+          : "Weighted contributions to current RMI Momentum. Audience response uses official-channel audience growth plus sampled public reaction when available; it is not a full-internet sentiment poll. Flat means the measured input has not materially changed from its baseline—not that its data is missing."}
       </p>
       <div className="grid gap-2 sm:grid-cols-2">
         {visibleDrivers.map((driver) => {
@@ -233,7 +229,7 @@ function SignalBreakdown({
               <div className="flex items-center justify-between gap-3 text-xs">
                 <span className="font-semibold text-paper/60">{driver.label}</span>
                 <span className={`font-semibold number-tabular ${textTone}`}>
-                  {driver.contribution === 0 ? "Neutral" : formatArtistMomentumContribution(driver.contribution)}
+                  {formatArtistMomentumContribution(driver.contribution)}
                 </span>
               </div>
               <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-paper/10" aria-hidden="true">

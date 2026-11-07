@@ -1,7 +1,5 @@
 "use client";
 
-import { GuestWelcome } from "@/components/home/GuestWelcome";
-import { PersonalMarketHome } from "@/components/home/PersonalMarketHome";
 import { useAuth } from "@/components/AuthProvider";
 import { useGame } from "@/components/GameProvider";
 import { ArtistIdentity, ChangeText, RmiButton, RmiSection } from "@/components/RmiPrimitives";
@@ -17,16 +15,7 @@ import { useMemo } from "react";
 
 export default function HomePage() {
   const { session } = useAuth();
-  const { marketReady, state } = useGame();
-  return <div className="space-y-6">
-    {session ? <PersonalMarketHome key={session.user.id} /> : <GuestWelcome />}
-    {marketReady && state.artists.length ? <MarketOverview /> : <section className="rmi-card p-5" aria-label="Artist market preview"><h2 className="text-lg font-semibold">Explore artist markets</h2><p className="mt-2 text-sm leading-6 text-paper/60">Discover artists, learn what drives quotes, and choose your first watchlist.</p><Link href="/markets" className="mt-4 inline-flex text-sm font-semibold text-cyan">Browse markets</Link></section>}
-  </div>;
-}
-
-function MarketOverview() {
-  const { session } = useAuth();
-  const { state } = useGame();
+  const { state, portfolioValue, portfolioDayChange, watchlistArtists } = useGame();
   const breadth = getMarketBreadth(state.artists);
   const signalDeck = useMemo(
     () =>
@@ -40,10 +29,17 @@ function MarketOverview() {
         .slice(0, 6),
     [state.artists]
   );
+  const portfolioDayPercent = portfolioValue - portfolioDayChange > 0
+    ? (portfolioDayChange / (portfolioValue - portfolioDayChange)) * 100
+    : 0;
+  const investedValue = Math.max(0, portfolioValue - state.cashBalance);
+  const investedPercent = portfolioValue > 0
+    ? Math.min(100, Math.max(0, (investedValue / portfolioValue) * 100))
+    : 0;
 
   return (
     <div className="space-y-6">
-      {!session ? <section data-testid="home-market-hero" aria-label="Top market story">
+      <section data-testid="home-market-hero" aria-label="Top market story">
         <div className="mb-3 flex items-end justify-between gap-4">
           <div>
             <p className="rmi-kicker">Top Market Story</p>
@@ -56,7 +52,7 @@ function MarketOverview() {
           </Link>
         </div>
         <MarketNewsFeed limit={1} variant="home" />
-      </section> : null}
+      </section>
 
       <section className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <HeroStat label="Active Listings" value={String(state.artists.length)} accent="cyan" icon={<Activity className="h-4 w-4" />} />
@@ -101,7 +97,7 @@ function MarketOverview() {
 
       <WatchNow />
 
-      {!session ? <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1.55fr)_minmax(300px,0.65fr)]">
+      <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1.55fr)_minmax(300px,0.65fr)]">
         <RmiSection
           title="Market Catalysts"
           subtitle="More verified music stories, ranked by impact, confidence, recency, source quality, and reach."
@@ -115,14 +111,68 @@ function MarketOverview() {
         <div className="space-y-4">
           <MarketSideRail includeWatchlist={false} listSize={5} />
 
-          <RmiSection title="Start Trading">
-            <div className="space-y-4 p-4 text-sm">
-              <p className="font-bold leading-5 text-paper/70">Create a portfolio, follow catalysts, and compete on rankings. No real money.</p>
-              <RmiButton href="/account?mode=signup">Sign up</RmiButton>
-            </div>
+          <RmiSection title={session ? "Your Portfolio" : "Start Trading"}>
+            {session ? (
+              <div className="space-y-4 p-4">
+                <div className="flex items-end justify-between gap-3">
+                  <div>
+                    <p className="rmi-data-label">Total Value</p>
+                    <p className="mt-1 text-2xl font-bold number-tabular">{formatCurrency(portfolioValue)}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="rmi-data-label">Today</p>
+                    <p className={`mt-1 text-base font-semibold number-tabular ${portfolioDayPercent >= 0 ? "text-mint" : "text-ember"}`}>
+                      {formatPercent(portfolioDayPercent)}
+                    </p>
+                  </div>
+                </div>
+                <div>
+                  <div className="mb-2 flex items-center justify-between gap-3 text-[10px] font-bold text-paper/45">
+                    <span>Portfolio Allocation</span>
+                    <span className="number-tabular">{investedPercent.toFixed(0)}% invested</span>
+                  </div>
+                  <div className="h-1.5 overflow-hidden rounded-full bg-panelSoft">
+                    <div className="h-full rounded-full bg-cyan" style={{ width: `${investedPercent}%` }} />
+                  </div>
+                </div>
+                <dl className="grid grid-cols-2 gap-3 border-t border-line/70 pt-3">
+                  <div>
+                    <dt className="rmi-data-label">Invested</dt>
+                    <dd className="mt-1 text-sm font-semibold number-tabular">{formatCurrency(investedValue)}</dd>
+                  </div>
+                  <div>
+                    <dt className="rmi-data-label">Cash</dt>
+                    <dd className="mt-1 text-sm font-semibold number-tabular">{formatCurrency(state.cashBalance)}</dd>
+                  </div>
+                </dl>
+                <RmiButton href="/portfolio" variant="secondary" className="w-full">View Portfolio</RmiButton>
+              </div>
+            ) : (
+              <div className="space-y-4 p-4 text-sm">
+                <p className="font-bold leading-5 text-paper/70">Create a portfolio, follow catalysts, and compete on rankings. No real money.</p>
+                <RmiButton href="/account?mode=signup">Sign up</RmiButton>
+              </div>
+            )}
           </RmiSection>
+
+          {session ? (
+            <RmiSection title="Your Watchlist" action={<Link href="/watchlist" className="text-xs text-cyan">View All</Link>}>
+              {watchlistArtists.length ? (
+                watchlistArtists.slice(0, 5).map((artist) => (
+                  <div key={artist.id} className="flex items-center justify-between gap-3 border-b border-line px-4 py-3 last:border-b-0">
+                    <ArtistIdentity artist={artist} />
+                    <ChangeText value={artist.dailyChangePercent} />
+                  </div>
+                ))
+              ) : (
+                <div className="p-4 text-sm leading-6 text-paper/60">
+                  Save artists with the star button to track them here.
+                </div>
+              )}
+            </RmiSection>
+          ) : null}
         </div>
-      </div> : null}
+      </div>
 
     </div>
   );

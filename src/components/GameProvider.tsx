@@ -65,8 +65,6 @@ type GameContextValue = {
   syncMode: SyncMode;
   syncStatus: string;
   serverRefreshing: boolean;
-  profileLoaded: boolean;
-  watchlistLoaded: boolean;
   holdings: HoldingView[];
   shortPositions: ShortPositionView[];
   leaderboard: LeaderboardEntry[];
@@ -102,7 +100,6 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
   const activeUserId = useRef(session?.user.id ?? null);
   activeUserId.current = session?.user.id ?? null;
   const profileSequence = useRef(0);
-  const watchlistSequence = useRef(0);
   // Never present bundled seed quotes as live data while the Supabase snapshot loads.
   const [state, setState] = useState<GameState>(() => clearMarketQuotes(createInitialGameState()));
   const hydrated = true;
@@ -118,10 +115,8 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
   const [avatarUrl, setAvatarUrl] = useState("");
   const [onboardingCompleted, setOnboardingCompleted] = useState(true);
   const [profileLoaded, setProfileLoaded] = useState(false);
-  const [watchlistLoaded, setWatchlistLoaded] = useState(false);
 
   useEffect(() => {
-    watchlistSequence.current++;
     setState(current => clearPrivateGameState(current));
     setWatchlistArtistIds([]);
     setIsAdminUser(false);
@@ -129,7 +124,6 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     setServerLeaderboard(null);
     setLeaderboardError("");
     setProfileLoaded(false);
-    setWatchlistLoaded(false);
     setServerRefreshing(false);
   }, [session?.user.id]);
 
@@ -298,18 +292,13 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
   const refreshWatchlist = useCallback(
     async (accessToken?: string) => {
       if (!authConfigured || !accessToken) {
-        setWatchlistLoaded(true);
+        setWatchlistArtistIds([]);
         return false;
       }
 
       const owner = activeUserId.current;
-      const requestId = ++watchlistSequence.current;
-      const isCurrent = () => activeUserId.current === owner && requestId === watchlistSequence.current;
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 20_000);
       try {
         const response = await fetch("/api/watchlist", {
-          signal: controller.signal,
           headers: {
             authorization: `Bearer ${accessToken}`
           }
@@ -320,16 +309,13 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
           throw new Error(payload.error ?? "Could not load watchlist.");
         }
 
-        if (!isCurrent()) return false;
+        if (activeUserId.current !== owner) return false;
         setWatchlistArtistIds(payload.watchlist);
-        setWatchlistLoaded(true);
         return true;
       } catch {
-        if (!isCurrent()) return false;
-        setWatchlistLoaded(true);
+        if (activeUserId.current !== owner) return false;
+        setWatchlistArtistIds([]);
         return false;
-      } finally {
-        clearTimeout(timeout);
       }
     },
     [authConfigured]
@@ -648,45 +634,37 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       }
 
       const currentlyWatchlisted = isWatchlisted(artistId);
-      const owner = session.user.id;
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 20_000);
-      try {
-        const response = await fetch("/api/watchlist", {
-          method: currentlyWatchlisted ? "DELETE" : "POST",
-          signal: controller.signal,
-          headers: {
-            "content-type": "application/json",
-            authorization: `Bearer ${session.access_token}`
-          },
-          body: JSON.stringify({ artistId })
-        });
-        const payload = await response.json();
-        if (activeUserId.current !== owner) {
-          return { ok: false, message: "Your account changed. Try again." };
-        }
-        if (!response.ok || !payload.ok) {
-          return { ok: false, message: payload.error ?? "Watchlist update failed." };
-        }
+      const response = await fetch("/api/watchlist", {
+        method: currentlyWatchlisted ? "DELETE" : "POST",
+        headers: {
+          "content-type": "application/json",
+          authorization: `Bearer ${session.access_token}`
+        },
+        body: JSON.stringify({
+          artistId
+        })
+      });
+      const payload = await response.json();
 
-        // A read started before this write must not undo the saved choice.
-        watchlistSequence.current++;
-        setWatchlistLoaded(true);
-        setWatchlistArtistIds(current => {
-          if (activeUserId.current !== owner) return current;
-          return currentlyWatchlisted
-            ? current.filter(candidate => candidate !== artistId)
-            : current.includes(artistId) ? current : [artistId, ...current];
-        });
+      if (!response.ok || !payload.ok) {
         return {
-          ok: true,
-          message: currentlyWatchlisted ? `Removed ${artist.ticker} from watchlist.` : `Added ${artist.ticker} to watchlist.`
+          ok: false,
+          message: payload.error ?? "Watchlist update failed."
         };
-      } catch {
-        return { ok: false, message: "Could not save your watchlist. Try again." };
-      } finally {
-        clearTimeout(timeout);
       }
+
+      setWatchlistArtistIds((current) =>
+        currentlyWatchlisted
+          ? current.filter((candidate) => candidate !== artistId)
+          : current.includes(artistId)
+            ? current
+            : [artistId, ...current]
+      );
+
+      return {
+        ok: true,
+        message: currentlyWatchlisted ? `Removed ${artist.ticker} from watchlist.` : `Added ${artist.ticker} to watchlist.`
+      };
     },
     [getArtist, isWatchlisted, session, syncMode]
   );
@@ -708,8 +686,6 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       syncMode,
       syncStatus,
       serverRefreshing,
-      profileLoaded,
-      watchlistLoaded,
       holdings,
       shortPositions,
       leaderboard,
@@ -743,8 +719,6 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       syncMode,
       syncStatus,
       serverRefreshing,
-      profileLoaded,
-      watchlistLoaded,
       holdings,
       shortPositions,
       leaderboard,

@@ -1,4 +1,3 @@
-import { getQuotePublications } from "@/lib/quote-publication";
 import { summarizeQuoteFreshness } from "@/lib/quote-freshness";
 import { sameQuoteRevisions } from "@/server/market/read-stability";
 import { allowDemoMarket, MARKET_ERROR_HEADERS } from "@/server/market/public-response";
@@ -212,7 +211,7 @@ async function loadStableSnapshot(supabase: ReturnType<typeof createServiceRoleC
       return result.data ?? [];
     }),
     loadAllPages(async (from, to) => {
-      const result = await supabase.from("market_observations").select("artist_id,observed_at,observed_date,model_version:raw_payload->>modelVersion")
+      const result = await supabase.from("market_observations").select("artist_id,observed_at,observed_date")
         .eq("source", "market_refresh").eq("metric", "completed").in("artist_id", artistIds)
         .in("observed_date", [getMarketDate(), shiftMarketDate(getMarketDate(), -1)])
         .order("artist_id").order("observed_date").range(from, to);
@@ -230,18 +229,19 @@ async function loadStableSnapshot(supabase: ReturnType<typeof createServiceRoleC
   if (!typedArtists.length || typedArtists.some(row => !Number.isFinite(Number(row.current_price)) || Number(row.current_price) <= 0)) {
     throw new Error("The market returned invalid current quotes.");
   }
-  const publications = getQuotePublications(completions, getMarketDate());
   const fallback = createInitialGameState();
   const state: GameState = {
     ...fallback,
     quoteFreshness: summarizeQuoteFreshness(artistIds, completions, getMarketDate()),
     ...(currentCorrections.length ? { valuationNotice: { date: getMarketDate(), artistCount: currentCorrections.length } } : {}),
-    artists: typedArtists.map(artist => {
-      const publication = publications.get(artist.id);
-      return { ...mapArtist(artist, statsByArtist[artist.id] ?? null, historyByArtist[artist.id] ?? [], imageByArtistId.get(artist.id)),
-        ...(publication ? { quoteAsOf: publication.observed_at } : {}),
-        ...(typeof publication?.model_version === "string" && publication.model_version.length <= 80 ? { quoteModelVersion: publication.model_version } : {}) };
-    }),
+    artists: typedArtists.map((artist) =>
+      mapArtist(
+        artist,
+        statsByArtist[artist.id] ?? null,
+        historyByArtist[artist.id] ?? [],
+        imageByArtistId.get(artist.id)
+      )
+    ),
     holdings: [],
     shortPositions: [],
     transactions: [],

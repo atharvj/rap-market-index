@@ -10,7 +10,7 @@ const sections = [
   {
     id: "price-movement",
     title: "How prices move",
-    body: "Artist prices are updated by a market engine that looks for meaningful changes in audience momentum, video activity, public attention, releases, reviews, major events, and eligible trading demand. Opening valuations use one shared audience scale across verified Spotify monthly listeners, Last.fm listening, and YouTube subscribers and views. Public pricing rules explain the input categories, momentum-score coefficients, source checks and correction policy."
+    body: "Artist prices are updated by a market engine that looks for meaningful changes in audience momentum, video activity, public attention, releases, reviews, major events, and eligible trading demand. Opening valuations use one shared audience scale across verified Spotify monthly listeners, Last.fm listening, and YouTube subscribers and views. The exact weights are kept internal so the game is harder to manipulate."
   },
   {
     id: "quote-meaning",
@@ -126,7 +126,6 @@ export default function AboutPage() {
           </div>
           <div className="flex flex-wrap gap-3 border-t border-line py-6">
             {[
-              ["Pricing Rules", "/methodology"],
               ["Browse Markets", "/markets"],
               ["Read Market News", "/news"],
               ["View Rankings", "/leaderboard"]

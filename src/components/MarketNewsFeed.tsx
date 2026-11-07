@@ -1,6 +1,5 @@
 "use client";
 
-import { createLatestRequest } from "@/lib/latest-request";
 import { formatDate } from "@/lib/formatters";
 import { MARKET_CONTENT_REFRESH_MS } from "@/lib/refresh-policy";
 import type { MarketNewsSort } from "@/lib/market-news-sort";
@@ -24,7 +23,6 @@ export type MarketNewsItem = {
     ticker: string;
   }>;
   eventDate: string;
-  announcedReleaseDate?: string | null;
   publishedDate?: string;
   eventType: string;
   eventLabel?: string | null;
@@ -71,7 +69,6 @@ export function MarketNewsFeed({
   eventType,
   newsTag,
   limit = 8,
-  lookbackDays = 45,
   skip = 0,
   compact = false,
   variant,
@@ -83,7 +80,6 @@ export function MarketNewsFeed({
   eventType?: string;
   newsTag?: string;
   limit?: number;
-  lookbackDays?: number;
   skip?: number;
   compact?: boolean;
   variant?: MarketNewsVariant;
@@ -97,13 +93,11 @@ export function MarketNewsFeed({
   const safeSkip = Math.max(0, Math.floor(skip));
 
   useEffect(() => {
-    const requests = createLatestRequest();
-    let loaded = false;
-    setItems([]);
+    const controller = new AbortController();
     setLoading(true);
     const params = new URLSearchParams({
       limit: String(limit + safeSkip),
-      lookbackDays: String(lookbackDays),
+      lookbackDays: "45",
       feed: artistId || artistIdsKey ? "artist" : "news"
     });
     params.set("sort", sort);
@@ -124,32 +118,26 @@ export function MarketNewsFeed({
       params.set("tag", newsTag);
     }
 
-    const loadNews = () => {
-      const request = requests.start();
-      return fetch(`/api/market/news?${params.toString()}`, { signal: request.signal })
-      .then(async response => {
-        if (!response.ok) throw new Error("News unavailable");
-        return response.json() as Promise<MarketNewsResponse>;
-      })
+    const loadNews = () => fetch(`/api/market/news?${params.toString()}`, {
+      signal: controller.signal
+    })
+      .then((response) => response.json() as Promise<MarketNewsResponse>)
       .then((payload) => {
-        if (!request.isCurrent()) return;
-        if (!payload.ok || !Array.isArray(payload.news)) throw new Error("News unavailable");
-        const nextItems = payload.news.slice(safeSkip, safeSkip + limit);
-        loaded = true;
+        const nextItems = payload.ok ? (payload.news ?? []).slice(safeSkip, safeSkip + limit) : [];
         setItems(nextItems);
         onItemsChange?.(nextItems);
       })
       .catch(() => {
-        if (request.isCurrent() && !loaded) {
+        if (!controller.signal.aborted) {
           setItems([]);
           onItemsChange?.([]);
         }
       })
       .finally(() => {
-        if (request.isCurrent()) setLoading(false);
-        request.finish();
+        if (!controller.signal.aborted) {
+          setLoading(false);
+        }
       });
-    };
 
     void loadNews();
 
@@ -167,12 +155,12 @@ export function MarketNewsFeed({
     document.addEventListener("visibilitychange", refreshVisibleNews);
 
     return () => {
-      requests.dispose();
+      controller.abort();
       window.clearInterval(interval);
       window.removeEventListener("focus", refreshVisibleNews);
       document.removeEventListener("visibilitychange", refreshVisibleNews);
     };
-  }, [artistId, artistIdsKey, eventType, limit, lookbackDays, newsTag, onItemsChange, resolvedVariant, safeSkip, sort]);
+  }, [artistId, artistIdsKey, eventType, limit, newsTag, onItemsChange, resolvedVariant, safeSkip, sort]);
 
   if (loading) {
     return <MarketNewsSkeleton compact={resolvedVariant === "compact"} />;
@@ -277,9 +265,9 @@ function HomeLeadStory({ item }: { item: MarketNewsItem }) {
               <span>{formatDate(getNewsDisplayDate(item))}</span>
               <SourceMeta item={item} />
             </div>
-            <h2 className="mt-3 text-2xl font-bold leading-[1.08] text-paper sm:text-4xl">
+            <h1 className="mt-3 text-2xl font-bold leading-[1.08] text-paper sm:text-4xl">
               {trimTitle(item.title, 132)}
-            </h2>
+            </h1>
             <p className="mt-3 text-sm leading-6 text-paper/58">
               {source} catalyst ranked by impact, confidence, and recency for {formatNewsArtistNames(item)}.
             </p>

@@ -376,9 +376,8 @@ test.beforeEach(async ({ page }) => {
 });
 
 test("homepage visual contract", async ({ page }) => {
-  await assertStablePublicPage(page, "/", "Back the artists you believe in.", "guest-homepage.png");
+  await assertStablePublicPage(page, "/", marketNews[0].title, "homepage.png");
   await expect(page.getByText("Top Market Story", { exact: true })).toBeVisible();
-  await expect(page.getByRole("heading", { level: 1 })).toHaveCount(1);
 
   const railSparkline = page.getByRole("img", {
     name: new RegExp(`Recent price history for ${marketState.artists[0].name}`)
@@ -387,7 +386,7 @@ test("homepage visual contract", async ({ page }) => {
   expect((railPath?.match(/L/g) ?? []).length).toBeGreaterThan(2);
 });
 
-test("homepage introduces the game and shows one top story without repeats", async ({ page }) => {
+test("homepage leads with one top story and does not repeat it below", async ({ page }) => {
   const newsRequests: URL[] = [];
   page.on("request", (request) => {
     const requestUrl = new URL(request.url());
@@ -412,169 +411,6 @@ test("homepage introduces the game and shows one top story without repeats", asy
   await expect(
     page.getByRole("link", { name: `View ${marketNews[0].artistName} market` })
   ).toHaveText("View artist market");
-});
-
-test("guests can understand RMI, read pricing rules and sign up before quotes load", async ({ page }) => {
-  let release!: () => void;
-  const held = new Promise<void>(resolve => { release = resolve; });
-  await page.route("**/api/market/snapshot", async route => {
-    await held;
-    await route.fulfill({ contentType: "application/json", body: JSON.stringify({ ok: true, source: "supabase", state: marketState }) }).catch(() => {});
-  });
-  try {
-    await page.goto("/");
-    await expect(page.getByRole("heading", { level: 1, name: "Back the artists you believe in." })).toBeVisible();
-    await expect(page.getByText("$25,000", { exact: false }).first()).toBeVisible();
-    await expect(page.getByText("Top Market Story", { exact: true })).toHaveCount(0);
-    await page.getByRole("link", { name: "How prices work", exact: true }).click();
-    await expect(page.getByRole("heading", { level: 1, name: "How RMI prices work" })).toBeVisible();
-    await expect(page.getByRole("table")).toContainText("Audience response");
-    await page.goto("/account?mode=signup");
-    await expect(page.getByRole("button", { name: "Create account with Google", exact: true })).toBeVisible();
-  } finally { release(); }
-});
-
-test("personal home uses followed and held artists, actual date ranges and a public-only recap", async ({ page }) => {
-  await installPortfolioFixture(page);
-  await page.addInitScript(() => {
-    Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText: async (text: string) => { (window as Window & { copiedRecap?: string }).copiedRecap = text; } } });
-  });
-  const trackedIds = marketState.artists.slice(0, 3).map(a => a.id);
-  await page.route("**/api/watchlist", route => route.fulfill({ contentType: "application/json", body: JSON.stringify({ ok: true, watchlist: [trackedIds[2], "unknown-artist"] }) }));
-  const requests: URL[] = [];
-  let failNews = false;
-  await page.route("**/api/market/news**", route => {
-    const url = new URL(route.request().url());
-    if (url.searchParams.get("feed") !== "artist") return route.fallback();
-    requests.push(url);
-    return route.fulfill({ status: failNews ? 503 : 200, contentType: "application/json", body: JSON.stringify(failNews ? { ok: false } : { ok: true, news: [{ ...marketNews[0], announcedReleaseDate: "2026-07-20" }] }) });
-  });
-  await page.goto("/");
-  await expect(page.getByRole("heading", { name: "Your artists. Your next move." })).toBeVisible();
-  const review = page.getByRole("region", { name: "Your market", exact: true });
-  await expect(review.getByText("$17,500", { exact: true })).toBeVisible();
-  await expect(review.getByText("Jul 10–Jul 17 · 7D")).toHaveCount(3);
-  await expect(review.getByText("Read announcement · RMI Test Wire")).toBeVisible();
-  expect(requests.some(url => url.searchParams.get("artistIds")?.split(",").sort().join(",") === [...trackedIds].sort().join(",") && url.searchParams.get("sort") === "latest" && url.searchParams.get("lookbackDays") === "14")).toBe(true);
-  await review.getByRole("button", { name: "Copy artist recap" }).click();
-  await expect(review.getByRole("button", { name: "Recap copied" })).toBeVisible();
-  const recap = await page.evaluate(() => (window as Window & { copiedRecap?: string }).copiedRecap);
-  expect(recap).toContain("2026-07-10 to 2026-07-17");
-  for (const artist of marketState.artists.slice(0, 3)) expect(recap).toContain(artist.name);
-  expect(recap).not.toMatch(/17,?500|PortfolioTester|portfolio@example|shares|cash/i);
-  await page.evaluate(() => window.scrollTo(0, 0));
-  await page.screenshot({ path: test.info().outputPath("personal-home-dark.png") });
-  failNews = true;
-  await page.evaluate(() => window.dispatchEvent(new Event("focus")));
-  await expect.poll(() => requests.length).toBeGreaterThan(1);
-  await expect(review.getByText("Read announcement · RMI Test Wire")).toBeVisible();
-  await page.setViewportSize({ width: 390, height: 844 });
-  const dimensions = await page.evaluate(() => ({ width: document.documentElement.clientWidth, scroll: document.documentElement.scrollWidth }));
-  expect(dimensions.scroll).toBeLessThanOrEqual(dimensions.width + 1);
-  await page.evaluate(() => { document.documentElement.dataset.theme = "light"; });
-  await page.evaluate(() => window.scrollTo(0, 0));
-  await page.screenshot({ path: test.info().outputPath("personal-home-mobile-light.png"), fullPage: true });
-});
-
-test("copy failure offers manual selection and artist quotes explain their recorded move", async ({ page }) => {
-  await installPortfolioFixture(page);
-  await page.addInitScript(() => { Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText: async () => { throw new Error("Clipboard denied"); } } }); });
-  await page.goto("/");
-  await page.getByRole("button", { name: "Copy artist recap" }).click();
-  await expect(page.getByRole("textbox", { name: "Copy your artist recap" })).toHaveValue(/My RMI artist watch/);
-  await page.goto(`/artists/${marketState.artists[0].id}?guide=first-trade&side=buy#trade`);
-  const explanation = page.getByRole("region", { name: "Quote explanation" });
-  await expect(explanation.getByRole("heading", { name: "Why this quote moved" })).toBeVisible();
-  await expect(explanation).toContainText(marketState.artists[0].lastMoveExplanation);
-  await expect(explanation.getByRole("link", { name: "Read pricing rules" })).toHaveAttribute("href", "/methodology");
-  await expect(page.getByRole("textbox", { name: "Shares", exact: true })).toHaveValue("1");
-});
-
-test("a delayed watchlist read cannot undo a newly saved artist", async ({ page }) => {
-  await installPortfolioFixture(page);
-  let release!: () => void;
-  const held = new Promise<void>(resolve => { release = resolve; });
-  let finished!: () => void;
-  const completed = new Promise<void>(resolve => { finished = resolve; });
-  await page.route("**/api/watchlist", async route => {
-    if (route.request().method() === "GET") {
-      await held;
-      await route.fulfill({ contentType: "application/json", body: JSON.stringify({ ok: true, watchlist: [] }) }).catch(() => {});
-      finished();
-    } else await route.fulfill({ contentType: "application/json", body: JSON.stringify({ ok: true }) });
-  });
-  try {
-    await page.goto(`/artists/${marketState.artists[2].id}`);
-    await expect(page.getByRole("link", { name: /Portfolio.*\$/ })).toBeVisible();
-    await page.getByRole("button", { name: "Add to watchlist", exact: true }).click();
-    await expect(page.getByRole("button", { name: "Remove from watchlist", exact: true })).toBeVisible();
-    release(); await completed;
-    await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
-    await expect(page.getByRole("button", { name: "Remove from watchlist", exact: true })).toBeVisible();
-  } finally { release(); }
-});
-
-test("a failed watchlist save leaves the choice intact and allows a retry", async ({ page }) => {
-  await installPortfolioFixture(page);
-  let saves = 0;
-  await page.route("**/api/watchlist", route => {
-    if (route.request().method() === "GET") return route.fallback();
-    saves++;
-    return saves === 1 ? route.abort("failed") : route.fulfill({ contentType: "application/json", body: JSON.stringify({ ok: true }) });
-  });
-  await page.goto(`/artists/${marketState.artists[2].id}`);
-  await expect(page.getByRole("link", { name: /Portfolio.*\$/ })).toBeVisible();
-  const add = page.getByRole("button", { name: "Add to watchlist", exact: true });
-  await add.click();
-  await expect(page.getByRole("alert").filter({ hasText: "Could not save your watchlist. Try again." })).toBeVisible();
-  await expect(add).toBeEnabled();
-  await add.click();
-  await expect(page.getByRole("button", { name: "Remove from watchlist", exact: true })).toBeVisible();
-  expect(saves).toBe(2);
-});
-
-test("a previous account's delayed watchlist write cannot populate the new personal home", async ({ page }) => {
-  await installPortfolioFixture(page);
-  const userB = "33333333-3333-4333-8333-333333333333";
-  const tokenB = createTestAccessToken(userB);
-  let release!: () => void;
-  const held = new Promise<void>(resolve => { release = resolve; });
-  let started!: () => void;
-  const pending = new Promise<void>(resolve => { started = resolve; });
-  let finished!: () => void;
-  const completed = new Promise<void>(resolve => { finished = resolve; });
-  await page.route("**/api/profile/bootstrap", route => {
-    if (route.request().headers().authorization !== `Bearer ${tokenB}`) return route.fallback();
-    return route.fulfill({ contentType: "application/json", body: JSON.stringify({ ok: true, profile: { id: userB, username: "SecondUser", cashBalance: 25000, onboardingCompleted: true }, holdings: [], shortPositions: [], transactions: [] }) });
-  });
-  await page.route("**/api/watchlist", async route => {
-    if (route.request().method() === "POST") { started(); await held; }
-    await route.fulfill({ contentType: "application/json", body: JSON.stringify({ ok: true, watchlist: [] }) }).catch(() => {});
-    if (route.request().method() === "POST") finished();
-  });
-  try {
-    await page.goto(`/artists/${marketState.artists[2].id}`);
-    await expect(page.getByRole("link", { name: /Portfolio.*\$/ })).toBeVisible();
-    await page.getByRole("button", { name: "Add to watchlist", exact: true }).click();
-    await pending;
-    await page.route("https://example.supabase.co/auth/v1/user", route => route.fulfill({ contentType: "application/json", body: JSON.stringify({ id: userB, aud: "authenticated", role: "authenticated", email: "second@example.com", email_confirmed_at: "2026-07-21T12:00:00Z", created_at: "2026-07-21T12:00:00Z", app_metadata: { provider: "email" }, user_metadata: { username: "SecondUser" } }) }));
-    await page.evaluate(({ id, token }) => {
-      const key = "sb-example-auth-token";
-      const previous = JSON.parse(localStorage.getItem(key)!);
-      const next = { ...previous, access_token: token, user: { ...previous.user, id, email: "second@example.com", user_metadata: { username: "SecondUser" } } };
-      localStorage.setItem(key, JSON.stringify(next));
-      const channel = new BroadcastChannel(key); channel.postMessage({ event: "SIGNED_IN", session: next }); channel.close();
-    }, { id: userB, token: tokenB });
-    await page.getByRole("button", { name: "Open account menu", exact: true }).click();
-    await expect(page.getByText("SecondUser", { exact: true }).first()).toBeVisible();
-    await page.keyboard.press("Escape");
-    await page.getByRole("link", { name: "RMI home", exact: true }).click();
-    await expect(page.getByRole("heading", { name: "Make this market yours" })).toBeVisible();
-    release(); await completed;
-    await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
-    await expect(page.getByRole("heading", { name: "Make this market yours" })).toBeVisible();
-    await expect(page.getByRole("heading", { name: "Your artist week" })).toHaveCount(0);
-  } finally { release(); }
 });
 
 test("Watch Now links every credited performer under the video", async ({ page }) => {
@@ -1014,12 +850,7 @@ test("help feedback can be submitted without signing in", async ({ page }) => {
   });
 });
 
-test("onboarding saves selections and opens a guided ticket without placing an order", async ({ page }) => {
-  let onboardingCompleted = false;
-  let savedFavorites: string[] = [];
-  let watchlist: string[] = [];
-  let tradeRequests = 0;
-  page.on("request", request => { if (request.method() === "POST" && /\/api\/trades(?:[/?]|$)/.test(request.url())) tradeRequests++; });
+test("onboarding watchlist selections stay visibly selected", async ({ page }) => {
   const userId = "11111111-1111-4111-8111-111111111111";
   const timestamp = "2026-07-21T12:00:00.000Z";
   const user = {
@@ -1049,10 +880,8 @@ test("onboarding saves selections and opens a guided ticket without placing an o
   await page.route("https://example.supabase.co/auth/v1/user", (route) =>
     route.fulfill({ contentType: "application/json", body: JSON.stringify(user) })
   );
-  await page.route("**/api/profile/bootstrap", (route) => {
-    const body = route.request().postDataJSON();
-    if (body?.onboardingCompleted === true) { onboardingCompleted = true; savedFavorites = body.favoriteArtistIds; }
-    return route.fulfill({
+  await page.route("**/api/profile/bootstrap", (route) =>
+    route.fulfill({
       contentType: "application/json",
       body: JSON.stringify({
         ok: true,
@@ -1060,23 +889,19 @@ test("onboarding saves selections and opens a guided ticket without placing an o
           id: userId,
           username: "OnboardingTester",
           cashBalance: 25_000,
-          favoriteArtistIds: savedFavorites,
-          onboardingCompleted,
+          favoriteArtistIds: [],
+          onboardingCompleted: false,
           isAdmin: false
         },
         holdings: [],
         shortPositions: [],
         transactions: []
       })
-    });
-  });
-  await page.route("**/api/watchlist", (route) => {
-    if (route.request().method() === "POST") {
-      const { artistId } = route.request().postDataJSON();
-      watchlist = watchlist.includes(artistId) ? watchlist.filter(id => id !== artistId) : [...watchlist, artistId];
-    }
-    return route.fulfill({ contentType: "application/json", body: JSON.stringify({ ok: true, watchlist }) });
-  });
+    })
+  );
+  await page.route("**/api/watchlist", (route) =>
+    route.fulfill({ contentType: "application/json", body: JSON.stringify({ ok: true, watchlist: [] }) })
+  );
 
   await page.goto("/onboarding");
   await expect(page.getByRole("heading", { name: "Add artists to your watchlist" })).toBeVisible();
@@ -1093,15 +918,6 @@ test("onboarding saves selections and opens a guided ticket without placing an o
   await page.getByRole("button", { name: "Continue" }).click();
   await expect(page.getByRole("heading", { name: "Your opening balance" })).toBeVisible();
   await expect(page.getByRole("paragraph").filter({ hasText: "$25,000" })).toBeVisible();
-  await page.getByRole("button", { name: "Continue" }).click();
-  await expect(page.getByRole("heading", { name: "Review your first pick" })).toBeVisible();
-  await page.getByRole("button", { name: "Review first trade", exact: true }).click();
-  await expect(page).toHaveURL(/\/artists\/[^?]+\?guide=first-trade&side=buy#trade$/);
-  await expect(page.getByRole("region", { name: "First trade guide" })).toBeVisible();
-  expect(onboardingCompleted).toBe(true);
-  expect(savedFavorites).toHaveLength(3);
-  expect(watchlist.sort()).toEqual([...savedFavorites].sort());
-  expect(tradeRequests).toBe(0);
 });
 
 test("portfolio shows purchase basis and unrealized position performance", async ({ page }) => {
@@ -1160,7 +976,7 @@ test("artist position average-fill help escapes the sticky sidebar", async ({ pa
 test("primary public pages do not overflow a mobile viewport", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
 
-  for (const path of ["/", "/markets", "/news", "/about", "/help", "/methodology"]) {
+  for (const path of ["/", "/markets", "/news", "/about", "/help"]) {
     await page.goto(path);
     await expect(page.locator('[aria-busy="true"]')).toHaveCount(0, { timeout: 15_000 });
     const dimensions = await page.evaluate(() => ({
