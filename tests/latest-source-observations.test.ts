@@ -17,6 +17,7 @@ beforeAll(async () => {
       ('busy','youtube_uploads','coverage','2026-11-05','2026-11-05T12:00:00Z'),
       ('unrequested','media_rss','coverage','2026-11-05','2026-11-05T12:00:00Z');`);
   await db.exec(await readFile("supabase/migrations/051_latest_source_observation_times.sql", "utf8"));
+  await db.exec(await readFile("supabase/migrations/052_plan_source_lookups_for_actual_parameters.sql", "utf8"));
 });
 afterAll(async () => { await db?.close(); });
 
@@ -49,4 +50,20 @@ it("reads the bounded lookup and fails instead of assuming an unsuccessful read 
   rpc.mockClear();
   expect(await loadLatestSourceObservationTimes({ ...options, artistIds: [] })).toEqual({});
   expect(rpc).not.toHaveBeenCalled();
+});
+
+
+it("keeps source and date isolation across repeated calls from a generic prepared RPC", async () => {
+  await db.exec("set plan_cache_mode = force_generic_plan; prepare source_lookup(text[],text,date,date) as select * from get_latest_source_observation_times($1,$2,$3,$4)");
+  try {
+    for (let i = 0; i < 8; i++) {
+      const rows = (await db.query<{ artist_id: string; observed_at: Date }>(
+        "execute source_lookup(array['busy','quiet','busy'],'youtube_uploads','2026-11-05','2026-11-05')")).rows;
+      expect(rows.map(row => [row.artist_id, new Date(row.observed_at).toISOString()])).toEqual([["busy", "2026-11-05T12:00:00.000Z"]]);
+    }
+    const rows = (await db.query<{ artist_id: string }>(
+      "execute source_lookup(array['busy','quiet'],'media_rss','2026-11-01','2026-11-01')")).rows;
+    expect(rows.map(row => row.artist_id)).toEqual(["busy", "quiet"]);
+    expect((await db.query("execute source_lookup(array['busy'],'not-a-source','2026-11-01','2026-11-05')")).rows).toEqual([]);
+  } finally { await db.exec("deallocate source_lookup; reset plan_cache_mode"); }
 });

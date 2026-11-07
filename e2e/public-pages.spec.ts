@@ -716,7 +716,8 @@ test("artist pages distinguish feed outages from missing artists and recover ver
     await response;
   };
   await refresh();
-  await expect(page.getByRole("alert").filter({ hasText: "Live market data is temporarily unavailable" })).toBeVisible();
+  await expect(page.locator("main > [role=alert]")).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "Artist data temporarily unavailable", exact: true })).toBeVisible();
   await expect(page.getByText("The last verified quote is still shown.", { exact: false })).toHaveCount(0);
 
   mode = "success";
@@ -724,7 +725,7 @@ test("artist pages distinguish feed outages from missing artists and recover ver
   await expect(page.getByRole("heading", { name: artist.name, exact: true })).toBeVisible();
   mode = "invalid";
   await refresh();
-  await expect(page.getByRole("alert").filter({ hasText: "The last verified quote is still shown" })).toBeVisible();
+  await expect(page.locator("main > [role=alert]")).toHaveCount(0);
   await expect(page.getByRole("heading", { name: artist.name, exact: true })).toBeVisible();
 });
 
@@ -1091,17 +1092,19 @@ test("a failed session verification recovers to sign in instead of an endless ac
   await expect(page.getByRole("button", { name: "Continue with Google", exact: true })).toBeVisible();
 });
 
-test("a valuation correction is identified independently of market performance", async ({ page }) => {
+test("valuation corrections do not add a public operational banner", async ({ page }) => {
   await page.route("**/api/market/snapshot", route => route.fulfill({ contentType: "application/json", body: JSON.stringify({ ok: true, source: "supabase",
     state: { ...marketState, valuationNotice: { date: marketState.lastUpdatedAt, artistCount: 16 } } }) }));
   await page.goto("/markets");
-  await expect(page.getByRole("status").filter({ hasText: "Quotes were recalibrated today" })).toContainText("portfolio values include this correction");
+  await expect(page.getByRole("link", { name: "Market Quotes", exact: true })).toBeVisible();
+  await expect(page.getByText(/Quotes were recalibrated today/)).toHaveCount(0);
 });
 
-test("delayed quote coverage is visible without inventing a fresh update", async ({ page }) => {
-  await page.route("**/api/market/snapshot", route => route.fulfill({ contentType:"application/json",body:JSON.stringify({ok:true,source:"supabase",state:{...marketState,quoteFreshness:{artistCount:marketState.artists.length,staleArtistCount:2,asOf:"2026-11-05T12:00:00Z",checkedAt:"2026-11-05T13:00:00Z"}}}) }));
+test("delayed quote coverage keeps public quotes visible without warning banners", async ({ page }) => {
+  await page.route("**/api/market/snapshot", route => route.fulfill({ contentType:"application/json",body:JSON.stringify({ok:true,source:"supabase",state:{...marketState,quoteFreshness:{artistCount:marketState.artists.length,staleArtistCount:marketState.artists.length,asOf:"2026-11-05T12:00:00Z",checkedAt:"2026-11-05T13:00:00Z"}}}) }));
   await page.goto("/markets");
-  await expect(page.getByText(/Quotes are awaiting a refresh for 2/)).toBeVisible();
+  await expect(page.getByText(/Quotes are awaiting a refresh/)).toHaveCount(0);
+  await expect(page.getByText(/Last complete refresh:/)).toHaveCount(0);
   await expect(page.getByRole("link",{name:"Market Quotes",exact:true})).toBeVisible();
 });
 
