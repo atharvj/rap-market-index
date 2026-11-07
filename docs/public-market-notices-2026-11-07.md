@@ -49,3 +49,11 @@ A full-roster read-only daily calculation then succeeded for all 89 artists in
 185 seconds, supporting the need to reserve the opening's execution window for
 calculation/publication. Its source warnings withheld unsuitable Polymarket
 contracts and unverifiable comment uploaders; those safeguards remain enabled.
+
+The controlled standard daily worker retry exposed an intermittent YouTube
+baseline-read statement timeout (the full read-only run had passed). Migration
+054 covers numerical source/date/artist/metric reads with value and observation
+timestamps, avoiding evidence heap reads for the ordered baseline pages. Baseline
+windows, rate calculations and pricing weights are unchanged.
+The exact baseline loader (including recent and annual windows) subsequently
+passed four consecutive all-artist reads in 1.0–2.2 seconds.
