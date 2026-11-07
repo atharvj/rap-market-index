@@ -23,7 +23,7 @@ export async function loadValuationBoundaries({ supabase, artistIds, startDate, 
       return result.data ?? [];
     }),
     loadAllPages(async (from, to) => {
-      let query = supabase.from("market_signal_snapshots").select("artist_id,source_date,model_version,raw_payload")
+      let query = supabase.from("market_signal_snapshots").select("artist_id,source_date,model_version,audience_revaluation:raw_payload->audienceRevaluation,price_before_revaluation:raw_payload->priceBeforeRevaluation")
         .in("artist_id", artistIds).lte("source_date", endDate)
         .not("raw_payload->audienceRevaluation", "is", null).order("source_date").order("artist_id");
       if (startDate) query = query.gte("source_date", startDate);
@@ -34,12 +34,11 @@ export async function loadValuationBoundaries({ supabase, artistIds, startDate, 
   ]);
   const byKey = new Map<string, StoredValuationBoundary>();
   for (const row of legacy) {
-    const raw = row.raw_payload as Record<string, unknown> | null;
-    const record = readAudienceRevaluation(raw?.audienceRevaluation, row.source_date);
+    const record = readAudienceRevaluation(row.audience_revaluation, row.source_date);
     if (!record) throw new Error("Could not verify a legacy valuation correction.");
     byKey.set(`${row.artist_id}:${row.source_date}`, { artistId: row.artist_id, sourceDate: row.source_date,
       modelVersion: row.model_version, record,
-      ...(typeof raw?.priceBeforeRevaluation === "number" ? { priceBeforeRevaluation: raw.priceBeforeRevaluation } : {}) });
+      ...(typeof row.price_before_revaluation === "number" ? { priceBeforeRevaluation: row.price_before_revaluation } : {}) });
   }
   for (const row of saved) {
     const record = readAudienceRevaluation({ version: 2, effectiveDate: row.effective_date, effectiveAt: row.effective_at,

@@ -21,7 +21,7 @@ describe("durable valuation correction loading", () => {
     expect(history.map(point => point.price)).toEqual([140,140]);
   });
   it("does not apply the same correction twice when a legacy snapshot also has it", async () => {
-    const rows = await loadValuationBoundaries({ supabase: client([saved],[{ artist_id: "a", source_date: date, model_version: "v47", raw_payload: { audienceRevaluation: record } }]), artistIds: ["a"], endDate: date });
+    const rows = await loadValuationBoundaries({ supabase: client([saved],[{ artist_id: "a", source_date: date, model_version: "v47", audience_revaluation: record }]), artistIds: ["a"], endDate: date });
     expect(rows).toHaveLength(1); expect(rows[0].record.effectiveAt).toBe(time);
   });
   it("fails closed instead of serving quotes on a conflicting correction scale", async () => {

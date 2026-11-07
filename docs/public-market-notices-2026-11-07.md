@@ -29,3 +29,10 @@ prepared RPC calls. Updated browser regressions cover hidden operational banners
 and retention/recovery of verified quote data.
 
 Final deployment, CI and guarded refresh outcomes are recorded in RMI_HANDOFF.md.
+
+A live public check also reproduced a separate chart-loading timeout in the legacy
+valuation-correction query. Migration 053 adds a partial date/artist index for
+snapshots that actually contain a correction. The reader now selects only the
+correction and pre-correction price instead of downloading whole evidence JSON.
+Legacy fallback, correction validation, conflict detection and permanent ledger
+records remain; no history is discarded to avoid the query.
