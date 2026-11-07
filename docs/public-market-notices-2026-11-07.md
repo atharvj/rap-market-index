@@ -57,3 +57,14 @@ timestamps, avoiding evidence heap reads for the ordered baseline pages. Baselin
 windows, rate calculations and pricing weights are unchanged.
 The exact baseline loader (including recent and annual windows) subsequently
 passed four consecutive all-artist reads in 1.0–2.2 seconds.
+
+After baseline reads were fixed, the standard live worker reached persistence and
+exposed a separate oversized observation-upsert timeout. Evidence writes now use
+at most 100 rows or approximately 1 MiB per request, with an individual larger
+record retained intact. Only explicit database cancellation is retried once, with
+identical rows/timestamps. Duplicate identities and non-finite values fail before
+writes; source error flags clear only after all batches succeed. Partial evidence
+is safe to retry, and quote publication still requires successful completion of
+the entire evidence save before the existing atomic quote transaction runs.
+Regression tests cover byte/row limits, complete retention, stable retries,
+failures that prevent later saves/cleanup, and invalid input.

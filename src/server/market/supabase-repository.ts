@@ -835,25 +835,52 @@ export async function persistMarketObservations(supabase: Supabase, observations
     return;
   }
 
-  await removeResolvedObservationErrors(supabase, observations);
-
-  const { error } = await supabase.from("market_observations").upsert(
-    observations.map((observation) => ({
+  const observedAt = new Date().toISOString();
+  const identities = new Set<string>();
+  const rows = observations.map(observation => {
+    const identity = [observation.artistId, observation.source, observation.metric, observation.observedDate].join("\u0000");
+    if (identities.has(identity)) throw new Error("Duplicate market observation identity.");
+    if (!Number.isFinite(observation.value)) throw new Error("Market observation values must be finite.");
+    identities.add(identity);
+    return {
       artist_id: observation.artistId,
       source: observation.source,
       metric: observation.metric,
       observed_date: observation.observedDate,
-      observed_at: observation.observedAt ?? new Date().toISOString(),
+      observed_at: observation.observedAt ?? observedAt,
       value: observation.value,
       unit: observation.unit,
       raw_payload: observation.rawPayload as Json
-    })),
-    { onConflict: "artist_id,source,metric,observed_date" }
-  );
-
-  if (error) {
-    throw new Error(`Could not save market observations: ${error.message}`);
+    };
+  });
+  const batches: typeof rows[] = [];
+  const encoder = new TextEncoder();
+  let batch: typeof rows = [];
+  let bytes = 2;
+  for (const row of rows) {
+    const rowBytes = encoder.encode(JSON.stringify(row)).byteLength;
+    if (batch.length && (batch.length >= 100 || bytes + rowBytes + 1 > 1024 * 1024)) {
+      batches.push(batch);
+      batch = [];
+      bytes = 2;
+    }
+    bytes += rowBytes + (batch.length ? 1 : 0);
+    batch.push(row);
   }
+  if (batch.length) batches.push(batch);
+  for (const batch of batches) {
+    const save = () => supabase.from("market_observations").upsert(batch, {
+      onConflict: "artist_id,source,metric,observed_date"
+    });
+    let result = await save();
+    // A canceled statement rolls back. Retrying the same rows/timestamps is
+    // idempotent, including when earlier batches already committed.
+    if (result.error?.code === "57014") result = await save();
+    if (result.error) throw new Error(`Could not save market observations: ${result.error.message}`);
+  }
+  // Keep source failure flags until every observation was saved. The caller
+  // publishes atomic quotes only after this function succeeds completely.
+  await removeResolvedObservationErrors(supabase, observations);
 }
 
 async function removeResolvedObservationErrors(supabase: Supabase, observations: MarketObservation[]) {
