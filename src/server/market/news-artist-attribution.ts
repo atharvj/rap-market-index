@@ -1,4 +1,5 @@
-import { hasRequiredArtistEventDisambiguation } from "@/server/market/artist-event-disambiguation";
+import { hasRequiredArtistEventDisambiguation, hasArtistStatusSubjectContext } from "@/server/market/artist-event-disambiguation";
+import { getArtistStatusSubtype } from "@/server/market/status-events";
 
 export function getNewsAttributionText(title: string, rawPayload: Record<string, unknown>) {
   // Legacy event titles can be synthesized (for example, "Drake - ...").
@@ -19,8 +20,11 @@ export function hasNewsArtistAttribution({
   artistName, title, rawPayload
 }: { artistName: string; title: string; rawPayload: Record<string, unknown> }) {
   if (rawPayload.artistAttributionRejected === true) return false;
+  const text = getNewsAttributionText(title, rawPayload);
+  const statusSubtype = getArtistStatusSubtype(rawPayload.statusSubtype);
+  if (statusSubtype && !hasArtistStatusSubjectContext({ artistName, text, statusSubtype })) return false;
   return hasRequiredArtistEventDisambiguation({
     artistName,
-    text: getNewsAttributionText(title, rawPayload)
+    text
   });
 }

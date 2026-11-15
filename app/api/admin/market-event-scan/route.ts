@@ -11,6 +11,7 @@ import { selectArtistsByOldestCoverage } from "@/server/market/event-scan-select
 import type { MarketUpdateArtist } from "@/server/market/daily-update";
 import type { MarketEvent } from "@/server/market/market-data";
 import { getArtistStatusSubtype, shouldRecommendStatusTradingHalt } from "@/server/market/status-events";
+import { isMarketEventSourceIntegrityValid } from "@/server/market/event-integrity";
 import {
   loadActiveArtists,
   loadArtistExternalIds,
@@ -491,13 +492,9 @@ function buildStatusHaltCandidates(events: MarketEvent[], artists: MarketUpdateA
   const candidates: StatusHaltCandidate[] = [];
 
   for (const event of events) {
-    if (!shouldRecommendStatusTradingHalt(event)) {
-      continue;
-    }
-
     const artist = artistsById.get(event.artistId);
 
-    if (!artist || seen.has(artist.id)) {
+    if (!artist || seen.has(artist.id) || !isMarketEventSourceIntegrityValid(event) || !shouldRecommendStatusTradingHalt(event, artist.name)) {
       continue;
     }
 

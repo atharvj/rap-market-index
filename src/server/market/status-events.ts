@@ -1,5 +1,7 @@
 import { clamp } from "@/lib/pricing";
 import type { MarketEvent } from "@/server/market/market-data";
+import { hasArtistStatusSubjectContext } from "@/server/market/artist-event-disambiguation";
+import { getVerifiedTrackingArtistName } from "@/server/market/artist-tracking";
 
 export type ArtistStatusSubtype =
   | "death"
@@ -180,11 +182,16 @@ export function getArtistStatusSubtype(value: unknown): ArtistStatusSubtype | nu
   return null;
 }
 
-export function shouldRecommendStatusTradingHalt(event: MarketEvent) {
+export function shouldRecommendStatusTradingHalt(event: MarketEvent, artistName = getVerifiedTrackingArtistName(event.artistId)) {
+  if (!artistName) return false;
+  const raw = event.rawPayload;
+  const text = raw.publisherArticleVerified === true && raw.publisherHeadlineVerified === true &&
+    typeof raw.publisherHeadline === "string" ? raw.publisherHeadline : event.title;
   return (
     getArtistStatusSubtype(event.rawPayload.statusSubtype) === "death" &&
     event.rawPayload.statusHaltRecommended === true &&
-    event.confidence >= 0.72
+    event.confidence >= 0.72 &&
+    hasArtistStatusSubjectContext({ artistName, text, statusSubtype: "death" })
   );
 }
 

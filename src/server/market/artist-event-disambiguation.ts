@@ -1,4 +1,5 @@
 import { isHistoricalRetrospective } from "@/server/market/article-timeliness";
+import { getNonCatalystArticleReason } from "@/server/market/article-editorial-context";
 import { getArtistTextKey } from "@/server/market/artist-text-identifiers";
 import { getTrackingAliasesByName, resolveVerifiedTrackingName } from "@/server/market/artist-tracking";
 import { stripQuotedMusicTitles } from "@/server/market/article-artist-text";
@@ -255,6 +256,7 @@ export function isGenericMusicListicleTitle(title: string) {
 }
 
 export function isLowValueMarketArticleTitle(title: string) {
+  if (getNonCatalystArticleReason(title)) return true;
   if (isHistoricalRetrospective(title)) return true;
   const normalized = normalizeEventSearchText(title);
   const hasExplicitMusicDemandContext =
@@ -458,6 +460,7 @@ function hasCreditObjectContext(normalizedText: string, normalizedAlias: string)
   const alias = toRegexPhrase(normalizedAlias);
   const filler = "(?:\\S+\\s+){0,8}";
   const patterns = [
+    new RegExp(`\\b(?:sampled|covered|interpolated|remixed)\\s+by\\s+${filler}${alias}\\b`),
     new RegExp(`\\b(?:producer|collaborator|songwriter|engineer|manager|friend|labelmate)\\s+(?:for|with|of)\\s+${filler}${alias}\\b`),
     new RegExp(`\\b(?:worked|works|collaborated|collaborates|teamed\\s+up)\\s+(?:with|for|on)\\s+${filler}${alias}\\b`),
     new RegExp(`\\b(?:song|track|single|album|project|beat|production)\\s+(?:for|with|by|from)\\s+${filler}${alias}\\b`)

@@ -1,4 +1,5 @@
 import { isHistoricalRetrospective } from "@/server/market/article-timeliness";
+import { getNonCatalystArticleReason } from "@/server/market/article-editorial-context";
 import { clamp } from "@/lib/pricing";
 import type { MarketUpdateArtist } from "@/server/market/daily-update";
 import {
@@ -622,6 +623,9 @@ export function classifyArticleEvent(
   const lowerTitle = title.toLowerCase();
   const sourceTier = getSourceTier(domain);
   const toneScore = clamp((getNumber(tone) ?? 0) * 8, -45, 45);
+  const nonCatalystReason = getNonCatalystArticleReason(title);
+  if (nonCatalystReason) return { eventType: "news", sentimentScore: 0, impactScore: 0,
+    confidence: getArticleConfidence(sourceTier, 0.6), reason: nonCatalystReason };
   const tourDisruption = classifyTourDisruption(lowerTitle, sourceTier, toneScore);
 
   if (tourDisruption) {
@@ -785,6 +789,19 @@ export function classifyArticleEvent(
     };
   }
 
+  // A listening reaction is evidence about reception, never another release.
+  const listeningContext = /\b(?:listening to|listens? to|listened to|album reaction)\b/.test(lowerTitle) && /\b(?:album|song|track|project|single)\b/.test(lowerTitle);
+  if (listeningContext) {
+    const negative = /\b(?:less enthusiastic|unimpressed|not impressed|underwhelmed|bored|hates?|pans?|not feeling|wasn.t feeling)\b/.test(lowerTitle);
+    const positive = !negative && /\b(?:more enthusiastic|impressed|loves?|praises?|enthusiastic|blown away)\b/.test(lowerTitle);
+    const sentiment = negative ? -18 : positive ? 18 : 0;
+    return { eventType: "review", sentimentScore: sentiment, impactScore: sentiment,
+      confidence: getArticleConfidence(sourceTier, 0.6), reason: "listening_reaction_terms" };
+  }
+  if (/\b(?:fails? to (?:crack|chart|reach)|misses? (?:the |billboard|top)|falls? (?:off|out of))\b/.test(lowerTitle) && hasAny(lowerTitle, CHART_TERMS)) {
+    return { eventType: "news", sentimentScore: -24, impactScore: -28,
+      confidence: getArticleConfidence(sourceTier, 0.62), reason: "decline_terms" };
+  }
   const musicRelease = buildReleaseArticleClassification(
     lowerTitle,
     sourceTier,

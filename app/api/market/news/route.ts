@@ -1,4 +1,7 @@
 import { allowDemoMarket, MARKET_ERROR_HEADERS } from "@/server/market/public-response";
+import { classifyStoredMediaEvent, getStoredMediaHeadline, normalizeStoredMediaReception } from "@/server/market/stored-media-classification";
+import { getNonCatalystArticleReason } from "@/server/market/article-editorial-context";
+import { areSameRecordingNewsCoverage } from "@/server/market/news-story-groups";
 import { NextResponse } from "next/server";
 import { isHistoricalRetrospective } from "@/server/market/article-timeliness";
 import { createServiceRoleClient, getSupabaseConfigStatus } from "@/lib/supabase/server";
@@ -14,7 +17,7 @@ import {
   isLowValueMarketArticleTitle,
   isUncorroboratedLowTierMarketClaim
 } from "@/server/market/artist-event-disambiguation";
-import { classifyArticleEvent, getSourceTier, normalizeDomain } from "@/server/market/gdelt-source";
+import { getSourceTier, normalizeDomain } from "@/server/market/gdelt-source";
 import { loadSourcePreviewImageUrls } from "@/server/market/source-preview-images";
 import {
   areNewsStoryEventsEquivalent,
@@ -186,7 +189,7 @@ export async function GET(request: Request) {
     }
 
     if (eventType) {
-      query = query.eq("event_type", eventType);
+      query = eventType === "review" ? query.in("event_type", ["review", "release"]) : query.eq("event_type", eventType);
     }
 
     const { data, error } = await query;
@@ -207,9 +210,20 @@ export async function GET(request: Request) {
       : initialEvents;
     const effectiveFeedMode = selectedArtistIds.length ? "artist" : feedMode;
     const rankedEvents = sortMarketNewsEvents(
-      candidateEvents.filter(
+      candidateEvents.map(event => {
+        const artist = artistById.get(event.artist_id);
+        if (!artist) return event;
+        const normalized = normalizeStoredMediaReception({ artistId: event.artist_id, eventDate: event.event_date,
+          eventType: event.event_type, title: event.title, impactScore: Number(event.impact_score),
+          sentimentScore: Number(event.sentiment_score), confidence: Number(event.confidence),
+          sourceUrl: event.source_url ?? undefined, rawPayload: toRawPayload(event.raw_payload) }, artist.name);
+        return { ...event, event_type: normalized.eventType, impact_score: normalized.impactScore,
+          sentiment_score: normalized.sentimentScore, confidence: normalized.confidence,
+          raw_payload: normalized.rawPayload as MarketEventRow["raw_payload"] };
+      }).filter(
         (event) =>
           artistById.has(event.artist_id) &&
+          (!eventType || event.event_type === eventType) &&
           isPublicMarketNewsEvent(event, {
             feedMode: effectiveFeedMode,
             artist: artistById.get(event.artist_id) ?? null
@@ -336,7 +350,7 @@ async function loadArtistFeedCandidateEvents({
     .limit(500);
 
   if (eventType) {
-    relatedQuery = relatedQuery.eq("event_type", eventType);
+    relatedQuery = eventType === "review" ? relatedQuery.in("event_type", ["review", "release"]) : relatedQuery.eq("event_type", eventType);
   }
 
   const result = await relatedQuery;
@@ -524,6 +538,8 @@ function isPublicMarketNewsEvent(
 
   if (rawPayload.artistAttributionRejected === true) return false;
   if (["media_rss_item", "gdelt_article", "ai_research_event"].includes(source) &&
+    getNonCatalystArticleReason(getStoredMediaHeadline({ title: event.title, rawPayload }))) return false;
+  if (["media_rss_item", "gdelt_article", "ai_research_event"].includes(source) &&
     (!artist || !hasNewsArtistAttribution({ artistName: artist.name, title: event.title, rawPayload }))) return false;
 
   if (["media_rss_item", "gdelt_article", "ai_research_event"].includes(source) && isHistoricalRetrospective(event.title)) {
@@ -596,7 +612,7 @@ function isPublicMarketNewsEvent(
 
   if (source === "gdelt_article" || source === "media_rss_item") {
     return (
-      hasMaterialMarketImpact(impactScore, 22) &&
+      hasMaterialMarketImpact(impactScore, feedMode === "artist" && event.event_type === "review" ? 18 : 22) &&
       confidence >= 0.55 &&
       !isLowSignalSocialTitle(title) &&
       !isLowValueArticleTitle(title)
@@ -619,13 +635,10 @@ function isStoredMediaEventStillValid(
     return false;
   }
 
-  const domain =
-    getRawString(rawPayload.domain) ||
-    normalizeDomain(undefined, event.source_url ?? undefined) ||
-    "";
-  const classification = classifyArticleEvent(event.title, domain, undefined, {
-    allowLowTierRelease: true
-  });
+  const classification = classifyStoredMediaEvent({ artistId: event.artist_id, eventDate: event.event_date,
+    eventType: event.event_type, title: event.title, impactScore: Number(event.impact_score),
+    sentimentScore: Number(event.sentiment_score), confidence: Number(event.confidence),
+    sourceUrl: event.source_url ?? undefined, rawPayload }, artist.name);
   const storedReason = getRawString(rawPayload.classificationReason);
   const sourceTier = getRawNumber(rawPayload.sourceTier) ?? 0;
   const corroboratingSourceCount = getRawNumber(rawPayload.corroboratingSourceCount) ?? 0;
@@ -1065,7 +1078,7 @@ function dedupeNearDuplicateMarketNewsEvents(events: MarketEventRow[], feedMode:
 }
 
 function isNearDuplicateStory(candidate: MarketEventRow, selected: MarketEventRow[]) {
-  return selected.some((existing) => areNewsStoryEventsEquivalent(candidate, existing));
+  return selected.some((existing) => areNewsStoryEventsEquivalent(candidate, existing) || areSameRecordingNewsCoverage(candidate, existing));
 }
 
 function getNewsHeadlineKey(event: MarketEventRow) {

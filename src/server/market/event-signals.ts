@@ -15,7 +15,7 @@ import {
 import { isMarketEventSourceIntegrityValid } from "@/server/market/event-integrity";
 import { getNewsAttributionText } from "@/server/market/news-artist-attribution";
 import { priceNewEventEvidence } from "@/server/market/event-pricing-history";
-import { classifyStoredMediaEvent, getStoredMediaHeadline } from "@/server/market/stored-media-classification";
+import { classifyStoredMediaEvent, getStoredMediaHeadline, normalizeStoredMediaReception } from "@/server/market/stored-media-classification";
 import { hasSingleReleaseAheadOfProject } from "@/server/market/gdelt-source";
 
 export type ManualMarketEventInput = {
@@ -46,7 +46,8 @@ export function buildEventMarketSignals({
   const signals: AdapterSignals = {};
 
   for (const artist of artists) {
-    const events = (eventsByArtist[artist.id] ?? []).filter(event => event.eventDate <= runDate && isMarketEventSourceIntegrityValid(event));
+    const events = (eventsByArtist[artist.id] ?? []).map(event => normalizeStoredMediaReception(event, artist.name))
+      .filter(event => event.eventDate <= runDate && isMarketEventSourceIntegrityValid(event));
 
     if (!events.length && !artist.previousEventPricing) {
       continue;

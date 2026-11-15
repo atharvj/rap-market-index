@@ -97,6 +97,32 @@ export function areNewsStoryEventsEquivalent(first: NewsStoryEvent, second: News
   return shared >= 4 || (shared >= 3 && (containment >= 0.5 || sharedPhrase)) || sameRelease;
 }
 
+/** Avoid repeated coverage of one recording in a featured list. Artist attribution
+ * and price-event grouping remain separate; an audio release and later video are
+ * different lifecycle events. This never merges stories merely sharing artists. */
+export function areSameRecordingNewsCoverage(first: NewsStoryEvent, second: NewsStoryEvent) {
+  const gap = getNewsStoryDayGap(first.event_date, second.event_date);
+  if (gap === null || gap > 4 || hasReleaseLifecycleMismatch(first.title, second.title)) return false;
+  if (![first, second].every(e => ["release", "viral"].includes(e.event_type ?? "") &&
+    /\b(?:track|song|single|video|featuring|feat|ft)\b/i.test(e.title))) return false;
+  const titles = (text: string) => {
+    const result = [...text.matchAll(/"([^"]+)"|“([^”]+)”|‘([^’]+)’|(?<!\w)'([^']+)'/g)]
+      .map(match => normalizeNewsStoryHeadline(match.slice(1).find(Boolean) ?? ""));
+    const catalog = text.match(/^(.{2,80}?)\s+[-–—]\s+song\s+by\b/i);
+    if (catalog) result.push(normalizeNewsStoryHeadline(catalog[1]));
+    const official = text.match(/\s+[-–—]\s+(.+?)\s*\[(?:official|music)|\s+[-–—]\s+(.+?)\s*\((?:official|music)/i);
+    if (official) result.push(normalizeNewsStoryHeadline(official[1] ?? official[2]));
+    return result.filter(key => key.length >= 4 && key.split(" ").length >= 2);
+  };
+  if (!titles(first.title).some(key => titles(second.title).includes(key))) return false;
+  if (first.artist_id === second.artist_id) return true;
+  const mentionsId = (text: string, id: string) => {
+    const name = normalizeNewsStoryHeadline(id);
+    return name.length >= 4 && ` ${normalizeNewsStoryHeadline(text)} `.includes(` ${name} `);
+  };
+  return mentionsId(first.title, second.artist_id) || mentionsId(second.title, first.artist_id);
+}
+
 export function getNewsStoryKey(event: NewsStoryEvent) {
   const headline = normalizeNewsStoryHeadline(event.title);
 

@@ -2,6 +2,7 @@ import type { MarketEvent } from "@/server/market/market-data";
 import { isHistoricalRetrospective } from "@/server/market/article-timeliness";
 import { hasNewsArtistAttribution } from "@/server/market/news-artist-attribution";
 import { getVerifiedTrackingArtistName } from "@/server/market/artist-tracking";
+import { getNonCatalystArticleReason } from "@/server/market/article-editorial-context";
 
 type EventIdentity = {
   eventDate: string;
@@ -27,6 +28,11 @@ export function isStoredMarketEventSourceIntegrityValid(
 ) {
   if (rawPayload.artistAttributionRejected === true) return false;
   const source = getString(rawPayload.source)?.toLowerCase();
+  if (["media_rss_item", "gdelt_article", "ai_research_event"].includes(source ?? "")) {
+    const headline = rawPayload.publisherArticleVerified === true && rawPayload.publisherHeadlineVerified === true &&
+      typeof rawPayload.publisherHeadline === "string" ? rawPayload.publisherHeadline : event.title;
+    if (getNonCatalystArticleReason(headline)) return false;
+  }
   if (["media_rss_item", "gdelt_article", "ai_research_event"].includes(source ?? "") && isHistoricalRetrospective(event.title)) return false;
 
   if (source !== "ai_research_event") {
