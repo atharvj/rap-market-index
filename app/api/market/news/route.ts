@@ -859,7 +859,7 @@ function getNewsImportanceScore(event: MarketEventRow, runDate: string) {
   const rawPayload = toRawPayload(event.raw_payload);
   const source = getRawString(rawPayload.source);
   const sourceWeight = getSourceWeight(source);
-  const editorialWeight = getNewsEditorialWeight(rawPayload);
+  const editorialWeight = getNewsEditorialWeight(rawPayload, event.title);
   const reachScore = isYoutubeNewsSource(source) ? getYoutubeNewsReachScore(rawPayload) : 0;
   const typeWeight: Record<MarketNewsType, number> = {
     release: 18,
@@ -881,9 +881,11 @@ function getNewsImportanceScore(event: MarketEventRow, runDate: string) {
   );
 }
 
-function getNewsEditorialWeight(rawPayload: Record<string, unknown>) {
+function getNewsEditorialWeight(rawPayload: Record<string, unknown>, title: string) {
   const marketConnection = getRawString(rawPayload.marketConnection);
   const classificationReason = getRawString(rawPayload.classificationReason);
+  if (classificationReason === "release_terms" && /\bteas(?:es?|ing)\b/i.test(title) &&
+    !/\b(?:releases?|drops?|out now)\b/i.test(title)) return 0.55;
 
   if (marketConnection === "attention_only") {
     return getRawBoolean(rawPayload.musicDemandConfirmed) ? 0.35 : 0;

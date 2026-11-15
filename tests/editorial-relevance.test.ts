@@ -41,6 +41,10 @@ function event(title: string, artistId = "lil-baby"): MarketEvent {
   };
 }
 describe("editorial relevance beyond keyword matches", () => {
+  it("does not invent a performance from an artist reacting to a lineup they are not on", () => {
+    expect(getNonCatalystArticleReason("Drake Responds to Coachella 2027 Lineup, Which Doesn't Feature Him")).toBe("lineup_commentary");
+    expect(getNonCatalystArticleReason("Artist Responds After Being Dropped From a Festival Lineup")).toBeNull();
+  });
   it.each([
     promotion,
     "Shop Drake's Signed Vinyl and New Hoodie",

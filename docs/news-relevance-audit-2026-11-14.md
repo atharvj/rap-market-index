@@ -37,17 +37,20 @@ the existing site design, valuation scale and recorded charts are retained.
 - Featured selection suppresses repeated coverage of the same named recording
   across credited artists. Artist attribution and price-event grouping are
   unchanged by this display rule. A later video release remains a separate event.
+- Vague album teases receive lower featured-ranking weight than completed releases.
+  Reactions to lineups an artist is not on cannot become performance/feature gains.
 - Pricing engine version advances to `rmi-core-v48` to identify the changed
   evidence rules. Numerical price coefficients and stored prices are unchanged.
 
 ## Verification and operational correction
 
-826 unit/security tests across 127 files and type checking passed locally,
+828 unit/security tests across 127 files and type checking passed locally,
 including public-API filtering and price-signal tests. Production build, release
 CI and live checks are recorded in the parent workspace's `RMI_HANDOFF.md`.
 
-The active-halt audit found only the misattributed J. Cole restriction. Its
-correction must retain the row and original reason, match that exact erroneous
-reason and update timestamp, and leave unrelated controls untouched. The source
-fix must be deployed before clearing it so the scanner cannot recreate it.
+The active-halt audit found only the misattributed J. Cole restriction. It was
+cleared on November 14 at 6:59 p.m. Central after the source fix deployed. The
+conditional update matched the exact erroneous reason and last-update timestamp.
+It retained the row, ended the halt and preserved its original reason with the
+resolution. The original row was also backed up locally. No other controls changed.
 No quotes, portfolio balances, execution prices or graph history are reset.

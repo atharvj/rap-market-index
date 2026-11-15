@@ -23,5 +23,9 @@ export function getNonCatalystArticleReason(text: string) {
       title,
     );
   if (chartPolicy) return "chart_policy_commentary";
+  const unbookedLineupReaction = /\b(?:reacts?|responds?|comments?|weighs? in|slams?)\b/.test(title) &&
+    /\blineup\b/.test(title) && /\b(?:doesn'?t feature|does not feature|not featured|doesn'?t include|without (?:him|her|them))\b/.test(title) &&
+    !/\b(?:cancels?|cancelled|canceled|withdraws?|removed|dropped from)\b/.test(title);
+  if (unbookedLineupReaction) return "lineup_commentary";
   return null;
 }

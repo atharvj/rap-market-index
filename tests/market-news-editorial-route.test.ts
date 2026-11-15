@@ -223,3 +223,8 @@ it("applies the corrected type consistently to the artist's review and release f
     ),
   ).toBe(false);
 });
+it("features an actual chart milestone above a vague album tease", async () => {
+  mocks.events = [row("tease", "lil-baby", "Lil Baby Teases New Album On The Way"), row("chart", "bigxthaplug", "BigXthaPlug Scores His First No. 1 Rap Album With ‘Better Over Time’", "viral", "chart_terms")];
+  const response = await GET(new Request("https://rmi.test/api/market/news?feed=news&sort=top&limit=1&runDate=2026-11-14"));
+  expect((await response.json()).news[0].id).toBe("chart");
+});
