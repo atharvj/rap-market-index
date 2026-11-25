@@ -111,6 +111,23 @@ it("opens daily quotes without waiting for publisher discovery and verifies comp
   expect(ready).toHaveBeenCalledTimes(2);
 });
 
+it("routes a native schedule through the production site and refuses worker redirects", async () => {
+  vi.stubEnv("VERCEL_ENV", "production");
+  vi.stubEnv("NEXT_PUBLIC_SITE_URL", "https://market.example.test");
+  ready.mockResolvedValue({ ready: false });
+  vi.mocked(fetch).mockResolvedValue(Response.redirect("https://deployment.example.test/login", 302));
+  const scheduledRequest = new Request("https://deployment.example.test/api/cron/release-window", {
+    headers: { "x-market-update-secret": "test-secret" }
+  });
+  const response = await release(scheduledRequest);
+  expect(fetch).toHaveBeenCalledWith(new URL("https://market.example.test/api/cron/daily-market-update"), {
+    headers: { "x-market-update-secret": "test-secret" },
+    redirect: "manual"
+  });
+  expect(response.status).toBe(502);
+  expect(await response.json()).toMatchObject({ ok: false, stage: "market-update" });
+});
+
 it("keeps an unverified daily opening closed even after a successful worker response", async () => {
   ready.mockResolvedValue({ ready: false });
   vi.mocked(fetch).mockResolvedValue(Response.json({ ok: true }));

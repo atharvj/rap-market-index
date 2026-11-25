@@ -7,6 +7,7 @@ import { loadReleaseWindowStatus } from "@/server/market/release-window";
 import { enforceRateLimit, getRequestIp } from "@/server/rate-limit";
 import { secureCompare } from "@/server/secrets";
 import { claimAutomationWindow } from "@/server/market/automation-lease";
+import { getSiteUrl } from "@/lib/site-metadata";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
@@ -74,8 +75,12 @@ export async function GET(request: Request) {
     reason: "News discovery runs in the dedicated news and catalyst workers."
   } as const;
 
-  const marketUpdateResponse = await fetch(new URL("/api/cron/daily-market-update", request.url), {
-    headers: { "x-market-update-secret": secret }
+  // Vercel schedules arrive on the protected deployment hostname. Route the
+  // child request through the public production alias where it can authenticate.
+  const workerOrigin = process.env.VERCEL_ENV === "production" ? getSiteUrl() : request.url;
+  const marketUpdateResponse = await fetch(new URL("/api/cron/daily-market-update", workerOrigin), {
+    headers: { "x-market-update-secret": secret },
+    redirect: "manual"
   });
   const marketUpdate = await readAutomationResponse(marketUpdateResponse);
 
