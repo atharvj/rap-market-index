@@ -20,8 +20,9 @@ export function isPendingCatalyst({
 }) {
   const eventCreatedAt = new Date(event.createdAt).getTime();
   const quoteTimestamp = quotedAt ? new Date(quotedAt).getTime() : Number.NEGATIVE_INFINITY;
+  const marketDate = getMarketDate(now);
 
-  if (!Number.isFinite(eventCreatedAt)) {
+  if (!Number.isFinite(eventCreatedAt) || eventCreatedAt > now.getTime() || event.eventDate > marketDate) {
     return false;
   }
 
@@ -29,7 +30,7 @@ export function isPendingCatalyst({
     return true;
   }
 
-  if (event.eventType !== "release" || event.eventDate !== getMarketDate(now)) {
+  if (event.eventType !== "release" || event.eventDate !== marketDate) {
     return false;
   }
 

@@ -14,7 +14,7 @@ import {
 } from "@/server/market/artist-event-disambiguation";
 import { isMarketEventSourceIntegrityValid } from "@/server/market/event-integrity";
 import { getNewsAttributionText } from "@/server/market/news-artist-attribution";
-import { priceNewEventEvidence } from "@/server/market/event-pricing-history";
+import { areDistinctPricingStoryStages, priceNewEventEvidence } from "@/server/market/event-pricing-history";
 import { classifyStoredMediaEvent, getStoredMediaHeadline, normalizeStoredMediaReception } from "@/server/market/stored-media-classification";
 import { hasSingleReleaseAheadOfProject } from "@/server/market/gdelt-source";
 
@@ -2662,18 +2662,24 @@ function isMarketEventType(value: string): value is MarketEvent["eventType"] {
 
 function dedupeSemanticallyEquivalentEvents(events: MarketEvent[]) {
   const selected: Array<MarketEvent & { observedStorySources: string[] }> = [];
+  const selectedSubtypes: string[] = [];
 
   for (const event of events) {
-    const existingIndex = selected.findIndex((existing) =>
+    const subtype = getEventSubtype(event);
+    const existingIndex = selected.findIndex((existing, index) =>
+      !areDistinctPricingStoryStages(subtype, selectedSubtypes[index]) &&
       areNewsStoryEventsEquivalent(toNewsStoryEvent(event), toNewsStoryEvent(existing))
     );
 
     if (existingIndex === -1) {
       selected.push({ ...event, observedStorySources: [getObservedStorySource(event)] });
+      selectedSubtypes.push(subtype);
     } else {
       const previous = selected[existingIndex];
       const sources = [...new Set([...previous.observedStorySources, getObservedStorySource(event)])];
-      selected[existingIndex] = { ...(getEventEvidencePreference(event) > getEventEvidencePreference(previous) ? event : previous), observedStorySources: sources };
+      const replace = getEventEvidencePreference(event) > getEventEvidencePreference(previous);
+      selected[existingIndex] = { ...(replace ? event : previous), observedStorySources: sources };
+      if (replace) selectedSubtypes[existingIndex] = subtype;
     }
   }
 

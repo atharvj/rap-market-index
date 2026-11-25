@@ -4,6 +4,11 @@ import { isPendingCatalyst } from "@/server/market/pending-catalyst";
 const now = new Date("2026-07-22T04:15:00.000Z");
 
 describe("pending market catalysts", () => {
+  it("excludes future event dates and detection timestamps from the current session", () => {
+    const quotedAt = "2026-07-22T04:00:00.000Z";
+    expect(isPendingCatalyst({ event: { createdAt: "2026-07-22T04:10:00.000Z", eventDate: "2026-07-23", eventType: "release" }, quotedAt, now })).toBe(false);
+    expect(isPendingCatalyst({ event: { createdAt: "2026-07-22T04:16:00.000Z", eventDate: "2026-07-22", eventType: "news" }, quotedAt, now })).toBe(false);
+  });
   it("pauses for an event detected after the latest quote", () => {
     expect(isPendingCatalyst({
       event: {

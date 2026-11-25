@@ -97,12 +97,13 @@ export function areNewsStoryEventsEquivalent(first: NewsStoryEvent, second: News
   return shared >= 4 || (shared >= 3 && (containment >= 0.5 || sharedPhrase)) || sameRelease;
 }
 
-/** Avoid repeated coverage of one recording in a featured list. Artist attribution
- * and price-event grouping remain separate; an audio release and later video are
- * different lifecycle events. This never merges stories merely sharing artists. */
+/** Match a named recording across coverage without grouping previews, audio and
+ * video releases together. Shared artist names alone are insufficient. */
 export function areSameRecordingNewsCoverage(first: NewsStoryEvent, second: NewsStoryEvent) {
   const gap = getNewsStoryDayGap(first.event_date, second.event_date);
   if (gap === null || gap > 4 || hasReleaseLifecycleMismatch(first.title, second.title)) return false;
+  const isPreview = (title: string) => /\b(?:announces?|upcoming|forthcoming|teas(?:es?|ing)|previews?|snippets?|unreleased)\b/i.test(title);
+  if (isPreview(first.title) !== isPreview(second.title)) return false;
   if (![first, second].every(e => ["release", "viral"].includes(e.event_type ?? "") &&
     /\b(?:track|song|single|video|featuring|feat|ft)\b/i.test(e.title))) return false;
   const titles = (text: string) => {

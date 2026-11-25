@@ -200,13 +200,16 @@ export async function GET(request: Request) {
 
 async function loadPendingCatalysts() {
   const supabase = createServiceRoleClient();
+  const now = new Date();
   const detectedAfter = new Date(
-    Date.now() - RECENT_DETECTION_WINDOW_HOURS * 60 * 60 * 1000
+    now.getTime() - RECENT_DETECTION_WINDOW_HOURS * 60 * 60 * 1000
   ).toISOString();
   const { data: events, error: eventError } = await supabase
     .from("market_events")
     .select("artist_id,title,source_url,raw_payload,event_date,event_type,created_at")
     .gte("created_at", detectedAfter)
+    .lte("created_at", now.toISOString())
+    .lte("event_date", getMarketDate(now))
     .gte("confidence", PENDING_CATALYST_MIN_CONFIDENCE)
     .or(`impact_score.gte.${PENDING_CATALYST_MIN_IMPACT},impact_score.lte.-${PENDING_CATALYST_MIN_IMPACT}`)
     .order("created_at", { ascending: false })
@@ -268,7 +271,8 @@ async function loadPendingCatalysts() {
         eventDate: event.event_date,
         eventType: event.event_type
       },
-      quotedAt: latestQuoteByArtist.get(event.artist_id) ?? null
+      quotedAt: latestQuoteByArtist.get(event.artist_id) ?? null,
+      now
     })) {
       continue;
     }

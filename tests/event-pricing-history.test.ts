@@ -6,6 +6,23 @@ const event = (impact = 40, overrides = {}) => ({
     sourceUrl: "https://publisher.test/chart" }, weightedImpact: impact, shockWeightedImpact: impact, ...overrides
 });
 describe("event pricing history", () => {
+  it("counts alternate coverage of the same recording once, including on the next day", () => {
+    const release = event(40, { eventSubtype: "major_feature", event: { ...event().event,
+      title: 'Drake Reunites With Travis Scott on New Future Track "Ya Hit"', sourceUrl: "https://publisher.test/reunion" } });
+    const alternate = event(32, { eventSubtype: "feature", event: { ...event().event,
+      title: "Ya Hit – Song by Future featuring Drake, Travis Scott, & Loe Shimmy", sourceUrl: "https://different.test/track" } });
+    const today = priceNewEventEvidence([release, alternate], undefined, "2026-10-12", "drake");
+    expect(today.events.map(row => row.weightedImpact)).toEqual([40, 0]);
+    const tomorrow = priceNewEventEvidence([alternate], { pricingHistory: today.history }, "2026-10-13", "drake");
+    expect(tomorrow.events[0].weightedImpact).toBe(0);
+
+    const video = event(32, { eventSubtype: "single_video_release", event: { ...event().event,
+      eventDate: "2026-10-13", eventType: "release", title: 'Future Drops "Ya Hit" Music Video With Drake', sourceUrl: "https://publisher.test/video" } });
+    const chart = event(35, { eventSubtype: "chart", event: { ...event().event,
+      eventDate: "2026-10-13", title: 'Drake Feature "Ya Hit" Debuts at No. 1 on Billboard', sourceUrl: "https://publisher.test/chart-result" } });
+    const outcomes = priceNewEventEvidence([video, chart], { pricingHistory: today.history }, "2026-10-13", "drake");
+    expect(outcomes.events.map(row => row.weightedImpact)).toEqual([32, 35]);
+  });
   it("keeps an actual project release distinct from its earlier announcement at the same URL", () => {
     const announcement = event(25, { eventSubtype: "project_announcement" });
     const first = priceNewEventEvidence([announcement], undefined, "2026-10-12", "drake");

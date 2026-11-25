@@ -33,6 +33,7 @@ beforeAll(async()=>{
   await db.exec(await sql("040_enforce_whole_share_trading.sql"));
   await db.exec(await sql("049_strict_market_opening.sql"));
   await db.exec(await sql("050_transactional_trade_readiness.sql"));
+  await db.exec(await sql("056_ignore_future_and_rejected_catalysts.sql"));
 });
 afterAll(async()=>{await db?.close();});
 beforeEach(async()=>{

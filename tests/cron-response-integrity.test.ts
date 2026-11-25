@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("@/lib/supabase/server", () => ({
   getSupabaseConfigStatus: () => ({ readyForAdminWrites: true }),
   createServiceRoleClient: () => ({ from() {
-    const builder = { select: () => builder, gte: () => builder, or: () => builder, order: () => builder, limit: async () => ({ data: [], error: null }) };
+    const builder = { select: () => builder, gte: () => builder, lte: () => builder, or: () => builder, order: () => builder, limit: async () => ({ data: [], error: null }) };
     return builder;
   } })
 }));

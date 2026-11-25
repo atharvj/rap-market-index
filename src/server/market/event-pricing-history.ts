@@ -1,4 +1,4 @@
-import { areNewsStoryEventsEquivalent, type NewsStoryEvent } from "@/server/market/news-story-groups";
+import { areNewsStoryEventsEquivalent, areSameRecordingNewsCoverage, type NewsStoryEvent } from "@/server/market/news-story-groups";
 
 type PricedStory = NewsStoryEvent & { pricingSubtype?: string; positiveImpact: number; negativeImpact: number;
   positiveShockImpact: number; negativeShockImpact: number };
@@ -96,10 +96,23 @@ function validStory(story: PricedStory, artistId: string) {
     [story.positiveImpact, story.negativeImpact, story.positiveShockImpact, story.negativeShockImpact]
       .every(value => Number.isFinite(value) && value >= 0 && value <= 1000);
 }
+const recordingReleaseSubtypes = new Set(["single_video_release", "track_audio_release", "feature", "major_feature", "release"]);
+const recordingOutcomeSubtypes = new Set(["chart", "review", "public_reaction", "late_reception"]);
+
+export function areDistinctPricingStoryStages(firstType = "", secondType = "") {
+  if (firstType && secondType && firstType !== secondType &&
+    [firstType, secondType].some(type => type === "project_announcement" || type === "project_release")) return true;
+  return (recordingReleaseSubtypes.has(firstType) && recordingOutcomeSubtypes.has(secondType)) ||
+    (recordingReleaseSubtypes.has(secondType) && recordingOutcomeSubtypes.has(firstType));
+}
+
 function samePricingStory(first: NewsStoryEvent & { pricingSubtype?: string }, second: NewsStoryEvent & { pricingSubtype?: string }) {
-  if (first.pricingSubtype && second.pricingSubtype && first.pricingSubtype !== second.pricingSubtype &&
-    [first.pricingSubtype, second.pricingSubtype].some(type => type === "project_announcement" || type === "project_release")) return false;
-  return areNewsStoryEventsEquivalent(first, second);
+  if (areDistinctPricingStoryStages(first.pricingSubtype, second.pricingSubtype)) return false;
+  if (areNewsStoryEventsEquivalent(first, second)) return true;
+  // Match release and feature coverage across different headlines. A chart
+  // result or audience reaction can provide separate evidence about the song.
+  return recordingReleaseSubtypes.has(first.pricingSubtype ?? "") &&
+    recordingReleaseSubtypes.has(second.pricingSubtype ?? "") && areSameRecordingNewsCoverage(first, second);
 }
 function eventHeadline(event: ScoredEvent["event"]) {
   const raw = event.rawPayload;
