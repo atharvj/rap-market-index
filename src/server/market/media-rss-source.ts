@@ -176,8 +176,8 @@ export async function collectMediaRssMarketEvents({
   scannedFeedCount += artistSearchResults.reduce((total, { results }) => total + results.length, 0);
   const artistBuilds = await Promise.all(
     artistSearchResults.map(async ({ artist, queries, results }) => {
-      const localObservations: MarketObservation[] = [];
       const localWarnings: string[] = [];
+      const feedFailures: Array<{ feedUrl: string; error: string }> = [];
       let artistSearchItems: MediaFeedItem[] = [];
 
       for (const result of results) {
@@ -185,14 +185,7 @@ export async function collectMediaRssMarketEvents({
           artistSearchItems.push(...result.items);
         } else {
           localWarnings.push(`${artist.ticker}: media search feed failed: ${result.error}`);
-          localObservations.push(
-            createObservation(artist.id, runDate, REQUEST_ERROR, 1, "flag", {
-              source: SOURCE,
-              feedUrl: result.feedUrl,
-              queries,
-              error: result.error
-            })
-          );
+          feedFailures.push({ feedUrl: result.feedUrl, error: result.error });
         }
       }
 
@@ -216,10 +209,18 @@ export async function collectMediaRssMarketEvents({
         articleVerifier
       });
 
+      const failureObservations = feedFailures.length ? [
+        createObservation(artist.id, runDate, REQUEST_ERROR, 1, "flag", {
+          source: SOURCE,
+          queries,
+          feedFailures
+        })
+      ] : [];
+
       return {
         artistId: artist.id,
         events: artistEvents.events,
-        observations: [...localObservations, ...artistEvents.observations],
+        observations: [...failureObservations, ...artistEvents.observations],
         warnings: localWarnings
       };
     })

@@ -1260,7 +1260,8 @@ async function persistUpdateBatch(
     news_score: update.stats.newsScore,
     trader_demand: update.stats.traderDemand
   }));
-  const signalRows = updates.map((update) => ({
+  // The publisher uses these large evidence documents only for the daily baseline.
+  const signalRows = options.intraday ? [] : updates.map((update) => ({
     artist_id: update.artistId,
     source_date: runDate,
     streaming_growth: update.stats.streamingGrowth,
@@ -1322,14 +1323,20 @@ async function persistUpdateBatch(
       Number(options.tickComparisonPrices?.[update.artistId]) > 0)) {
     throw new Error("Atomic quote publication requires live evidence and original comparison prices for every artist.");
   }
-  const publication = await supabase.rpc("persist_market_quote_batch", {
+  const args = {
     p_run_date: runDate, p_intraday: options.intraday === true,
     p_stats: statsRows, p_signals: signalRows, p_history: historyRows,
     p_quotes: updates.map(update => ({ id: update.artistId, previous_close: update.previousClose,
       current_price: update.currentPrice, daily_change_percent: update.dailyChangePercent,
       hype_score: update.hypeScore, last_move_explanation: update.explanation })),
     p_ticks: tickRows, p_pricing_state: pricingStates, p_comparison_prices: options.tickComparisonPrices as Json
-  });
+  };
+  const publish = () => supabase.rpc("persist_market_quote_batch", args);
+  let publication = await publish();
+  // SQLSTATE 57014 confirms PostgreSQL canceled and rolled back the transaction.
+  // A fresh attempt still checks the comparison prices under the original locks.
+  // Transport failures can be ambiguous and must never retry a committed write.
+  if (publication.error?.code === "57014") publication = await publish();
   if (publication.error) throw new Error(`Atomic quote publication failed: ${publication.error.message}`);
   const result = publication.data as { atomic?: boolean; artistCount?: number; priceTickCount?: number } | null;
   if (!result || result.atomic !== true || result.artistCount !== updates.length || result.priceTickCount !== tickRows.length) {

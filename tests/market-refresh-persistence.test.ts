@@ -17,10 +17,23 @@ describe("atomic quote refresh tracking", () => {
     expect(await run()).toEqual({ atomic: true, priceTickCount: 0 });
     expect(from).not.toHaveBeenCalled();
     expect(rpc).toHaveBeenCalledExactlyOnceWith("persist_market_quote_batch", expect.objectContaining({
-      p_intraday: true, p_comparison_prices: { artist: 50 }, p_ticks: [],
+      p_intraday: true, p_comparison_prices: { artist: 50 }, p_ticks: [], p_signals: [],
       p_pricing_state: [expect.objectContaining({ source: "market_pricing", metric: "evidence_state",
         raw_payload: expect.objectContaining({ receptionPricingBaseline: { youtube_comments: 12 }, marketEvents: { pricingHistory: { version: 1 } } }) })]
     }));
+  });
+  it("retries a rolled-back publication once with the original batch", async () => {
+    const { run, rpc, from } = setup();
+    rpc.mockResolvedValueOnce({ error: { code: "57014", message: "statement timeout" }, data: null });
+    await expect(run()).resolves.toEqual({ atomic: true, priceTickCount: 0 });
+    expect(rpc).toHaveBeenCalledTimes(2);
+    expect(rpc.mock.calls[0]).toEqual(rpc.mock.calls[1]);
+    expect(from).not.toHaveBeenCalled();
+  });
+  it("reports a second timeout instead of retrying indefinitely", async () => {
+    const { run, rpc } = setup({ error: { code: "57014", message: "statement timeout" }, data: null });
+    await expect(run()).rejects.toThrow("statement timeout");
+    expect(rpc).toHaveBeenCalledTimes(2);
   });
   it.each([
     { error: { code: "40001", message: "stale quote" }, data: null },

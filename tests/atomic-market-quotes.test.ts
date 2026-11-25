@@ -26,6 +26,7 @@ beforeAll(async () => {
   await db.exec(await readFile("supabase/migrations/038_expand_signal_score_range.sql", "utf8"));
   await db.exec(await readFile("supabase/migrations/046_atomic_market_quotes.sql", "utf8"));
   await db.exec(await readFile("supabase/migrations/047_preserve_valuation_boundaries.sql", "utf8"));
+  await db.exec(await readFile("supabase/migrations/055_bound_quote_batch_validation.sql", "utf8"));
   date = (await db.query<{date:string}>("select (now() at time zone 'America/New_York')::date::text as date")).rows[0].date;
   await db.exec(`set request.jwt.claim.role = 'service_role';
     insert into artists(id,name,ticker,current_price,previous_close,category) values ('a','Artist A','AA',100,100,'mainstream'),('b','Artist B','BB',100,100,'mainstream'),('c','Artist C','CC',100,100,'mainstream'),('d','Artist D','DD',100,100,'mainstream');`);
@@ -76,6 +77,12 @@ describe("transactional quote publication in PostgreSQL", () => {
     await expect(publish(input, 100)).rejects.toThrow("mismatched artist identities");
     const wrongTick = batch("b"); wrongTick.ticks[0].price = 900;
     await expect(publish(wrongTick, 100)).rejects.toThrow("Quote tick does not match");
+    const duplicateState = batch("b");
+    duplicateState.quotes.push(...batch("d").quotes);
+    duplicateState.stats.push(...batch("d").stats);
+    duplicateState.history.push(...batch("d").history);
+    duplicateState.state.push(duplicateState.state[0]);
+    await expect(publish(duplicateState, 100, true)).rejects.toThrow("mismatched artist identities");
   });
   it("withholds execution from public roles even though it is a security-definer function", async () => {
     for (const role of ["anon", "authenticated"]) {

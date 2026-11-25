@@ -28,6 +28,17 @@ const googleUrl = "https://news.google.com/rss/articles/CBMiTestArticle?oc=5";
 const canonicalUrl = "https://www.billboard.com/music/rb-hip-hop/baby-keem-casino-123/";
 
 describe("media RSS publisher-date verification", () => {
+  it("records simultaneous artist search failures under one observation key", async () => {
+    const result = await collectMediaRssMarketEvents({
+      artists: [artist], runDate: "2026-11-24", feedUrls: ["https://feeds.example.com/music.xml"], delayMs: 0,
+      fetchImpl: async input => String(input).includes("news.google.com")
+        ? new Response("Temporarily unavailable", { status: 503 })
+        : new Response("<rss><channel></channel></rss>")
+    });
+    const errors = result.observations.filter(row => row.metric === "request_error");
+    expect(errors).toHaveLength(1);
+    expect(errors[0].rawPayload.feedFailures).toHaveLength(2);
+  });
   it("dates an upcoming-album announcement when it was published while retaining the future release date as metadata", async () => {
     const headline = "Baby Keem Announces New Album Ca$ino for July 25", publisherUrl = "https://www.billboard.com/music/baby-keem-casino/";
     const result = await collectMediaRssMarketEvents({ artists: [artist], runDate: "2026-07-13", includeGoogleNews: false,
