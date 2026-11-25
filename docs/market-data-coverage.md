@@ -24,13 +24,7 @@ Hourly discovery is a minimum interval between scans, not a guaranteed arrival t
 
 The existing GitHub catalyst workflow requested 15-minute intervals, but its latest actual runs were at 01:02, 06:15 and 13:08 UTC on September 14. All succeeded; the missing invocations happened before the application ran. The free schedule now uses minutes 7, 22, 37 and 52 to avoid the hourly rush and the deeper scan at minute 15. This mitigates contention, but does not guarantee the interval: [GitHub documents that scheduled jobs can be delayed or dropped](https://docs.github.com/en/actions/how-tos/troubleshoot-workflows).
 
-The live team is on Vercel Hobby, which permits only daily cron invocations. A proposed native schedule after an authorized Pro upgrade would preserve the existing release-window entry and add this entry to `vercel.json`:
-
-```json
-{ "path": "/api/cron/catalyst-refresh", "schedule": "7,22,37,52 * * * *" }
-```
-
-The endpoint already supports the configured `CRON_SECRET`. Disable the GitHub catalyst schedule when enabling the native schedule to avoid duplicate jobs. This proposed entry is not enabled on Hobby. [Vercel's cron limits](https://vercel.com/docs/cron-jobs/usage-and-pricing) and [Pro pricing](https://vercel.com/docs/plans/pro-plan) list a $20/month platform fee, including one deploying seat and $20 usage credit, with additional usage billed separately. No upgrade or purchase has been made.
+Vercel Schedules calls the authenticated release-window endpoint daily at midnight Eastern, with the 15-minute Hobby scheduling window. The GitHub opening workflow and visitor-triggered recovery also remain available. All three use the same distributed lock and verify the daily market before opening trading. [Vercel's schedule limits](https://vercel.com/docs/schedules/limits)
 
 ## Relevance and recording credits
 

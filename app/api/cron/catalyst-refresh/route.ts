@@ -12,6 +12,7 @@ import { secureCompare } from "@/server/secrets";
 import { isStoredMarketEventSourceIntegrityValid } from "@/server/market/event-integrity";
 import { buildIntradayArtistBatch } from "@/server/market/intraday-refresh";
 import { claimAutomationWindow } from "@/server/market/automation-lease";
+import { loadReleaseWindowStatus } from "@/server/market/release-window";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
@@ -69,9 +70,20 @@ export async function GET(request: Request) {
     return NextResponse.json({ ok: false, error: "MARKET_UPDATE_SECRET is not configured." }, { status: 500 });
   }
 
-  const runDate = getMarketDate();
+  const now = new Date();
+  const runDate = getMarketDate(now);
+  const supabase = createServiceRoleClient();
   try {
-    if (!await claimAutomationWindow(createServiceRoleClient())) {
+    const opening = await loadReleaseWindowStatus(supabase, now);
+    if (!opening.ready) {
+      return NextResponse.json({ ok: true, skipped: true, runDate, reason: "The daily market opening is still pending." });
+    }
+  } catch {
+    return NextResponse.json({ ok: false, runDate, stage: "opening", error: "Could not verify the daily market opening." }, { status: 503 });
+  }
+
+  try {
+    if (!await claimAutomationWindow(supabase)) {
       return NextResponse.json({ ok: true, skipped: true, busy: true, runDate, reason: "Another market automation attempt owns the current recovery window." });
     }
   } catch {

@@ -16,10 +16,12 @@ import { GET as catalyst } from "../app/api/cron/catalyst-refresh/route";
 import { GET as release } from "../app/api/cron/release-window/route";
 const request = () => new Request("https://example.test/api/cron/refresh", { headers: { "x-market-update-secret": "test-secret" } });
 const successfulQuotes = () => ({ ok: true, persisted: true, summary: { artistCount: 89 }, updates: Array(89).fill({ artistId: "artist" }) });
-beforeEach(() => { lease.mockReset().mockResolvedValue(true); ready.mockReset().mockResolvedValue({ ready: false }); vi.stubEnv("MARKET_UPDATE_SECRET", "test-secret"); vi.stubGlobal("fetch", vi.fn()); });
+beforeEach(() => { lease.mockReset().mockResolvedValue(true); ready.mockReset().mockResolvedValue({ ready: true }); vi.stubEnv("MARKET_UPDATE_SECRET", "test-secret"); vi.stubGlobal("fetch", vi.fn()); });
 afterEach(() => { vi.unstubAllGlobals(); vi.unstubAllEnvs(); });
 for (const [name, handler] of [["catalyst", catalyst], ["release", release]] as const) {
   describe(`${name} scheduler failure reporting`, () => {
+    beforeEach(() => { ready.mockResolvedValue({ ready: name === "catalyst" }); });
+
     it.each([{}, null, { ok: false, error: "Scan failed" }, { ok: "true" }])("rejects invalid worker completion %j", async payload => {
       vi.mocked(fetch).mockResolvedValue(Response.json(payload));
       const response = await handler(request());
@@ -50,6 +52,24 @@ for (const [name, handler] of [["catalyst", catalyst], ["release", release]] as 
     });
   });
 }
+
+it("leaves the automation lock available when the daily opening is pending", async () => {
+  ready.mockResolvedValue({ ready: false });
+  const response = await catalyst(request());
+  expect(response.status).toBe(200);
+  expect(await response.json()).toMatchObject({ ok: true, skipped: true });
+  expect(lease).not.toHaveBeenCalled();
+  expect(fetch).not.toHaveBeenCalled();
+});
+
+it("leaves the automation lock available when the daily opening cannot be verified", async () => {
+  ready.mockRejectedValue(new Error("database unavailable"));
+  const response = await catalyst(request());
+  expect(response.status).toBe(503);
+  expect(await response.json()).toMatchObject({ ok: false, stage: "opening" });
+  expect(lease).not.toHaveBeenCalled();
+  expect(fetch).not.toHaveBeenCalled();
+});
 
 it("refreshes measured quotes before news discovery and still reports a later discovery failure", async () => {
   vi.mocked(fetch).mockResolvedValueOnce(Response.json(successfulQuotes()))
@@ -92,6 +112,7 @@ it("opens daily quotes without waiting for publisher discovery and verifies comp
 });
 
 it("keeps an unverified daily opening closed even after a successful worker response", async () => {
+  ready.mockResolvedValue({ ready: false });
   vi.mocked(fetch).mockResolvedValue(Response.json({ ok: true }));
   const response = await release(request());
   expect(response.status).toBe(503);

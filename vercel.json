@@ -1,9 +1,11 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "crons": [
-    {
+  "schedules": {
+    "daily-market-opening": {
       "path": "/api/cron/release-window",
-      "schedule": "0 7 * * *"
+      "requestMethod": "GET",
+      "schedule": "0 0 * * *",
+      "timezone": "America/New_York"
     }
-  ]
+  }
 }
